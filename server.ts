@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from "express";
 import http from "http";
 import path from "path";
+import { randomUUID } from "node:crypto";
 import { createServer as createViteServer } from "vite";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -15,8 +16,61 @@ interface WalletDocument {
   updatedAt: FirebaseFirestore.Timestamp;
 }
 
+type TransferErrorCode =
+  | 'UNAUTHENTICATED'
+  | 'INVALID_REQUEST'
+  | 'INVALID_RECIPIENT'
+  | 'RECIPIENT_NOT_FOUND'
+  | 'SELF_TRANSFER_NOT_ALLOWED'
+  | 'INVALID_AMOUNT'
+  | 'INVALID_CURRENCY'
+  | 'INVALID_IDEMPOTENCY_KEY'
+  | 'IDEMPOTENCY_KEY_CONFLICT'
+  | 'TRANSFER_ALREADY_COMPLETED'
+  | 'TRANSFER_IN_PROGRESS'
+  | 'WALLET_NOT_FOUND'
+  | 'WALLET_UNAVAILABLE'
+  | 'INSUFFICIENT_FUNDS'
+  | 'TRANSACTION_FAILED'
+  | 'SERVICE_UNAVAILABLE';
+
+interface TransferErrorResponse {
+  error: {
+    code: TransferErrorCode;
+    message: string;
+  };
+}
+
+interface TransferRequestInput {
+  recipientId: string;
+  amountMinor: number;
+  currency: 'NGN';
+  idempotencyKey: string;
+  description?: string;
+}
+
 const WALLET_CURRENCY = 'NGN';
 const WALLET_STATUSES = new Set<WalletDocument['status']>(['active', 'suspended', 'locked']);
+const MAX_DESCRIPTION_LENGTH = 500;
+const MAX_IDEMPOTENCY_KEY_LENGTH = 128;
+const transferErrorStatus: Record<TransferErrorCode, number> = {
+  UNAUTHENTICATED: 401,
+  INVALID_REQUEST: 400,
+  INVALID_RECIPIENT: 400,
+  RECIPIENT_NOT_FOUND: 404,
+  SELF_TRANSFER_NOT_ALLOWED: 400,
+  INVALID_AMOUNT: 400,
+  INVALID_CURRENCY: 400,
+  INVALID_IDEMPOTENCY_KEY: 400,
+  IDEMPOTENCY_KEY_CONFLICT: 409,
+  TRANSFER_ALREADY_COMPLETED: 200,
+  TRANSFER_IN_PROGRESS: 409,
+  WALLET_NOT_FOUND: 404,
+  WALLET_UNAVAILABLE: 403,
+  INSUFFICIENT_FUNDS: 409,
+  TRANSACTION_FAILED: 500,
+  SERVICE_UNAVAILABLE: 503,
+};
 
 // Initialize Firebase Admin (Uses Application Default Credentials if available, otherwise just relies on the project configuration)
 if (getApps().length === 0) {
@@ -26,6 +80,46 @@ if (getApps().length === 0) {
 }
 
 const adminDb = getFirestore();
+
+function errorResponse(res: Response, code: TransferErrorCode, message: string, statusOverride?: number) {
+  const status = statusOverride ?? transferErrorStatus[code] ?? 500;
+  const payload: TransferErrorResponse = {
+    error: {
+      code,
+      message,
+    },
+  };
+  return res.status(status).json(payload);
+}
+
+function sanitizeDescription(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (typeof value !== 'string') {
+    throw new Error('INVALID_REQUEST');
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length > MAX_DESCRIPTION_LENGTH) {
+    throw new Error('INVALID_REQUEST');
+  }
+
+  return trimmed;
+}
+
+function isSafeTransferAmount(amount: unknown): amount is number {
+  return typeof amount === 'number' && Number.isInteger(amount) && Number.isSafeInteger(amount) && amount > 0;
+}
+
+function isSafeIdempotencyKey(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= MAX_IDEMPOTENCY_KEY_LENGTH && /^[A-Za-z0-9._:-]+$/.test(value.trim());
+}
+
+function buildRequestFingerprint(senderUid: string, recipientId: string, amountMinor: number, currency: string, description?: string) {
+  return [senderUid, recipientId, String(amountMinor), currency, description ?? ''].join('|');
+}
 
 function validateWalletDocument(data: FirebaseFirestore.DocumentData | undefined, uid: string): WalletDocument {
   if (!data || data.uid !== uid) {
@@ -80,6 +174,106 @@ async function ensureWalletForUser(uid: string): Promise<WalletDocument> {
   });
 }
 
+function validateTransferRequest(body: unknown, senderUid: string): TransferRequestInput {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new Error('INVALID_REQUEST');
+  }
+
+  const payload = body as Record<string, unknown>;
+  const allowedKeys = new Set(['recipientId', 'amountMinor', 'currency', 'idempotencyKey', 'description', 'senderUid']);
+
+  for (const key of Object.keys(payload)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error('INVALID_REQUEST');
+    }
+  }
+
+  if ('senderUid' in payload) {
+    throw new Error('INVALID_REQUEST');
+  }
+
+  const recipientId = payload.recipientId;
+  if (typeof recipientId !== 'string' || recipientId.trim().length === 0) {
+    throw new Error('INVALID_RECIPIENT');
+  }
+
+  if (recipientId === senderUid) {
+    throw new Error('SELF_TRANSFER_NOT_ALLOWED');
+  }
+
+  const amountMinor = payload.amountMinor;
+  if (!isSafeTransferAmount(amountMinor)) {
+    throw new Error('INVALID_AMOUNT');
+  }
+
+  if (payload.currency !== WALLET_CURRENCY) {
+    throw new Error('INVALID_CURRENCY');
+  }
+
+  const idempotencyKey = payload.idempotencyKey;
+  if (!isSafeIdempotencyKey(idempotencyKey)) {
+    throw new Error('INVALID_IDEMPOTENCY_KEY');
+  }
+
+  const description = sanitizeDescription(payload.description);
+
+  return {
+    recipientId: recipientId.trim(),
+    amountMinor,
+    currency: 'NGN',
+    idempotencyKey: idempotencyKey.trim(),
+    description,
+  };
+}
+
+function transferResultPayload(
+  transactionId: string,
+  reference: string,
+  senderUid: string,
+  recipientId: string,
+  amountMinor: number,
+  currency: string,
+  description: string | undefined,
+  status: 'completed' | 'failed'
+) {
+  const payload: Record<string, unknown> = {
+    id: transactionId,
+    reference,
+    senderId: senderUid,
+    recipientId,
+    amount: amountMinor,
+    currency,
+    type: 'transfer',
+    sourceModule: 'unique_pay.wallet_transfer',
+    provider: 'unique_pay_internal_wallet',
+    status,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    recordKind: 'financial',
+    schemaVersion: 2,
+    amountUnit: 'minor',
+  };
+
+  if (description !== undefined) {
+    payload.description = description;
+  }
+
+  return payload;
+}
+
+async function readUserExists(uid: string): Promise<boolean> {
+  try {
+    await getAuth().getUser(uid);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function idempotencyDocumentId(senderUid: string, idempotencyKey: string) {
+  return `${senderUid}_${idempotencyKey}`;
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -91,7 +285,7 @@ async function startServer() {
   const authenticate = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized: No token provided' });
+      return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to access this resource.');
     }
 
     const token = authHeader.split('Bearer ')[1];
@@ -100,9 +294,8 @@ async function startServer() {
       const decodedToken = await getAuth().verifyIdToken(token);
       (req as any).user = decodedToken;
       next();
-    } catch (error) {
-      console.error('Error verifying Firebase auth token:', error);
-      res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    } catch (_error) {
+      return errorResponse(res, 'UNAUTHENTICATED', 'The supplied Firebase token is invalid or expired.');
     }
   };
 
@@ -115,7 +308,7 @@ async function startServer() {
     const uid = (req as any).user?.uid as string | undefined;
 
     if (!uid) {
-      return res.status(401).json({ error: "Unauthorized: Missing authenticated user" });
+      return errorResponse(res, 'UNAUTHENTICATED', 'Missing authenticated user.');
     }
 
     try {
@@ -123,13 +316,13 @@ async function startServer() {
       const snapshot = await walletRef.get();
 
       if (!snapshot.exists) {
-        return res.status(404).json({ error: "Wallet not found" });
+        return errorResponse(res, 'WALLET_NOT_FOUND', 'No wallet exists for this user.', 404);
       }
 
       return res.status(200).json(validateWalletDocument(snapshot.data(), uid));
     } catch (error) {
       console.error('Error fetching wallet:', error);
-      return res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch wallet' });
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to fetch wallet.');
     }
   });
 
@@ -137,7 +330,7 @@ async function startServer() {
     const uid = (req as any).user?.uid as string | undefined;
 
     if (!uid) {
-      return res.status(401).json({ error: "Unauthorized: Missing authenticated user" });
+      return errorResponse(res, 'UNAUTHENTICATED', 'Missing authenticated user.');
     }
 
     try {
@@ -152,7 +345,310 @@ async function startServer() {
       });
     } catch (error) {
       console.error("Error initializing wallet:", error);
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to initialize wallet" });
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to initialize wallet.');
+    }
+  });
+
+  app.post("/api/wallet/transfer", authenticate, async (req, res) => {
+    const senderUid = (req as any).user?.uid as string | undefined;
+
+    if (!senderUid) {
+      return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to initiate a transfer.');
+    }
+
+    let validatedRequest: TransferRequestInput;
+    try {
+      validatedRequest = validateTransferRequest(req.body, senderUid);
+    } catch (error) {
+      const code = (error as Error).message as TransferErrorCode;
+      const messageMap: Record<TransferErrorCode, string> = {
+        UNAUTHENTICATED: 'Authentication is required to initiate a transfer.',
+        INVALID_REQUEST: 'The transfer request body is malformed or contains unsupported fields.',
+        INVALID_RECIPIENT: 'A valid recipient UID is required.',
+        RECIPIENT_NOT_FOUND: 'The recipient does not exist.',
+        SELF_TRANSFER_NOT_ALLOWED: 'A wallet transfer to yourself is not allowed.',
+        INVALID_AMOUNT: 'Transfer amount must be a positive integer minor-unit amount.',
+        INVALID_CURRENCY: 'Only NGN transfers are supported.',
+        INVALID_IDEMPOTENCY_KEY: 'The idempotency key is invalid or exceeds the allowed length.',
+        IDEMPOTENCY_KEY_CONFLICT: 'This idempotency key was already used with different request parameters.',
+        TRANSFER_ALREADY_COMPLETED: 'This transfer has already been completed.',
+        TRANSFER_IN_PROGRESS: 'A transfer with this idempotency key is already in progress.',
+        WALLET_NOT_FOUND: 'A wallet record is missing for this transfer.',
+        WALLET_UNAVAILABLE: 'One or both wallets are unavailable for transfer.',
+        INSUFFICIENT_FUNDS: 'The sender wallet does not have enough funds.',
+        TRANSACTION_FAILED: 'The transfer failed while processing the transaction.',
+        SERVICE_UNAVAILABLE: 'The transfer service is temporarily unavailable.',
+      };
+
+      return errorResponse(res, code, messageMap[code] ?? 'Invalid transfer request.');
+    }
+
+    const { recipientId, amountMinor, currency, idempotencyKey, description } = validatedRequest;
+
+    const recipientExists = await readUserExists(recipientId);
+    if (!recipientExists) {
+      return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'The recipient user does not exist.');
+    }
+
+    const fingerprint = buildRequestFingerprint(senderUid, recipientId, amountMinor, currency, description);
+    const idempotencyRef = adminDb.collection('walletIdempotency').doc(idempotencyDocumentId(senderUid, idempotencyKey));
+
+    try {
+      const transactionResult = await adminDb.runTransaction(async (transaction) => {
+        const idempotencySnapshot = await transaction.get(idempotencyRef);
+        if (idempotencySnapshot.exists) {
+          const existing = idempotencySnapshot.data() as Record<string, unknown>;
+          const existingFingerprint = String(existing.requestFingerprint ?? '');
+          const status = String(existing.status ?? '');
+
+          if (existingFingerprint !== fingerprint) {
+            return {
+              error: {
+                code: 'IDEMPOTENCY_KEY_CONFLICT' as TransferErrorCode,
+                message: 'This idempotency key was already used with different transfer parameters.',
+              },
+            } as TransferErrorResponse;
+          }
+
+          if (status === 'completed') {
+            return existing.result as Record<string, unknown>;
+          }
+
+          if (status === 'failed') {
+            return existing.errorResult as Record<string, unknown>;
+          }
+
+          if (status === 'in_progress') {
+            return {
+              error: {
+                code: 'TRANSFER_IN_PROGRESS' as TransferErrorCode,
+                message: 'A transfer with this idempotency key is already in progress.',
+              },
+            } as TransferErrorResponse;
+          }
+        }
+
+        const senderWalletRef = adminDb.collection('wallets').doc(senderUid);
+        const recipientWalletRef = adminDb.collection('wallets').doc(recipientId);
+        const [senderWalletSnapshot, recipientWalletSnapshot] = await Promise.all([
+          transaction.get(senderWalletRef),
+          transaction.get(recipientWalletRef),
+        ]);
+
+        if (!senderWalletSnapshot.exists || !recipientWalletSnapshot.exists) {
+          const failure = {
+            error: {
+              code: 'WALLET_NOT_FOUND' as TransferErrorCode,
+              message: 'Both sender and recipient wallets must already exist before transfer.',
+            },
+          } as TransferErrorResponse;
+          transaction.set(idempotencyRef, {
+            senderUid,
+            recipientId,
+            amountMinor,
+            currency,
+            description: description ?? '',
+            requestFingerprint: fingerprint,
+            status: 'failed',
+            errorResult: failure,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+          return failure;
+        }
+
+        let senderWallet: WalletDocument;
+        let recipientWallet: WalletDocument;
+
+        try {
+          senderWallet = validateWalletDocument(senderWalletSnapshot.data(), senderUid);
+          recipientWallet = validateWalletDocument(recipientWalletSnapshot.data(), recipientId);
+        } catch (_error) {
+          const failure = {
+            error: {
+              code: 'WALLET_UNAVAILABLE' as TransferErrorCode,
+              message: 'The wallet status or currency configuration is not valid for transfer.',
+            },
+          } as TransferErrorResponse;
+          transaction.set(idempotencyRef, {
+            senderUid,
+            recipientId,
+            amountMinor,
+            currency,
+            description: description ?? '',
+            requestFingerprint: fingerprint,
+            status: 'failed',
+            errorResult: failure,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+          return failure;
+        }
+
+        if (senderWallet.status !== 'active' || recipientWallet.status !== 'active') {
+          const failure = {
+            error: {
+              code: 'WALLET_UNAVAILABLE' as TransferErrorCode,
+              message: 'One or both wallets are unavailable for transfer.',
+            },
+          } as TransferErrorResponse;
+          transaction.set(idempotencyRef, {
+            senderUid,
+            recipientId,
+            amountMinor,
+            currency,
+            description: description ?? '',
+            requestFingerprint: fingerprint,
+            status: 'failed',
+            errorResult: failure,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+          return failure;
+        }
+
+        const senderBalance = senderWallet.availableBalanceMinor;
+        const recipientBalance = recipientWallet.availableBalanceMinor;
+
+        if (!Number.isSafeInteger(senderBalance) || !Number.isSafeInteger(recipientBalance)) {
+          const failure = {
+            error: {
+              code: 'TRANSACTION_FAILED' as TransferErrorCode,
+              message: 'The wallet balances are invalid for execution.',
+            },
+          } as TransferErrorResponse;
+          transaction.set(idempotencyRef, {
+            senderUid,
+            recipientId,
+            amountMinor,
+            currency,
+            description: description ?? '',
+            requestFingerprint: fingerprint,
+            status: 'failed',
+            errorResult: failure,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+          return failure;
+        }
+
+        if (senderBalance < amountMinor) {
+          const failure = {
+            error: {
+              code: 'INSUFFICIENT_FUNDS' as TransferErrorCode,
+              message: 'Insufficient wallet balance.',
+            },
+          } as TransferErrorResponse;
+          transaction.set(idempotencyRef, {
+            senderUid,
+            recipientId,
+            amountMinor,
+            currency,
+            description: description ?? '',
+            requestFingerprint: fingerprint,
+            status: 'failed',
+            errorResult: failure,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+          return failure;
+        }
+
+        const newSenderBalance = senderBalance - amountMinor;
+        const newRecipientBalance = recipientBalance + amountMinor;
+
+        if (!Number.isSafeInteger(newSenderBalance) || !Number.isSafeInteger(newRecipientBalance)) {
+          const failure = {
+            error: {
+              code: 'TRANSACTION_FAILED' as TransferErrorCode,
+              message: 'The transfer amount would exceed the safe integer range for wallet accounting.',
+            },
+          } as TransferErrorResponse;
+          transaction.set(idempotencyRef, {
+            senderUid,
+            recipientId,
+            amountMinor,
+            currency,
+            description: description ?? '',
+            requestFingerprint: fingerprint,
+            status: 'failed',
+            errorResult: failure,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+          return failure;
+        }
+
+        const now = Timestamp.now();
+        const transactionId = adminDb.collection('transactions').doc().id;
+        const reference = `UP-WT-${Date.now()}-${randomUUID().slice(0, 8)}`;
+        const transactionRecord = {
+          id: transactionId,
+          reference,
+          senderId: senderUid,
+          recipientId,
+          amount: amountMinor,
+          currency,
+          type: 'transfer',
+          sourceModule: 'unique_pay.wallet_transfer',
+          provider: 'unique_pay_internal_wallet',
+          status: 'completed',
+          createdAt: now,
+          updatedAt: now,
+          recordKind: 'financial',
+          schemaVersion: 2,
+          amountUnit: 'minor',
+        };
+
+        const completedResult = {
+          transaction: transferResultPayload(
+            transactionId,
+            reference,
+            senderUid,
+            recipientId,
+            amountMinor,
+            currency,
+            description,
+            'completed'
+          ),
+          idempotencyKey,
+          status: 'completed',
+        };
+
+        transaction.set(adminDb.collection('transactions').doc(transactionId), transactionRecord);
+        transaction.update(senderWalletRef, {
+          availableBalanceMinor: newSenderBalance,
+          updatedAt: now,
+        });
+        transaction.update(recipientWalletRef, {
+          availableBalanceMinor: newRecipientBalance,
+          updatedAt: now,
+        });
+        transaction.set(idempotencyRef, {
+          senderUid,
+          recipientId,
+          amountMinor,
+          currency,
+          description: description ?? '',
+          requestFingerprint: fingerprint,
+          status: 'completed',
+          result: completedResult,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        return completedResult;
+      });
+
+      if ((transactionResult as TransferErrorResponse | undefined)?.error) {
+        const { code, message } = (transactionResult as TransferErrorResponse).error;
+        return errorResponse(res, code, message, transferErrorStatus[code] ?? 500);
+      }
+
+      return res.status(200).json(transactionResult);
+    } catch (error) {
+      console.error('Transfer execution failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The transfer service is temporarily unavailable.');
     }
   });
 
