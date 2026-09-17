@@ -6,6 +6,15 @@ import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 
+interface WalletDocument {
+  uid: string;
+  currency: string;
+  availableBalanceMinor: number;
+  status: 'active' | 'suspended' | 'locked';
+  createdAt: FirebaseFirestore.Timestamp;
+  updatedAt: FirebaseFirestore.Timestamp;
+}
+
 // Initialize Firebase Admin (Uses Application Default Credentials if available, otherwise just relies on the project configuration)
 if (getApps().length === 0) {
   initializeApp({
@@ -14,6 +23,32 @@ if (getApps().length === 0) {
 }
 
 const adminDb = getFirestore();
+
+async function ensureWalletForUser(uid: string): Promise<WalletDocument> {
+  if (!uid || typeof uid !== 'string') {
+    throw new Error('Invalid authenticated UID');
+  }
+
+  const walletRef = adminDb.collection('wallets').doc(uid);
+  const walletSnapshot = await walletRef.get();
+
+  if (walletSnapshot.exists) {
+    return walletSnapshot.data() as WalletDocument;
+  }
+
+  const now = Timestamp.now();
+  const wallet: WalletDocument = {
+    uid,
+    currency: 'NGN',
+    availableBalanceMinor: 0,
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await walletRef.create(wallet);
+  return wallet;
+}
 
 async function startServer() {
   const app = express();
@@ -30,9 +65,7 @@ async function startServer() {
     }
 
     const token = authHeader.split('Bearer ')[1];
-    
-    // We skip verification of the Google Workspace token used for Calendar, because that's an OAuth token, not a Firebase ID Token.
-    // If the token is meant for our own Firebase backend, we verify it:
+
     try {
       const decodedToken = await getAuth().verifyIdToken(token);
       (req as any).user = decodedToken;
@@ -48,8 +81,28 @@ async function startServer() {
     res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" });
   });
 
-  // Initialize the authenticated user's internal wallet without changing an existing wallet.
-  // The wallet owner is always taken from the verified Firebase ID token, never from the request body.
+  app.get("/api/wallet", authenticate, async (req, res) => {
+    const uid = (req as any).user?.uid as string | undefined;
+
+    if (!uid) {
+      return res.status(401).json({ error: "Unauthorized: Missing authenticated user" });
+    }
+
+    try {
+      const walletRef = adminDb.collection('wallets').doc(uid);
+      const snapshot = await walletRef.get();
+
+      if (!snapshot.exists) {
+        return res.status(404).json({ error: "Wallet not found" });
+      }
+
+      return res.status(200).json(snapshot.data());
+    } catch (error) {
+      console.error('Error fetching wallet:', error);
+      return res.status(500).json({ error: 'Failed to fetch wallet' });
+    }
+  });
+
   app.post("/api/wallet", authenticate, async (req, res) => {
     const uid = (req as any).user?.uid as string | undefined;
 
@@ -58,27 +111,15 @@ async function startServer() {
     }
 
     try {
-      const walletRef = adminDb.collection("wallets").doc(uid);
-
-      await adminDb.runTransaction(async (transaction) => {
-        const walletSnapshot = await transaction.get(walletRef);
-
-        if (walletSnapshot.exists) {
-          return;
-        }
-
-        const now = Timestamp.now();
-        transaction.create(walletRef, {
-          uid,
-          currency: "NGN",
-          availableBalanceMinor: 0,
-          status: "active",
-          createdAt: now,
-          updatedAt: now,
-        });
+      const wallet = await ensureWalletForUser(uid);
+      res.status(200).json({
+        uid: wallet.uid,
+        currency: wallet.currency,
+        availableBalanceMinor: wallet.availableBalanceMinor,
+        status: wallet.status,
+        createdAt: wallet.createdAt.toDate().toISOString(),
+        updatedAt: wallet.updatedAt.toDate().toISOString(),
       });
-
-      res.status(200).json({ walletId: uid });
     } catch (error) {
       console.error("Error initializing wallet:", error);
       res.status(500).json({ error: "Failed to initialize wallet" });
@@ -116,10 +157,9 @@ async function startServer() {
     }
   });
 
-  // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true,  },
+      server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
