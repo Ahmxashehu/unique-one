@@ -4,6 +4,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 
 // Initialize Firebase Admin (Uses Application Default Credentials if available, otherwise just relies on the project configuration)
 if (getApps().length === 0) {
@@ -11,6 +12,8 @@ if (getApps().length === 0) {
     projectId: "gen-lang-client-0680695304",
   });
 }
+
+const adminDb = getFirestore();
 
 async function startServer() {
   const app = express();
@@ -43,6 +46,43 @@ async function startServer() {
   // API Routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" });
+  });
+
+  // Initialize the authenticated user's internal wallet without changing an existing wallet.
+  // The wallet owner is always taken from the verified Firebase ID token, never from the request body.
+  app.post("/api/wallet", authenticate, async (req, res) => {
+    const uid = (req as any).user?.uid as string | undefined;
+
+    if (!uid) {
+      return res.status(401).json({ error: "Unauthorized: Missing authenticated user" });
+    }
+
+    try {
+      const walletRef = adminDb.collection("wallets").doc(uid);
+
+      await adminDb.runTransaction(async (transaction) => {
+        const walletSnapshot = await transaction.get(walletRef);
+
+        if (walletSnapshot.exists) {
+          return;
+        }
+
+        const now = Timestamp.now();
+        transaction.create(walletRef, {
+          uid,
+          currency: "NGN",
+          availableBalanceMinor: 0,
+          status: "active",
+          createdAt: now,
+          updatedAt: now,
+        });
+      });
+
+      res.status(200).json({ walletId: uid });
+    } catch (error) {
+      console.error("Error initializing wallet:", error);
+      res.status(500).json({ error: "Failed to initialize wallet" });
+    }
   });
 
   // Proxy Google Calendar API requests securely through the backend
