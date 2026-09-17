@@ -15,6 +15,9 @@ interface WalletDocument {
   updatedAt: FirebaseFirestore.Timestamp;
 }
 
+const WALLET_CURRENCY = 'NGN';
+const WALLET_STATUSES = new Set<WalletDocument['status']>(['active', 'suspended', 'locked']);
+
 // Initialize Firebase Admin (Uses Application Default Credentials if available, otherwise just relies on the project configuration)
 if (getApps().length === 0) {
   initializeApp({
@@ -24,30 +27,57 @@ if (getApps().length === 0) {
 
 const adminDb = getFirestore();
 
+function validateWalletDocument(data: FirebaseFirestore.DocumentData | undefined, uid: string): WalletDocument {
+  if (!data || data.uid !== uid) {
+    throw new Error('Invalid wallet: document UID does not match authenticated user');
+  }
+
+  if (!Number.isInteger(data.availableBalanceMinor)) {
+    throw new Error('Invalid wallet: availableBalanceMinor must be an integer');
+  }
+
+  if (data.currency !== WALLET_CURRENCY) {
+    throw new Error(`Invalid wallet: currency must be ${WALLET_CURRENCY}`);
+  }
+
+  if (typeof data.status !== 'string' || !WALLET_STATUSES.has(data.status as WalletDocument['status'])) {
+    throw new Error('Invalid wallet: status is not supported');
+  }
+
+  if (!(data.createdAt instanceof Timestamp) || !(data.updatedAt instanceof Timestamp)) {
+    throw new Error('Invalid wallet: timestamps are required');
+  }
+
+  return data as WalletDocument;
+}
+
 async function ensureWalletForUser(uid: string): Promise<WalletDocument> {
   if (!uid || typeof uid !== 'string') {
     throw new Error('Invalid authenticated UID');
   }
 
   const walletRef = adminDb.collection('wallets').doc(uid);
-  const walletSnapshot = await walletRef.get();
 
-  if (walletSnapshot.exists) {
-    return walletSnapshot.data() as WalletDocument;
-  }
+  return adminDb.runTransaction(async (transaction) => {
+    const walletSnapshot = await transaction.get(walletRef);
 
-  const now = Timestamp.now();
-  const wallet: WalletDocument = {
-    uid,
-    currency: 'NGN',
-    availableBalanceMinor: 0,
-    status: 'active',
-    createdAt: now,
-    updatedAt: now,
-  };
+    if (walletSnapshot.exists) {
+      return validateWalletDocument(walletSnapshot.data(), uid);
+    }
 
-  await walletRef.create(wallet);
-  return wallet;
+    const now = Timestamp.now();
+    const wallet: WalletDocument = {
+      uid,
+      currency: WALLET_CURRENCY,
+      availableBalanceMinor: 0,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    transaction.create(walletRef, wallet);
+    return wallet;
+  });
 }
 
 async function startServer() {
@@ -96,10 +126,10 @@ async function startServer() {
         return res.status(404).json({ error: "Wallet not found" });
       }
 
-      return res.status(200).json(snapshot.data());
+      return res.status(200).json(validateWalletDocument(snapshot.data(), uid));
     } catch (error) {
       console.error('Error fetching wallet:', error);
-      return res.status(500).json({ error: 'Failed to fetch wallet' });
+      return res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch wallet' });
     }
   });
 
@@ -122,7 +152,7 @@ async function startServer() {
       });
     } catch (error) {
       console.error("Error initializing wallet:", error);
-      res.status(500).json({ error: "Failed to initialize wallet" });
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to initialize wallet" });
     }
   });
 
