@@ -136,8 +136,8 @@ service cloud.firestore {
 
     match /transactions/{txId} {
       allow read: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isAdmin();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
     }
 
     match /locations/{locationId} {
