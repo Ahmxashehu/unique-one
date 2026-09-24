@@ -154,6 +154,10 @@ service cloud.firestore {
       allow read, create, update, delete: if false;
     }
 
+    match /ledgerEntries/{ledgerId} {
+      allow read, create, update, delete: if false;
+    }
+
     match /locations/{locationId} {
       allow read: if true;
       allow create, update: if isAuthenticated();
