@@ -173,18 +173,9 @@ service cloud.firestore {
 
     // Communication Core: privileged/server workflow creates conversations and
     // membership records; clients can only consume stored membership.
-    // Legacy messaging permissions remain in this single consolidated block.
     match /conversations/{conversationId} {
       allow read: if isConversationMember(conversationId);
       allow create, update, delete: if false;
-      allow read, update: if isAuthenticated() && request.auth.uid in resource.data.participants;
-      allow create: if isAuthenticated() && request.auth.uid in request.resource.data.participants;
-      allow delete: if isAdmin();
-      
-      match /messages/{messageId} {
-        allow read, update: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
-        allow create: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants && request.resource.data.senderId == request.auth.uid;
-      }
     }
 
     match /conversationMembers/{membershipId} {

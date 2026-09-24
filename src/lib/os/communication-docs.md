@@ -6,5 +6,7 @@
 - All timestamps follow the existing OS convention of ISO-8601 strings at the application boundary.
 - `Message` reuses the existing `MessageStatus` lifecycle from `src/lib/os/types.ts`.
 - Communication documents must remain independent of UniquePay: they must not store wallet balances, ledger entries, transaction credentials, or payment-provider credentials.
+- Conversation creation is server-authored: the trusted endpoint creates one `conversations/{conversationId}` document plus deterministic `conversationMembers/{conversationId}_{uid}` membership documents atomically.
+- Conversation and membership writes persist only schema-defined fields, derive `createdBy` from verified Firebase Auth, and store timestamps as ISO-8601 strings generated from server-authored time.
 
-This step is schema-only. It intentionally adds no Firestore access layer, security rules, real-time subscriptions, message UI, or external messaging integration.
+Current foundation includes read helpers plus one trusted server-side conversation-creation endpoint. It still intentionally excludes client-authored conversation writes, real-time subscriptions, message UI, and external messaging integration.

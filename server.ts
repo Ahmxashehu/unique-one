@@ -6,6 +6,7 @@ import { createServer as createViteServer } from "vite";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import type { Conversation, ConversationMember, ConversationType } from "./src/lib/os/communication-types";
 
 interface WalletDocument {
   uid: string;
@@ -24,10 +25,15 @@ type TransferErrorCode =
   | 'TRANSACTION_FAILED' | 'SERVICE_UNAVAILABLE';
 interface TransferErrorResponse { error: { code: TransferErrorCode; message: string } }
 interface TransferRequestInput { recipientId: string; amountMinor: number; currency: 'NGN'; idempotencyKey: string; description?: string }
+interface CreateConversationRequestInput { type: ConversationType; title?: string; avatarUrl?: string; memberUids: string[] }
 const WALLET_CURRENCY = 'NGN';
 const WALLET_STATUSES = new Set<WalletDocument['status']>(['active', 'suspended', 'locked']);
 const MAX_DESCRIPTION_LENGTH = 500;
 const MAX_IDEMPOTENCY_KEY_LENGTH = 128;
+const MAX_CONVERSATION_TITLE_LENGTH = 500;
+const MAX_CONVERSATION_AVATAR_URL_LENGTH = 2048;
+const MAX_CONVERSATION_MEMBER_COUNT = 50;
+const COMMUNICATION_CONVERSATION_TYPES = new Set<ConversationType>(['direct', 'group', 'business']);
 const transferErrorStatus: Record<TransferErrorCode, number> = {
   UNAUTHENTICATED: 401, INVALID_REQUEST: 400, INVALID_RECIPIENT: 400, RECIPIENT_NOT_FOUND: 404,
   SELF_TRANSFER_NOT_ALLOWED: 400, INVALID_AMOUNT: 400, INVALID_CURRENCY: 400, INVALID_IDEMPOTENCY_KEY: 400,
@@ -35,10 +41,21 @@ const transferErrorStatus: Record<TransferErrorCode, number> = {
   WALLET_NOT_FOUND: 404, WALLET_UNAVAILABLE: 403, INSUFFICIENT_FUNDS: 409, TRANSACTION_FAILED: 500,
   SERVICE_UNAVAILABLE: 503,
 };
+class RequestValidationError extends Error {
+  code: 'UNAUTHENTICATED' | 'INVALID_REQUEST';
+  constructor(code: 'UNAUTHENTICATED' | 'INVALID_REQUEST', message: string) {
+    super(message);
+    this.name = 'RequestValidationError';
+    this.code = code;
+  }
+}
 if (getApps().length === 0) initializeApp({ projectId: "gen-lang-client-0680695304" });
 const adminDb = getFirestore();
 function errorResponse(res: Response, code: TransferErrorCode, message: string, statusOverride?: number) {
   return res.status(statusOverride ?? transferErrorStatus[code] ?? 500).json({ error: { code, message } });
+}
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 function sanitizeDescription(value: unknown): string | undefined {
   if (value === undefined || value === null || value === '') return undefined;
@@ -97,6 +114,85 @@ function validateTransferRequest(body: unknown, senderUid: string): TransferRequ
   if (!isSafeIdempotencyKey(payload.idempotencyKey)) throw new Error('INVALID_IDEMPOTENCY_KEY');
   const description = sanitizeDescription(payload.description);
   return { recipientId, amountMinor: payload.amountMinor, currency: 'NGN', idempotencyKey: payload.idempotencyKey.trim(), description };
+}
+function sanitizeRequiredAuthUid(value: unknown): string {
+  if (!isSafeFirebaseUid(value)) {
+    throw new RequestValidationError('UNAUTHENTICATED', 'Missing authenticated user.');
+  }
+  return value;
+}
+function sanitizeOptionalConversationText(value: unknown, fieldName: 'title' | 'avatarUrl', maxLength: number): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string') {
+    throw new RequestValidationError('INVALID_REQUEST', `${fieldName} must be a string when provided.`);
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new RequestValidationError('INVALID_REQUEST', `${fieldName} must not be empty.`);
+  }
+  if (trimmed.length > maxLength) {
+    throw new RequestValidationError('INVALID_REQUEST', `${fieldName} exceeds the maximum allowed length of ${maxLength}.`);
+  }
+  return trimmed;
+}
+function conversationMemberDocumentId(conversationId: string, uid: string) {
+  return `${conversationId}_${uid}`;
+}
+function validateCreateConversationRequest(body: unknown, creatorUid: string): CreateConversationRequestInput {
+  if (!isPlainObject(body)) {
+    throw new RequestValidationError('INVALID_REQUEST', 'The conversation request body must be a plain object.');
+  }
+  const payload = body as Record<string, unknown>;
+  const forbiddenKeys = new Set(['creatorId', 'ownerId', 'createdBy', 'createdAt', 'updatedAt', 'status', 'role', 'roles', 'membershipRole', 'membershipRoles', 'conversationId']);
+  for (const key of Object.keys(payload)) {
+    if (forbiddenKeys.has(key)) {
+      throw new RequestValidationError('INVALID_REQUEST', `${key} must not be provided by the client.`);
+    }
+  }
+  const allowedKeys = new Set(['type', 'title', 'avatarUrl', 'memberUids']);
+  for (const key of Object.keys(payload)) {
+    if (!allowedKeys.has(key)) {
+      throw new RequestValidationError('INVALID_REQUEST', `Unsupported field: ${key}.`);
+    }
+  }
+  if (typeof payload.type !== 'string' || !COMMUNICATION_CONVERSATION_TYPES.has(payload.type as ConversationType)) {
+    throw new RequestValidationError('INVALID_REQUEST', 'type must be one of: direct, group, business.');
+  }
+  const title = sanitizeOptionalConversationText(payload.title, 'title', MAX_CONVERSATION_TITLE_LENGTH);
+  const avatarUrl = sanitizeOptionalConversationText(payload.avatarUrl, 'avatarUrl', MAX_CONVERSATION_AVATAR_URL_LENGTH);
+  if (payload.memberUids !== undefined && !Array.isArray(payload.memberUids)) {
+    throw new RequestValidationError('INVALID_REQUEST', 'memberUids must be an array of Firebase UIDs when provided.');
+  }
+  const memberUidSet = new Set<string>([creatorUid]);
+  if (Array.isArray(payload.memberUids)) {
+    for (const rawUid of payload.memberUids) {
+      if (typeof rawUid !== 'string') {
+        throw new RequestValidationError('INVALID_REQUEST', 'memberUids must contain only string Firebase UIDs.');
+      }
+      const candidateUid = rawUid.trim();
+      if (!isSafeFirebaseUid(candidateUid)) {
+        throw new RequestValidationError('INVALID_REQUEST', 'memberUids contains an invalid Firebase UID.');
+      }
+      memberUidSet.add(candidateUid);
+    }
+  }
+  if (memberUidSet.size > MAX_CONVERSATION_MEMBER_COUNT) {
+    throw new RequestValidationError('INVALID_REQUEST', `A conversation may have at most ${MAX_CONVERSATION_MEMBER_COUNT} unique members.`);
+  }
+  return {
+    type: payload.type as ConversationType,
+    memberUids: Array.from(memberUidSet),
+    title,
+    avatarUrl,
+  };
+}
+function buildConversationMembers(conversationId: string, memberUids: string[], creatorUid: string, joinedAt: string): ConversationMember[] {
+  return memberUids.map((uid) => ({
+    conversationId,
+    uid,
+    role: uid === creatorUid ? 'owner' : 'member',
+    joinedAt,
+  }));
 }
 function transferResultPayload(transactionId: string, reference: string, senderUid: string, recipientId: string, amountMinor: number, currency: string, description: string | undefined, status: 'completed' | 'failed') {
   const payload: Record<string, unknown> = { id: transactionId, reference, senderId: senderUid, recipientId, amount: amountMinor, currency, type: 'transfer', sourceModule: 'unique_pay.wallet_transfer', provider: 'unique_pay_internal_wallet', status, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' };
@@ -221,6 +317,49 @@ async function startServer() {
       if ((transactionResult as TransferErrorResponse | undefined)?.error) { const { code, message } = (transactionResult as TransferErrorResponse).error; return errorResponse(res, code, message, transferErrorStatus[code] ?? 500); }
       return res.status(200).json(transactionResult);
     } catch (error) { console.error('Transfer execution failed:', error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The transfer service is temporarily unavailable.'); }
+  });
+  app.post("/api/communication/conversations", authenticate, async (req, res) => {
+    let creatorUid: string;
+    let validatedRequest: CreateConversationRequestInput;
+    try {
+      creatorUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      validatedRequest = validateCreateConversationRequest(req.body, creatorUid);
+    } catch (error) {
+      if (error instanceof RequestValidationError) {
+        return errorResponse(res, error.code, error.message);
+      }
+      console.error('Conversation request validation failed:', error);
+      return errorResponse(res, 'INVALID_REQUEST', 'The conversation request is invalid.');
+    }
+    try {
+      const conversationRef = adminDb.collection('conversations').doc();
+      const now = Timestamp.now();
+      const nowIso = now.toDate().toISOString();
+      const conversation: Conversation = {
+        id: conversationRef.id,
+        type: validatedRequest.type,
+        createdBy: creatorUid,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        status: 'active',
+      };
+      if (validatedRequest.title !== undefined) conversation.title = validatedRequest.title;
+      if (validatedRequest.avatarUrl !== undefined) conversation.avatarUrl = validatedRequest.avatarUrl;
+      const members = buildConversationMembers(conversation.id, validatedRequest.memberUids, creatorUid, nowIso);
+      const batch = adminDb.batch();
+      batch.create(conversationRef, conversation);
+      for (const member of members) {
+        batch.create(
+          adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversation.id, member.uid)),
+          member,
+        );
+      }
+      await batch.commit();
+      return res.status(201).json({ conversation, members });
+    } catch (error) {
+      console.error('Conversation creation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to create the conversation.');
+    }
   });
   app.get("/api/calendar/events", async (req, res) => {
     try {
