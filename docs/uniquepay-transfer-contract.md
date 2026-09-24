@@ -164,6 +164,68 @@ The ledger must preserve:
 
 The exact accounting model and reconciliation procedures must be reviewed before production use.
 
+9a. Canonical Schemas (Step 3 — finalized, not yet implemented)
+
+The following canonical schemas are approved for Step 3 and define the trusted financial data contract.
+
+wallets (collection)
+
+- uid: string
+- currency: "NGN"
+- availableBalanceMinor: integer
+- status: "active" | "suspended" | "closed"
+- createdAt: string
+- updatedAt: string
+
+All wallet balances must be stored as integer NGN minor units (kobo).
+
+- ₦1 = 100 minor units
+- ₦100 = 10,000 minor units
+
+transactions (collection)
+
+- id: string
+- reference: string
+- senderId: string
+- recipientId: string
+- amountMinor: integer (authoritative)
+- amount: number (legacy display-only compatibility field; non-authoritative)
+- currency: "NGN"
+- description: optional string
+- type: transaction type
+- status: transfer status
+- createdAt: string
+- updatedAt: string
+
+ledgerEntries (server-only collection)
+
+- id: string
+- transactionId: string
+- reference: string
+- uid: string
+- direction: "debit" | "credit"
+- amountMinor: integer
+- currency: "NGN"
+- status: transaction status
+- idempotencyKey: string
+- createdAt: string
+
+The ledgerEntries collection is server-only and must not be written directly by clients.
+
+walletIdempotency (server-only collection)
+
+- id: string
+- uid: string
+- idempotencyKey: string
+- requestFingerprint: string
+- status: "completed" | "failed"
+- transactionId: optional string
+- resultReference: optional string
+- createdAt: string
+- updatedAt: string
+
+The walletIdempotency collection is server-only and must not be written directly by clients.
+
 10. Idempotency
 
 Each transfer request must include a unique idempotency key for the authenticated sender.
