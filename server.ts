@@ -28,6 +28,15 @@ interface WalletTransferRequestBody {
   description?: unknown;
 }
 
+interface WalletDocument {
+  uid?: unknown;
+  currency?: unknown;
+  availableBalanceMinor?: unknown;
+  status?: unknown;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -61,11 +70,15 @@ async function startServer() {
     res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" });
   });
 
-  // UniquePay wallet transfer endpoint — Step 4A: validation skeleton only.
-  // NOTE: This endpoint does NOT move money. It only validates the request shape
-  // and authenticated sender identity. Wallet reads/writes, ledger entries,
-  // transaction records, and idempotency records are implemented in later steps.
-  app.post("/api/wallet/transfer", authenticate, (req: AuthenticatedRequest, res: Response) => {
+  // UniquePay wallet transfer endpoint — Step 4B: adds read-only wallet
+  // existence/status/currency/balance validation on top of the Step 4A
+  // request-shape validation skeleton.
+  // NOTE: This endpoint STILL does NOT move money. Wallet documents are only
+  // READ here for validation purposes. No wallet document is modified, no
+  // ledger entries, transaction records, or idempotency records are created,
+  // and no Firestore transaction/batch write occurs. Those are implemented
+  // in later steps.
+  app.post("/api/wallet/transfer", authenticate, async (req: AuthenticatedRequest, res: Response) => {
     const senderUid = req.user?.uid;
     if (!senderUid) {
       return res.status(401).json({ error: "Unauthorized: No authenticated user" });
@@ -106,12 +119,62 @@ async function startServer() {
       return res.status(400).json({ error: "INVALID_DESCRIPTION", message: "description must be a string when provided" });
     }
 
-    // Development-only response. No wallet reads/writes, ledger entries,
-    // transaction records, idempotency records, or payment provider calls occur here.
+    // Step 4B: read-only wallet validation. Wallet documents are read here,
+    // never written to.
+    try {
+      const [senderWalletSnap, recipientWalletSnap] = await Promise.all([
+        db.collection("wallets").doc(senderUid).get(),
+        db.collection("wallets").doc(recipientId).get(),
+      ]);
+
+      if (!senderWalletSnap.exists) {
+        return res.status(404).json({ error: "WALLET_NOT_FOUND", message: "Sender wallet does not exist" });
+      }
+
+      if (!recipientWalletSnap.exists) {
+        return res.status(404).json({ error: "WALLET_NOT_FOUND", message: "Recipient wallet does not exist" });
+      }
+
+      const senderWallet = senderWalletSnap.data() as WalletDocument;
+      const recipientWallet = recipientWalletSnap.data() as WalletDocument;
+
+      if (senderWallet.status !== "active") {
+        return res.status(409).json({ error: "WALLET_NOT_ACTIVE", message: "Sender wallet is not active" });
+      }
+
+      if (recipientWallet.status !== "active") {
+        return res.status(409).json({ error: "WALLET_NOT_ACTIVE", message: "Recipient wallet is not active" });
+      }
+
+      if (senderWallet.currency !== "NGN") {
+        return res.status(400).json({ error: "UNSUPPORTED_WALLET_CURRENCY", message: "Sender wallet currency is not NGN" });
+      }
+
+      if (recipientWallet.currency !== "NGN") {
+        return res.status(400).json({ error: "UNSUPPORTED_WALLET_CURRENCY", message: "Recipient wallet currency is not NGN" });
+      }
+
+      const senderBalance = senderWallet.availableBalanceMinor;
+      if (typeof senderBalance !== "number" || !Number.isSafeInteger(senderBalance)) {
+        return res.status(400).json({ error: "INVALID_WALLET_BALANCE", message: "Sender wallet balance is invalid" });
+      }
+
+      if (senderBalance < amountMinor) {
+        return res.status(400).json({ error: "INSUFFICIENT_FUNDS", message: "Sender wallet does not have sufficient available balance" });
+      }
+    } catch (error) {
+      console.error("Error validating wallets for transfer:", error);
+      return res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to validate wallets" });
+    }
+
+    // Development-only response. Wallet documents were only read above for
+    // validation. No wallet reads/writes were mutating, no ledger entries,
+    // transaction records, idempotency records, or payment provider calls
+    // occur here, and no money has moved.
     return res.status(200).json({
       ok: true,
       status: "validated",
-      message: "Transfer request validated. No transfer has occurred; money movement is not implemented yet.",
+      message: "Transfer request and wallets validated. No transfer has occurred; money movement is not implemented yet.",
     });
   });
 
