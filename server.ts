@@ -3,6 +3,7 @@ import http from "http";
 import path from "path";
 import { randomUUID } from "node:crypto";
 import { createServer as createViteServer } from "vite";
+import rateLimit, { type Store } from "express-rate-limit";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
@@ -36,7 +37,6 @@ const MAX_CONVERSATION_MEMBER_COUNT = 50;
 const CONVERSATION_CREATE_WINDOW_MS = 60_000;
 const MAX_CONVERSATION_CREATES_PER_WINDOW = 10;
 const COMMUNICATION_CONVERSATION_TYPES = new Set<ConversationType>(['direct', 'group', 'business']);
-const conversationCreateRateLimits = new Map<string, { count: number; windowStartedAt: number }>();
 const transferErrorStatus: Record<TransferErrorCode, number> = {
   UNAUTHENTICATED: 401, INVALID_REQUEST: 400, INVALID_RECIPIENT: 400, RECIPIENT_NOT_FOUND: 404,
   SELF_TRANSFER_NOT_ALLOWED: 400, INVALID_AMOUNT: 400, INVALID_CURRENCY: 400, INVALID_IDEMPOTENCY_KEY: 400,
@@ -142,8 +142,22 @@ function conversationMemberDocumentId(conversationId: string, uid: string) {
   return `${conversationId}_${uid}`;
 }
 function validateConversationMemberCount(type: ConversationType, memberUids: string[]) {
-  if (type === 'direct' && memberUids.length !== 2) {
-    throw new RequestValidationError('INVALID_REQUEST', 'direct conversations must include exactly two unique members.');
+  switch (type) {
+    case 'direct':
+      if (memberUids.length !== 2) {
+        throw new RequestValidationError('INVALID_REQUEST', 'direct conversations must include exactly two unique members.');
+      }
+      return;
+    case 'group':
+      if (memberUids.length < 2 || memberUids.length > MAX_CONVERSATION_MEMBER_COUNT) {
+        throw new RequestValidationError('INVALID_REQUEST', 'group conversations must include between 2 and 50 unique members.');
+      }
+      return;
+    case 'business':
+      if (memberUids.length < 2 || memberUids.length > MAX_CONVERSATION_MEMBER_COUNT) {
+        throw new RequestValidationError('INVALID_REQUEST', 'business conversations must include between 2 and 50 unique members.');
+      }
+      return;
   }
 }
 function validateCreateConversationRequest(body: unknown, creatorUid: string): CreateConversationRequestInput {
@@ -204,34 +218,82 @@ function buildConversationMembers(conversationId: string, memberUids: string[], 
     joinedAt,
   }));
 }
-function conversationCreateRateLimit(req: Request, res: Response, next: NextFunction) {
-  try {
-    const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
-    const rateLimitKey = `${uid}:${req.ip ?? 'unknown'}`;
-    const now = Date.now();
-    const existing = conversationCreateRateLimits.get(rateLimitKey);
-    if (!existing || now - existing.windowStartedAt >= CONVERSATION_CREATE_WINDOW_MS) {
-      conversationCreateRateLimits.set(rateLimitKey, { count: 1, windowStartedAt: now });
-    } else if (existing.count >= MAX_CONVERSATION_CREATES_PER_WINDOW) {
-      return errorResponse(res, 'RATE_LIMITED', 'Too many conversation creation requests. Please try again shortly.');
-    } else {
-      existing.count += 1;
-    }
-    if (conversationCreateRateLimits.size > 10_000) {
-      for (const [key, value] of conversationCreateRateLimits.entries()) {
-        if (now - value.windowStartedAt >= CONVERSATION_CREATE_WINDOW_MS) {
-          conversationCreateRateLimits.delete(key);
-        }
+function createFirestoreRateLimitStore(collectionName: string, windowMs: number): Store {
+  return {
+    localKeys: false,
+    prefix: `${collectionName}:`,
+    async get(key) {
+      const snapshot = await adminDb.collection(collectionName).doc(key).get();
+      if (!snapshot.exists) return undefined;
+      const data = snapshot.data() as Record<string, unknown> | undefined;
+      const totalHits = Number.isSafeInteger(data?.totalHits) ? Number(data?.totalHits) : 0;
+      const resetTime = typeof data?.resetTime === 'string' ? new Date(data.resetTime) : undefined;
+      if (!resetTime || Number.isNaN(resetTime.getTime()) || resetTime.getTime() <= Date.now()) {
+        await snapshot.ref.delete().catch(() => undefined);
+        return undefined;
       }
-    }
-    return next();
-  } catch (error) {
-    if (error instanceof RequestValidationError) {
-      return errorResponse(res, error.code, error.message);
-    }
-    return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to access this resource.');
-  }
+      return { totalHits, resetTime };
+    },
+    async increment(key) {
+      const docRef = adminDb.collection(collectionName).doc(key);
+      const now = Timestamp.now();
+      const nowIso = now.toDate().toISOString();
+      const defaultResetTime = new Date(now.toMillis() + windowMs);
+      return adminDb.runTransaction(async transaction => {
+        const snapshot = await transaction.get(docRef);
+        const data = snapshot.data() as Record<string, unknown> | undefined;
+        const existingResetTime = typeof data?.resetTime === 'string' ? new Date(data.resetTime) : undefined;
+        const resetTime = existingResetTime && !Number.isNaN(existingResetTime.getTime()) && existingResetTime.getTime() > now.toMillis()
+          ? existingResetTime
+          : defaultResetTime;
+        const previousHits = existingResetTime && existingResetTime.getTime() > now.toMillis() && Number.isSafeInteger(data?.totalHits)
+          ? Number(data?.totalHits)
+          : 0;
+        const totalHits = previousHits + 1;
+        transaction.set(docRef, {
+          key,
+          totalHits,
+          resetTime: resetTime.toISOString(),
+          createdAt: typeof data?.createdAt === 'string' ? data.createdAt : nowIso,
+          updatedAt: nowIso,
+        });
+        return { totalHits, resetTime };
+      });
+    },
+    async decrement(key) {
+      const docRef = adminDb.collection(collectionName).doc(key);
+      await adminDb.runTransaction(async transaction => {
+        const snapshot = await transaction.get(docRef);
+        if (!snapshot.exists) return;
+        const data = snapshot.data() as Record<string, unknown> | undefined;
+        const totalHits = Number.isSafeInteger(data?.totalHits) ? Number(data?.totalHits) - 1 : 0;
+        if (totalHits <= 0) {
+          transaction.delete(docRef);
+          return;
+        }
+        transaction.update(docRef, {
+          totalHits,
+          updatedAt: Timestamp.now().toDate().toISOString(),
+        });
+      });
+    },
+    async resetKey(key) {
+      await adminDb.collection(collectionName).doc(key).delete();
+    },
+  };
 }
+const conversationCreateRateLimit = rateLimit({
+  windowMs: CONVERSATION_CREATE_WINDOW_MS,
+  limit: MAX_CONVERSATION_CREATES_PER_WINDOW,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createFirestoreRateLimitStore('communicationConversationRateLimits', CONVERSATION_CREATE_WINDOW_MS),
+  keyGenerator: (req) => {
+    const uid = (req as any).user?.uid;
+    return isSafeFirebaseUid(uid) ? uid : 'anonymous';
+  },
+  handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conversation creation requests. Please try again shortly.'),
+});
 function transferResultPayload(transactionId: string, reference: string, senderUid: string, recipientId: string, amountMinor: number, currency: string, description: string | undefined, status: 'completed' | 'failed') {
   const payload: Record<string, unknown> = { id: transactionId, reference, senderId: senderUid, recipientId, amount: amountMinor, currency, type: 'transfer', sourceModule: 'unique_pay.wallet_transfer', provider: 'unique_pay_internal_wallet', status, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' };
   if (description !== undefined) payload.description = description;
