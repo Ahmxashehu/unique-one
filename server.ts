@@ -14,8 +14,6 @@ if (getApps().length === 0) {
   });
 }
 
-// Server-side Firestore instance (uses the existing Firebase Admin app above).
-// Reserved for future server-side wallet/transfer work; not read from or written to yet.
 const db = getFirestore();
 
 export interface AuthenticatedRequest extends Request {
