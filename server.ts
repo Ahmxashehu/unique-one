@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { rateLimit } from "express-rate-limit";
 
 // Initialize Firebase Admin (Uses Application Default Credentials if available, otherwise just relies on the project configuration)
 if (getApps().length === 0) {
@@ -46,21 +47,12 @@ const getWalletBalanceMinor = (wallet: Record<string, unknown>): number | null =
   return null;
 };
 
-type RateLimitState = {
-  count: number;
-  windowStartMs: number;
-};
-
 async function startServer() {
   const app = express();
   const PORT = 3000;
   const httpServer = http.createServer(app);
 
   app.use(express.json());
-
-  const transferValidationRateLimitWindowMs = 60_000;
-  const transferValidationRateLimitMaxRequests = 30;
-  const transferValidationRateLimitStore = new Map<string, RateLimitState>();
 
   // Firebase Authentication Middleware
   const authenticate = async (req: Request, res: Response, next: NextFunction) => {
@@ -83,31 +75,19 @@ async function startServer() {
     }
   };
 
-  const rateLimitTransferValidation = (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction,
-  ) => {
-    const identifier = req.user?.uid ?? req.ip;
-    const now = Date.now();
-    const existing = transferValidationRateLimitStore.get(identifier);
-
-    if (!existing || now - existing.windowStartMs >= transferValidationRateLimitWindowMs) {
-      transferValidationRateLimitStore.set(identifier, { count: 1, windowStartMs: now });
-      return next();
-    }
-
-    if (existing.count >= transferValidationRateLimitMaxRequests) {
-      return res.status(429).json({
+  const rateLimitTransferValidation = rateLimit({
+    windowMs: 60_000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => (req as AuthenticatedRequest).user?.uid ?? req.ip,
+    handler: (_req, res) => {
+      res.status(429).json({
         error: "Too many transfer validation requests",
         code: "RATE_LIMIT_EXCEEDED",
       });
-    }
-
-    existing.count += 1;
-    transferValidationRateLimitStore.set(identifier, existing);
-    return next();
-  };
+    },
+  });
 
   // API Routes
   app.get("/api/health", (req, res) => {
