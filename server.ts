@@ -46,12 +46,21 @@ const getWalletBalanceMinor = (wallet: Record<string, unknown>): number | null =
   return null;
 };
 
+type RateLimitState = {
+  count: number;
+  windowStartMs: number;
+};
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
   const httpServer = http.createServer(app);
 
   app.use(express.json());
+
+  const transferValidationRateLimitWindowMs = 60_000;
+  const transferValidationRateLimitMaxRequests = 30;
+  const transferValidationRateLimitStore = new Map<string, RateLimitState>();
 
   // Firebase Authentication Middleware
   const authenticate = async (req: Request, res: Response, next: NextFunction) => {
@@ -74,6 +83,32 @@ async function startServer() {
     }
   };
 
+  const rateLimitTransferValidation = (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    const identifier = req.user?.uid ?? req.ip;
+    const now = Date.now();
+    const existing = transferValidationRateLimitStore.get(identifier);
+
+    if (!existing || now - existing.windowStartMs >= transferValidationRateLimitWindowMs) {
+      transferValidationRateLimitStore.set(identifier, { count: 1, windowStartMs: now });
+      return next();
+    }
+
+    if (existing.count >= transferValidationRateLimitMaxRequests) {
+      return res.status(429).json({
+        error: "Too many transfer validation requests",
+        code: "RATE_LIMIT_EXCEEDED",
+      });
+    }
+
+    existing.count += 1;
+    transferValidationRateLimitStore.set(identifier, existing);
+    return next();
+  };
+
   // API Routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" });
@@ -82,6 +117,7 @@ async function startServer() {
   app.post(
     "/api/transfers/validate",
     authenticate,
+    rateLimitTransferValidation,
     async (req: AuthenticatedRequest, res: Response) => {
       const senderUid = req.user?.uid;
       if (!senderUid) {
