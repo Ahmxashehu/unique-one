@@ -183,6 +183,38 @@ async function startServer() {
         transaction.set(adminDb.collection('transactions').doc(transactionId), transactionRecord);
         transaction.update(senderWalletRef, { availableBalanceMinor: newSenderBalance, updatedAt: now });
         transaction.update(recipientWalletRef, { availableBalanceMinor: newRecipientBalance, updatedAt: now });
+        // Step 11A-2: Double-entry ledger. Two server-generated ledgerEntries documents
+        // (LedgerEntryRecord schema) are written atomically within this same transaction:
+        // one debit for the sender, one credit for the recipient. Both share the same
+        // transactionId, reference, amountMinor, currency, status, and idempotencyKey.
+        const senderLedgerRef = adminDb.collection('ledgerEntries').doc();
+        const recipientLedgerRef = adminDb.collection('ledgerEntries').doc();
+        const senderLedgerEntry = {
+          id: senderLedgerRef.id,
+          transactionId,
+          reference,
+          uid: senderUid,
+          direction: 'debit' as const,
+          amountMinor,
+          currency,
+          status: 'completed' as const,
+          idempotencyKey,
+          createdAt: now,
+        };
+        const recipientLedgerEntry = {
+          id: recipientLedgerRef.id,
+          transactionId,
+          reference,
+          uid: recipientId,
+          direction: 'credit' as const,
+          amountMinor,
+          currency,
+          status: 'completed' as const,
+          idempotencyKey,
+          createdAt: now,
+        };
+        transaction.set(senderLedgerRef, senderLedgerEntry);
+        transaction.set(recipientLedgerRef, recipientLedgerEntry);
         transaction.set(idempotencyRef, { senderUid, recipientId, amountMinor, currency, description: description ?? '', requestFingerprint: fingerprint, status: 'completed', result: completedResult, createdAt: now, updatedAt: now });
         return completedResult;
       });
