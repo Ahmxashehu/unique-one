@@ -23,6 +23,17 @@ import type {
  *  - Voice/video calls or external messaging providers.
  *  - Any UniquePay wallet/transfer/ledger logic. Communication Core stays
  *    completely separate from financial/payment operations.
+ *
+ * Integration note (Step 3 correction):
+ * There is currently no Communication Core HTTP route in `server.ts` (no
+ * messaging endpoints exist yet — by design, per the current step scope).
+ * Genuine request-level enforcement of this validation therefore requires
+ * an endpoint that calls `validateMessageDraft()` on an incoming request
+ * body. Creating such an endpoint is explicitly out of scope for this
+ * correction. This module is written so that any future endpoint can
+ * import and call these functions directly (mirroring how `server.ts`
+ * already calls `validateTransferRequest()` before performing wallet
+ * writes), but no route wiring is added here.
  */
 
 /** Minimal shape of an authenticated request user, as attached by existing auth middleware. */
@@ -36,7 +47,8 @@ export type CommunicationErrorCode =
   | 'INVALID_USER_ID'
   | 'INVALID_MESSAGE_TYPE'
   | 'INVALID_MESSAGE_TEXT'
-  | 'INVALID_METADATA';
+  | 'INVALID_METADATA'
+  | 'INVALID_REQUEST';
 
 export class CommunicationValidationError extends Error {
   code: CommunicationErrorCode;
@@ -130,6 +142,9 @@ export function validateMessageText(value: unknown): string {
 /**
  * Validates generic request/profile metadata strings (e.g. conversation title,
  * request subject) against a shared, conservative length limit.
+ *
+ * Whitespace-only input is normalized to `undefined` (treated the same as
+ * absent metadata) rather than accepted as an empty string.
  */
 export function validateMetadataLength(value: unknown, fieldName: string, maxLength = MAX_METADATA_LENGTH): string | undefined {
   if (value === undefined || value === null || value === '') return undefined;
@@ -137,6 +152,7 @@ export function validateMetadataLength(value: unknown, fieldName: string, maxLen
     throw new CommunicationValidationError('INVALID_METADATA', `${fieldName} must be a string.`);
   }
   const trimmed = value.trim();
+  if (trimmed.length === 0) return undefined;
   if (trimmed.length > maxLength) {
     throw new CommunicationValidationError('INVALID_METADATA', `${fieldName} exceeds the maximum allowed length of ${maxLength}.`);
   }
@@ -157,11 +173,19 @@ export interface ValidatedMessageDraft {
   createdAt: string;
 }
 
-/** Raw, untrusted input for a message draft (e.g. an HTTP request body). */
+/**
+ * Raw, untrusted input for a message draft (e.g. an HTTP request body).
+ *
+ * `senderId` is intentionally typed as `unknown` here (not omitted) so that
+ * `validateMessageDraft()` can detect and explicitly reject it if a client
+ * attempts to supply one. The server never derives the sender from this
+ * field.
+ */
 export interface MessageDraftInput {
   conversationId: unknown;
   type: unknown;
   text: unknown;
+  senderId?: unknown;
 }
 
 /**
@@ -169,10 +193,16 @@ export interface MessageDraftInput {
  *
  * `authenticatedUser` must come from verified server-side authentication
  * (e.g. `req.user` set by the existing `authenticate` middleware). The
- * sender is always derived from this value; any `senderId` present on the
- * raw input is ignored.
+ * sender is always derived exclusively from this value. If the raw input
+ * includes a `senderId` field at all, the request is rejected outright
+ * rather than having that field silently discarded — mirroring the
+ * existing `validateTransferRequest()` convention in `server.ts`, which
+ * rejects any request body containing a client-supplied `senderUid`.
  */
 export function validateMessageDraft(input: MessageDraftInput, authenticatedUser: unknown): ValidatedMessageDraft {
+  if (Object.prototype.hasOwnProperty.call(input, 'senderId') && input.senderId !== undefined) {
+    throw new CommunicationValidationError('INVALID_REQUEST', 'senderId must not be provided by the client; it is derived from the authenticated user.');
+  }
   const { uid } = validateAuthenticatedUser(authenticatedUser);
   const conversationId = validateConversationId(input.conversationId);
   const type = validateMessageType(input.type);
