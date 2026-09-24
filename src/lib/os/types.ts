@@ -289,8 +289,8 @@ export interface TransactionModel {
   reference: string;
   senderId: string;
   recipientId: string;
-  amount: number;
-  currency: string;
+  amountMinor: number;
+  currency: 'NGN';
   type: TransactionType;
   sourceModule: string;
   relatedOrderId?: string;
@@ -298,6 +298,7 @@ export interface TransactionModel {
   relatedRequestId?: string;
   provider: string; // e.g., 'unique_pay_demo', 'paystack', 'flutterwave'
   status: TransactionStatus;
+  description?: string;
   createdAt: string;
   updatedAt: string;
   failureReason?: string;
@@ -305,18 +306,45 @@ export interface TransactionModel {
 }
 
 // UniquePay Types
+export interface Wallet {
+  uid: string;
+  currency: 'NGN';
+  availableBalanceMinor: number;
+  status: 'active' | 'suspended' | 'closed';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface LedgerEntry {
   id: string;
   transactionId: string;
   idempotencyKey: string;
   reference: string;
   uid: string;
-  amount: number;
-  currency: string;
-  type: 'credit' | 'debit' | 'pending_credit' | 'pending_debit' | 'reversal' | 'refund' | 'fee' | 'adjustment' | 'settlement' | 'dispute';
+  direction: 'debit' | 'credit';
+  amountMinor: number;
+  currency: 'NGN';
   status: 'pending' | 'completed' | 'failed' | 'reversed';
-  providerReference?: string;
   createdAt: string;
+}
+
+export interface WalletIdempotencyRecord {
+  id: string; // Deterministic key: `${uid}:${idempotencyKey}`
+  uid: string;
+  idempotencyKey: string;
+  request: {
+    recipientId: string;
+    amountMinor: number;
+    currency: 'NGN';
+    description?: string;
+  };
+  result: {
+    transactionId: string;
+    reference: string;
+    status: TransactionStatus;
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PaymentProvider {

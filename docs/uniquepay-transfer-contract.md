@@ -86,6 +86,68 @@ For NGN:
 
 Amounts must be positive integers and validated against configured transaction limits.
 
+Canonical rule:
+
+- All authoritative financial amounts use `amountMinor` integers.
+- NGN uses 100 minor units per ₦1.
+- Do not maintain competing authoritative `amount` and `amountMinor` fields for wallet transfer records.
+
+5B. Canonical Wallet and Financial Schemas
+
+Wallet collection
+
+- Collection: `wallets`
+- Document ID: Firebase Auth UID
+- Fields:
+  - `uid: string`
+  - `currency: "NGN"`
+  - `availableBalanceMinor: integer`
+  - `status: "active" | "suspended" | "closed"`
+  - `createdAt`
+  - `updatedAt`
+
+New wallet initialization:
+
+- `availableBalanceMinor = 0`
+
+Transaction collection (server-created only)
+
+- Collection: `transactions`
+- Preserved fields:
+  - `id` / `reference`
+  - `senderId`
+  - `recipientId`
+  - `amountMinor`
+  - `currency`
+  - `type`
+  - `status`
+  - `description` (when provided)
+  - `createdAt`
+  - `updatedAt`
+
+Ledger collection (server-only)
+
+- Collection: `ledgerEntries`
+- Per-entry fields:
+  - `transactionId`
+  - `reference`
+  - `uid`
+  - `direction: "debit" | "credit"`
+  - `amountMinor`
+  - `currency`
+  - `status`
+  - `idempotencyKey`
+  - `createdAt`
+
+Idempotency collection (server-only)
+
+- Collection: `walletIdempotency`
+- Identity: deterministic key for `authenticatedSenderUid + idempotencyKey`
+- Stored data must be sufficient to:
+  - replay identical requests safely
+  - detect conflicting key reuse
+  - return the original successful result
+
 6. Authentication and Authorization
 
 The endpoint must require a valid Firebase ID token.
