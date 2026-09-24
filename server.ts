@@ -4,12 +4,17 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import type { DecodedIdToken } from "firebase-admin/auth";
 
 // Initialize Firebase Admin (Uses Application Default Credentials if available, otherwise just relies on the project configuration)
 if (getApps().length === 0) {
   initializeApp({
     projectId: "gen-lang-client-0680695304",
   });
+}
+
+export interface AuthenticatedRequest extends Request {
+  user?: DecodedIdToken;
 }
 
 async function startServer() {
@@ -20,7 +25,7 @@ async function startServer() {
   app.use(express.json());
 
   // Firebase Authentication Middleware
-  const authenticate = async (req: Request, res: Response, next: NextFunction) => {
+  const authenticate = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Unauthorized: No token provided' });
@@ -32,7 +37,7 @@ async function startServer() {
     // If the token is meant for our own Firebase backend, we verify it:
     try {
       const decodedToken = await getAuth().verifyIdToken(token);
-      (req as any).user = decodedToken;
+      req.user = decodedToken;
       next();
     } catch (error) {
       console.error('Error verifying Firebase auth token:', error);
