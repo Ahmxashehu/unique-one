@@ -86,68 +86,6 @@ For NGN:
 
 Amounts must be positive integers and validated against configured transaction limits.
 
-Canonical rule:
-
-- All authoritative financial amounts use `amountMinor` integers.
-- NGN uses 100 minor units per ₦1.
-- Do not maintain competing authoritative `amount` and `amountMinor` fields for wallet transfer records.
-
-5B. Canonical Wallet and Financial Schemas
-
-Wallet collection
-
-- Collection: `wallets`
-- Document ID: Firebase Auth UID
-- Fields:
-  - `uid: string`
-  - `currency: "NGN"`
-  - `availableBalanceMinor: integer`
-  - `status: "active" | "suspended" | "closed"`
-  - `createdAt`
-  - `updatedAt`
-
-New wallet initialization:
-
-- `availableBalanceMinor = 0`
-
-Transaction collection (server-created only)
-
-- Collection: `transactions`
-- Preserved fields:
-  - `id` / `reference`
-  - `senderId`
-  - `recipientId`
-  - `amountMinor`
-  - `currency`
-  - `type`
-  - `status`
-  - `description` (when provided)
-  - `createdAt`
-  - `updatedAt`
-
-Ledger collection (server-only)
-
-- Collection: `ledgerEntries`
-- Per-entry fields:
-  - `transactionId`
-  - `reference`
-  - `uid`
-  - `direction: "debit" | "credit"`
-  - `amountMinor`
-  - `currency`
-  - `status`
-  - `idempotencyKey`
-  - `createdAt`
-
-Idempotency collection (server-only)
-
-- Collection: `walletIdempotency`
-- Identity: deterministic key for `authenticatedSenderUid + idempotencyKey`
-- Stored data must be sufficient to:
-  - replay identical requests safely
-  - detect conflicting key reuse
-  - return the original successful result
-
 6. Authentication and Authorization
 
 The endpoint must require a valid Firebase ID token.
@@ -225,6 +163,68 @@ The ledger must preserve:
 - Appropriate status.
 
 The exact accounting model and reconciliation procedures must be reviewed before production use.
+
+9a. Canonical Schemas (Step 3 — finalized, not yet implemented)
+
+The following canonical schemas are approved for Step 3 and define the trusted financial data contract.
+
+wallets (collection)
+
+- uid: string
+- currency: "NGN"
+- availableBalanceMinor: integer
+- status: "active" | "suspended" | "closed"
+- createdAt: string
+- updatedAt: string
+
+All wallet balances must be stored as integer NGN minor units (kobo).
+
+- ₦1 = 100 minor units
+- ₦100 = 10,000 minor units
+
+transactions (collection)
+
+- id: string
+- reference: string
+- senderId: string
+- recipientId: string
+- amountMinor: integer (authoritative)
+- amount: number (legacy display-only compatibility field; non-authoritative)
+- currency: "NGN"
+- description: optional string
+- type: transaction type
+- status: transfer status
+- createdAt: string
+- updatedAt: string
+
+ledgerEntries (server-only collection)
+
+- id: string
+- transactionId: string
+- reference: string
+- uid: string
+- direction: "debit" | "credit"
+- amountMinor: integer
+- currency: "NGN"
+- status: transaction status
+- idempotencyKey: string
+- createdAt: string
+
+The ledgerEntries collection is server-only and must not be written directly by clients.
+
+walletIdempotency (server-only collection)
+
+- id: string
+- uid: string
+- idempotencyKey: string
+- requestFingerprint: string
+- status: "completed" | "failed"
+- transactionId: optional string
+- resultReference: optional string
+- createdAt: string
+- updatedAt: string
+
+The walletIdempotency collection is server-only and must not be written directly by clients.
 
 10. Idempotency
 

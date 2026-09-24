@@ -216,6 +216,47 @@ export type PaymentRequestStatus = 'draft' | 'sent' | 'viewed' | 'pending_approv
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'partially_paid' | 'paid' | 'overdue' | 'cancelled' | 'refunded' | 'disputed';
 export type TransactionType = 'payment' | 'transfer' | 'refund' | 'fee' | 'invoice_payment' | 'school_payment' | 'merchant_payment' | 'bulk_payment' | 'reversal';
 export type TransactionStatus = 'pending' | 'completed' | 'failed' | 'reversed' | 'disputed';
+export type WalletCurrency = 'NGN';
+export type WalletStatus = 'active' | 'suspended' | 'closed';
+
+// Canonical UniquePay wallet schema (collection: wallets).
+// Financial amounts are stored as integers in NGN minor units (kobo): ₦1 = 100.
+export interface WalletModel {
+  uid: string;
+  currency: WalletCurrency;
+  availableBalanceMinor: number;
+  status: WalletStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Canonical UniquePay ledger schema (server-only collection: ledgerEntries).
+// Financial amounts are stored as integers in NGN minor units (kobo): ₦1 = 100.
+export interface LedgerEntryRecord {
+  id: string;
+  transactionId: string;
+  reference: string;
+  uid: string;
+  direction: 'debit' | 'credit';
+  amountMinor: number;
+  currency: WalletCurrency;
+  status: TransactionStatus;
+  idempotencyKey: string;
+  createdAt: string;
+}
+
+// Canonical idempotency schema (server-only collection: walletIdempotency).
+export interface WalletIdempotencyRecord {
+  id: string;
+  uid: string;
+  idempotencyKey: string;
+  requestFingerprint: string;
+  status: 'completed' | 'failed';
+  transactionId?: string;
+  resultReference?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface PaymentRequestModel {
   id: string;
@@ -289,8 +330,11 @@ export interface TransactionModel {
   reference: string;
   senderId: string;
   recipientId: string;
+  /** @deprecated Legacy display-only field for UI compatibility; non-authoritative for financial operations. */
+  amount: number;
   amountMinor: number;
-  currency: 'NGN';
+  currency: string;
+  description?: string;
   type: TransactionType;
   sourceModule: string;
   relatedOrderId?: string;
@@ -298,53 +342,27 @@ export interface TransactionModel {
   relatedRequestId?: string;
   provider: string; // e.g., 'unique_pay_demo', 'paystack', 'flutterwave'
   status: TransactionStatus;
-  description?: string;
   createdAt: string;
   updatedAt: string;
   failureReason?: string;
   reversalReason?: string;
 }
 
+// Legacy UniquePay ledger type retained for compatibility.
+// New wallet ledger writes must use LedgerEntryRecord in the server-only ledgerEntries collection.
 // UniquePay Types
-export interface Wallet {
-  uid: string;
-  currency: 'NGN';
-  availableBalanceMinor: number;
-  status: 'active' | 'suspended' | 'closed';
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface LedgerEntry {
   id: string;
   transactionId: string;
   idempotencyKey: string;
   reference: string;
   uid: string;
-  direction: 'debit' | 'credit';
-  amountMinor: number;
-  currency: 'NGN';
+  amount: number;
+  currency: string;
+  type: 'credit' | 'debit' | 'pending_credit' | 'pending_debit' | 'reversal' | 'refund' | 'fee' | 'adjustment' | 'settlement' | 'dispute';
   status: 'pending' | 'completed' | 'failed' | 'reversed';
+  providerReference?: string;
   createdAt: string;
-}
-
-export interface WalletIdempotencyRecord {
-  id: string; // Deterministic key: `${uid}:${idempotencyKey}`
-  uid: string;
-  idempotencyKey: string;
-  request: {
-    recipientId: string;
-    amountMinor: number;
-    currency: 'NGN';
-    description?: string;
-  };
-  result: {
-    transactionId: string;
-    reference: string;
-    status: TransactionStatus;
-  };
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface PaymentProvider {
