@@ -260,40 +260,14 @@ function createFirestoreRateLimitStore(collectionName: string, windowMs: number)
         return { totalHits, resetTime };
       });
     },
-    async decrement(key) {
-      const docRef = adminDb.collection(collectionName).doc(key);
-      await adminDb.runTransaction(async transaction => {
-        const snapshot = await transaction.get(docRef);
-        if (!snapshot.exists) return;
-        const data = snapshot.data() as Record<string, unknown> | undefined;
-        const totalHits = Number.isSafeInteger(data?.totalHits) ? Number(data?.totalHits) - 1 : 0;
-        if (totalHits <= 0) {
-          transaction.delete(docRef);
-          return;
-        }
-        transaction.update(docRef, {
-          totalHits,
-          updatedAt: Timestamp.now().toDate().toISOString(),
-        });
-      });
+    async decrement() {
+      return;
     },
     async resetKey(key) {
       await adminDb.collection(collectionName).doc(key).delete();
     },
   };
 }
-const conversationCreateRateLimit = rateLimit({
-  windowMs: CONVERSATION_CREATE_WINDOW_MS,
-  limit: MAX_CONVERSATION_CREATES_PER_WINDOW,
-  standardHeaders: true,
-  legacyHeaders: false,
-  store: createFirestoreRateLimitStore('communicationConversationRateLimits', CONVERSATION_CREATE_WINDOW_MS),
-  keyGenerator: (req) => {
-    const uid = (req as any).user?.uid;
-    return isSafeFirebaseUid(uid) ? uid : 'anonymous';
-  },
-  handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conversation creation requests. Please try again shortly.'),
-});
 function transferResultPayload(transactionId: string, reference: string, senderUid: string, recipientId: string, amountMinor: number, currency: string, description: string | undefined, status: 'completed' | 'failed') {
   const payload: Record<string, unknown> = { id: transactionId, reference, senderId: senderUid, recipientId, amount: amountMinor, currency, type: 'transfer', sourceModule: 'unique_pay.wallet_transfer', provider: 'unique_pay_internal_wallet', status, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' };
   if (description !== undefined) payload.description = description;
@@ -419,7 +393,18 @@ async function startServer() {
       return res.status(200).json(transactionResult);
     } catch (error) { console.error('Transfer execution failed:', error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The transfer service is temporarily unavailable.'); }
   });
-  app.post("/api/communication/conversations", authenticate, conversationCreateRateLimit, async (req, res) => {
+  app.post("/api/communication/conversations", authenticate, rateLimit({
+    windowMs: CONVERSATION_CREATE_WINDOW_MS,
+    limit: MAX_CONVERSATION_CREATES_PER_WINDOW,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationConversationRateLimits', CONVERSATION_CREATE_WINDOW_MS),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : 'anonymous';
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conversation creation requests. Please try again shortly.'),
+  }), async (req, res) => {
     let creatorUid: string;
     let validatedRequest: CreateConversationRequestInput;
     try {
