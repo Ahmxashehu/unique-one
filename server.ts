@@ -80,7 +80,7 @@ async function startServer() {
     limit: 30,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => (req as AuthenticatedRequest).user?.uid ?? req.ip,
+    keyGenerator: (req) => req.headers.authorization ?? req.ip,
     handler: (_req, res) => {
       res.status(429).json({
         error: "Too many transfer validation requests",
@@ -96,8 +96,8 @@ async function startServer() {
 
   app.post(
     "/api/transfers/validate",
-    authenticate,
     rateLimitTransferValidation,
+    authenticate,
     async (req: AuthenticatedRequest, res: Response) => {
       const senderUid = req.user?.uid;
       if (!senderUid) {
