@@ -10,45 +10,25 @@ import {
   type DocumentData,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { auth, db } from '../firebase';
 import type {
   Conversation,
   ConversationMember,
   Message,
   MessageRequest,
-  UserPresence,
   Notification,
+  UserPresence,
 } from './communication-types';
 
 /**
  * Communication Core Firestore data-access foundation.
  *
- * Step 4 scope: typed, read-only(-mostly) data access for the new
- * Communication Core collections defined in `communication-types.ts`.
+ * Uses the existing Firebase client app, Auth instance, and Firestore client
+ * from `src/lib/firebase.ts`. All reads are one-shot reads; this module does
+ * not add writes, listeners, server endpoints, or legacy-message access.
  *
- * This module reuses the repository's existing Firebase client SDK
- * instance (`src/lib/firebase.ts`). It does NOT initialize a second
- * Firebase app and does NOT use the Firebase Admin SDK.
- *
- * This module intentionally does NOT implement:
- *  - Realtime listeners (`onSnapshot`) — reads are one-shot (`getDoc`/`getDocs`).
- *  - Message creation/writes, presence writes, or notification writes.
- *  - Chat UI, WebSockets, Socket.IO, voice/video, or external providers.
- *  - Any UniquePay wallet/transfer/ledger logic.
- *
- * Legacy separation:
- * The existing legacy messaging system (`src/pages/messages/*`) reads and
- * writes a top-level `conversations` collection plus a *nested*
- * `conversations/{conversationId}/messages` subcollection, using the
- * legacy `Conversation`/`Message` shapes from `src/lib/os/types.ts`. This
- * module is intentionally independent: it reads the *new* Communication
- * Core collections (`conversationMembers`, top-level `messages`,
- * `messageRequests`, `userPresence`, `notifications`) and the *new*
- * types from `communication-types.ts`. The legacy `conversations`
- * collection name is shared by both systems (per the Step 4 instructions,
- * which do not introduce an alternate name), but this module's
- * `getConversation`/`getUserConversations` only ever map documents through
- * the new `Conversation` shape and never write to that collection.
+ * Current-user helpers derive their UID exclusively from `auth.currentUser`.
+ * They intentionally do not accept caller-provided user IDs.
  */
 
 const CONVERSATIONS_COLLECTION = 'conversations';
@@ -62,6 +42,7 @@ const DEFAULT_MESSAGE_LIMIT = 50;
 const MAX_MESSAGE_LIMIT = 200;
 
 export type CommunicationDbErrorCode =
+  | 'UNAUTHENTICATED'
   | 'INVALID_ID'
   | 'NOT_FOUND'
   | 'INVALID_DOCUMENT_SHAPE'
@@ -69,6 +50,7 @@ export type CommunicationDbErrorCode =
 
 export class CommunicationDbError extends Error {
   code: CommunicationDbErrorCode;
+
   constructor(code: CommunicationDbErrorCode, message: string) {
     super(message);
     this.name = 'CommunicationDbError';
@@ -76,13 +58,12 @@ export class CommunicationDbError extends Error {
   }
 }
 
-/** Bounded identifier check, matching the convention already used by `communicationCore.ts`. */
 function isBoundedIdentifier(value: unknown, maxLength = 128): value is string {
   return (
-    typeof value === 'string' &&
-    value.length >= 1 &&
-    value.length <= maxLength &&
-    /^[A-Za-z0-9_-]+$/.test(value)
+    typeof value === 'string'
+    && value.length >= 1
+    && value.length <= maxLength
+    && /^[A-Za-z0-9_-]+$/.test(value)
   );
 }
 
@@ -93,11 +74,19 @@ function requireId(value: unknown, fieldName: string): string {
   return value;
 }
 
-/** Wraps a Firestore read so unexpected SDK failures surface as a typed, safe error. */
+/** Derives the UID from the repository's existing Firebase Auth client instance. */
+function requireAuthenticatedUid(): string {
+  const uid = auth.currentUser?.uid;
+  if (!isBoundedIdentifier(uid)) {
+    throw new CommunicationDbError('UNAUTHENTICATED', 'Authentication is required to read private Communication Core data.');
+  }
+  return uid;
+}
+
 async function safeRead<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
-  } catch (error) {
+  } catch (_) {
     throw new CommunicationDbError('READ_FAILED', 'Failed to read Communication Core data from Firestore.');
   }
 }
@@ -106,14 +95,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** Coerces a Firestore Timestamp-like value or ISO string to an ISO-8601 string. Never fabricates a value. */
 function coerceTimestampToIso(value: unknown, fieldName: string): string {
   if (typeof value === 'string') return value;
-  if (
-    value &&
-    typeof value === 'object' &&
-    typeof (value as { toDate?: unknown }).toDate === 'function'
-  ) {
+  if (value && typeof value === 'object' && typeof (value as { toDate?: unknown }).toDate === 'function') {
     return (value as { toDate: () => Date }).toDate().toISOString();
   }
   throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', `${fieldName} is missing or is not a valid timestamp.`);
@@ -124,10 +108,6 @@ function coerceOptionalTimestampToIso(value: unknown): string | undefined {
   return coerceTimestampToIso(value, 'optional timestamp field');
 }
 
-// ---------------------------------------------------------------------------
-// Conversations
-// ---------------------------------------------------------------------------
-
 function mapConversation(snapshotId: string, data: DocumentData | undefined): Conversation {
   if (!isPlainObject(data)) {
     throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'Conversation document data is missing or malformed.');
@@ -135,6 +115,7 @@ function mapConversation(snapshotId: string, data: DocumentData | undefined): Co
   if (typeof data.type !== 'string' || typeof data.createdBy !== 'string' || typeof data.status !== 'string') {
     throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'Conversation document is missing required fields.');
   }
+
   const conversation: Conversation = {
     id: snapshotId,
     type: data.type as Conversation['type'],
@@ -145,13 +126,13 @@ function mapConversation(snapshotId: string, data: DocumentData | undefined): Co
   };
   if (typeof data.title === 'string') conversation.title = data.title;
   if (typeof data.avatarUrl === 'string') conversation.avatarUrl = data.avatarUrl;
+  if (typeof data.lastMessageId === 'string') conversation.lastMessageId = data.lastMessageId;
   const lastMessageAt = coerceOptionalTimestampToIso(data.lastMessageAt);
   if (lastMessageAt !== undefined) conversation.lastMessageAt = lastMessageAt;
-  if (typeof data.lastMessageId === 'string') conversation.lastMessageId = data.lastMessageId;
   return conversation;
 }
 
-/** Reads a single Communication Core conversation by ID. Throws if not found or malformed. */
+/** Reads one new Communication Core conversation by ID. */
 export async function getConversation(conversationId: string): Promise<Conversation> {
   const id = requireId(conversationId, 'conversationId');
   const snapshot = await safeRead(() => getDoc(doc(db, CONVERSATIONS_COLLECTION, id)));
@@ -161,15 +142,8 @@ export async function getConversation(conversationId: string): Promise<Conversat
   return mapConversation(snapshot.id, snapshot.data());
 }
 
-function mapConversationMember(snapshotId: string, data: DocumentData | undefined): ConversationMember {
-  if (!isPlainObject(data)) {
-    throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'ConversationMember document data is missing or malformed.');
-  }
-  if (
-    typeof data.conversationId !== 'string' ||
-    typeof data.uid !== 'string' ||
-    typeof data.role !== 'string'
-  ) {
+function mapConversationMember(data: DocumentData | undefined): ConversationMember {
+  if (!isPlainObject(data) || typeof data.conversationId !== 'string' || typeof data.uid !== 'string' || typeof data.role !== 'string') {
     throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'ConversationMember document is missing required fields.');
   }
   const member: ConversationMember = {
@@ -184,37 +158,22 @@ function mapConversationMember(snapshotId: string, data: DocumentData | undefine
   return member;
 }
 
-/** Reads all membership records for a conversation from the `conversationMembers` collection. */
+/** Reads membership records for a conversation. Firestore rules enforce membership. */
 export async function getConversationMembers(conversationId: string): Promise<ConversationMember[]> {
   const id = requireId(conversationId, 'conversationId');
-  const membersQuery = query(
-    collection(db, CONVERSATION_MEMBERS_COLLECTION),
-    where('conversationId', '==', id),
-  );
-  const snapshot = await safeRead(() => getDocs(membersQuery));
-  return snapshot.docs.map((docSnap: QueryDocumentSnapshot<DocumentData>) => mapConversationMember(docSnap.id, docSnap.data()));
+  const memberQuery = query(collection(db, CONVERSATION_MEMBERS_COLLECTION), where('conversationId', '==', id));
+  const snapshot = await safeRead(() => getDocs(memberQuery));
+  return snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapConversationMember(item.data()));
 }
 
-/**
- * Reads all conversations a given user belongs to, via `conversationMembers`.
- *
- * `userId` must be an already-verified identifier (e.g. the authenticated
- * user's UID from the repository's existing auth context, such as
- * `useAuth().currentUser.uid` on the client or the verified `req.user.uid`
- * on the server). This helper does not perform authentication itself and
- * must not be called with an unauthenticated, caller-supplied ID when the
- * intent is "current user's" data.
- */
-export async function getUserConversations(userId: string): Promise<Conversation[]> {
-  const uid = requireId(userId, 'userId');
-  const membershipQuery = query(
-    collection(db, CONVERSATION_MEMBERS_COLLECTION),
-    where('uid', '==', uid),
-  );
-  const membershipSnapshot = await safeRead(() => getDocs(membershipQuery));
+/** Reads conversations for the currently authenticated Firebase user. */
+export async function getUserConversations(): Promise<Conversation[]> {
+  const uid = requireAuthenticatedUid();
+  const memberQuery = query(collection(db, CONVERSATION_MEMBERS_COLLECTION), where('uid', '==', uid));
+  const membershipSnapshot = await safeRead(() => getDocs(memberQuery));
   const conversationIds = membershipSnapshot.docs
-    .map((docSnap: QueryDocumentSnapshot<DocumentData>) => docSnap.data().conversationId)
-    .filter((value: unknown): value is string => typeof value === 'string');
+    .map((item: QueryDocumentSnapshot<DocumentData>) => item.data().conversationId)
+    .filter((value: unknown): value is string => isBoundedIdentifier(value));
 
   const conversations: Conversation[] = [];
   for (const conversationId of conversationIds) {
@@ -228,20 +187,8 @@ export async function getUserConversations(userId: string): Promise<Conversation
   return conversations;
 }
 
-// ---------------------------------------------------------------------------
-// Messages (new top-level Communication Core collection: "messages")
-// ---------------------------------------------------------------------------
-
 function mapMessage(snapshotId: string, data: DocumentData | undefined): Message {
-  if (!isPlainObject(data)) {
-    throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'Message document data is missing or malformed.');
-  }
-  if (
-    typeof data.conversationId !== 'string' ||
-    typeof data.senderId !== 'string' ||
-    typeof data.type !== 'string' ||
-    typeof data.status !== 'string'
-  ) {
+  if (!isPlainObject(data) || typeof data.conversationId !== 'string' || typeof data.senderId !== 'string' || typeof data.type !== 'string' || typeof data.status !== 'string') {
     throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'Message document is missing required fields.');
   }
   const message: Message = {
@@ -253,40 +200,32 @@ function mapMessage(snapshotId: string, data: DocumentData | undefined): Message
     status: data.status as Message['status'],
   };
   if (typeof data.text === 'string') message.text = data.text;
+  if (Array.isArray(data.attachments)) message.attachments = data.attachments;
   if (typeof data.replyToMessageId === 'string') message.replyToMessageId = data.replyToMessageId;
   const updatedAt = coerceOptionalTimestampToIso(data.updatedAt);
   if (updatedAt !== undefined) message.updatedAt = updatedAt;
-  if (Array.isArray(data.attachments)) message.attachments = data.attachments;
   return message;
 }
 
 function clampMessageLimit(requested: number | undefined): number {
-  if (requested === undefined) return DEFAULT_MESSAGE_LIMIT;
-  if (!Number.isSafeInteger(requested) || requested <= 0) return DEFAULT_MESSAGE_LIMIT;
+  if (requested === undefined || !Number.isSafeInteger(requested) || requested <= 0) return DEFAULT_MESSAGE_LIMIT;
   return Math.min(requested, MAX_MESSAGE_LIMIT);
 }
 
-/**
- * Reads messages for a conversation from the new top-level `messages`
- * collection (NOT the legacy nested
- * `conversations/{conversationId}/messages` subcollection used by
- * `src/pages/messages/ChatView.tsx`). Ordered oldest-first, bounded by
- * `limit` (default 50, max 200).
- */
+/** Reads top-level Communication Core messages, never legacy nested messages. */
 export async function getMessagesForConversation(conversationId: string, limit?: number): Promise<Message[]> {
   const id = requireId(conversationId, 'conversationId');
-  const boundedLimit = clampMessageLimit(limit);
-  const messagesQuery = query(
+  const messageQuery = query(
     collection(db, MESSAGES_COLLECTION),
     where('conversationId', '==', id),
     orderBy('createdAt', 'asc'),
-    fbLimit(boundedLimit),
+    fbLimit(clampMessageLimit(limit)),
   );
-  const snapshot = await safeRead(() => getDocs(messagesQuery));
-  return snapshot.docs.map((docSnap: QueryDocumentSnapshot<DocumentData>) => mapMessage(docSnap.id, docSnap.data()));
+  const snapshot = await safeRead(() => getDocs(messageQuery));
+  return snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data()));
 }
 
-/** Reads a single message by ID from the top-level `messages` collection. */
+/** Reads a message from the top-level Communication Core messages collection. */
 export async function getMessage(messageId: string): Promise<Message> {
   const id = requireId(messageId, 'messageId');
   const snapshot = await safeRead(() => getDoc(doc(db, MESSAGES_COLLECTION, id)));
@@ -296,19 +235,8 @@ export async function getMessage(messageId: string): Promise<Message> {
   return mapMessage(snapshot.id, snapshot.data());
 }
 
-// ---------------------------------------------------------------------------
-// Message requests
-// ---------------------------------------------------------------------------
-
 function mapMessageRequest(snapshotId: string, data: DocumentData | undefined): MessageRequest {
-  if (!isPlainObject(data)) {
-    throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'MessageRequest document data is missing or malformed.');
-  }
-  if (
-    typeof data.fromUid !== 'string' ||
-    typeof data.toUid !== 'string' ||
-    typeof data.status !== 'string'
-  ) {
+  if (!isPlainObject(data) || typeof data.fromUid !== 'string' || typeof data.toUid !== 'string' || typeof data.status !== 'string') {
     throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'MessageRequest document is missing required fields.');
   }
   const messageRequest: MessageRequest = {
@@ -323,45 +251,24 @@ function mapMessageRequest(snapshotId: string, data: DocumentData | undefined): 
   return messageRequest;
 }
 
-/**
- * Reads message requests sent TO the given user.
- * `userId` must be a verified/authenticated identifier; see the note on
- * `getUserConversations`.
- */
-export async function getIncomingMessageRequests(userId: string): Promise<MessageRequest[]> {
-  const uid = requireId(userId, 'userId');
-  const requestsQuery = query(
-    collection(db, MESSAGE_REQUESTS_COLLECTION),
-    where('toUid', '==', uid),
-  );
+/** Reads message requests addressed to the currently authenticated user. */
+export async function getIncomingMessageRequests(): Promise<MessageRequest[]> {
+  const uid = requireAuthenticatedUid();
+  const requestsQuery = query(collection(db, MESSAGE_REQUESTS_COLLECTION), where('toUid', '==', uid));
   const snapshot = await safeRead(() => getDocs(requestsQuery));
-  return snapshot.docs.map((docSnap: QueryDocumentSnapshot<DocumentData>) => mapMessageRequest(docSnap.id, docSnap.data()));
+  return snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessageRequest(item.id, item.data()));
 }
 
-/**
- * Reads message requests sent FROM the given user.
- * `userId` must be a verified/authenticated identifier; see the note on
- * `getUserConversations`.
- */
-export async function getOutgoingMessageRequests(userId: string): Promise<MessageRequest[]> {
-  const uid = requireId(userId, 'userId');
-  const requestsQuery = query(
-    collection(db, MESSAGE_REQUESTS_COLLECTION),
-    where('fromUid', '==', uid),
-  );
+/** Reads message requests sent by the currently authenticated user. */
+export async function getOutgoingMessageRequests(): Promise<MessageRequest[]> {
+  const uid = requireAuthenticatedUid();
+  const requestsQuery = query(collection(db, MESSAGE_REQUESTS_COLLECTION), where('fromUid', '==', uid));
   const snapshot = await safeRead(() => getDocs(requestsQuery));
-  return snapshot.docs.map((docSnap: QueryDocumentSnapshot<DocumentData>) => mapMessageRequest(docSnap.id, docSnap.data()));
+  return snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessageRequest(item.id, item.data()));
 }
-
-// ---------------------------------------------------------------------------
-// Presence
-// ---------------------------------------------------------------------------
 
 function mapUserPresence(data: DocumentData | undefined, uid: string): UserPresence {
-  if (!isPlainObject(data)) {
-    throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'UserPresence document data is missing or malformed.');
-  }
-  if (typeof data.status !== 'string') {
+  if (!isPlainObject(data) || typeof data.status !== 'string') {
     throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'UserPresence document is missing required fields.');
   }
   return {
@@ -371,31 +278,18 @@ function mapUserPresence(data: DocumentData | undefined, uid: string): UserPrese
   };
 }
 
-/** Reads a user's Communication Core presence document. Does not write presence. */
-export async function getUserPresence(userId: string): Promise<UserPresence> {
-  const uid = requireId(userId, 'userId');
+/** Reads presence only for the currently authenticated user. */
+export async function getUserPresence(): Promise<UserPresence> {
+  const uid = requireAuthenticatedUid();
   const snapshot = await safeRead(() => getDoc(doc(db, USER_PRESENCE_COLLECTION, uid)));
   if (!snapshot.exists()) {
-    throw new CommunicationDbError('NOT_FOUND', `Presence for user ${uid} was not found.`);
+    throw new CommunicationDbError('NOT_FOUND', 'Presence for the authenticated user was not found.');
   }
   return mapUserPresence(snapshot.data(), uid);
 }
 
-// ---------------------------------------------------------------------------
-// Notifications
-// ---------------------------------------------------------------------------
-
 function mapNotification(snapshotId: string, data: DocumentData | undefined): Notification {
-  if (!isPlainObject(data)) {
-    throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'Notification document data is missing or malformed.');
-  }
-  if (
-    typeof data.uid !== 'string' ||
-    typeof data.type !== 'string' ||
-    typeof data.title !== 'string' ||
-    typeof data.body !== 'string' ||
-    typeof data.read !== 'boolean'
-  ) {
+  if (!isPlainObject(data) || typeof data.uid !== 'string' || typeof data.type !== 'string' || typeof data.title !== 'string' || typeof data.body !== 'string' || typeof data.read !== 'boolean') {
     throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'Notification document is missing required fields.');
   }
   const notification: Notification = {
@@ -412,17 +306,10 @@ function mapNotification(snapshotId: string, data: DocumentData | undefined): No
   return notification;
 }
 
-/**
- * Reads notifications for the given user.
- * `userId` must be a verified/authenticated identifier; see the note on
- * `getUserConversations`.
- */
-export async function getNotifications(userId: string): Promise<Notification[]> {
-  const uid = requireId(userId, 'userId');
-  const notificationsQuery = query(
-    collection(db, NOTIFICATIONS_COLLECTION),
-    where('uid', '==', uid),
-  );
+/** Reads notifications only for the currently authenticated user. */
+export async function getNotifications(): Promise<Notification[]> {
+  const uid = requireAuthenticatedUid();
+  const notificationsQuery = query(collection(db, NOTIFICATIONS_COLLECTION), where('uid', '==', uid));
   const snapshot = await safeRead(() => getDocs(notificationsQuery));
-  return snapshot.docs.map((docSnap: QueryDocumentSnapshot<DocumentData>) => mapNotification(docSnap.id, docSnap.data()));
+  return snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapNotification(item.id, item.data()));
 }
