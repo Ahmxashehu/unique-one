@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import type { DecodedIdToken } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
 // Initialize Firebase Admin (Uses Application Default Credentials if available, otherwise just relies on the project configuration)
 if (getApps().length === 0) {
@@ -12,6 +13,10 @@ if (getApps().length === 0) {
     projectId: "gen-lang-client-0680695304",
   });
 }
+
+// Server-side Firestore instance (uses the existing Firebase Admin app above).
+// Reserved for future server-side wallet/transfer work; not read from or written to yet.
+const db = getFirestore();
 
 export interface AuthenticatedRequest extends Request {
   user?: DecodedIdToken;
