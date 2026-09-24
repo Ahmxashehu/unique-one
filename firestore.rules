@@ -176,6 +176,11 @@ service cloud.firestore {
     match /conversations/{conversationId} {
       allow read: if isConversationMember(conversationId);
       allow create, update, delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isConversationMember(conversationId);
+        allow create, update, delete: if false;
+      }
     }
 
     match /conversationMembers/{membershipId} {

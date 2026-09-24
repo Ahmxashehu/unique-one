@@ -21,7 +21,7 @@ type TransferErrorCode =
   | 'UNAUTHENTICATED' | 'INVALID_REQUEST' | 'INVALID_RECIPIENT' | 'RECIPIENT_NOT_FOUND'
   | 'SELF_TRANSFER_NOT_ALLOWED' | 'INVALID_AMOUNT' | 'INVALID_CURRENCY'
   | 'INVALID_IDEMPOTENCY_KEY' | 'IDEMPOTENCY_KEY_CONFLICT' | 'TRANSFER_ALREADY_COMPLETED'
-  | 'TRANSFER_IN_PROGRESS' | 'WALLET_NOT_FOUND' | 'WALLET_UNAVAILABLE' | 'INSUFFICIENT_FUNDS'
+  | 'TRANSFER_IN_PROGRESS' | 'WALLET_NOT_FOUND' | 'WALLET_UNAVAILABLE' | 'INSUFFICIENT_FUNDS' | 'RATE_LIMITED'
   | 'TRANSACTION_FAILED' | 'SERVICE_UNAVAILABLE';
 interface TransferErrorResponse { error: { code: TransferErrorCode; message: string } }
 interface TransferRequestInput { recipientId: string; amountMinor: number; currency: 'NGN'; idempotencyKey: string; description?: string }
@@ -33,11 +33,14 @@ const MAX_IDEMPOTENCY_KEY_LENGTH = 128;
 const MAX_CONVERSATION_TITLE_LENGTH = 500;
 const MAX_CONVERSATION_AVATAR_URL_LENGTH = 2048;
 const MAX_CONVERSATION_MEMBER_COUNT = 50;
+const CONVERSATION_CREATE_WINDOW_MS = 60_000;
+const MAX_CONVERSATION_CREATES_PER_WINDOW = 10;
 const COMMUNICATION_CONVERSATION_TYPES = new Set<ConversationType>(['direct', 'group', 'business']);
+const conversationCreateRateLimits = new Map<string, { count: number; windowStartedAt: number }>();
 const transferErrorStatus: Record<TransferErrorCode, number> = {
   UNAUTHENTICATED: 401, INVALID_REQUEST: 400, INVALID_RECIPIENT: 400, RECIPIENT_NOT_FOUND: 404,
   SELF_TRANSFER_NOT_ALLOWED: 400, INVALID_AMOUNT: 400, INVALID_CURRENCY: 400, INVALID_IDEMPOTENCY_KEY: 400,
-  IDEMPOTENCY_KEY_CONFLICT: 409, TRANSFER_ALREADY_COMPLETED: 200, TRANSFER_IN_PROGRESS: 409,
+  IDEMPOTENCY_KEY_CONFLICT: 409, TRANSFER_ALREADY_COMPLETED: 200, TRANSFER_IN_PROGRESS: 409, RATE_LIMITED: 429,
   WALLET_NOT_FOUND: 404, WALLET_UNAVAILABLE: 403, INSUFFICIENT_FUNDS: 409, TRANSACTION_FAILED: 500,
   SERVICE_UNAVAILABLE: 503,
 };
@@ -138,6 +141,11 @@ function sanitizeOptionalConversationText(value: unknown, fieldName: 'title' | '
 function conversationMemberDocumentId(conversationId: string, uid: string) {
   return `${conversationId}_${uid}`;
 }
+function validateConversationMemberCount(type: ConversationType, memberUids: string[]) {
+  if (type === 'direct' && memberUids.length !== 2) {
+    throw new RequestValidationError('INVALID_REQUEST', 'direct conversations must include exactly two unique members.');
+  }
+}
 function validateCreateConversationRequest(body: unknown, creatorUid: string): CreateConversationRequestInput {
   if (!isPlainObject(body)) {
     throw new RequestValidationError('INVALID_REQUEST', 'The conversation request body must be a plain object.');
@@ -179,9 +187,11 @@ function validateCreateConversationRequest(body: unknown, creatorUid: string): C
   if (memberUidSet.size > MAX_CONVERSATION_MEMBER_COUNT) {
     throw new RequestValidationError('INVALID_REQUEST', `A conversation may have at most ${MAX_CONVERSATION_MEMBER_COUNT} unique members.`);
   }
+  const memberUids = Array.from(memberUidSet);
+  validateConversationMemberCount(payload.type as ConversationType, memberUids);
   return {
     type: payload.type as ConversationType,
-    memberUids: Array.from(memberUidSet),
+    memberUids,
     title,
     avatarUrl,
   };
@@ -193,6 +203,34 @@ function buildConversationMembers(conversationId: string, memberUids: string[], 
     role: uid === creatorUid ? 'owner' : 'member',
     joinedAt,
   }));
+}
+function conversationCreateRateLimit(req: Request, res: Response, next: NextFunction) {
+  try {
+    const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+    const rateLimitKey = `${uid}:${req.ip ?? 'unknown'}`;
+    const now = Date.now();
+    const existing = conversationCreateRateLimits.get(rateLimitKey);
+    if (!existing || now - existing.windowStartedAt >= CONVERSATION_CREATE_WINDOW_MS) {
+      conversationCreateRateLimits.set(rateLimitKey, { count: 1, windowStartedAt: now });
+    } else if (existing.count >= MAX_CONVERSATION_CREATES_PER_WINDOW) {
+      return errorResponse(res, 'RATE_LIMITED', 'Too many conversation creation requests. Please try again shortly.');
+    } else {
+      existing.count += 1;
+    }
+    if (conversationCreateRateLimits.size > 10_000) {
+      for (const [key, value] of conversationCreateRateLimits.entries()) {
+        if (now - value.windowStartedAt >= CONVERSATION_CREATE_WINDOW_MS) {
+          conversationCreateRateLimits.delete(key);
+        }
+      }
+    }
+    return next();
+  } catch (error) {
+    if (error instanceof RequestValidationError) {
+      return errorResponse(res, error.code, error.message);
+    }
+    return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to access this resource.');
+  }
 }
 function transferResultPayload(transactionId: string, reference: string, senderUid: string, recipientId: string, amountMinor: number, currency: string, description: string | undefined, status: 'completed' | 'failed') {
   const payload: Record<string, unknown> = { id: transactionId, reference, senderId: senderUid, recipientId, amount: amountMinor, currency, type: 'transfer', sourceModule: 'unique_pay.wallet_transfer', provider: 'unique_pay_internal_wallet', status, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' };
@@ -318,7 +356,7 @@ async function startServer() {
       return res.status(200).json(transactionResult);
     } catch (error) { console.error('Transfer execution failed:', error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The transfer service is temporarily unavailable.'); }
   });
-  app.post("/api/communication/conversations", authenticate, async (req, res) => {
+  app.post("/api/communication/conversations", authenticate, conversationCreateRateLimit, async (req, res) => {
     let creatorUid: string;
     let validatedRequest: CreateConversationRequestInput;
     try {
