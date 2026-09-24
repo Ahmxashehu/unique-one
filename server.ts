@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import type { DecodedIdToken } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
 // Initialize Firebase Admin (Uses Application Default Credentials if available, otherwise just relies on the project configuration)
 if (getApps().length === 0) {
@@ -12,6 +13,8 @@ if (getApps().length === 0) {
     projectId: "gen-lang-client-0680695304",
   });
 }
+
+export const adminFirestore = getFirestore();
 
 export interface AuthenticatedRequest extends Request {
   user?: DecodedIdToken;
