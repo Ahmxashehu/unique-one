@@ -5,6 +5,7 @@ import {
   type DocumentReference,
   type Firestore,
 } from 'firebase-admin/firestore';
+import { webcrypto } from 'node:crypto';
 
 import {
   evaluateLegacyConversation,
@@ -231,7 +232,7 @@ async function buildSourceSnapshotHash(
     sourceDocumentId,
     sourceData: normalizedSourceData,
   });
-  const digest = await crypto.subtle.digest(
+  const digest = await webcrypto.subtle.digest(
     'SHA-256',
     new TextEncoder().encode(payload),
   );
@@ -254,49 +255,6 @@ function toComparableState(state: LegacyMessageMigrationState): unknown {
     createdAt: state.createdAt,
     version: state.version,
   });
-}
-
-async function readLegacyConversationDiagnosticSnapshot(
-  db: Firestore,
-  legacyConversationId: string,
-): Promise<LegacyConversationDiagnosticSnapshot | null> {
-  try {
-    const snapshot = await db
-      .collection('conversations')
-      .doc(legacyConversationId)
-      .get();
-
-    return snapshot.exists
-      ? (snapshot.data() as LegacyConversationDiagnosticSnapshot)
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-async function readSourceSnapshotHash(
-  db: Firestore,
-  sourceCollection: LegacyMessageMigrationSourceCollection | null,
-  sourceDocumentId: string | null,
-): Promise<string | null> {
-  if (!sourceCollection || !sourceDocumentId) {
-    return null;
-  }
-
-  try {
-    const snapshot = await db.collection(sourceCollection).doc(sourceDocumentId).get();
-    if (!snapshot.exists) {
-      return null;
-    }
-
-    return buildSourceSnapshotHash(
-      sourceCollection,
-      sourceDocumentId,
-      snapshot.data() as DocumentData,
-    );
-  } catch {
-    return null;
-  }
 }
 
 function buildStateRecord(
@@ -344,19 +302,18 @@ async function createOrUpdateLegacyMessageMigrationStateWithDependencies(
 ): Promise<LegacyMessageMigrationState> {
   const evaluation = await evaluateConversation(legacyConversationId);
   const sourceMetadata = parseSourceMetadata(evaluation);
-  const [conversationSnapshot, sourceSnapshotHash] = await Promise.all([
-    readLegacyConversationDiagnosticSnapshot(db, legacyConversationId),
-    readSourceSnapshotHash(
-      db,
-      sourceMetadata.sourceCollection,
-      sourceMetadata.sourceDocumentId,
-    ),
-  ]);
-
-  const legacyParticipantSnapshot = getLegacyParticipantSnapshot(conversationSnapshot);
   const stateDocumentReference = db
     .collection(MIGRATION_STATE_COLLECTION)
     .doc(legacyConversationId);
+  const conversationDocumentReference = db
+    .collection('conversations')
+    .doc(legacyConversationId);
+  const sourceDocumentReference =
+    sourceMetadata.sourceCollection && sourceMetadata.sourceDocumentId
+      ? db
+          .collection(sourceMetadata.sourceCollection)
+          .doc(sourceMetadata.sourceDocumentId)
+      : null;
 
   return db.runTransaction(async (transaction: StateTransaction) => {
     const existingStateSnapshot = await transaction.get(stateDocumentReference);
@@ -368,6 +325,26 @@ async function createOrUpdateLegacyMessageMigrationStateWithDependencies(
       }
     }
 
+    const conversationSnapshot = await transaction.get(conversationDocumentReference);
+    const legacyParticipantSnapshot = getLegacyParticipantSnapshot(
+      conversationSnapshot.exists
+        ? (conversationSnapshot.data() as LegacyConversationDiagnosticSnapshot)
+        : null,
+    );
+    const sourceSnapshotHash =
+      sourceDocumentReference && sourceMetadata.sourceCollection && sourceMetadata.sourceDocumentId
+        ? await transaction.get(sourceDocumentReference).then((sourceSnapshot) => {
+            if (!sourceSnapshot.exists) {
+              return null;
+            }
+
+            return buildSourceSnapshotHash(
+              sourceMetadata.sourceCollection!,
+              sourceMetadata.sourceDocumentId!,
+              sourceSnapshot.data() as DocumentData,
+            );
+          })
+        : null;
     const now = Timestamp.now();
     const createdAt =
       existingStateSnapshot.exists &&

@@ -42,6 +42,10 @@ function isForbiddenIdentity(value: string): boolean {
   return ['unknown', 'order_seller'].includes(value.trim());
 }
 
+function isNonEmptyStringArray(values: unknown[]): values is string[] {
+  return values.every(isNonEmptyString);
+}
+
 function isAuthUserNotFoundError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && (error as { code?: unknown }).code === 'auth/user-not-found';
 }
@@ -149,7 +153,7 @@ async function evaluateWithDependencies(
         : ['sellerId', 'customerId'];
   const participantUids = participantFields.map((field) => source[field]);
 
-  if (participantUids.some((uid) => !isNonEmptyString(uid))) {
+  if (!isNonEmptyStringArray(participantUids)) {
     return {
       conversationId,
       status: 'blocked',
@@ -159,7 +163,7 @@ async function evaluateWithDependencies(
     };
   }
 
-  const normalizedParticipantUids = participantUids.map((uid) => (uid as string).trim());
+  const normalizedParticipantUids = participantUids.map((uid) => uid.trim());
   if (normalizedParticipantUids.some(isForbiddenIdentity)) {
     return {
       conversationId,
