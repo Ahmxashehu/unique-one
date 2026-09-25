@@ -66,16 +66,6 @@ async function evaluateWithDependencies(
     };
   }
 
-  export async function evaluateLegacyConversationWithOverrides(
-    conversationId: string,
-    overrides: Partial<EvaluationDependencies> = {},
-  ): Promise<LegacyMessageEvaluation> {
-    return evaluateWithDependencies(conversationId, {
-      ...getDependencies(),
-      ...overrides,
-    });
-  }
-
   let conversationSnapshot;
   try {
     conversationSnapshot = await db.collection('conversations').doc(conversationId).get();
@@ -230,6 +220,16 @@ async function evaluateWithDependencies(
     derivedParticipantUids: normalizedParticipantUids,
     reasonCodes: [],
   };
+}
+
+export async function evaluateLegacyConversationWithOverrides(
+  conversationId: string,
+  overrides: Partial<EvaluationDependencies> = {},
+): Promise<LegacyMessageEvaluation> {
+  return evaluateWithDependencies(conversationId, {
+    ...getDependencies(),
+    ...overrides,
+  });
 }
 
 /**
