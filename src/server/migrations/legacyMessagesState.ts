@@ -433,31 +433,30 @@ async function createOrUpdateLegacyMessageMigrationStateWithDependencies(
     const legacyParticipantSnapshot = getLegacyParticipantSnapshot(
       transactionConversation,
     );
-    const sourceSnapshotHash =
-      sourceMetadata.sourceCollection && sourceMetadata.sourceDocumentId
-        ? await (async () => {
-            const sourcePath = `${sourceMetadata.sourceCollection}/${sourceMetadata.sourceDocumentId}`;
-            let sourceSnapshot = sourceSnapshotsByPath.get(sourcePath);
-            if (!sourceSnapshot) {
-              sourceSnapshot = await transaction.get(
-                db
-                  .collection(sourceMetadata.sourceCollection)
-                  .doc(sourceMetadata.sourceDocumentId),
-              );
-              sourceSnapshotsByPath.set(sourcePath, sourceSnapshot);
-            }
+    let sourceSnapshotHash: string | null = null;
+    if (
+      sourceMetadata.sourceCollection !== null &&
+      sourceMetadata.sourceDocumentId !== null
+    ) {
+      const sourceCollection = sourceMetadata.sourceCollection;
+      const sourceDocumentId = sourceMetadata.sourceDocumentId;
+      const sourcePath = `${sourceCollection}/${sourceDocumentId}`;
+      let sourceSnapshot = sourceSnapshotsByPath.get(sourcePath);
+      if (!sourceSnapshot) {
+        sourceSnapshot = await transaction.get(
+          db.collection(sourceCollection).doc(sourceDocumentId),
+        );
+        sourceSnapshotsByPath.set(sourcePath, sourceSnapshot);
+      }
 
-            if (!sourceSnapshot.exists) {
-              return null;
-            }
-
-            return buildSourceSnapshotHash(
-              sourceMetadata.sourceCollection,
-              sourceMetadata.sourceDocumentId,
-              sourceSnapshot.data() as DocumentData,
-            );
-          })()
-        : null;
+      if (sourceSnapshot.exists) {
+        sourceSnapshotHash = await buildSourceSnapshotHash(
+          sourceCollection,
+          sourceDocumentId,
+          sourceSnapshot.data() as DocumentData,
+        );
+      }
+    }
     const now = Timestamp.now();
     const createdAt =
       existingStateSnapshot.exists &&
