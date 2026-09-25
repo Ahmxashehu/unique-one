@@ -3,9 +3,13 @@ import { collection, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { AlertCircle, ArrowDownLeft, ArrowUpRight, Filter, Loader2, Search, Wallet } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../lib/firebase';
-import { TransactionModel } from '../../lib/os/types';
+import {
+  FinancialTransactionViewModel,
+  formatFinancialTransactionAmount,
+  mapFinancialTransaction,
+} from '../../lib/os/pay/financialTransaction';
 
-type TransactionRecord = TransactionModel & { isOutgoing: boolean };
+type TransactionRecord = FinancialTransactionViewModel;
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -14,20 +18,6 @@ function formatDate(value: string) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date);
-}
-
-function formatAmount(transaction: TransactionRecord) {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: transaction.currency,
-    maximumFractionDigits: 2,
-  }).format(transaction.amount);
-}
-
-function getTransactionDate(transaction: TransactionModel) {
-  const value = transaction.createdAt;
-  if (typeof value === 'string') return value;
-  return String(value);
 }
 
 export default function TransactionHistoryPage() {
@@ -57,8 +47,6 @@ export default function TransactionHistoryPage() {
 
       try {
         const transactionsRef = collection(db, 'transactions');
-        // The security rules authorize both sender and recipient ownership. Separate
-        // reads keep each query aligned with those rules and avoid broad collection reads.
         const [sentSnapshot, receivedSnapshot] = await Promise.all([
           getDocs(query(transactionsRef, where('senderId', '==', currentUser.uid), orderBy('createdAt', 'desc'))),
           getDocs(query(transactionsRef, where('recipientId', '==', currentUser.uid), orderBy('createdAt', 'desc'))),
@@ -68,16 +56,15 @@ export default function TransactionHistoryPage() {
 
         const byId = new Map<string, TransactionRecord>();
         sentSnapshot.forEach((document) => {
-          const transaction = { id: document.id, ...document.data() } as TransactionModel;
-          byId.set(document.id, { ...transaction, isOutgoing: true });
+          const transaction = mapFinancialTransaction(document.id, document.data(), currentUser.uid);
+          if (transaction) byId.set(document.id, transaction);
         });
         receivedSnapshot.forEach((document) => {
-          const transaction = { id: document.id, ...document.data() } as TransactionModel;
-          const existing = byId.get(document.id);
-          byId.set(document.id, { ...transaction, isOutgoing: existing?.isOutgoing ?? false });
+          const transaction = mapFinancialTransaction(document.id, document.data(), currentUser.uid);
+          if (transaction) byId.set(document.id, transaction);
         });
 
-        setTransactions([...byId.values()].sort((a, b) => getTransactionDate(b).localeCompare(getTransactionDate(a))));
+        setTransactions([...byId.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
       } catch (loadError) {
         console.error('Unable to load transaction history:', loadError);
         if (isMounted) setError('We could not load your transactions. Please try again.');
@@ -95,9 +82,16 @@ export default function TransactionHistoryPage() {
   const visibleTransactions = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     return transactions.filter((transaction) => {
-      const matchesFilter = filter === 'all' || (filter === 'sent' ? transaction.isOutgoing : !transaction.isOutgoing);
-      const matchesSearch = !normalizedSearch || [transaction.reference, transaction.type, transaction.status, transaction.senderId, transaction.recipientId]
-        .some((value) => value.toLowerCase().includes(normalizedSearch));
+      const matchesFilter = filter === 'all' || (filter === 'sent' ? transaction.direction === 'outgoing' : transaction.direction === 'incoming');
+      const searchableValues = [
+        transaction.reference,
+        transaction.type,
+        transaction.sourceModule,
+        transaction.status,
+        transaction.senderId,
+        transaction.recipientId,
+      ];
+      const matchesSearch = !normalizedSearch || searchableValues.some((value) => value.toLowerCase().includes(normalizedSearch));
       return matchesFilter && matchesSearch;
     });
   }, [filter, search, transactions]);
@@ -123,46 +117,35 @@ export default function TransactionHistoryPage() {
 
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 p-3">
-          <div className="relative w-full sm:ml-auto sm:w-72">
+          <div className="relative w-full sm:ml-auto sm:w-80">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Search transactions..." className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-4 text-sm outline-none focus:border-slate-400" />
           </div>
         </div>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center">
-            <Loader2 className="mb-4 h-8 w-8 animate-spin text-slate-400" />
-            <p className="text-sm text-slate-500">Loading your transactions...</p>
-          </div>
+          <div className="flex flex-col items-center justify-center p-12 text-center"><Loader2 className="mb-4 h-8 w-8 animate-spin text-slate-400" /><p className="text-sm text-slate-500">Loading your transactions...</p></div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center">
-            <AlertCircle className="mb-4 h-10 w-10 text-red-400" />
-            <p className="font-medium text-slate-900">Unable to load transactions</p>
-            <p className="mt-1 text-sm text-slate-500">{error}</p>
-          </div>
+          <div className="flex flex-col items-center justify-center p-12 text-center"><AlertCircle className="mb-4 h-10 w-10 text-red-400" /><p className="font-medium text-slate-900">Unable to load transactions</p><p className="mt-1 text-sm text-slate-500">{error}</p></div>
         ) : visibleTransactions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-50"><Wallet className="h-8 w-8 text-slate-400" /></div>
-            <p className="font-medium text-slate-900">{transactions.length ? 'No matching transactions' : 'No transactions'}</p>
-            <p className="mt-1 text-sm text-slate-500">{transactions.length ? 'Try a different search or filter.' : 'Your ledger is completely clean.'}</p>
-          </div>
+          <div className="flex flex-col items-center justify-center p-12 text-center"><div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-50"><Wallet className="h-8 w-8 text-slate-400" /></div><p className="font-medium text-slate-900">{transactions.length ? 'No matching transactions' : 'No transactions'}</p><p className="mt-1 text-sm text-slate-500">{transactions.length ? 'Try a different search or filter.' : 'Your ledger is completely clean.'}</p></div>
         ) : (
           <div className="divide-y divide-slate-100">
             {visibleTransactions.map((transaction) => (
               <div key={transaction.id} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${transaction.isOutgoing ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                    {transaction.isOutgoing ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownLeft className="h-5 w-5" />}
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${transaction.direction === 'outgoing' ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                    {transaction.direction === 'outgoing' ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownLeft className="h-5 w-5" />}
                   </div>
                   <div className="min-w-0">
                     <p className="truncate font-medium capitalize text-slate-900">{transaction.type.replaceAll('_', ' ')}</p>
-                    <p className="truncate text-xs text-slate-500">{transaction.isOutgoing ? `To ${transaction.recipientId}` : `From ${transaction.senderId}`}</p>
-                    <p className="mt-1 truncate text-xs text-slate-400">{transaction.reference} · {formatDate(getTransactionDate(transaction))}</p>
+                    <p className="truncate text-xs text-slate-500">{transaction.direction === 'outgoing' ? `To ${transaction.recipientId}` : `From ${transaction.senderId}`}</p>
+                    <p className="mt-1 truncate text-xs text-slate-400">{transaction.reference} · {transaction.sourceModule} · {formatDate(transaction.createdAt)}</p>
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-4 sm:justify-end">
                   <div className="text-left sm:text-right">
-                    <p className={`font-semibold ${transaction.isOutgoing ? 'text-slate-900' : 'text-emerald-600'}`}>{transaction.isOutgoing ? '-' : '+'}{formatAmount(transaction)}</p>
+                    <p className={`font-semibold ${transaction.direction === 'outgoing' ? 'text-slate-900' : 'text-emerald-600'}`}>{transaction.direction === 'outgoing' ? '-' : '+'}{formatFinancialTransactionAmount(transaction)}</p>
                     <span className="text-xs capitalize text-slate-500">{transaction.status}</span>
                   </div>
                 </div>
