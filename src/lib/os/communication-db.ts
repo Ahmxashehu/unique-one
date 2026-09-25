@@ -15,6 +15,7 @@ import type {
   Conversation,
   ConversationMember,
   Message,
+  MessageAttachmentMetadata,
   MessageRequest,
   Notification,
   UserPresence,
@@ -174,17 +175,28 @@ export async function getUserConversations(): Promise<Conversation[]> {
   const conversationIds = membershipSnapshot.docs
     .map((item: QueryDocumentSnapshot<DocumentData>) => item.data().conversationId)
     .filter((value: unknown): value is string => isBoundedIdentifier(value));
-
-  const conversations: Conversation[] = [];
-  for (const conversationId of conversationIds) {
+  const uniqueConversationIds = Array.from(new Set(conversationIds));
+  const conversations = await Promise.all(uniqueConversationIds.map(async (conversationId) => {
     try {
-      conversations.push(await getConversation(conversationId));
+      return await getConversation(conversationId);
     } catch (error) {
-      if (error instanceof CommunicationDbError && error.code === 'NOT_FOUND') continue;
+      if (error instanceof CommunicationDbError && error.code === 'NOT_FOUND') return null;
       throw error;
     }
-  }
-  return conversations;
+  }));
+  return conversations.filter((conversation): conversation is Conversation => conversation !== null);
+}
+
+function isMessageAttachmentMetadata(value: unknown): value is MessageAttachmentMetadata {
+  if (!isPlainObject(value)) return false;
+  return (
+    typeof value.id === 'string'
+    && typeof value.name === 'string'
+    && typeof value.contentType === 'string'
+    && typeof value.url === 'string'
+    && Number.isSafeInteger(value.sizeBytes)
+    && Number(value.sizeBytes) >= 0
+  );
 }
 
 function mapMessage(snapshotId: string, data: DocumentData | undefined): Message {
@@ -200,7 +212,12 @@ function mapMessage(snapshotId: string, data: DocumentData | undefined): Message
     status: data.status as Message['status'],
   };
   if (typeof data.text === 'string') message.text = data.text;
-  if (Array.isArray(data.attachments)) message.attachments = data.attachments;
+  if (Array.isArray(data.attachments)) {
+    if (!data.attachments.every(isMessageAttachmentMetadata)) {
+      throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'Message attachments contain invalid metadata.');
+    }
+    message.attachments = data.attachments as MessageAttachmentMetadata[];
+  }
   if (typeof data.replyToMessageId === 'string') message.replyToMessageId = data.replyToMessageId;
   const updatedAt = coerceOptionalTimestampToIso(data.updatedAt);
   if (updatedAt !== undefined) message.updatedAt = updatedAt;

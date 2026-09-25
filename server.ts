@@ -1,7 +1,6 @@
 import express, { Request, Response, NextFunction } from "express";
 import http from "http";
 import path from "path";
-import { randomUUID } from "node:crypto";
 import { createServer as createViteServer } from "vite";
 import rateLimit, { type Store } from "express-rate-limit";
 import { initializeApp, getApps } from "firebase-admin/app";
@@ -282,6 +281,7 @@ async function startServer() {
   const PORT = 3000;
   const httpServer = http.createServer(app);
   app.use(express.json());
+  app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
   const authenticate = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to access this resource.');
@@ -289,7 +289,7 @@ async function startServer() {
     catch (_) { return errorResponse(res, 'UNAUTHENTICATED', 'The supplied Firebase token is invalid or expired.'); }
   };
   app.get("/api/health", (req, res) => res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" }));
-  app.get("/api/wallet", authenticate, async (req, res) => {
+  app.get("/api/wallet", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = (req as any).user?.uid as string | undefined;
     if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Missing authenticated user.');
     try {
@@ -298,7 +298,7 @@ async function startServer() {
       return res.status(200).json(validateWalletDocument(snapshot.data(), uid));
     } catch (error) { console.error('Error fetching wallet:', error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to fetch wallet.'); }
   });
-  app.post("/api/wallet", authenticate, async (req, res) => {
+  app.post("/api/wallet", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = (req as any).user?.uid as string | undefined;
     if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Missing authenticated user.');
     try {
@@ -306,7 +306,7 @@ async function startServer() {
       return res.status(200).json({ uid: wallet.uid, currency: wallet.currency, availableBalanceMinor: wallet.availableBalanceMinor, status: wallet.status, createdAt: wallet.createdAt.toDate().toISOString(), updatedAt: wallet.updatedAt.toDate().toISOString() });
     } catch (error) { console.error("Error initializing wallet:", error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to initialize wallet.'); }
   });
-  app.post("/api/wallet/transfer", authenticate, async (req, res) => {
+  app.post("/api/wallet/transfer", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false, handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many transfer requests were made. Please try again shortly.') }), authenticate, async (req, res) => {
     const senderUid = (req as any).user?.uid as string | undefined;
     if (!senderUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to initiate a transfer.');
     let validatedRequest: TransferRequestInput;
@@ -320,6 +320,7 @@ async function startServer() {
       return errorResponse(res, code, messages[code] ?? 'Invalid transfer request.');
     }
     const { recipientId, amountMinor, currency, idempotencyKey, description } = validatedRequest;
+    if (!(await readUserExists(recipientId))) return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'The recipient user does not exist.');
     const fingerprint = buildRequestFingerprint(senderUid, recipientId, amountMinor, currency, description);
     const idempotencyRef = adminDb.collection('walletIdempotency').doc(idempotencyDocumentId(senderUid, idempotencyKey));
     try {
@@ -332,9 +333,6 @@ async function startServer() {
           if (existing.status === 'failed') return existing.errorResult as Record<string, unknown>;
           if (existing.status === 'in_progress') return { error: { code: 'TRANSFER_IN_PROGRESS' as TransferErrorCode, message: 'A transfer with this idempotency key is already in progress.' } } as TransferErrorResponse;
         }
-        // This external lookup is intentionally after the transactional idempotency read.
-        // A committed final result is authoritative and never requires Auth availability.
-        if (!(await readUserExists(recipientId))) return { error: { code: 'RECIPIENT_NOT_FOUND' as TransferErrorCode, message: 'The recipient user does not exist.' } } as TransferErrorResponse;
         const senderWalletRef = adminDb.collection('wallets').doc(senderUid);
         const recipientWalletRef = adminDb.collection('wallets').doc(recipientId);
         const [senderWalletSnapshot, recipientWalletSnapshot] = await Promise.all([transaction.get(senderWalletRef), transaction.get(recipientWalletRef)]);
@@ -348,7 +346,7 @@ async function startServer() {
         if (senderBalance < amountMinor) return writeFailure({ error: { code: 'INSUFFICIENT_FUNDS', message: 'Insufficient wallet balance.' } });
         const newSenderBalance = senderBalance - amountMinor; const newRecipientBalance = recipientBalance + amountMinor;
         if (!Number.isSafeInteger(newSenderBalance) || !Number.isSafeInteger(newRecipientBalance)) return writeFailure({ error: { code: 'TRANSACTION_FAILED', message: 'The transfer amount would exceed the safe integer range for wallet accounting.' } });
-        const now = Timestamp.now(); const transactionId = adminDb.collection('transactions').doc().id; const reference = `UP-WT-${Date.now()}-${randomUUID().slice(0, 8)}`;
+        const now = Timestamp.now(); const transactionId = adminDb.collection('transactions').doc().id; const reference = `UP-WT-${transactionId}`;
         const transactionRecord = { id: transactionId, reference, senderId: senderUid, recipientId, amount: amountMinor, currency, type: 'transfer', sourceModule: 'unique_pay.wallet_transfer', provider: 'unique_pay_internal_wallet', status: 'completed', createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' };
         const completedResult = { transaction: transferResultPayload(transactionId, reference, senderUid, recipientId, amountMinor, currency, description, 'completed'), idempotencyKey, status: 'completed' };
         transaction.set(adminDb.collection('transactions').doc(transactionId), transactionRecord);
@@ -393,18 +391,18 @@ async function startServer() {
       return res.status(200).json(transactionResult);
     } catch (error) { console.error('Transfer execution failed:', error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The transfer service is temporarily unavailable.'); }
   });
-  app.post("/api/communication/conversations", authenticate, rateLimit({
+  app.post("/api/communication/conversations", rateLimit({
     windowMs: CONVERSATION_CREATE_WINDOW_MS,
     limit: MAX_CONVERSATION_CREATES_PER_WINDOW,
     standardHeaders: true,
     legacyHeaders: false,
     store: createFirestoreRateLimitStore('communicationConversationRateLimits', CONVERSATION_CREATE_WINDOW_MS),
     keyGenerator: (req) => {
-      const uid = (req as any).user?.uid;
-      return isSafeFirebaseUid(uid) ? uid : 'anonymous';
+      const ip = req.ip;
+      return typeof ip === 'string' && ip.length > 0 ? ip : 'anonymous';
     },
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conversation creation requests. Please try again shortly.'),
-  }), async (req, res) => {
+  }), authenticate, async (req, res) => {
     let creatorUid: string;
     let validatedRequest: CreateConversationRequestInput;
     try {
