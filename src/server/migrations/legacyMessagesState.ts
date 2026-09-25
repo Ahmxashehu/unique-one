@@ -8,7 +8,7 @@ import {
 import { webcrypto } from 'node:crypto';
 
 import {
-  evaluateLegacyConversation,
+  evaluateLegacyConversationWithOverrides,
   type LegacyMessageEvaluation,
 } from './legacyMessages';
 
@@ -48,11 +48,13 @@ export interface LegacyMessageMigrationState {
 
 interface LegacyConversationDiagnosticSnapshot {
   participants?: unknown;
+  orderId?: unknown;
+  paymentRequestId?: unknown;
+  invoiceId?: unknown;
 }
 
 interface MigrationDependencies {
   db: Firestore;
-  evaluateConversation: typeof evaluateLegacyConversation;
 }
 
 interface StateTransaction {
@@ -62,17 +64,26 @@ interface StateTransaction {
   set(documentReference: unknown, data: LegacyMessageMigrationState): void;
 }
 
+type TransactionDocumentSnapshot = Awaited<ReturnType<StateTransaction['get']>>;
+
 const MIGRATION_STATE_COLLECTION = 'communicationCoreMigration';
 const MIGRATION_STATE_VERSION = 1;
 const IMMUTABLE_STATUSES = new Set<LegacyMessageMigrationStatus>([
   'migrated',
   'failed_permanent',
 ]);
+const SUPPORTED_SOURCE_REFERENCES: Array<{
+  field: 'orderId' | 'paymentRequestId' | 'invoiceId';
+  collection: LegacyMessageMigrationSourceCollection;
+}> = [
+  { field: 'orderId', collection: 'orders' },
+  { field: 'paymentRequestId', collection: 'payment_requests' },
+  { field: 'invoiceId', collection: 'invoices' },
+];
 
 function getDependencies(): MigrationDependencies {
   return {
     db: getFirestore(),
-    evaluateConversation: evaluateLegacyConversation,
   };
 }
 
@@ -284,6 +295,64 @@ function buildStateRecord(
   };
 }
 
+function getSourceReferenceForEvaluationPrefetch(
+  conversation: LegacyConversationDiagnosticSnapshot | null,
+):
+  | {
+      sourceCollection: LegacyMessageMigrationSourceCollection;
+      sourceDocumentId: string;
+    }
+  | null {
+  if (!conversation) {
+    return null;
+  }
+
+  const presentReferences = SUPPORTED_SOURCE_REFERENCES.filter(({ field }) => {
+    const value = conversation[field];
+    return value !== undefined && value !== null && value !== '';
+  });
+
+  if (presentReferences.length !== 1) {
+    return null;
+  }
+
+  const sourceDocumentId = conversation[presentReferences[0].field];
+  if (typeof sourceDocumentId !== 'string' || sourceDocumentId.trim().length === 0) {
+    return null;
+  }
+
+  return {
+    sourceCollection: presentReferences[0].collection,
+    sourceDocumentId,
+  };
+}
+
+function createTransactionScopedEvaluationDb(
+  legacyConversationId: string,
+  conversationSnapshot: TransactionDocumentSnapshot,
+  sourceSnapshotsByPath: Map<string, TransactionDocumentSnapshot>,
+): Firestore {
+  return {
+    collection: (collectionName: string) => ({
+      doc: (documentId: string) => ({
+        get: async () => {
+          const path = `${collectionName}/${documentId}`;
+          if (path === `conversations/${legacyConversationId}`) {
+            return conversationSnapshot;
+          }
+
+          const sourceSnapshot = sourceSnapshotsByPath.get(path);
+          if (sourceSnapshot) {
+            return sourceSnapshot;
+          }
+
+          throw new Error(`transaction_scoped_snapshot_missing:${path}`);
+        },
+      }),
+    }),
+  } as Firestore;
+}
+
 /**
  * Creates or updates the isolated migration-state document for a single legacy
  * conversation without modifying any legacy or Communication Core records.
@@ -299,22 +368,14 @@ export async function createOrUpdateLegacyMessageMigrationState(
 
 async function createOrUpdateLegacyMessageMigrationStateWithDependencies(
   legacyConversationId: string,
-  { db, evaluateConversation }: MigrationDependencies,
+  { db }: MigrationDependencies,
 ): Promise<LegacyMessageMigrationState> {
-  const evaluation = await evaluateConversation(legacyConversationId);
-  const sourceMetadata = parseSourceMetadata(evaluation);
   const stateDocumentReference = db
     .collection(MIGRATION_STATE_COLLECTION)
     .doc(legacyConversationId);
   const conversationDocumentReference = db
     .collection('conversations')
     .doc(legacyConversationId);
-  const sourceDocumentReference =
-    sourceMetadata.sourceCollection && sourceMetadata.sourceDocumentId
-      ? db
-          .collection(sourceMetadata.sourceCollection)
-          .doc(sourceMetadata.sourceDocumentId)
-      : null;
 
   return db.runTransaction(async (transaction: StateTransaction) => {
     const existingStateSnapshot = await transaction.get(stateDocumentReference);
@@ -327,24 +388,62 @@ async function createOrUpdateLegacyMessageMigrationStateWithDependencies(
     }
 
     const conversationSnapshot = await transaction.get(conversationDocumentReference);
-    const legacyParticipantSnapshot = getLegacyParticipantSnapshot(
+    const transactionConversation =
       conversationSnapshot.exists
         ? (conversationSnapshot.data() as LegacyConversationDiagnosticSnapshot)
-        : null,
+        : null;
+    const sourceSnapshotsByPath = new Map<string, TransactionDocumentSnapshot>();
+    const prefetchSourceReference =
+      getSourceReferenceForEvaluationPrefetch(transactionConversation);
+    if (prefetchSourceReference) {
+      const prefetchPath = `${prefetchSourceReference.sourceCollection}/${prefetchSourceReference.sourceDocumentId}`;
+      sourceSnapshotsByPath.set(
+        prefetchPath,
+        await transaction.get(
+          db
+            .collection(prefetchSourceReference.sourceCollection)
+            .doc(prefetchSourceReference.sourceDocumentId),
+        ),
+      );
+    }
+    const evaluation = await evaluateLegacyConversationWithOverrides(
+      legacyConversationId,
+      {
+        db: createTransactionScopedEvaluationDb(
+          legacyConversationId,
+          conversationSnapshot,
+          sourceSnapshotsByPath,
+        ),
+      },
+    );
+    const sourceMetadata = parseSourceMetadata(evaluation);
+    const legacyParticipantSnapshot = getLegacyParticipantSnapshot(
+      transactionConversation,
     );
     const sourceSnapshotHash =
-      sourceDocumentReference && sourceMetadata.sourceCollection && sourceMetadata.sourceDocumentId
-        ? await transaction.get(sourceDocumentReference).then((sourceSnapshot) => {
+      sourceMetadata.sourceCollection && sourceMetadata.sourceDocumentId
+        ? await (async () => {
+            const sourcePath = `${sourceMetadata.sourceCollection}/${sourceMetadata.sourceDocumentId}`;
+            let sourceSnapshot = sourceSnapshotsByPath.get(sourcePath);
+            if (!sourceSnapshot) {
+              sourceSnapshot = await transaction.get(
+                db
+                  .collection(sourceMetadata.sourceCollection)
+                  .doc(sourceMetadata.sourceDocumentId),
+              );
+              sourceSnapshotsByPath.set(sourcePath, sourceSnapshot);
+            }
+
             if (!sourceSnapshot.exists) {
               return null;
             }
 
             return buildSourceSnapshotHash(
-              sourceMetadata.sourceCollection!,
-              sourceMetadata.sourceDocumentId!,
+              sourceMetadata.sourceCollection,
+              sourceMetadata.sourceDocumentId,
               sourceSnapshot.data() as DocumentData,
             );
-          })
+          })()
         : null;
     const now = Timestamp.now();
     const createdAt =

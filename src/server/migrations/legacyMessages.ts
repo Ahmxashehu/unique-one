@@ -66,6 +66,16 @@ async function evaluateWithDependencies(
     };
   }
 
+  export async function evaluateLegacyConversationWithOverrides(
+    conversationId: string,
+    overrides: Partial<EvaluationDependencies> = {},
+  ): Promise<LegacyMessageEvaluation> {
+    return evaluateWithDependencies(conversationId, {
+      ...getDependencies(),
+      ...overrides,
+    });
+  }
+
   let conversationSnapshot;
   try {
     conversationSnapshot = await db.collection('conversations').doc(conversationId).get();
@@ -228,7 +238,7 @@ async function evaluateWithDependencies(
 export async function evaluateLegacyConversation(
   conversationId: string,
 ): Promise<LegacyMessageEvaluation> {
-  return evaluateWithDependencies(conversationId, getDependencies());
+  return evaluateLegacyConversationWithOverrides(conversationId);
 }
 
 export const __legacyMessageEvaluatorTestOnly = {
