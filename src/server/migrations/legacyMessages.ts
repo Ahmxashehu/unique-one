@@ -1,5 +1,10 @@
 import { getAuth, type Auth } from 'firebase-admin/auth';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import {
+  getFirestore,
+  type DocumentReference,
+  type DocumentSnapshot,
+  type Firestore,
+} from 'firebase-admin/firestore';
 
 type SupportedSourceType = 'order' | 'payment' | 'invoice';
 type EvaluationStatus = 'eligible' | 'blocked' | 'out_of_scope' | 'retryable_error';
@@ -19,10 +24,23 @@ interface LegacyConversation {
   invoiceId?: unknown;
 }
 
+/**
+ * Reads a single document reference. Defaults to a plain `.get()` call, but
+ * callers that need the evaluation to observe the exact same Firestore
+ * snapshot as other reads (e.g. a migration-state transaction) can inject a
+ * reader backed by `transaction.get(...)` instead.
+ */
+export type EvaluationDocumentReader = (
+  documentReference: DocumentReference,
+) => Promise<DocumentSnapshot>;
+
 interface EvaluationDependencies {
   db: Firestore;
   auth: Auth;
+  getDoc: EvaluationDocumentReader;
 }
+
+export type EvaluationDependencyOverrides = Partial<EvaluationDependencies>;
 
 const supportedReferences: Array<{
   field: keyof LegacyConversation;
@@ -46,13 +64,23 @@ function isAuthUserNotFoundError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && (error as { code?: unknown }).code === 'auth/user-not-found';
 }
 
-function getDependencies(): EvaluationDependencies {
-  return { db: getFirestore(), auth: getAuth() };
+function defaultGetDoc(documentReference: DocumentReference): Promise<DocumentSnapshot> {
+  return documentReference.get();
+}
+
+function getDependencies(
+  overrides?: EvaluationDependencyOverrides,
+): EvaluationDependencies {
+  return {
+    db: overrides?.db ?? getFirestore(),
+    auth: overrides?.auth ?? getAuth(),
+    getDoc: overrides?.getDoc ?? defaultGetDoc,
+  };
 }
 
 async function evaluateWithDependencies(
   conversationId: string,
-  { db, auth }: EvaluationDependencies,
+  { db, auth, getDoc }: EvaluationDependencies,
 ): Promise<LegacyMessageEvaluation> {
   if (!isNonEmptyString(conversationId) || isForbiddenIdentity(conversationId)) {
     return {
@@ -64,7 +92,7 @@ async function evaluateWithDependencies(
 
   let conversationSnapshot;
   try {
-    conversationSnapshot = await db.collection('conversations').doc(conversationId).get();
+    conversationSnapshot = await getDoc(db.collection('conversations').doc(conversationId));
   } catch {
     return {
       conversationId,
@@ -119,7 +147,7 @@ async function evaluateWithDependencies(
 
   let sourceSnapshot;
   try {
-    sourceSnapshot = await db.collection(reference.collection).doc(sourceReference).get();
+    sourceSnapshot = await getDoc(db.collection(reference.collection).doc(sourceReference));
   } catch {
     return {
       conversationId,
@@ -220,11 +248,18 @@ async function evaluateWithDependencies(
 
 /**
  * Evaluates exactly one legacy conversation without writing any Firestore data.
+ *
+ * Accepts optional dependency overrides so callers (such as the migration
+ * state writer) can force every Firestore read performed during evaluation
+ * to go through `transaction.get(...)`, guaranteeing the evaluation observes
+ * the exact same consistent snapshot as any other reads made in that
+ * transaction.
  */
 export async function evaluateLegacyConversation(
   conversationId: string,
+  overrides?: EvaluationDependencyOverrides,
 ): Promise<LegacyMessageEvaluation> {
-  return evaluateWithDependencies(conversationId, getDependencies());
+  return evaluateWithDependencies(conversationId, getDependencies(overrides));
 }
 
 export const __legacyMessageEvaluatorTestOnly = {
