@@ -273,7 +273,15 @@ function transferResultPayload(transactionId: string, reference: string, senderU
   return payload;
 }
 async function readUserExists(uid: string): Promise<boolean> {
-  try { await getAuth().getUser(uid); return true; } catch (_) { return false; }
+  try {
+    await getAuth().getUser(uid);
+    return true;
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: unknown }).code === 'auth/user-not-found') {
+      return false;
+    }
+    throw error;
+  }
 }
 function idempotencyDocumentId(senderUid: string, idempotencyKey: string) { return `${senderUid}_${idempotencyKey}`; }
 async function startServer() {
@@ -320,7 +328,12 @@ async function startServer() {
       return errorResponse(res, code, messages[code] ?? 'Invalid transfer request.');
     }
     const { recipientId, amountMinor, currency, idempotencyKey, description } = validatedRequest;
-    if (!(await readUserExists(recipientId))) return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'The recipient user does not exist.');
+    try {
+      if (!(await readUserExists(recipientId))) return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'The recipient user does not exist.');
+    } catch (error) {
+      console.error('Recipient lookup failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to validate the recipient at this time.');
+    }
     const fingerprint = buildRequestFingerprint(senderUid, recipientId, amountMinor, currency, description);
     const idempotencyRef = adminDb.collection('walletIdempotency').doc(idempotencyDocumentId(senderUid, idempotencyKey));
     try {

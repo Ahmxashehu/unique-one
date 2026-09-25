@@ -251,6 +251,7 @@ function clampMessageLimit(requested: number | undefined): number {
 
 /** Reads top-level Communication Core messages, never legacy nested messages. */
 export async function getMessagesForConversation(conversationId: string, limit?: number): Promise<Message[]> {
+  requireAuthenticatedUid();
   const id = requireId(conversationId, 'conversationId');
   const messageQuery = query(
     collection(db, MESSAGES_COLLECTION),
@@ -264,6 +265,7 @@ export async function getMessagesForConversation(conversationId: string, limit?:
 
 /** Reads a message from the top-level Communication Core messages collection. */
 export async function getMessage(messageId: string): Promise<Message> {
+  requireAuthenticatedUid();
   const id = requireId(messageId, 'messageId');
   const snapshot = await safeRead(() => getDoc(doc(db, MESSAGES_COLLECTION, id)));
   if (!snapshot.exists()) {

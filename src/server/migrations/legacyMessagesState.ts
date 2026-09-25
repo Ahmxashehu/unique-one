@@ -458,6 +458,7 @@ async function createOrUpdateLegacyMessageMigrationStateWithDependencies(
       }
     }
     const now = Timestamp.now();
+    const evaluationStatus = mapEvaluationStatus(evaluation.status);
     const createdAt =
       existingStateSnapshot.exists &&
       existingStateSnapshot.data()?.createdAt instanceof Timestamp
@@ -468,13 +469,17 @@ async function createOrUpdateLegacyMessageMigrationStateWithDependencies(
       typeof existingStateSnapshot.data()?.attemptCount === 'number'
         ? existingStateSnapshot.data()?.attemptCount
         : 0;
+    const nextAttemptCount =
+      existingStateSnapshot.exists && !IMMUTABLE_STATUSES.has(evaluationStatus)
+        ? attemptCount + 1
+        : attemptCount;
     const nextState = buildStateRecord(
       legacyConversationId,
       evaluation,
       legacyParticipantSnapshot,
       sourceSnapshotHash,
       createdAt,
-      attemptCount,
+      nextAttemptCount,
       now,
     );
 
