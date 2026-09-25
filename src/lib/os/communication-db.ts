@@ -259,8 +259,12 @@ function clampMessageLimit(requested: number | undefined): number {
 
 /** Reads top-level Communication Core messages, never legacy nested messages. */
 export async function getMessagesForConversation(conversationId: string, limit?: number): Promise<Message[]> {
-  requireAuthenticatedUid();
+  const uid = requireAuthenticatedUid();
   const id = requireId(conversationId, 'conversationId');
+  const membershipSnapshot = await safeRead(() => getDoc(doc(db, CONVERSATION_MEMBERS_COLLECTION, `${id}_${uid}`)));
+  if (!membershipSnapshot.exists()) {
+    return [];
+  }
   const messageQuery = query(
     collection(db, MESSAGES_COLLECTION),
     where('conversationId', '==', id),
@@ -273,13 +277,18 @@ export async function getMessagesForConversation(conversationId: string, limit?:
 
 /** Reads a message from the top-level Communication Core messages collection. */
 export async function getMessage(messageId: string): Promise<Message> {
-  requireAuthenticatedUid();
+  const uid = requireAuthenticatedUid();
   const id = requireId(messageId, 'messageId');
   const snapshot = await safeRead(() => getDoc(doc(db, MESSAGES_COLLECTION, id)));
   if (!snapshot.exists()) {
     throw new CommunicationDbError('NOT_FOUND', `Message ${id} was not found.`);
   }
-  return mapMessage(snapshot.id, snapshot.data());
+  const message = mapMessage(snapshot.id, snapshot.data());
+  const membershipSnapshot = await safeRead(() => getDoc(doc(db, CONVERSATION_MEMBERS_COLLECTION, `${message.conversationId}_${uid}`)));
+  if (!membershipSnapshot.exists()) {
+    throw new CommunicationDbError('NOT_FOUND', `Message ${id} was not found.`);
+  }
+  return message;
 }
 
 function mapMessageRequest(snapshotId: string, data: DocumentData | undefined): MessageRequest {
