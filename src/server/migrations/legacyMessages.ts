@@ -159,7 +159,7 @@ async function evaluateWithDependencies(
     };
   }
 
-  const normalizedParticipantUids = participantUids.map((uid) => uid.trim());
+  const normalizedParticipantUids = participantUids.map((uid) => (uid as string).trim());
   if (normalizedParticipantUids.some(isForbiddenIdentity)) {
     return {
       conversationId,
