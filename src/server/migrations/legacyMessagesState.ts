@@ -112,14 +112,15 @@ function parseSourceMetadata(
     };
   }
 
-  const [sourceCollection, sourceDocumentId] = evaluation.sourcePath.split('/');
-  if (!sourceDocumentId) {
+  const pathSegments = evaluation.sourcePath.split('/');
+  if (pathSegments.length !== 2) {
     return {
       sourceType: null,
       sourceCollection: null,
       sourceDocumentId: null,
     };
   }
+  const [sourceCollection, sourceDocumentId] = pathSegments;
 
   if (sourceCollection === 'orders') {
     return {
