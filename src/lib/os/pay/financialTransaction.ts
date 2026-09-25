@@ -1,5 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
-import { TransactionModel, TransactionStatus, TransactionType } from './types';
+import { TransactionModel, TransactionStatus, TransactionType } from '../types';
 
 export interface FinancialTransactionViewModel {
   id: string;
