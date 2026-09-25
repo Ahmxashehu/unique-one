@@ -93,7 +93,8 @@ export function mapFinancialTransaction(
   if (typeof data !== 'object' || data === null) return null;
 
   const record = data as FinancialTransactionDocument;
-  if (record.recordKind !== 'financial' || record.schemaVersion !== 2 || record.amountUnit !== 'minor') return null;
+  const normalizedSchemaVersion = typeof record.schemaVersion === 'string' ? Number(record.schemaVersion) : record.schemaVersion;
+  if (record.recordKind !== 'financial' || normalizedSchemaVersion !== 2 || record.amountUnit !== 'minor') return null;
   if (!isSafeMinorAmount(record.amount)) return null;
   if (typeof record.reference !== 'string' || typeof record.senderId !== 'string' || typeof record.recipientId !== 'string') return null;
   if (typeof record.currency !== 'string' || !isTransactionType(record.type) || !isTransactionStatus(record.status)) return null;

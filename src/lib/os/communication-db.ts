@@ -137,8 +137,12 @@ function mapConversation(snapshotId: string, data: DocumentData | undefined): Co
 
 /** Reads one new Communication Core conversation by ID. */
 export async function getConversation(conversationId: string): Promise<Conversation> {
-  requireAuthenticatedUid();
+  const uid = requireAuthenticatedUid();
   const id = requireId(conversationId, 'conversationId');
+  const membershipSnapshot = await safeRead(() => getDoc(doc(db, CONVERSATION_MEMBERS_COLLECTION, `${id}_${uid}`)));
+  if (!membershipSnapshot.exists()) {
+    throw new CommunicationDbError('NOT_FOUND', `Conversation ${id} was not found.`);
+  }
   const snapshot = await safeRead(() => getDoc(doc(db, CONVERSATIONS_COLLECTION, id)));
   if (!snapshot.exists()) {
     throw new CommunicationDbError('NOT_FOUND', `Conversation ${id} was not found.`);

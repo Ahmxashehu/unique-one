@@ -191,7 +191,17 @@ service cloud.firestore {
     match /messages/{messageId} {
       allow read: if isConversationMember(resource.data.conversationId);
       allow create: if isConversationMember(request.resource.data.conversationId)
-        && request.resource.data.senderId == request.auth.uid;
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.keys().hasOnly(['conversationId', 'senderId', 'type', 'text', 'attachments', 'replyToMessageId', 'status', 'createdAt', 'updatedAt'])
+        && request.resource.data.conversationId is string
+        && request.resource.data.senderId is string
+        && request.resource.data.type is string
+        && request.resource.data.status is string
+        && (request.resource.data.text is string || !('text' in request.resource.data))
+        && (request.resource.data.attachments is list || !('attachments' in request.resource.data))
+        && (request.resource.data.replyToMessageId is string || !('replyToMessageId' in request.resource.data))
+        && ((request.resource.data.createdAt is timestamp) || (request.resource.data.createdAt is string))
+        && ((request.resource.data.updatedAt is timestamp) || (request.resource.data.updatedAt is string) || !('updatedAt' in request.resource.data));
       allow update, delete: if false;
     }
 
