@@ -168,8 +168,12 @@ function mapConversationMember(data: DocumentData | undefined): ConversationMemb
 
 /** Reads membership records for a conversation. Firestore rules enforce membership. */
 export async function getConversationMembers(conversationId: string): Promise<ConversationMember[]> {
-  requireAuthenticatedUid();
+  const uid = requireAuthenticatedUid();
   const id = requireId(conversationId, 'conversationId');
+  const membershipSnapshot = await safeRead(() => getDoc(doc(db, CONVERSATION_MEMBERS_COLLECTION, `${id}_${uid}`)));
+  if (!membershipSnapshot.exists()) {
+    return [];
+  }
   const memberQuery = query(collection(db, CONVERSATION_MEMBERS_COLLECTION), where('conversationId', '==', id));
   const snapshot = await safeRead(() => getDocs(memberQuery));
   return snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapConversationMember(item.data()));

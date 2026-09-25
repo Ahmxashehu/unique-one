@@ -200,6 +200,9 @@ export interface MessageDraftInput {
  * rejects any request body containing a client-supplied `senderUid`.
  */
 export function validateMessageDraft(input: MessageDraftInput, authenticatedUser: unknown): ValidatedMessageDraft {
+  if (typeof input !== 'object' || input === null) {
+    throw new CommunicationValidationError('INVALID_REQUEST', 'The message draft payload must be a plain object.');
+  }
   if (Object.prototype.hasOwnProperty.call(input, 'senderId') && input.senderId !== undefined) {
     throw new CommunicationValidationError('INVALID_REQUEST', 'senderId must not be provided by the client; it is derived from the authenticated user.');
   }
