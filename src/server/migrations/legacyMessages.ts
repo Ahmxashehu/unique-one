@@ -42,10 +42,6 @@ function isForbiddenIdentity(value: string): boolean {
   return ['unknown', 'order_seller'].includes(value.trim());
 }
 
-function isNotFoundError(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && (error as { code?: unknown }).code === 5;
-}
-
 function isAuthUserNotFoundError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && (error as { code?: unknown }).code === 'auth/user-not-found';
 }
@@ -66,7 +62,6 @@ async function evaluateWithDependencies(
     };
   }
 
-  const conversationPath = `conversations/${conversationId}`;
   let conversationSnapshot;
   try {
     conversationSnapshot = await db.collection('conversations').doc(conversationId).get();
@@ -234,5 +229,4 @@ export async function evaluateLegacyConversation(
 
 export const __legacyMessageEvaluatorTestOnly = {
   evaluateWithDependencies,
-  isNotFoundError,
 };
