@@ -347,7 +347,7 @@ async function startServer() {
         const newSenderBalance = senderBalance - amountMinor; const newRecipientBalance = recipientBalance + amountMinor;
         if (!Number.isSafeInteger(newSenderBalance) || !Number.isSafeInteger(newRecipientBalance)) return writeFailure({ error: { code: 'TRANSACTION_FAILED', message: 'The transfer amount would exceed the safe integer range for wallet accounting.' } });
         const now = Timestamp.now(); const transactionId = adminDb.collection('transactions').doc().id; const reference = `UP-WT-${transactionId}`;
-        const transactionRecord = { id: transactionId, reference, senderId: senderUid, recipientId, amount: amountMinor, currency, type: 'transfer', sourceModule: 'unique_pay.wallet_transfer', provider: 'unique_pay_internal_wallet', status: 'completed', createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' };
+        const transactionRecord = { id: transactionId, reference, senderId: senderUid, recipientId, amount: amountMinor, currency, type: 'transfer', sourceModule: 'unique_pay.wallet_transfer', provider: 'unique_pay_internal_wallet', status: 'completed', ...(description !== undefined ? { description } : {}), createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' };
         const completedResult = { transaction: transferResultPayload(transactionId, reference, senderUid, recipientId, amountMinor, currency, description, 'completed'), idempotencyKey, status: 'completed' };
         transaction.set(adminDb.collection('transactions').doc(transactionId), transactionRecord);
         transaction.update(senderWalletRef, { availableBalanceMinor: newSenderBalance, updatedAt: now });
@@ -391,18 +391,20 @@ async function startServer() {
       return res.status(200).json(transactionResult);
     } catch (error) { console.error('Transfer execution failed:', error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The transfer service is temporarily unavailable.'); }
   });
-  app.post("/api/communication/conversations", rateLimit({
+  app.post("/api/communication/conversations", authenticate, rateLimit({
     windowMs: CONVERSATION_CREATE_WINDOW_MS,
     limit: MAX_CONVERSATION_CREATES_PER_WINDOW,
     standardHeaders: true,
     legacyHeaders: false,
     store: createFirestoreRateLimitStore('communicationConversationRateLimits', CONVERSATION_CREATE_WINDOW_MS),
     keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      if (isSafeFirebaseUid(uid)) return uid;
       const ip = req.ip;
       return typeof ip === 'string' && ip.length > 0 ? ip : 'anonymous';
     },
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conversation creation requests. Please try again shortly.'),
-  }), authenticate, async (req, res) => {
+  }), async (req, res) => {
     let creatorUid: string;
     let validatedRequest: CreateConversationRequestInput;
     try {

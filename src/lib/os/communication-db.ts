@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  documentId,
   getDoc,
   getDocs,
   limit as fbLimit,
@@ -41,6 +42,7 @@ const NOTIFICATIONS_COLLECTION = 'notifications';
 
 const DEFAULT_MESSAGE_LIMIT = 50;
 const MAX_MESSAGE_LIMIT = 200;
+const MAX_IN_QUERY_IDS = 30;
 
 export type CommunicationDbErrorCode =
   | 'UNAUTHENTICATED'
@@ -135,6 +137,7 @@ function mapConversation(snapshotId: string, data: DocumentData | undefined): Co
 
 /** Reads one new Communication Core conversation by ID. */
 export async function getConversation(conversationId: string): Promise<Conversation> {
+  requireAuthenticatedUid();
   const id = requireId(conversationId, 'conversationId');
   const snapshot = await safeRead(() => getDoc(doc(db, CONVERSATIONS_COLLECTION, id)));
   if (!snapshot.exists()) {
@@ -161,10 +164,19 @@ function mapConversationMember(data: DocumentData | undefined): ConversationMemb
 
 /** Reads membership records for a conversation. Firestore rules enforce membership. */
 export async function getConversationMembers(conversationId: string): Promise<ConversationMember[]> {
+  requireAuthenticatedUid();
   const id = requireId(conversationId, 'conversationId');
   const memberQuery = query(collection(db, CONVERSATION_MEMBERS_COLLECTION), where('conversationId', '==', id));
   const snapshot = await safeRead(() => getDocs(memberQuery));
   return snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapConversationMember(item.data()));
+}
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
 }
 
 /** Reads conversations for the currently authenticated Firebase user. */
@@ -176,15 +188,23 @@ export async function getUserConversations(): Promise<Conversation[]> {
     .map((item: QueryDocumentSnapshot<DocumentData>) => item.data().conversationId)
     .filter((value: unknown): value is string => isBoundedIdentifier(value));
   const uniqueConversationIds = Array.from(new Set(conversationIds));
-  const conversations = await Promise.all(uniqueConversationIds.map(async (conversationId) => {
-    try {
-      return await getConversation(conversationId);
-    } catch (error) {
-      if (error instanceof CommunicationDbError && error.code === 'NOT_FOUND') return null;
-      throw error;
+  if (uniqueConversationIds.length === 0) return [];
+
+  const conversationsById = new Map<string, Conversation>();
+  const idChunks = chunkArray(uniqueConversationIds, MAX_IN_QUERY_IDS);
+  for (const idChunk of idChunks) {
+    const conversationsQuery = query(
+      collection(db, CONVERSATIONS_COLLECTION),
+      where(documentId(), 'in', idChunk),
+    );
+    const conversationsSnapshot = await safeRead(() => getDocs(conversationsQuery));
+    for (const conversationDoc of conversationsSnapshot.docs) {
+      conversationsById.set(conversationDoc.id, mapConversation(conversationDoc.id, conversationDoc.data()));
     }
-  }));
-  return conversations.filter((conversation): conversation is Conversation => conversation !== null);
+  }
+  return uniqueConversationIds
+    .map((conversationId) => conversationsById.get(conversationId))
+    .filter((conversation): conversation is Conversation => conversation !== undefined);
 }
 
 function isMessageAttachmentMetadata(value: unknown): value is MessageAttachmentMetadata {
