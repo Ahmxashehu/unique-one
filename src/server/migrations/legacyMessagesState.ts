@@ -1,3 +1,4 @@
+import { getAuth, type Auth, type UserRecord } from 'firebase-admin/auth';
 import {
   Timestamp,
   getFirestore,
@@ -54,6 +55,7 @@ interface LegacyConversationDiagnosticSnapshot {
 }
 
 interface MigrationDependencies {
+  auth: Auth;
   db: Firestore;
 }
 
@@ -65,6 +67,9 @@ interface StateTransaction {
 }
 
 type TransactionDocumentSnapshot = Awaited<ReturnType<StateTransaction['get']>>;
+type CachedAuthLookupResult =
+  | { status: 'exists'; user: UserRecord }
+  | { status: 'not_found'; error: unknown };
 
 const MIGRATION_STATE_COLLECTION = 'communicationCoreMigration';
 const MIGRATION_STATE_VERSION = 1;
@@ -75,8 +80,18 @@ const IMMUTABLE_STATUSES = new Set<LegacyMessageMigrationStatus>([
 
 function getDependencies(): MigrationDependencies {
   return {
+    auth: getAuth(),
     db: getFirestore(),
   };
+}
+
+function isAuthUserNotFoundError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'auth/user-not-found'
+  );
 }
 
 function getLegacyParticipantSnapshot(
@@ -319,6 +334,46 @@ function createTransactionScopedEvaluationDb(
   } as Firestore;
 }
 
+function createCachedAuthForEvaluation(
+  auth: Auth,
+  authLookupCache: Map<string, Promise<CachedAuthLookupResult>>,
+): Auth {
+  return {
+    async getUser(uid: string): Promise<UserRecord> {
+      let cachedLookup = authLookupCache.get(uid);
+      if (!cachedLookup) {
+        cachedLookup = (async () => {
+          try {
+            const user = await auth.getUser(uid);
+            return { status: 'exists', user } as const;
+          } catch (error) {
+            if (isAuthUserNotFoundError(error)) {
+              return { status: 'not_found', error } as const;
+            }
+
+            throw error;
+          }
+        })();
+        authLookupCache.set(uid, cachedLookup);
+      }
+
+      let lookupResult: CachedAuthLookupResult;
+      try {
+        lookupResult = await cachedLookup;
+      } catch (error) {
+        authLookupCache.delete(uid);
+        throw error;
+      }
+
+      if (lookupResult.status === 'exists') {
+        return lookupResult.user;
+      }
+
+      throw lookupResult.error;
+    },
+  } as Auth;
+}
+
 /**
  * Creates or updates the isolated migration-state document for a single legacy
  * conversation without modifying any legacy or Communication Core records.
@@ -334,8 +389,10 @@ export async function createOrUpdateLegacyMessageMigrationState(
 
 async function createOrUpdateLegacyMessageMigrationStateWithDependencies(
   legacyConversationId: string,
-  { db }: MigrationDependencies,
+  { auth, db }: MigrationDependencies,
 ): Promise<LegacyMessageMigrationState> {
+  const authLookupCache = new Map<string, Promise<CachedAuthLookupResult>>();
+  const cachedAuth = createCachedAuthForEvaluation(auth, authLookupCache);
   const stateDocumentReference = db
     .collection(MIGRATION_STATE_COLLECTION)
     .doc(legacyConversationId);
@@ -369,6 +426,7 @@ async function createOrUpdateLegacyMessageMigrationStateWithDependencies(
           conversationSnapshot,
           sourceSnapshotsByPath,
         ),
+        auth: cachedAuth,
       },
     );
     const sourceMetadata = parseSourceMetadata(evaluation);
