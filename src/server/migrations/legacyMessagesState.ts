@@ -72,14 +72,6 @@ const IMMUTABLE_STATUSES = new Set<LegacyMessageMigrationStatus>([
   'migrated',
   'failed_permanent',
 ]);
-const SUPPORTED_SOURCE_REFERENCES: Array<{
-  field: 'orderId' | 'paymentRequestId' | 'invoiceId';
-  collection: LegacyMessageMigrationSourceCollection;
-}> = [
-  { field: 'orderId', collection: 'orders' },
-  { field: 'paymentRequestId', collection: 'payment_requests' },
-  { field: 'invoiceId', collection: 'invoices' },
-];
 
 function getDependencies(): MigrationDependencies {
   return {
@@ -295,39 +287,9 @@ function buildStateRecord(
   };
 }
 
-function getSourceReferenceForEvaluationPrefetch(
-  conversation: LegacyConversationDiagnosticSnapshot | null,
-):
-  | {
-      sourceCollection: LegacyMessageMigrationSourceCollection;
-      sourceDocumentId: string;
-    }
-  | null {
-  if (!conversation) {
-    return null;
-  }
-
-  const presentReferences = SUPPORTED_SOURCE_REFERENCES.filter(({ field }) => {
-    const value = conversation[field];
-    return value !== undefined && value !== null && value !== '';
-  });
-
-  if (presentReferences.length !== 1) {
-    return null;
-  }
-
-  const sourceDocumentId = conversation[presentReferences[0].field];
-  if (typeof sourceDocumentId !== 'string' || sourceDocumentId.trim().length === 0) {
-    return null;
-  }
-
-  return {
-    sourceCollection: presentReferences[0].collection,
-    sourceDocumentId,
-  };
-}
-
 function createTransactionScopedEvaluationDb(
+  db: Firestore,
+  transaction: StateTransaction,
   legacyConversationId: string,
   conversationSnapshot: TransactionDocumentSnapshot,
   sourceSnapshotsByPath: Map<string, TransactionDocumentSnapshot>,
@@ -346,7 +308,11 @@ function createTransactionScopedEvaluationDb(
             return sourceSnapshot;
           }
 
-          throw new Error(`transaction_scoped_snapshot_missing:${path}`);
+          const nextSourceSnapshot = await transaction.get(
+            db.collection(collectionName).doc(documentId),
+          );
+          sourceSnapshotsByPath.set(path, nextSourceSnapshot);
+          return nextSourceSnapshot;
         },
       }),
     }),
@@ -393,23 +359,12 @@ async function createOrUpdateLegacyMessageMigrationStateWithDependencies(
         ? (conversationSnapshot.data() as LegacyConversationDiagnosticSnapshot)
         : null;
     const sourceSnapshotsByPath = new Map<string, TransactionDocumentSnapshot>();
-    const prefetchSourceReference =
-      getSourceReferenceForEvaluationPrefetch(transactionConversation);
-    if (prefetchSourceReference) {
-      const prefetchPath = `${prefetchSourceReference.sourceCollection}/${prefetchSourceReference.sourceDocumentId}`;
-      sourceSnapshotsByPath.set(
-        prefetchPath,
-        await transaction.get(
-          db
-            .collection(prefetchSourceReference.sourceCollection)
-            .doc(prefetchSourceReference.sourceDocumentId),
-        ),
-      );
-    }
     const evaluation = await evaluateLegacyConversationWithOverrides(
       legacyConversationId,
       {
         db: createTransactionScopedEvaluationDb(
+          db,
+          transaction,
           legacyConversationId,
           conversationSnapshot,
           sourceSnapshotsByPath,
