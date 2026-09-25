@@ -11,6 +11,7 @@ import { webcrypto } from 'node:crypto';
 import {
   evaluateLegacyConversationWithOverrides,
   type LegacyMessageEvaluation,
+  type LegacyMessageEvaluationDb,
 } from './legacyMessages';
 
 export type LegacyMessageMigrationStatus =
@@ -308,7 +309,7 @@ function createTransactionScopedEvaluationDb(
   legacyConversationId: string,
   conversationSnapshot: TransactionDocumentSnapshot,
   sourceSnapshotsByPath: Map<string, TransactionDocumentSnapshot>,
-): Firestore {
+): LegacyMessageEvaluationDb {
   return {
     collection: (collectionName: string) => ({
       doc: (documentId: string) => ({
@@ -331,7 +332,7 @@ function createTransactionScopedEvaluationDb(
         },
       }),
     }),
-  } as Firestore;
+  };
 }
 
 function createCachedAuthForEvaluation(

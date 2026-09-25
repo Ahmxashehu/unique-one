@@ -1,5 +1,5 @@
 import { getAuth, type Auth } from 'firebase-admin/auth';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { getFirestore, type DocumentData } from 'firebase-admin/firestore';
 
 type SupportedSourceType = 'order' | 'payment' | 'invoice';
 type EvaluationStatus = 'eligible' | 'blocked' | 'out_of_scope' | 'retryable_error';
@@ -20,8 +20,25 @@ interface LegacyConversation {
 }
 
 interface EvaluationDependencies {
-  db: Firestore;
+  db: LegacyMessageEvaluationDb;
   auth: Auth;
+}
+
+interface LegacyMessageEvaluationSnapshot {
+  exists: boolean;
+  data(): DocumentData | undefined;
+}
+
+interface LegacyMessageEvaluationDocumentRef {
+  get(): Promise<LegacyMessageEvaluationSnapshot>;
+}
+
+interface LegacyMessageEvaluationCollectionRef {
+  doc(documentId: string): LegacyMessageEvaluationDocumentRef;
+}
+
+export interface LegacyMessageEvaluationDb {
+  collection(collectionName: string): LegacyMessageEvaluationCollectionRef;
 }
 
 const supportedReferences: Array<{
