@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Search, Plus, MessageSquare, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getUserConversations, getIncomingMessageRequests } from '../../lib/os/communication-db';
-import type { Conversation, MessageRequest } from '../../lib/os/communication-types';
+import { getUserConversations } from '../../lib/os/communication-db';
+import type { Conversation } from '../../lib/os/communication-types';
 
 export default function MessagesCenter() {
   const navigate = useNavigate();
@@ -13,8 +13,6 @@ export default function MessagesCenter() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [requests, setRequests] = useState<MessageRequest[]>([]);
-  const [requestBusy, setRequestBusy] = useState<string | null>(null);
   const [userResults, setUserResults] = useState<Array<{ uid: string; fullName: string; username?: string; uniqueOneId?: string; profilePhotoUrl?: string }>>([]);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
 
@@ -29,10 +27,9 @@ export default function MessagesCenter() {
       setLoading(true);
       setError('');
       try {
-        const [result, incoming] = await Promise.all([getUserConversations(), getIncomingMessageRequests()]);
+        const result = await getUserConversations();
         if (!cancelled) {
           setConversations(result);
-          setRequests(incoming.filter((request) => request.status === 'pending'));
         }
       } catch (err) {
         console.error(err);
@@ -147,29 +144,7 @@ export default function MessagesCenter() {
           </div>
         )}
 
-        {requests.length > 0 && (
-          <div className="border-b border-slate-100 bg-slate-50 p-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Message requests</h3>
-            <div className="space-y-2">
-              {requests.map((request) => (
-                <div key={request.id} className="bg-white border border-slate-200 rounded-xl p-3">
-                  <p className="text-sm font-medium text-slate-900">New message request</p>
-                  <p className="text-xs text-slate-500 mt-1">From: {request.fromUid}</p>
-                  <div className="flex gap-2 mt-3">
-                    <button disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'accept')} className="flex-1 px-3 py-2 rounded-lg bg-slate-900 text-white text-xs disabled:opacity-50">
-                      {requestBusy === request.id ? 'Working...' : 'Accept'}
-                    </button>
-                    <button disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'decline')} className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-xs disabled:opacity-50">
-                      Decline
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto">
           {loading && <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>}
           {!loading && error && <div className="p-8 text-center text-sm text-red-600">{error}</div>}
           {!loading && !error && filtered.map((conv) => (
