@@ -125,6 +125,9 @@ export default function ChatView() {
         if (!active) return;
         setConversation(conversationPayload.conversation);
         setMessages(messagesPayload.messages);
+        if (showNewContactWarning && typeof window !== 'undefined' && window.localStorage.getItem(`unique-one:contact-reply:${id}`) === '1') {
+          setShowNewContactWarning(false);
+        }
         setLoading(false);
       } catch (err) {
         console.error(err);
@@ -190,7 +193,7 @@ export default function ChatView() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] -m-4 md:-m-6 lg:-m-8 bg-slate-50 md:rounded-3xl md:h-[calc(100vh-100px)] overflow-hidden">
+    <div className="flex flex-col h-[calc(100dvh-128px)] min-h-0 -m-4 md:-m-6 lg:-m-8 bg-slate-50 md:rounded-3xl md:h-[calc(100vh-100px)] overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/os/messages')} className="p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-full md:hidden" aria-label="Back">
@@ -200,7 +203,7 @@ export default function ChatView() {
             {(conversation?.title ?? 'U').charAt(0).toUpperCase()}
           </div>
           <div>
-            <h2 className="font-bold text-slate-900 text-sm md:text-base">{conversation?.title ?? 'Conversation'}</h2>
+            <h2 className="font-bold text-slate-900 text-sm md:text-base">{conversation?.title ?? 'Messages'}</h2>
             <p className="text-xs text-slate-500">{otherPresence?.status === 'online' ? 'Online' : otherPresence?.lastSeenAt ? `Last seen ${new Date(otherPresence.lastSeenAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : conversation?.status ?? 'Loading...'}</p>
           </div>
         </div>
@@ -219,14 +222,17 @@ export default function ChatView() {
                 <p className="text-sm font-semibold text-slate-900">New contact</p>
                 <p className="text-xs text-slate-600 mt-1">You may not know this person. Read the message first. If it looks familiar, you can reply; if you don't recognize the person, you can block them.</p>
                 <div className="flex gap-2 mt-3">
-                  <button onClick={() => setShowNewContactWarning(false)} className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-medium">Reply</button>
+                  <button onClick={() => {
+                    setShowNewContactWarning(false);
+                    if (id) window.localStorage.setItem(`unique-one:contact-reply:${id}`, '1');
+                  }} className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-medium">Reply</button>
                   <button onClick={() => void blockUser()} className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-medium flex items-center gap-1.5"><Ban className="w-3.5 h-3.5" /> Block</button>
                 </div>
               </div>
             </div>
           </div>
         )}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         {loading && <div className="flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>}
         {error && <div className="text-center text-xs text-red-600 bg-red-50 rounded-lg p-2">{error}</div>}
         {!loading && messages.map((msg) => {
@@ -247,7 +253,7 @@ export default function ChatView() {
         })}
       </div>
 
-      {!blocked && <div className="bg-white border-t border-slate-200 p-3 sm:p-4 shrink-0">
+      {!blocked && <div className="bg-white border-t border-slate-200 p-3 sm:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shrink-0">
         <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1 pr-2">
           <button className="p-3 text-slate-400 shrink-0" aria-label="Attach file"><Paperclip className="w-5 h-5" /></button>
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => {
