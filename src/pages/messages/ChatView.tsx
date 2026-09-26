@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, ShieldAlert, Ban, CornerUpLeft, X } from 'lucide-react';
+import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, ShieldAlert, Ban, CornerUpLeft, X, Smile, Trash2, VolumeX, Volume2 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { subscribeToMessagesForConversation } from '../../lib/os/communication-db';
@@ -20,6 +20,8 @@ export default function ChatView() {
   const [showNewContactWarning, setShowNewContactWarning] = useState(() => new URLSearchParams(window.location.search).get('new') === '1');
   const [blocked, setBlocked] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [reactionTarget, setReactionTarget] = useState<string | null>(null);
+  const [muted, setMuted] = useState(false);
 
   const updatePresence = useCallback(async (status: 'online' | 'offline') => {
     if (!currentUser) return;
@@ -125,6 +127,7 @@ export default function ChatView() {
         }
         if (!active) return;
         setConversation(conversationPayload.conversation);
+        setMuted(conversationPayload.conversation?.muted === true);
         setMessages(messagesPayload.messages);
         if (showNewContactWarning && typeof window !== 'undefined' && window.localStorage.getItem(`unique-one:contact-reply:${id}`) === '1') {
           setShowNewContactWarning(false);
@@ -170,6 +173,59 @@ export default function ChatView() {
     return () => window.clearInterval(timer);
   }, [id, currentUser, loadOtherPresence]);
 
+  const updateReaction = async (messageId: string, reaction: string) => {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.getIdToken();
+      const target = messages.find((item) => item.id === messageId);
+      const method = target?.myReaction === reaction ? 'DELETE' : 'POST';
+      const response = await fetch(`/api/communication/messages/${messageId}/reactions`, {
+        method,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        ...(method === 'POST' ? { body: JSON.stringify({ reaction }) } : {}),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to update reaction.');
+      setReactionTarget(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update reaction.');
+    }
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    if (!currentUser || !window.confirm('Delete this message?')) return;
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch(`/api/communication/messages/${messageId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to delete message.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete message.');
+    }
+  };
+
+  const toggleMute = async () => {
+    if (!id || !currentUser) return;
+    try {
+      const nextMuted = !muted;
+      const token = await currentUser.getIdToken();
+      const response = await fetch(`/api/communication/conversations/${id}/mute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ muted: nextMuted }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to update mute setting.');
+      setMuted(nextMuted);
+      setConversation((current) => current ? { ...current, muted: nextMuted } : current);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update mute setting.');
+    }
+  };
+
   const handleSend = async () => {
     const text = message.trim();
     if (!text || !id || !currentUser || sending) return;
@@ -212,7 +268,7 @@ export default function ChatView() {
         <div className="flex items-center gap-1">
           <button className="p-2 text-slate-400 rounded-full hidden sm:block" aria-label="Voice call"><Phone className="w-5 h-5" /></button>
           <button className="p-2 text-slate-400 rounded-full hidden sm:block" aria-label="Video call"><Video className="w-5 h-5" /></button>
-          <button className="p-2 text-slate-400 rounded-full" aria-label="More options"><MoreVertical className="w-5 h-5" /></button>
+          <button onClick={() => void toggleMute()} className="p-2 text-slate-500 rounded-full hover:bg-slate-100" aria-label={muted ? 'Unmute conversation' : 'Mute conversation'} title={muted ? 'Unmute conversation' : 'Mute conversation'}>{muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}</button>
         </div>
       </div>
 
@@ -242,7 +298,7 @@ export default function ChatView() {
           return (
             <div key={msg.id} id={`message-${msg.id}`} className={`flex ${mine ? 'justify-end' : 'justify-start'} group`}>
               <div className="relative max-w-[75%] md:max-w-[60%]">
-                <button onClick={() => setReplyingTo(msg)} className={`absolute -top-3 ${mine ? '-left-10' : '-right-10'} hidden group-hover:flex items-center justify-center w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm text-slate-500 hover:text-slate-900`} aria-label="Reply to message" title="Reply">
+                <button onClick={() => setReplyingTo(msg)} className={`absolute -top-10 ${mine ? '-left-1' : '-right-1'} sm:-top-3 ${mine ? 'sm:-left-10' : 'sm:-right-10'} flex items-center justify-center w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm text-slate-500 hover:text-slate-900 z-10`} aria-label="Reply to message" title="Reply">
                   <CornerUpLeft className="w-4 h-4" />
                 </button>
                 <div className={`rounded-2xl px-4 py-2 ${mine ? 'bg-slate-900 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-900 rounded-tl-sm'}`}>
@@ -255,13 +311,20 @@ export default function ChatView() {
                       </button>
                     ) : null;
                   })()}
-                  {msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>}
-                  <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-slate-400">
+                  {msg.deleted ? <p className="text-sm italic opacity-70">This message was deleted</p> : msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>}
+                  {msg.reactions && Object.keys(msg.reactions).length > 0 && <div className="flex flex-wrap gap-1 mt-2">
+                    {Object.entries(msg.reactions).map(([emoji, count]) => <button key={emoji} onClick={() => void updateReaction(msg.id, emoji)} className={`px-1.5 py-0.5 rounded-full text-xs border ${msg.myReaction === emoji ? 'border-slate-900 bg-slate-100' : 'border-slate-200 bg-white/80'}`}>{emoji} {count}</button>)}
+                  </div>}
+                  <div className="flex items-center justify-between gap-2 mt-1 text-[10px] text-slate-400">
+                    <div className="flex gap-1"><button onClick={() => setReactionTarget(reactionTarget === msg.id ? null : msg.id)} className="p-1 rounded hover:bg-black/10" aria-label="React"><Smile className="w-3 h-3" /></button>{mine && !msg.deleted && <button onClick={() => void deleteMessage(msg.id)} className="p-1 rounded hover:bg-black/10" aria-label="Delete"><Trash2 className="w-3 h-3" /></button>}</div>
                     <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     {mine && msg.status === 'sent' && <Check className="w-3 h-3" />}
                     {mine && msg.status === 'delivered' && <CheckCheck className="w-3 h-3" />}
                     {mine && msg.status === 'read' && <CheckCheck className="w-3 h-3 text-blue-400" />}
                   </div>
+                  {reactionTarget === msg.id && <div className="absolute bottom-7 left-0 z-20 flex gap-1 rounded-full bg-white border border-slate-200 shadow-lg px-2 py-1">
+                    {['👍','❤️','😂','😮','😢','🙏'].map((emoji) => <button key={emoji} onClick={() => void updateReaction(msg.id, emoji)} className="text-lg p-1 rounded-full hover:bg-slate-100" aria-label={`React ${emoji}`}>{emoji}</button>)}
+                  </div>}
                 </div>
               </div>
             </div>
