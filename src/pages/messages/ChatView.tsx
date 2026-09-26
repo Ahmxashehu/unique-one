@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, Clock } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getConversation, getConversationMembers, getMessagesForConversation } from '../../lib/os/communication-db';
+import { getConversation, getConversationMembers, subscribeToMessagesForConversation } from '../../lib/os/communication-db';
 import type { Conversation, Message } from '../../lib/os/communication-types';
 
 export default function ChatView() {
@@ -16,22 +16,6 @@ export default function ChatView() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [otherPresence, setOtherPresence] = useState<{ uid: string; status: 'online' | 'offline'; lastSeenAt: string | null } | null>(null);
-
-  const loadChat = useCallback(async () => {
-    if (!id || !currentUser) return;
-    setLoading(true);
-    setError('');
-    try {
-      const [conv, msgs] = await Promise.all([getConversation(id), getMessagesForConversation(id)]);
-      setConversation(conv);
-      setMessages(msgs);
-    } catch (err) {
-      console.error(err);
-      setError('Unable to load this conversation.');
-    } finally {
-      setLoading(false);
-    }
-  }, [id, currentUser]);
 
   const updatePresence = useCallback(async (status: 'online' | 'offline') => {
     if (!currentUser) return;
@@ -87,7 +71,43 @@ export default function ChatView() {
 
   useEffect(() => { void loadOtherPresence(); }, [loadOtherPresence]);
 
-  useEffect(() => { void loadChat(); }, [loadChat]);
+  useEffect(() => {
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+    setLoading(true);
+    setError('');
+    void (async () => {
+      if (!id || !currentUser) return;
+      try {
+        const conv = await getConversation(id);
+        if (!active) return;
+        setConversation(conv);
+        unsubscribe = await subscribeToMessagesForConversation(
+          id,
+          (items) => {
+            if (!active) return;
+            setMessages(items);
+            setLoading(false);
+          },
+          (subscriptionError) => {
+            if (!active) return;
+            setError(subscriptionError.message);
+            setLoading(false);
+          },
+        );
+      } catch (err) {
+        console.error(err);
+        if (active) {
+          setError('Unable to load this conversation.');
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
+  }, [id, currentUser]);
 
   const markVisibleMessagesRead = useCallback(async (items: Message[]) => {
     if (!currentUser) return;
@@ -107,9 +127,9 @@ export default function ChatView() {
 
   useEffect(() => {
     if (!id || !currentUser) return;
-    const timer = window.setInterval(() => { void loadChat(); void loadOtherPresence(); }, 5000);
+    const timer = window.setInterval(() => { void loadOtherPresence(); }, 5000);
     return () => window.clearInterval(timer);
-  }, [id, currentUser, loadChat]);
+  }, [id, currentUser, loadOtherPresence]);
 
   const handleSend = async () => {
     const text = message.trim();
@@ -126,7 +146,6 @@ export default function ChatView() {
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to send message.');
       setMessage('');
-      await loadChat();
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'Failed to send message.');
