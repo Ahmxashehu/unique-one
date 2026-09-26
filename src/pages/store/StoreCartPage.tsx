@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, Trash2, ArrowRight, Loader2, Minus, Plus } from 'lucide-react';
-import { collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Product, CartItem } from '../../lib/os/types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -17,16 +17,24 @@ export default function StoreCartPage() {
   const loadCart = async () => {
     if (!currentUser) { setItems([]); setLoading(false); return; }
     setLoading(true);
+    setError('');
     try {
       const snap = await getDocs(query(collection(db, 'carts'), where('customerId', '==', currentUser.uid)));
       const rows: CartRow[] = [];
+
       for (const cartDoc of snap.docs) {
         const cart = cartDoc.data() as CartItem;
-        const productSnap = await getDocs(query(collection(db, 'products'), where('id', '==', cart.productId)));
-        if (!productSnap.empty) {
-          rows.push({ ...cart, id: cartDoc.id, product: productSnap.docs[0].data() as Product });
+        // Product IDs are the Firestore document IDs created by Add Product.
+        // A direct document read also respects the Store product security rule.
+        const productSnap = await getDoc(doc(db, 'products', cart.productId));
+        if (productSnap.exists()) {
+          const product = productSnap.data() as Product;
+          if (product.status === 'published') {
+            rows.push({ ...cart, id: cartDoc.id, product });
+          }
         }
       }
+
       setItems(rows);
     } catch (err: any) {
       setError(err.message || 'Could not load your cart.');
