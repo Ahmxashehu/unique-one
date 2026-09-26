@@ -1309,6 +1309,39 @@ async function startServer() {
     }
   });
 
+  app.get("/api/communication/conversations/:conversationId/messages", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = req.params.conversationId;
+      if (!isSafeConversationId(conversationId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The conversation ID is invalid.');
+      }
+      const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationId, uid));
+      const membershipSnapshot = await membershipRef.get();
+      if (!membershipSnapshot.exists) {
+        return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      }
+      const limitValue = Number(req.query.limit);
+      const messageLimit = Number.isSafeInteger(limitValue) && limitValue > 0 ? Math.min(limitValue, 100) : 100;
+      const snapshot = await adminDb.collection('messages')
+        .where('conversationId', '==', conversationId)
+        .limit(messageLimit)
+        .get();
+      const messages = snapshot.docs
+        .map((messageDoc) => ({ id: messageDoc.id, ...messageDoc.data() }))
+        .sort((a, b) => String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')));
+      return res.status(200).json({ messages });
+    } catch (error) {
+      console.error('Communication message read failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to read Communication messages.');
+    }
+  });
+
   app.post("/api/communication/messages", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 60,
