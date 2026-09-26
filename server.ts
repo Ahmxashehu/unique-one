@@ -6,7 +6,7 @@ import rateLimit, { type Store } from "express-rate-limit";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import type { Conversation, ConversationMember, ConversationType, Message } from "./src/lib/os/communication-types";
+import type { Conversation, ConversationMember, ConversationType, Message, MessageRequest } from "./src/lib/os/communication-types";
 import { validateMessageDraft, CommunicationValidationError } from "./communicationCore";
 
 interface WalletDocument {
