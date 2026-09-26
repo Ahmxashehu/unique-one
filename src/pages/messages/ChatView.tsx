@@ -35,6 +35,7 @@ export default function ChatView() {
   const [muted, setMuted] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachmentMetadata[]>([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [attachmentStage, setAttachmentStage] = useState<'preparing' | 'uploading' | null>(null);
   const [attachmentProgress, setAttachmentProgress] = useState(0);
 
   const updatePresence = useCallback(async (status: 'online' | 'offline') => {
@@ -241,10 +242,13 @@ export default function ChatView() {
       return;
     }
     setUploadingAttachment(true);
+    setAttachmentStage('preparing');
+    setAttachmentProgress(0);
     setError('');
     try {
       const uploaded: MessageAttachmentMetadata[] = [];
       for (const file of files) {
+        setAttachmentStage('preparing');
         const metadata = await uploadMedia(file, {
           ownerId: currentUser.uid,
           pathPrefix: `messages/${id}/${currentUser.uid}`,
@@ -255,7 +259,10 @@ export default function ChatView() {
           optimizeImage: file.type.startsWith('image/'),
           imageMaxDimension: 1600,
           imageTargetBytes: 450 * 1024,
-          onProgress: setAttachmentProgress,
+          onProgress: (progress) => {
+            setAttachmentStage('uploading');
+            setAttachmentProgress(progress);
+          },
         });
         uploaded.push({
           id: metadata.fileId,
@@ -271,6 +278,7 @@ export default function ChatView() {
       setError(err instanceof Error ? err.message : 'Failed to upload attachment.');
     } finally {
       setUploadingAttachment(false);
+      setAttachmentStage(null);
       setAttachmentProgress(0);
     }
   };
@@ -441,7 +449,7 @@ export default function ChatView() {
             </label>
           </div>
           {(attachments.length > 0 || uploadingAttachment) && <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-slate-200 rounded-xl p-2 shadow-sm">
-          {uploadingAttachment ? <p className="text-xs text-slate-500">Uploading attachment {attachmentProgress}%</p> : <div className="flex flex-wrap gap-1">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((entry) => entry.id !== item.id))} className="text-xs bg-slate-100 rounded-full px-2 py-1">{item.name} ×</button>)}</div>}
+          {uploadingAttachment ? <p className="text-xs text-slate-500">{attachmentStage === 'preparing' ? 'Preparing attachment…' : `Uploading attachment ${attachmentProgress}%`}</p> : <div className="flex flex-wrap gap-1">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((entry) => entry.id !== item.id))} className="text-xs bg-slate-100 rounded-full px-2 py-1">{item.name} ×</button>)}</div>}
         </div>}
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSend(); }
