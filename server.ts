@@ -1014,6 +1014,61 @@ async function startServer() {
     }
   });
 
+  app.post("/api/communication/media/upload", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }), express.raw({ type: 'application/octet-stream', limit: '20mb' }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = typeof req.headers['x-conversation-id'] === 'string' ? req.headers['x-conversation-id'].trim() : '';
+      const contentType = typeof req.headers['x-content-type'] === 'string' ? req.headers['x-content-type'].trim().toLowerCase() : '';
+      const originalName = typeof req.headers['x-original-name'] === 'string' ? req.headers['x-original-name'].trim() : '';
+      const body = req.body;
+      if (!isSafeConversationId(conversationId)) return errorResponse(res, 'INVALID_REQUEST', 'The conversation ID is invalid.');
+      if (!Buffer.isBuffer(body) || body.length <= 0) return errorResponse(res, 'INVALID_REQUEST', 'The attachment body is empty.');
+      const allowedTypes = new Set([
+        'image/webp', 'image/jpeg', 'image/png', 'image/gif',
+        'application/pdf', 'text/plain', 'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ]);
+      if (!allowedTypes.has(contentType)) return errorResponse(res, 'INVALID_REQUEST', 'This attachment type is not supported.');
+      const maxBytes = contentType.startsWith('image/') ? 5 * 1024 * 1024 : 20 * 1024 * 1024;
+      if (body.length > maxBytes) return errorResponse(res, 'INVALID_REQUEST', 'The attachment exceeds the allowed size.');
+      if (originalName.length < 1 || originalName.length > 255) return errorResponse(res, 'INVALID_REQUEST', 'The attachment filename is invalid.');
+      const membershipSnapshot = await adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationId, uid)).get();
+      if (!membershipSnapshot.exists) return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      const extension = contentType === 'image/webp' ? 'webp' : (originalName.includes('.') ? originalName.split('.').pop()?.toLowerCase() : 'bin');
+      const fileId = randomUUID();
+      const storagePath = `messages/${conversationId}/${uid}/${fileId}.${extension}`;
+      const bucket = getStorage().bucket('gen-lang-client-0680695304.firebasestorage.app');
+      const file = bucket.file(storagePath);
+      await file.save(body, {
+        resumable: false,
+        metadata: {
+          contentType,
+          metadata: {
+            originalName,
+            originalMimeType: contentType,
+            originalBytes: String(body.length),
+          },
+        },
+      });
+      const [downloadUrl] = await file.getSignedUrl({
+        version: 'v4',
+        action: 'read',
+        expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
+      });
+      return res.status(201).json({ fileId, storagePath, downloadUrl, mimeType: contentType, sizeBytes: body.length });
+    } catch (error) {
+      console.error('Communication media upload failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to upload the attachment.');
+    }
+  });
+
   app.post("/api/communication/media/upload-url", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 60,
