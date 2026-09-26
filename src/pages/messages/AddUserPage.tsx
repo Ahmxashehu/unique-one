@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Search, MessageSquare, Loader2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Search, MessageSquare, Loader2, UserPlus } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -19,7 +19,6 @@ export default function AddUserPage() {
   const [results, setResults] = useState<UserResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [sendingUid, setSendingUid] = useState<string | null>(null);
-  const [sentUids] = useState<string[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -86,7 +85,6 @@ export default function AddUserPage() {
         {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
         <div className="mt-6 space-y-3">
           {results.map((user) => {
-            const sent = sentUids.includes(user.uid);
             return (
               <div key={user.uid} className="flex items-center gap-3 p-4 border border-slate-200 rounded-2xl">
                 {user.profilePhotoUrl ? <img src={user.profilePhotoUrl} alt="" className="w-12 h-12 rounded-full object-cover" /> : <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-lg font-semibold text-slate-500">{user.fullName.charAt(0).toUpperCase()}</div>}
@@ -95,8 +93,8 @@ export default function AddUserPage() {
                   {user.username && <p className="text-sm text-slate-500 truncate">@{user.username}</p>}
                   {user.uniqueOneId && <p className="text-xs text-slate-400 mt-0.5">{user.uniqueOneId}</p>}
                 </div>
-                <button onClick={() => void sendRequest(user.uid)} disabled={sent || sendingUid === user.uid} className="shrink-0 px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-medium disabled:opacity-50 flex items-center gap-1.5">
-                  {sent ? <><CheckCircle2 className="w-4 h-4" /> Sent</> : sendingUid === user.uid ? 'Sending...' : <><UserPlus className="w-4 h-4" /> Add</>}
+                <button onClick={() => void startConversation(user.uid)} disabled={sendingUid === user.uid} className="shrink-0 px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-medium disabled:opacity-50 flex items-center gap-1.5">
+                  {sendingUid === user.uid ? 'Opening...' : <><MessageSquare className="w-4 h-4" /> Message</>}
                 </button>
               </div>
             );
