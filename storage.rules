@@ -1,0 +1,79 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function validImage() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp|gif)');
+    }
+
+    function validDocument() {
+      return request.resource.contentType.matches(
+        'application/pdf|application/msword|application/vnd.openxmlformats-officedocument.wordprocessingml.document|application/vnd.ms-excel|application/vnd.openxmlformats-officedocument.spreadsheetml.sheet|text/plain'
+      );
+    }
+
+    function validAudio() {
+      return request.resource.contentType.matches('audio/.*');
+    }
+
+    function validVideo() {
+      return request.resource.contentType.matches('video/.*');
+    }
+
+    // Public marketplace media. Only the owning user can upload/replace/delete.
+    // Product media is intentionally non-sensitive because it is displayed in Store.
+    match /products/{uid}/{productId}/{fileName} {
+      allow read: if true;
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && validImage()
+        && request.resource.size <= 5 * 1024 * 1024;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Private profile media. Users may manage only their own profile image.
+    match /users/{uid}/profile/{fileName} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && validImage()
+        && request.resource.size <= 5 * 1024 * 1024;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Communication media. Upload ownership is enforced by the UID path.
+    // Access requires authentication; the application also enforces conversation membership.
+    match /messages/{conversationId}/{uid}/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && (
+          (validImage() && request.resource.size <= 5 * 1024 * 1024) ||
+          (validDocument() && request.resource.size <= 20 * 1024 * 1024) ||
+          (validAudio() && request.resource.size <= 25 * 1024 * 1024) ||
+          (validVideo() && request.resource.size <= 100 * 1024 * 1024)
+        );
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Business documents remain private and can only be uploaded by the business owner.
+    match /businesses/{businessId}/documents/{uid}/{fileName} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && (
+          validDocument() && request.resource.size <= 20 * 1024 * 1024
+        );
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Deny every unrecognized path by default.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
