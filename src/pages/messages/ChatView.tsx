@@ -383,11 +383,21 @@ export default function ChatView() {
                     ) : null;
                   })()}
                   {msg.deleted ? <p className="text-sm italic opacity-70">This message was deleted</p> : msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>}
-                  {!msg.deleted && msg.attachments?.length ? <div className="mt-2 space-y-2">
-                    {msg.attachments.map((attachment) => attachment.contentType.startsWith('image/')
-                      ? <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer"><img src={attachment.url} alt={attachment.name} className="max-w-full max-h-64 rounded-xl object-cover" loading="lazy" /></a>
-                      : <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs underline">{attachment.name}</a>)}
-                  </div>}
+                  {!msg.deleted && msg.attachments?.length ? (
+                    <div className="mt-2 space-y-2">
+                      {msg.attachments.map((attachment) =>
+                        attachment.contentType.startsWith('image/') ? (
+                          <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer">
+                            <img src={attachment.url} alt={attachment.name} className="max-w-full max-h-64 rounded-xl object-cover" loading="lazy" />
+                          </a>
+                        ) : (
+                          <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs underline">
+                            {attachment.name}
+                          </a>
+                        )
+                      )}
+                    </div>
+                  ) : null}
                   {msg.reactions && Object.keys(msg.reactions).length > 0 && <div className="flex flex-wrap gap-1 mt-2">
                     {Object.entries(msg.reactions).map(([emoji, count]) => <button key={emoji} onClick={() => void updateReaction(msg.id, emoji)} className={`px-1.5 py-0.5 rounded-full text-xs border ${msg.myReaction === emoji ? 'border-slate-900 bg-slate-100' : 'border-slate-200 bg-white/80'}`}>{emoji} {count}</button>)}
                   </div>}
