@@ -274,11 +274,18 @@ export default function ChatView() {
         if (file.size > (isImage ? 5 : 20) * 1024 * 1024) throw new Error('The attachment is too large.');
 
         let body: Blob = file;
-        let contentType = file.type;
+        let contentType = file.type.toLowerCase();
         if (isImage) {
-          const optimized = await optimizeImage(file, 1600, 450 * 1024);
-          body = optimized.blob;
-          contentType = 'image/webp';
+          try {
+            const optimized = await optimizeImage(file, 1600, 450 * 1024);
+            body = optimized.blob;
+            contentType = 'image/webp';
+          } catch (optimizationError) {
+            console.warn('Image optimization failed; uploading the original image.', optimizationError);
+            if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(contentType)) {
+              throw new Error('This image format cannot be uploaded on this device. Please choose a JPG, PNG, WebP, or GIF image.');
+            }
+          }
         }
 
         setAttachmentStage('uploading');
@@ -286,25 +293,30 @@ export default function ChatView() {
         const token = await currentUser.getIdToken();
         const result = await new Promise<{ fileId: string; storagePath: string; downloadUrl: string; mimeType: string; sizeBytes: number }>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
-          xhr.open('POST', '/api/communication/media/upload');
+          xhr.open('POST', '/api/communication/media/upload', true);
+          xhr.timeout = 120000;
           xhr.setRequestHeader('Authorization', 'Bearer ' + token);
           xhr.setRequestHeader('Content-Type', 'application/octet-stream');
           xhr.setRequestHeader('X-Conversation-Id', id);
           xhr.setRequestHeader('X-Content-Type', contentType);
           xhr.setRequestHeader('X-Original-Name', file.name.slice(0, 255));
+          xhr.upload.onloadstart = () => setAttachmentProgress(0);
           xhr.upload.onprogress = (progressEvent) => {
             if (progressEvent.lengthComputable) {
-              setAttachmentProgress(Math.round((progressEvent.loaded / progressEvent.total) * 100));
+              setAttachmentProgress(Math.min(99, Math.round((progressEvent.loaded / progressEvent.total) * 100)));
             }
           };
-          xhr.onerror = () => reject(new Error('Network error while uploading the attachment.'));
+          xhr.onerror = () => reject(new Error('Network error while uploading the attachment. Please check your connection and try again.'));
+          xhr.ontimeout = () => reject(new Error('The attachment upload timed out. Please try again.'));
+          xhr.onabort = () => reject(new Error('The attachment upload was cancelled.'));
           xhr.onload = () => {
             let payload: { fileId?: string; storagePath?: string; downloadUrl?: string; mimeType?: string; sizeBytes?: number; error?: { message?: string } } | null = null;
             try { payload = JSON.parse(xhr.responseText); } catch (_) { /* handled below */ }
             if (xhr.status < 200 || xhr.status >= 300 || !payload?.downloadUrl) {
-              reject(new Error(payload?.error?.message ?? 'Failed to upload attachment.'));
+              reject(new Error(payload?.error?.message ?? `Upload failed (HTTP ${xhr.status}).`));
               return;
             }
+            setAttachmentProgress(100);
             resolve({
               fileId: payload.fileId!,
               storagePath: payload.storagePath!,
