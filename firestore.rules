@@ -1,27 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Reusable authentication functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    function isOwner(uid) {
-      return isAuthenticated() && request.auth.uid == uid;
-    }
-
-    // Communication membership documents use the deterministic ID
-    // `${conversationId}_${uid}` so rules can verify stored membership.
-    function conversationMemberId(conversationId, uid) {
-      return conversationId + '_' + uid;
-    }
+    function isAuthenticated() { return request.auth != null; }
+    function isOwner(uid) { return isAuthenticated() && request.auth.uid == uid; }
+    function conversationMemberId(conversationId, uid) { return conversationId + '_' + uid; }
     function isConversationMember(conversationId) {
       return isAuthenticated()
         && exists(/databases/$(database)/documents/conversationMembers/$(conversationMemberId(conversationId, request.auth.uid)));
     }
-
-    // Secure RBAC Role check (Roles are stored as an array in `roles`)
     function isAdmin() {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data != null &&
              'roles' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
              'administrator' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles;
@@ -29,191 +17,114 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      // Users can create their own record, but cannot grant themselves administrator rights
       allow create: if isOwner(userId) && (!('roles' in request.resource.data) || !('administrator' in request.resource.data.roles));
       allow update: if (isOwner(userId) && request.resource.data.roles == resource.data.roles) || isAdmin();
       allow delete: if isAdmin();
     }
-
     match /profiles/{userId} {
-      // Public reading allowed for ecosystem discovery
       allow read: if true;
       allow create, update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
     }
-
     match /businesses/{businessId} {
-      // Public can discover businesses
-      allow read: if true; 
-      // Any authenticated user can register a business
+      allow read: if true;
       allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid;
       allow update: if isOwner(resource.data.ownerUid) || isAdmin();
       allow delete: if isAdmin();
     }
-
-    match /roles/{roleId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    match /organizations/{orgId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
+    match /roles/{roleId} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
+    match /organizations/{orgId} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
     match /sessions/{sessionId} {
-      // Session updates
       allow read, update, delete: if isOwner(resource.data.uid);
       allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
     }
-
     match /notifications/{notificationId} {
       allow read: if isOwner(resource.data.uid);
-      allow update: if isOwner(resource.data.uid)
-        && request.resource.data.uid == resource.data.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow update: if isOwner(resource.data.uid) && request.resource.data.uid == resource.data.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
       allow create, delete: if isAdmin();
     }
-
-    match /audit_logs/{logId} {
-      // Audit records are trusted/server-generated and immutable to clients.
-      allow read: if isAdmin();
-      allow create: if false;
-      allow update, delete: if false;
-    }
-
+    match /audit_logs/{logId} { allow read: if isAdmin(); allow create, update, delete: if false; }
     match /products/{productId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isAdmin();
       allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid;
       allow update: if (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isAdmin();
       allow delete: if isAdmin();
     }
-
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.sellerId == request.auth.uid) || isAdmin();
       allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
-      allow update: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.sellerId == request.auth.uid) || isAdmin();
+      allow update: if isAuthenticated() && (request.resource.data.customerId == request.auth.uid || request.resource.data.sellerId == request.auth.uid) || isAdmin();
       allow delete: if isAdmin();
     }
-
     match /productRequests/{requestId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.customerId == request.auth.uid) || isAdmin();
       allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
       allow update: if (isAuthenticated() && resource.data.customerId == request.auth.uid) || isAdmin();
       allow delete: if isAdmin();
     }
-
     match /quotes/{quoteId} {
       allow read: if isAuthenticated() || isAdmin();
       allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid;
       allow update: if isAuthenticated() || isAdmin();
       allow delete: if isAdmin();
     }
-
     match /carts/{cartId} {
       allow read, update, delete: if isAuthenticated() && resource.data.customerId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
     }
-
     match /wishlists/{wishlistId} {
       allow read, update, delete: if isAuthenticated() && resource.data.customerId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
     }
-
     match /reviews/{reviewId} {
       allow read: if true;
       allow create: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid;
       allow update, delete: if isAdmin();
     }
-
     match /payment_requests/{reqId} {
       allow read: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isAdmin();
       allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isAdmin();
       allow delete: if isAdmin();
     }
-
     match /invoices/{invId} {
       allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin();
       allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin();
       allow delete: if isAdmin();
     }
-
     match /receipts/{recId} {
       allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin();
-      allow create: if false;
-      allow update, delete: if false;
+      allow create, update, delete: if false;
     }
-
     match /transactions/{txId} {
-      allow read: if isAdmin()
-        || (
-          isAuthenticated()
-          && (
-            resource.data.senderId == request.auth.uid
-            || resource.data.recipientId == request.auth.uid
-          )
-        );
+      allow read: if isAdmin() || (isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid));
+      allow create, update, delete: if false;
+    }
+    match /wallets/{uid} { allow read, create, update, delete: if false; }
+    match /walletIdempotency/{idempotencyId} { allow read, create, update, delete: if false; }
+    match /ledgerEntries/{ledgerId} { allow read, create, update, delete: if false; }
+
+    match /staffInvites/{inviteId} {
+      allow read: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.inviteeEmail == request.auth.token.email);
+      allow create: if isAuthenticated()
+        && request.resource.data.businessOwnerUid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.role in ['admin','manager','sales','cashier','accountant','inventory','support','delivery','branch_manager','viewer'];
+      allow update: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.inviteeEmail == request.auth.token.email);
+      allow delete: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
+    }
+    match /staffMembers/{staffId} {
+      allow read: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.uid == request.auth.uid);
       allow create, update, delete: if false;
     }
 
-    match /wallets/{uid} {
-      allow read, create, update, delete: if false;
-    }
-
-    match /walletIdempotency/{idempotencyId} {
-      allow read, create, update, delete: if false;
-    }
-
-    match /ledgerEntries/{ledgerId} {
-      allow read, create, update, delete: if false;
-    }
-
-    // Communication Core: privileged/server workflow creates conversations
-    // and membership records; clients can only consume authorized records.
-    match /conversations/{conversationId} {
-      allow read: if isConversationMember(conversationId);
-      allow create, update, delete: if false;
-    }
-
-    match /conversationMembers/{memberId} {
-      allow read: if isAuthenticated()
-        && resource.data.uid == request.auth.uid;
-      allow create, update, delete: if false;
-    }
-
-    match /messages/{messageId} {
-      // Message records are created only by the trusted Communication API.
-      allow read: if isConversationMember(resource.data.conversationId);
-      allow create, update, delete: if false;
-    }
-
-    match /messageDeliveries/{deliveryId} {
-      // Delivery/read state is maintained by the trusted Communication API.
-      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
-      allow create, update, delete: if false;
-    }
-
-    match /messageRequests/{requestId} {
-      // Message requests are created and state-transitioned by the trusted
-      // Communication API so requester identity and request lifecycle cannot
-      // be forged by the client.
-      allow read: if isAuthenticated()
-        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
-      allow create, update, delete: if false;
-    }
-
-    match /userPresence/{uid} {
-      allow read: if isAuthenticated() && request.auth.uid == uid;
-      // Presence is updated by the trusted Communication API.
-      allow create, update, delete: if false;
-    }
-
-    match /locations/{locationId} {
-      allow read: if true;
-      allow create, update: if isAuthenticated();
-      allow delete: if isAdmin();
-    }
+    match /conversations/{conversationId} { allow read: if isConversationMember(conversationId); allow create, update, delete: if false; }
+    match /conversationMembers/{memberId} { allow read: if isAuthenticated() && resource.data.uid == request.auth.uid; allow create, update, delete: if false; }
+    match /messages/{messageId} { allow read: if isConversationMember(resource.data.conversationId); allow create, update, delete: if false; }
+    match /messageDeliveries/{deliveryId} { allow read: if isAuthenticated() && resource.data.uid == request.auth.uid; allow create, update, delete: if false; }
+    match /messageRequests/{requestId} { allow read: if isAuthenticated() && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid); allow create, update, delete: if false; }
+    match /userPresence/{uid} { allow read: if isAuthenticated() && request.auth.uid == uid; allow create, update, delete: if false; }
+    match /locations/{locationId} { allow read: if true; allow create, update: if isAuthenticated(); allow delete: if isAdmin(); }
   }
 }
