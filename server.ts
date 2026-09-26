@@ -23,7 +23,7 @@ type TransferErrorCode =
   | 'UNAUTHENTICATED' | 'INVALID_REQUEST' | 'INVALID_RECIPIENT' | 'RECIPIENT_NOT_FOUND'
   | 'SELF_TRANSFER_NOT_ALLOWED' | 'INVALID_AMOUNT' | 'INVALID_CURRENCY'
   | 'INVALID_IDEMPOTENCY_KEY' | 'IDEMPOTENCY_KEY_CONFLICT' | 'TRANSFER_ALREADY_COMPLETED'
-  | 'TRANSFER_IN_PROGRESS' | 'WALLET_NOT_FOUND' | 'WALLET_UNAVAILABLE' | 'INSUFFICIENT_FUNDS' | 'RATE_LIMITED'
+  | 'TRANSFER_IN_PROGRESS' | 'WALLET_NOT_FOUND' | 'WALLET_UNAVAILABLE' | 'INSUFFICIENT_FUNDS' | 'RATE_LIMITED' | 'BLOCKED'
   | 'TRANSACTION_FAILED' | 'SERVICE_UNAVAILABLE';
 interface TransferErrorResponse { error: { code: TransferErrorCode; message: string } }
 interface TransferRequestInput { recipientId: string; amountMinor: number; currency: 'NGN'; idempotencyKey: string; description?: string }
@@ -42,7 +42,7 @@ const transferErrorStatus: Record<TransferErrorCode, number> = {
   UNAUTHENTICATED: 401, INVALID_REQUEST: 400, INVALID_RECIPIENT: 400, RECIPIENT_NOT_FOUND: 404,
   SELF_TRANSFER_NOT_ALLOWED: 400, INVALID_AMOUNT: 400, INVALID_CURRENCY: 400, INVALID_IDEMPOTENCY_KEY: 400,
   IDEMPOTENCY_KEY_CONFLICT: 409, TRANSFER_ALREADY_COMPLETED: 200, TRANSFER_IN_PROGRESS: 409, RATE_LIMITED: 429,
-  WALLET_NOT_FOUND: 404, WALLET_UNAVAILABLE: 403, INSUFFICIENT_FUNDS: 409, TRANSACTION_FAILED: 500,
+  WALLET_NOT_FOUND: 404, WALLET_UNAVAILABLE: 403, INSUFFICIENT_FUNDS: 409, BLOCKED: 403, TRANSACTION_FAILED: 500,
   SERVICE_UNAVAILABLE: 503,
 };
 class RequestValidationError extends Error {
@@ -327,7 +327,7 @@ async function startServer() {
     catch (error) {
       const code = (error as Error).message as TransferErrorCode;
       const messages: Record<TransferErrorCode, string> = {
-        UNAUTHENTICATED: 'Authentication is required to initiate a transfer.', INVALID_REQUEST: 'The transfer request body is malformed or contains unsupported fields.', INVALID_RECIPIENT: 'A valid recipient UID is required.', RECIPIENT_NOT_FOUND: 'The recipient does not exist.', SELF_TRANSFER_NOT_ALLOWED: 'A wallet transfer to yourself is not allowed.', INVALID_AMOUNT: 'Transfer amount must be a positive integer minor-unit amount.', INVALID_CURRENCY: 'Only NGN transfers are supported.', INVALID_IDEMPOTENCY_KEY: 'The idempotency key is invalid or exceeds the allowed length.', IDEMPOTENCY_KEY_CONFLICT: 'This idempotency key was already used with different transfer parameters.', TRANSFER_ALREADY_COMPLETED: 'This transfer has already been completed.', TRANSFER_IN_PROGRESS: 'A transfer with this idempotency key is already in progress.', WALLET_NOT_FOUND: 'A wallet record is missing for this transfer.', WALLET_UNAVAILABLE: 'The wallet status or currency configuration is not valid for transfer.', INSUFFICIENT_FUNDS: 'The sender wallet does not have enough funds.', TRANSACTION_FAILED: 'The transfer failed while processing the transaction.', SERVICE_UNAVAILABLE: 'The transfer service is temporarily unavailable.',
+        UNAUTHENTICATED: 'Authentication is required to initiate a transfer.', INVALID_REQUEST: 'The transfer request body is malformed or contains unsupported fields.', INVALID_RECIPIENT: 'A valid recipient UID is required.', RECIPIENT_NOT_FOUND: 'The recipient does not exist.', SELF_TRANSFER_NOT_ALLOWED: 'A wallet transfer to yourself is not allowed.', INVALID_AMOUNT: 'Transfer amount must be a positive integer minor-unit amount.', INVALID_CURRENCY: 'Only NGN transfers are supported.', INVALID_IDEMPOTENCY_KEY: 'The idempotency key is invalid or exceeds the allowed length.', IDEMPOTENCY_KEY_CONFLICT: 'This idempotency key was already used with different transfer parameters.', TRANSFER_ALREADY_COMPLETED: 'This transfer has already been completed.', TRANSFER_IN_PROGRESS: 'A transfer with this idempotency key is already in progress.', WALLET_NOT_FOUND: 'A wallet record is missing for this transfer.', WALLET_UNAVAILABLE: 'The wallet status or currency configuration is not valid for transfer.', INSUFFICIENT_FUNDS: 'The sender wallet does not have enough funds.', BLOCKED: 'Messaging is unavailable because one of the users has blocked the other.', TRANSACTION_FAILED: 'The transfer failed while processing the transaction.', SERVICE_UNAVAILABLE: 'The transfer service is temporarily unavailable.',
         RATE_LIMITED: 'Too many requests were made. Please try again shortly.',
       };
       return errorResponse(res, code, messages[code] ?? 'Invalid transfer request.');
@@ -855,7 +855,7 @@ async function startServer() {
           messageId,
           uid,
           status: nextStatus,
-          ...(nextStatus !== 'sent' ? { deliveredAt: typeof current.deliveredAt === 'string' ? current.deliveredAt : nowIso } : {}),
+          deliveredAt: typeof current.deliveredAt === 'string' ? current.deliveredAt : nowIso,
           ...(nextStatus === 'read' ? { readAt: typeof current.readAt === 'string' ? current.readAt : nowIso } : {}),
         };
         if (deliverySnapshot.exists) transaction.update(deliveryRef, delivery);
