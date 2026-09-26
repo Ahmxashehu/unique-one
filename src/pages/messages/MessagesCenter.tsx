@@ -15,6 +15,8 @@ export default function MessagesCenter() {
   const [error, setError] = useState('');
   const [requests, setRequests] = useState<MessageRequest[]>([]);
   const [requestBusy, setRequestBusy] = useState<string | null>(null);
+  const [userResults, setUserResults] = useState<Array<{ uid: string; fullName: string; username?: string; uniqueOneId?: string; profilePhotoUrl?: string }>>([]);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,6 +70,32 @@ export default function MessagesCenter() {
     }
   };
 
+  useEffect(() => {
+    const term = search.trim();
+    if (!currentUser || term.length < 2) {
+      setUserResults([]);
+      setUserSearchLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setUserSearchLoading(true);
+      try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch('/api/communication/users/search?q=' + encodeURIComponent(term), { headers: { Authorization: 'Bearer ' + token } });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(payload?.error?.message ?? 'User search failed.');
+        if (!cancelled) setUserResults(Array.isArray(payload?.users) ? payload.users : []);
+      } catch (err) {
+        console.error('Communication user search failed:', err);
+        if (!cancelled) setUserResults([]);
+      } finally {
+        if (!cancelled) setUserSearchLoading(false);
+      }
+    }, 300);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [currentUser, search]);
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return conversations
@@ -99,6 +127,25 @@ export default function MessagesCenter() {
             </button>
           ))}
         </div>
+
+        {search.trim().length >= 2 && (userSearchLoading || userResults.length > 0) && (
+          <div className="border-b border-slate-100 bg-white p-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">People</h3>
+            {userSearchLoading && <div className="flex justify-center py-2"><Loader2 className="w-4 h-4 animate-spin text-slate-400" /></div>}
+            <div className="space-y-2">
+              {userResults.map((user) => (
+                <div key={user.uid} className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50">
+                  {user.profilePhotoUrl ? <img src={user.profilePhotoUrl} alt="" className="w-10 h-10 rounded-full object-cover" /> : <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-semibold text-slate-500">{user.fullName.charAt(0).toUpperCase()}</div>}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{user.fullName}</p>
+                    <p className="text-xs text-slate-500 truncate">{user.username ? '@' + user.username : user.uniqueOneId ?? 'Unique One user'}</p>
+                  </div>
+                  <button onClick={() => navigate('/os/messages/add?q=' + encodeURIComponent(user.uniqueOneId ?? user.username ?? user.fullName))} className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs">Add</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {requests.length > 0 && (
           <div className="border-b border-slate-100 bg-slate-50 p-3">
