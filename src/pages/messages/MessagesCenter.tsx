@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Plus, MessageSquare, Loader2 } from 'lucide-react';
+import { Search, Plus, MessageSquare, Loader2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Conversation } from '../../lib/os/communication-types';
@@ -146,7 +146,7 @@ export default function MessagesCenter() {
                   <h4 className="font-semibold text-slate-900 truncate">{conv.title ?? 'Messages'}</h4>
                   <span className="text-xs text-slate-500 whitespace-nowrap">{conv.lastMessageAt ? new Date(conv.lastMessageAt).toLocaleDateString() : ''}</span>
                 </div>
-                <p className="text-sm text-slate-500 truncate mt-0.5">{conv.type === 'business' ? 'Business conversation' : 'Tap to open chat'}</p>
+                <div className="flex items-center gap-2 mt-0.5"><p className="text-sm text-slate-500 truncate">{conv.type === 'business' ? 'Business conversation' : 'Tap to open chat'}</p>{conv.muted && <VolumeX className="w-3.5 h-3.5 text-slate-400 shrink-0" />}{(conv.unreadCount ?? 0) > 0 && <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">{(conv.unreadCount ?? 0) > 99 ? '99+' : conv.unreadCount}</span>}</div>
               </div>
             </button>
           ))}
