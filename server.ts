@@ -79,6 +79,9 @@ function isSafeIdempotencyKey(value: unknown): value is string {
 function isSafeFirebaseUid(value: unknown): value is string {
   return typeof value === 'string' && value.length >= 1 && value.length <= 128 && /^[A-Za-z0-9_-]+$/.test(value);
 }
+function isSafeConversationId(value: unknown): value is string {
+  return typeof value === 'string' && value.length >= 1 && value.length <= 128 && /^[A-Za-z0-9_-]+$/.test(value);
+}
 function buildRequestFingerprint(senderUid: string, recipientId: string, amountMinor: number, currency: string, description?: string) {
   return [senderUid, recipientId, String(amountMinor), currency, description ?? ''].join('|');
 }
