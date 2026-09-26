@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, BadgeCheck, Clock, Save, Loader2, ShieldCheck, Hash, MessageSquare } from 'lucide-react';
+import { User, Mail, Phone, MapPin, BadgeCheck, Clock, Save, Loader2, ShieldCheck, Hash, MessageSquare, Camera } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { useOfflineQueue } from '../contexts/OfflineQueueContext';
+import { uploadMedia } from '../lib/media/upload';
 
 export default function ProfilePage() {
   const { userData, currentUser } = useAuth();
-  const { enqueueOperation } = useOfflineQueue();
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoError, setPhotoError] = useState('');
   const [formData, setFormData] = useState({
     fullName: userData?.fullName || '',
     phone: userData?.phone || '',
@@ -23,28 +24,51 @@ export default function ProfilePage() {
     return <div className="p-8 text-center text-slate-500">Loading profile...</div>;
   }
 
-  const handleSave = () => {
+  const handlePhotoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !currentUser) return;
+    setPhotoError('');
+    setPhotoLoading(true);
+    try {
+      const result = await uploadMedia(file, {
+        ownerId: currentUser.uid,
+        pathPrefix: `users/${currentUser.uid}/profile`,
+        fileId: 'avatar',
+        maxBytes: 5 * 1024 * 1024,
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+        optimizeImage: true,
+        imageMaxDimension: 512,
+        imageTargetBytes: 180 * 1024,
+      });
+      await updateDoc(doc(db, 'users', currentUser.uid), { profilePhotoUrl: result.downloadUrl });
+    } catch (err) {
+      console.error('Failed to update profile photo:', err);
+      setPhotoError(err instanceof Error ? err.message : 'Unable to update profile photo.');
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!currentUser) return;
     setLoading(true);
-    enqueueOperation('Update Profile', async () => {
-      try {
-        const userRef = doc(db, 'users', currentUser!.uid);
-        await updateDoc(userRef, {
-          fullName: formData.fullName,
-          phone: formData.phone,
-          username: formData.username,
-          preferredLanguage: formData.preferredLanguage,
-        });
-        setIsEditing(false);
-      } catch (err) {
-        console.error(err);
-        alert('Failed to update profile.');
-      } finally {
-        setLoading(false);
-      }
-    });
-    // Immediately close editing and stop loading state since it's queued
-    setIsEditing(false);
-    setLoading(false);
+    setPhotoError('');
+    try {
+      const userRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userRef, {
+        fullName: formData.fullName.trim(),
+        phone: formData.phone.trim(),
+        username: formData.username.trim(),
+        preferredLanguage: formData.preferredLanguage,
+      });
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+      setPhotoError(err instanceof Error ? err.message : 'Failed to update profile.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -88,8 +112,15 @@ export default function ProfilePage() {
       
       <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mb-8 pb-8 border-b border-slate-100">
-          <div className="w-24 h-24 bg-indigo-50 rounded-full flex shrink-0 items-center justify-center text-indigo-700 text-3xl font-bold uppercase">
-            {userData.fullName.charAt(0)}
+          <div className="relative shrink-0">
+            <div className="w-24 h-24 bg-indigo-50 rounded-full overflow-hidden flex items-center justify-center text-indigo-700 text-3xl font-bold uppercase">
+              {userData.profilePhotoUrl ? <img src={userData.profilePhotoUrl} alt="Profile" className="w-full h-full object-cover" /> : userData.fullName.charAt(0)}
+            </div>
+            <label className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center cursor-pointer shadow-lg">
+              {photoLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handlePhotoChange} disabled={photoLoading} className="hidden" />
+            </label>
+            {photoError && <p className="absolute top-full left-0 mt-2 w-56 text-xs text-red-600">{photoError}</p>}
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
