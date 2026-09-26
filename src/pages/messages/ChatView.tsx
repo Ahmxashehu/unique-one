@@ -147,7 +147,19 @@ export default function ChatView() {
               throw new Error(messagesPayload?.error?.message ?? 'Failed to read Communication messages.');
             }
             if (!active) return;
-            setMessages(messagesPayload.messages as Message[]);
+            const nextMessages = messagesPayload.messages as Message[];
+            setMessages((current) => {
+              if (current.length === nextMessages.length && current.every((item, index) => {
+                const next = nextMessages[index];
+                return item.id === next.id
+                  && item.updatedAt === next.updatedAt
+                  && item.status === next.status
+                  && item.deleted === next.deleted
+                  && JSON.stringify(item.reactions ?? {}) === JSON.stringify(next.reactions ?? {})
+                  && JSON.stringify(item.attachments ?? []) === JSON.stringify(next.attachments ?? []);
+              })) return current;
+              return nextMessages;
+            });
             setLoading(false);
           } catch (messageError) {
             if (active) {
@@ -497,6 +509,31 @@ export default function ChatView() {
       )}
 
       {!blocked && <div className="sticky bottom-0 z-30 bg-white border-t border-slate-200 p-3 sm:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shrink-0">
+        {(attachments.length > 0 || uploadingAttachment) && (
+          <div className="mb-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+            {uploadingAttachment ? (
+              <div className="flex items-center gap-2 px-2 py-1.5">
+                <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
+                <p className="text-xs text-slate-600">{attachmentStage === 'preparing' ? 'Preparing attachment…' : `Uploading attachment ${attachmentProgress}%`}</p>
+              </div>
+            ) : (
+              <div className="flex gap-2 overflow-x-auto">
+                {attachments.map((item) => (
+                  <div key={item.id} className="relative shrink-0">
+                    {item.contentType.startsWith('image/') ? (
+                      <img src={item.url} alt={item.name} className="w-20 h-20 rounded-xl object-cover border border-slate-200" />
+                    ) : (
+                      <div className="w-20 h-20 rounded-xl border border-slate-200 bg-white flex items-center justify-center px-2 text-[10px] text-slate-600 text-center">{item.name}</div>
+                    )}
+                    <button type="button" onClick={() => setAttachments((current) => current.filter((entry) => entry.id !== item.id))} className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center shadow" aria-label={`Remove ${item.name}`}>
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1 pr-2">
           <div className="flex items-center shrink-0">
             <label className="p-3 text-slate-500 cursor-pointer hover:bg-slate-100 rounded-xl" aria-label="Gallery" title="Choose from gallery">
@@ -512,9 +549,7 @@ export default function ChatView() {
               <input type="file" multiple accept=".pdf,.txt,.doc,.docx,.xls,.xlsx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void handleAttachmentSelect(event)} disabled={uploadingAttachment || sending} />
             </label>
           </div>
-          {(attachments.length > 0 || uploadingAttachment) && <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-slate-200 rounded-xl p-2 shadow-sm">
-          {uploadingAttachment ? <p className="text-xs text-slate-500">{attachmentStage === 'preparing' ? 'Preparing attachment…' : `Uploading attachment ${attachmentProgress}%`}</p> : <div className="flex flex-wrap gap-1">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((entry) => entry.id !== item.id))} className="text-xs bg-slate-100 rounded-full px-2 py-1">{item.name} ×</button>)}</div>}
-        </div>}
+}
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSend(); }
           }} placeholder="Type a message..." className="flex-1 bg-transparent border-none py-3 focus:ring-0 resize-none max-h-32 text-sm focus:outline-none" rows={1} />
