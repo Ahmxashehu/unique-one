@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, Clock } from 'lucide-react';
+import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, Clock, ShieldAlert, Ban } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getConversation, getConversationMembers, subscribeToMessagesForConversation } from '../../lib/os/communication-db';
@@ -16,6 +16,9 @@ export default function ChatView() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [otherPresence, setOtherPresence] = useState<{ uid: string; status: 'online' | 'offline'; lastSeenAt: string | null } | null>(null);
+  const [otherUid, setOtherUid] = useState<string | null>(null);
+  const [showNewContactWarning, setShowNewContactWarning] = useState(() => new URLSearchParams(window.location.search).get('new') === '1');
+  const [blocked, setBlocked] = useState(false);
 
   const updatePresence = useCallback(async (status: 'online' | 'offline') => {
     if (!currentUser) return;
@@ -50,6 +53,7 @@ export default function ChatView() {
     try {
       const members = await getConversationMembers(id);
       const otherMember = members.find((member) => member.uid !== currentUser.uid);
+      setOtherUid(otherMember?.uid ?? null);
       if (!otherMember) {
         setOtherPresence(null);
         return;
@@ -70,6 +74,23 @@ export default function ChatView() {
   }, [id, currentUser]);
 
   useEffect(() => { void loadOtherPresence(); }, [loadOtherPresence]);
+
+  const blockUser = async () => {
+    if (!currentUser || !otherUid || blocked) return;
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/communication/blocks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ blockedUid: otherUid }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to block this user.');
+      setBlocked(true);
+      setShowNewContactWarning(false);
+      navigate('/os/messages');
+    } catch (err) { setError(err instanceof Error ? err.message : 'Failed to block this user.'); }
+  };
 
   useEffect(() => {
     let active = true;
@@ -176,6 +197,21 @@ export default function ChatView() {
         </div>
       </div>
 
+        {showNewContactWarning && otherUid && !blocked && (
+          <div className="mx-4 mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 shrink-0">
+            <div className="flex items-start gap-3">
+              <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900">New contact</p>
+                <p className="text-xs text-slate-600 mt-1">You may not know this person. Read the message first. If it looks familiar, you can reply; if you don't recognize the person, you can block them.</p>
+                <div className="flex gap-2 mt-3">
+                  <button onClick={() => setShowNewContactWarning(false)} className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-medium">Reply</button>
+                  <button onClick={() => void blockUser()} className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-medium flex items-center gap-1.5"><Ban className="w-3.5 h-3.5" /> Block</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {loading && <div className="flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>}
         {error && <div className="text-center text-xs text-red-600 bg-red-50 rounded-lg p-2">{error}</div>}
@@ -197,7 +233,7 @@ export default function ChatView() {
         })}
       </div>
 
-      <div className="bg-white border-t border-slate-200 p-3 sm:p-4 shrink-0">
+      {!blocked && <div className="bg-white border-t border-slate-200 p-3 sm:p-4 shrink-0">
         <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1 pr-2">
           <button className="p-3 text-slate-400 shrink-0" aria-label="Attach file"><Paperclip className="w-5 h-5" /></button>
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => {
@@ -207,7 +243,7 @@ export default function ChatView() {
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
