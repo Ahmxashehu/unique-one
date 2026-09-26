@@ -1327,9 +1327,6 @@ async function startServer() {
     try {
       senderUid = sanitizeRequiredAuthUid((req as any).user?.uid);
       draft = validateMessageDraft(req.body, { uid: senderUid });
-      if (draft.type !== 'text') {
-        return errorResponse(res, 'INVALID_REQUEST', 'Only text messages are enabled in this communication step.');
-      }
     } catch (error) {
       if (error instanceof CommunicationValidationError) {
         return errorResponse(res, 'INVALID_REQUEST', error.message);
@@ -1361,8 +1358,9 @@ async function startServer() {
         id: messageRef.id,
         conversationId: draft.conversationId,
         senderId: senderUid,
-        type: 'text',
-        text: draft.text,
+        type: draft.type,
+        ...(draft.text ? { text: draft.text } : {}),
+        ...(draft.attachments ? { attachments: draft.attachments } : {}),
         createdAt: nowIso,
         updatedAt: nowIso,
         status: 'sent',
