@@ -1176,6 +1176,7 @@ async function startServer() {
         if (forwardBlock.exists || reverseBlock.exists) return errorResponse(res, 'BLOCKED', 'Messaging is unavailable because one of the users has blocked the other.');
       }
       const messageRef = adminDb.collection('messages').doc();
+      const replyMessageRef = draft.replyToMessageId ? adminDb.collection('messages').doc(draft.replyToMessageId) : null;
       const now = Timestamp.now();
       const nowIso = now.toDate().toISOString();
       const message: Message = {
@@ -1187,15 +1188,25 @@ async function startServer() {
         createdAt: nowIso,
         updatedAt: nowIso,
         status: 'sent',
+        ...(draft.replyToMessageId ? { replyToMessageId: draft.replyToMessageId } : {}),
       };
       await adminDb.runTransaction(async (transaction) => {
         const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(draft.conversationId, senderUid));
-        const [conversationSnapshot, membershipSnapshot] = await Promise.all([
+        const results = await Promise.all([
           transaction.get(conversationRef),
           transaction.get(membershipRef),
+          ...(replyMessageRef ? [transaction.get(replyMessageRef)] : []),
         ]);
+        const conversationSnapshot = results[0];
+        const membershipSnapshot = results[1];
+        const replySnapshot = results[2];
         if (!conversationSnapshot.exists || !membershipSnapshot.exists) {
           throw new RequestValidationError('INVALID_REQUEST', 'You are not a member of this conversation.');
+        }
+        if (replyMessageRef) {
+          if (!replySnapshot || !replySnapshot.exists) throw new RequestValidationError('INVALID_REQUEST', 'The message you are replying to was not found.');
+          const replyData = replySnapshot.data() as Partial<Message> | undefined;
+          if (!replyData || replyData.conversationId !== draft.conversationId) throw new RequestValidationError('INVALID_REQUEST', 'You can only reply to a message in this conversation.');
         }
         transaction.create(messageRef, message);
         transaction.update(conversationRef, {
