@@ -170,13 +170,20 @@ service cloud.firestore {
       allow read, create, update, delete: if false;
     }
 
-    // Communication Core: privileged/server workflow creates conversations and
-    // membership records; clients can only consume stored membership.
+    // Communication Core: privileged/server workflow creates conversations
+    // and membership records; clients can only consume authorized records.
     match /conversations/{conversationId} {
       allow read: if isConversationMember(conversationId);
       allow create, update, delete: if false;
+    }
 
-      match /messages/{messageId} {
+    match /conversationMembers/{memberId} {
+      allow read: if isAuthenticated()
+        && resource.data.uid == request.auth.uid;
+      allow create, update, delete: if false;
+    }
+
+    match /messages/{messageId} {
       // Message records are created only by the trusted Communication API.
       allow read: if isConversationMember(resource.data.conversationId);
       allow create, update, delete: if false;
@@ -197,8 +204,6 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    // Presence is self-managed. Cross-user presence reads require a future
-    // explicit relationship/index; this foundation therefore defaults to self-only.
     match /userPresence/{uid} {
       allow read: if isAuthenticated() && request.auth.uid == uid;
       // Presence is updated by the trusted Communication API.
