@@ -82,7 +82,7 @@ export default function MessagesCenter() {
         <div className="p-4 border-b border-slate-100">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-xl font-bold text-slate-900">Messages</h1>
-            <button onClick={() => navigate('/os/messages/new')} aria-label="New message" className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-full">
+            <button onClick={() => navigate('/os/messages/add')} aria-label="Add user" title="Add user" className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-full">
               <Plus className="w-5 h-5 text-slate-700" />
             </button>
           </div>
