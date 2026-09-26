@@ -42,31 +42,6 @@ export default function MessagesCenter() {
     return () => { cancelled = true; };
   }, [currentUser]);
 
-  const respondToRequest = async (requestId: string, action: 'accept' | 'decline') => {
-    if (!currentUser || requestBusy) return;
-    setRequestBusy(requestId);
-    setError('');
-    try {
-      const token = await currentUser.getIdToken();
-      const response = await fetch(`/api/communication/message-requests/${requestId}/respond`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to respond to message request.');
-      setRequests((current) => current.filter((request) => request.id !== requestId));
-      if (action === 'accept' && payload?.conversation?.id) {
-        navigate(`/os/messages/${payload.conversation.id}`);
-      }
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : 'Failed to respond to message request.');
-    } finally {
-      setRequestBusy(null);
-    }
-  };
-
   useEffect(() => {
     const term = search.trim();
     if (!currentUser || term.length < 2) {
