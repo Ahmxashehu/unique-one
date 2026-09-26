@@ -76,11 +76,10 @@ service cloud.firestore {
     }
 
     match /audit_logs/{logId} {
-      // Admins read audits
+      // Audit records are trusted/server-generated and immutable to clients.
       allow read: if isAdmin();
-      // Anyone can create a log, but they are immutable
-      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if false; 
+      allow create: if false;
+      allow update, delete: if false;
     }
 
     match /products/{productId} {
@@ -143,8 +142,8 @@ service cloud.firestore {
 
     match /receipts/{recId} {
       allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      allow create: if false;
+      allow update, delete: if false;
     }
 
     match /transactions/{txId} {
