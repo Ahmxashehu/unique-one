@@ -851,11 +851,14 @@ async function startServer() {
         const current = deliverySnapshot.exists ? deliverySnapshot.data() as Record<string, unknown> : {};
         const currentStatus = current.status === 'read' ? 'read' : current.status === 'delivered' ? 'delivered' : 'sent';
         const nextStatus = action === 'read' ? 'read' : (currentStatus === 'read' ? 'read' : 'delivered');
+        const deliveredAt = typeof current.deliveredAt === 'string'
+          ? current.deliveredAt
+          : (action === 'delivered' ? nowIso : undefined);
         const delivery = {
           messageId,
           uid,
           status: nextStatus,
-          deliveredAt: typeof current.deliveredAt === 'string' ? current.deliveredAt : nowIso,
+          ...(deliveredAt ? { deliveredAt } : {}),
           ...(nextStatus === 'read' ? { readAt: typeof current.readAt === 'string' ? current.readAt : nowIso } : {}),
         };
         if (deliverySnapshot.exists) transaction.update(deliveryRef, delivery);
