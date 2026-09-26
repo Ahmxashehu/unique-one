@@ -637,6 +637,69 @@ async function startServer() {
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to create the conversation.');
     }
   });
+  app.post("/api/communication/messages/:messageId/delivery", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMessageDeliveryRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : (req.ip || 'anonymous');
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many delivery updates. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const messageId = req.params.messageId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(messageId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The message ID is invalid.');
+      }
+      if (!isPlainObject(req.body) || (req.body.action !== 'delivered' && req.body.action !== 'read')) {
+        return errorResponse(res, 'INVALID_REQUEST', 'action must be delivered or read.');
+      }
+      const action = req.body.action as 'delivered' | 'read';
+      const messageRef = adminDb.collection('messages').doc(messageId);
+      const deliveryRef = adminDb.collection('messageDeliveries').doc(messageId + '_' + uid);
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const messageSnapshot = await transaction.get(messageRef);
+        if (!messageSnapshot.exists) throw new Error('MESSAGE_NOT_FOUND');
+        const message = messageSnapshot.data() as Message;
+        const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(message.conversationId, uid));
+        const membershipSnapshot = await transaction.get(membershipRef);
+        if (!membershipSnapshot.exists) throw new Error('FORBIDDEN');
+
+        const deliverySnapshot = await transaction.get(deliveryRef);
+        const nowIso = Timestamp.now().toDate().toISOString();
+        const current = deliverySnapshot.exists ? deliverySnapshot.data() as Record<string, unknown> : {};
+        const currentStatus = current.status === 'read' ? 'read' : current.status === 'delivered' ? 'delivered' : 'sent';
+        const nextStatus = action === 'read' ? 'read' : (currentStatus === 'read' ? 'read' : 'delivered');
+        const delivery = {
+          messageId,
+          uid,
+          status: nextStatus,
+          ...(nextStatus !== 'sent' ? { deliveredAt: typeof current.deliveredAt === 'string' ? current.deliveredAt : nowIso } : {}),
+          ...(nextStatus === 'read' ? { readAt: typeof current.readAt === 'string' ? current.readAt : nowIso } : {}),
+        };
+        if (deliverySnapshot.exists) transaction.update(deliveryRef, delivery);
+        else transaction.create(deliveryRef, delivery);
+
+        if (message.senderId !== uid) {
+          const messageStatus = nextStatus === 'read' ? 'read' : 'delivered';
+          if (message.status !== 'read') transaction.update(messageRef, { status: messageStatus, updatedAt: nowIso });
+        }
+        return { delivery, messageStatus: message.senderId === uid ? message.status : (nextStatus === 'read' ? 'read' : 'delivered') };
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'MESSAGE_NOT_FOUND') return errorResponse(res, 'INVALID_REQUEST', 'The message was not found.', 404);
+      if (code === 'FORBIDDEN') return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      console.error('Message delivery update failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to update message delivery status.');
+    }
+  });
+
   app.post("/api/communication/messages", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 60,
