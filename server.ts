@@ -983,7 +983,6 @@ async function startServer() {
               const lastReadAt = typeof memberData.lastReadAt === 'string' ? memberData.lastReadAt : null;
               const unreadSnapshot = await adminDb.collection('messages')
                 .where('conversationId', '==', conversationId)
-                .where('senderId', '!=', uid)
                 .get();
               const unreadCount = unreadSnapshot.docs.filter((doc) => {
                 const createdAt = doc.data().createdAt;
