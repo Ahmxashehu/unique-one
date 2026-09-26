@@ -3,7 +3,8 @@ import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check,
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { subscribeToMessagesForConversation } from '../../lib/os/communication-db';
-import type { Conversation, Message } from '../../lib/os/communication-types';
+import type { Conversation, Message, MessageAttachmentMetadata } from '../../lib/os/communication-types';
+import { uploadMedia } from '../../lib/media/upload';
 
 const formatMessageDate = (value: string) => {
   const date = new Date(value);
@@ -32,6 +33,9 @@ export default function ChatView() {
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [reactionTarget, setReactionTarget] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
+  const [attachments, setAttachments] = useState<MessageAttachmentMetadata[]>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [attachmentProgress, setAttachmentProgress] = useState(0);
 
   const updatePresence = useCallback(async (status: 'online' | 'offline') => {
     if (!currentUser) return;
@@ -236,9 +240,51 @@ export default function ChatView() {
     }
   };
 
+  const handleAttachmentSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (!id || !currentUser || files.length === 0) return;
+    if (files.length + attachments.length > 5) {
+      setError('You can attach up to 5 files to one message.');
+      return;
+    }
+    setUploadingAttachment(true);
+    setError('');
+    try {
+      const uploaded: MessageAttachmentMetadata[] = [];
+      for (const file of files) {
+        const metadata = await uploadMedia(file, {
+          ownerId: currentUser.uid,
+          pathPrefix: `messages/${id}/${currentUser.uid}`,
+          maxBytes: file.type.startsWith('image/') ? 5 * 1024 * 1024 : 20 * 1024 * 1024,
+          allowedMimeTypes: file.type.startsWith('image/')
+            ? ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+            : ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+          optimizeImage: file.type.startsWith('image/'),
+          imageMaxDimension: 1600,
+          imageTargetBytes: 450 * 1024,
+          onProgress: setAttachmentProgress,
+        });
+        uploaded.push({
+          id: metadata.fileId,
+          name: metadata.originalName,
+          contentType: metadata.mimeType,
+          sizeBytes: metadata.sizeBytes,
+          url: metadata.downloadUrl,
+        });
+      }
+      setAttachments((current) => [...current, ...uploaded]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload attachment.');
+    } finally {
+      setUploadingAttachment(false);
+      setAttachmentProgress(0);
+    }
+  };
+
   const handleSend = async () => {
     const text = message.trim();
-    if (!text || !id || !currentUser || sending) return;
+    if ((!text && attachments.length === 0) || !id || !currentUser || sending || uploadingAttachment) return;
     setSending(true);
     setError('');
     try {
@@ -246,11 +292,21 @@ export default function ChatView() {
       const response = await fetch('/api/communication/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId: id, type: 'text', text, replyToMessageId: replyingTo?.id }),
+        body: JSON.stringify({
+          conversationId: id,
+          type: attachments.length > 0 ? (attachments.every((item) => item.contentType.startsWith('image/')) ? 'image' : 'file') : 'text',
+          ...(text ? { text } : {}),
+          ...(attachments.length > 0 ? { attachments: attachments.map((item) => ({
+            ...item,
+            storagePath: `messages/${id}/${currentUser.uid}/${item.id}.webp`,
+          })) } : {}),
+          replyToMessageId: replyingTo?.id,
+        }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to send message.');
       setMessage('');
+      setAttachments([]);
       setReplyingTo(null);
     } catch (err) {
       console.error(err);
@@ -326,6 +382,11 @@ export default function ChatView() {
                     ) : null;
                   })()}
                   {msg.deleted ? <p className="text-sm italic opacity-70">This message was deleted</p> : msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>}
+                  {!msg.deleted && msg.attachments?.length ? <div className="mt-2 space-y-2">
+                    {msg.attachments.map((attachment) => attachment.contentType.startsWith('image/')
+                      ? <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer"><img src={attachment.url} alt={attachment.name} className="max-w-full max-h-64 rounded-xl object-cover" loading="lazy" /></a>
+                      : <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs underline">{attachment.name}</a>)}
+                  </div>}
                   {msg.reactions && Object.keys(msg.reactions).length > 0 && <div className="flex flex-wrap gap-1 mt-2">
                     {Object.entries(msg.reactions).map(([emoji, count]) => <button key={emoji} onClick={() => void updateReaction(msg.id, emoji)} className={`px-1.5 py-0.5 rounded-full text-xs border ${msg.myReaction === emoji ? 'border-slate-900 bg-slate-100' : 'border-slate-200 bg-white/80'}`}>{emoji} {count}</button>)}
                   </div>}
@@ -362,11 +423,17 @@ export default function ChatView() {
 
       {!blocked && <div className="sticky bottom-0 z-30 bg-white border-t border-slate-200 p-3 sm:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shrink-0">
         <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1 pr-2">
-          <button className="p-3 text-slate-400 shrink-0" aria-label="Attach file"><Paperclip className="w-5 h-5" /></button>
+          <label className="p-3 text-slate-500 shrink-0 cursor-pointer hover:bg-slate-100 rounded-xl" aria-label="Attach file" title="Attach file">
+            <Paperclip className="w-5 h-5" />
+            <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,.pdf,.txt,.doc,.docx,.xls,.xlsx" className="hidden" onChange={(event) => void handleAttachmentSelect(event)} disabled={uploadingAttachment || sending} />
+          </label>
+          {(attachments.length > 0 || uploadingAttachment) && <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-slate-200 rounded-xl p-2 shadow-sm">
+          {uploadingAttachment ? <p className="text-xs text-slate-500">Uploading attachment {attachmentProgress}%</p> : <div className="flex flex-wrap gap-1">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((entry) => entry.id !== item.id))} className="text-xs bg-slate-100 rounded-full px-2 py-1">{item.name} ×</button>)}</div>}
+        </div>}
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSend(); }
           }} placeholder="Type a message..." className="flex-1 bg-transparent border-none py-3 focus:ring-0 resize-none max-h-32 text-sm focus:outline-none" rows={1} />
-          <button onClick={() => void handleSend()} disabled={!message.trim() || sending} className="p-3 bg-slate-900 text-white rounded-xl disabled:opacity-50 shrink-0 mb-1" aria-label="Send">
+          <button onClick={() => void handleSend()} disabled={(!message.trim() && attachments.length === 0) || sending || uploadingAttachment} className="p-3 bg-slate-900 text-white rounded-xl disabled:opacity-50 shrink-0 mb-1" aria-label="Send">
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
