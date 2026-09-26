@@ -5,6 +5,16 @@ import { useAuth } from '../../contexts/AuthContext';
 import { subscribeToMessagesForConversation } from '../../lib/os/communication-db';
 import type { Conversation, Message } from '../../lib/os/communication-types';
 
+const formatMessageDate = (value: string) => {
+  const date = new Date(value);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return date.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' });
+};
+
 export default function ChatView() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -293,10 +303,14 @@ export default function ChatView() {
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         {loading && <div className="flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>}
         {error && <div className="text-center text-xs text-red-600 bg-red-50 rounded-lg p-2">{error}</div>}
-        {!loading && messages.map((msg) => {
+        {!loading && messages.map((msg, index) => {
           const mine = msg.senderId === currentUser?.uid;
+          const previous = index > 0 ? messages[index - 1] : null;
+          const showDate = !previous || new Date(previous.createdAt).toDateString() !== new Date(msg.createdAt).toDateString();
           return (
-            <div key={msg.id} id={`message-${msg.id}`} className={`flex ${mine ? 'justify-end' : 'justify-start'} group`}>
+            <div key={msg.id}>
+              {showDate && <div className="flex justify-center my-2"><span className="px-3 py-1 rounded-full bg-slate-200 text-slate-500 text-[10px] font-medium">{formatMessageDate(msg.createdAt)}</span></div>}
+              <div id={`message-${msg.id}`} className={`flex ${mine ? 'justify-end' : 'justify-start'} group`}>
               <div className="relative max-w-[75%] md:max-w-[60%]">
                 <button onClick={() => setReplyingTo(msg)} className={`absolute -top-10 ${mine ? '-left-1' : '-right-1'} sm:-top-3 ${mine ? 'sm:-left-10' : 'sm:-right-10'} flex items-center justify-center w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm text-slate-500 hover:text-slate-900 z-10`} aria-label="Reply to message" title="Reply">
                   <CornerUpLeft className="w-4 h-4" />
@@ -326,6 +340,7 @@ export default function ChatView() {
                     {['👍','❤️','😂','😮','😢','🙏'].map((emoji) => <button key={emoji} onClick={() => void updateReaction(msg.id, emoji)} className="text-lg p-1 rounded-full hover:bg-slate-100" aria-label={`React ${emoji}`}>{emoji}</button>)}
                   </div>}
                 </div>
+              </div>
               </div>
             </div>
           );
