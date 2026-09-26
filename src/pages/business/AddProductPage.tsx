@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { PackagePlus, Save, Loader2, AlertCircle, X, ImagePlus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { db, storage } from '../../lib/firebase';
+import { db } from '../../lib/firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { uploadMedia } from '../../lib/media/upload';
 import { useNavigate } from 'react-router-dom';
 import { ProductCategory, ProductCondition, ProductStatus, Product } from '../../lib/os/types';
 
@@ -19,34 +19,6 @@ const CATEGORIES: { value: ProductCategory; label: string }[] = [
 
 const MAX_IMAGES = 5;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-const MAX_IMAGE_DIMENSION = 1600;
-const TARGET_IMAGE_BYTES = 450 * 1024;
-
-function compressImage(file: File): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(url);
-      const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight));
-      const width = Math.max(1, Math.round(image.naturalWidth * scale));
-      const height = Math.max(1, Math.round(image.naturalHeight * scale));
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext('2d');
-      if (!context) { reject(new Error('Image processing is not supported on this device.')); return; }
-      context.drawImage(image, 0, 0, width, height);
-      const quality = file.size > TARGET_IMAGE_BYTES ? 0.78 : 0.86;
-      canvas.toBlob(blob => {
-        if (!blob) { reject(new Error('Unable to optimize this image.')); return; }
-        resolve(blob);
-      }, 'image/webp', quality);
-    };
-    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Unable to read one of the selected images.')); };
-    image.src = url;
-  });
-}
 
 export default function AddProductPage() {
   const { currentUser, userData } = useAuth();
@@ -92,21 +64,17 @@ export default function AddProductPage() {
   };
 
   const uploadImage = async (file: File, productId: string, index: number, total: number) => {
-    const optimized = await compressImage(file);
-    const storageRef = ref(storage, `products/${currentUser!.uid}/${productId}/image-${index + 1}.webp`);
-    return new Promise<string>((resolve, reject) => {
-      const task = uploadBytesResumable(storageRef, optimized, {
-        contentType: 'image/webp',
-        customMetadata: { originalName: file.name, optimizedFromBytes: String(file.size) },
-      });
-      task.on('state_changed',
-        snapshot => setUploadProgress(Math.round(((index + snapshot.bytesTransferred / snapshot.totalBytes) / total) * 100)),
-        reject,
-        async () => {
-          try { resolve(await getDownloadURL(task.snapshot.ref)); } catch (err) { reject(err); }
-        }
-      );
+    const result = await uploadMedia(file, {
+      ownerId: currentUser!.uid,
+      pathPrefix: `products/${currentUser!.uid}/${productId}`,
+      fileId: `image-${index + 1}`,
+      maxBytes: MAX_IMAGE_SIZE,
+      optimizeImage: true,
+      imageMaxDimension: 1600,
+      imageTargetBytes: 450 * 1024,
+      onProgress: progress => setUploadProgress(Math.round(((index + progress / 100) / total) * 100)),
     });
+    return result.downloadUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent, status: ProductStatus) => {
