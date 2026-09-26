@@ -290,6 +290,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
   const httpServer = http.createServer(app);
+  // Codespaces forwards requests through a trusted proxy and supplies X-Forwarded-For.
+  app.set('trust proxy', 1);
   app.use(express.json());
   app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
   const authenticate = async (req: Request, res: Response, next: NextFunction) => {
@@ -500,6 +502,9 @@ async function startServer() {
       const usersRef = adminDb.collection('users');
       const candidates = new Map<string, FirebaseFirestore.DocumentData>();
       const normalized = rawQuery.toLowerCase();
+      const addCandidate = (uid: string, data: FirebaseFirestore.DocumentData | undefined) => {
+        if (uid !== requesterUid) candidates.set(uid, data ?? {});
+      };
       const queries = [
         usersRef.where('email', '==', rawQuery).limit(10),
         usersRef.where('email', '==', normalized).limit(10),
@@ -511,9 +516,31 @@ async function startServer() {
       ];
       const snapshots = await Promise.all(queries.map((query) => query.get()));
       for (const snapshot of snapshots) {
-        for (const doc of snapshot.docs) {
-          if (doc.id !== requesterUid) candidates.set(doc.id, doc.data());
+        for (const doc of snapshot.docs) addCandidate(doc.id, doc.data());
+      }
+      // Fall back to Firebase Auth for email/phone so users remain discoverable
+      // even when those identifiers are not yet copied into their profile document.
+      try {
+        const auth = getAuth();
+        if (rawQuery.includes('@')) {
+          const authUser = await auth.getUserByEmail(rawQuery).catch(() => null);
+          if (authUser) addCandidate(authUser.uid, {
+            fullName: authUser.displayName,
+            email: authUser.email,
+            profilePhotoUrl: authUser.photoURL,
+          });
         }
+        if (/^\+?[0-9][0-9\s().-]{6,20}$/.test(rawQuery)) {
+          const phone = rawQuery.replace(/[\s().-]/g, '');
+          const authUser = await auth.getUserByPhoneNumber(phone).catch(() => null);
+          if (authUser) addCandidate(authUser.uid, {
+            fullName: authUser.displayName,
+            phone: authUser.phoneNumber,
+            profilePhotoUrl: authUser.photoURL,
+          });
+        }
+      } catch (error) {
+        console.warn('Firebase Auth user lookup skipped:', error);
       }
       const results = Array.from(candidates.entries()).slice(0, 10).map(([uid, data]) => ({
         uid,
