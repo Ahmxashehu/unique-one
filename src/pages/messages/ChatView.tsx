@@ -98,46 +98,49 @@ export default function ChatView() {
 
   useEffect(() => {
     let active = true;
-    let unsubscribe: (() => void) | undefined;
+    let pollTimer: number | undefined;
     setLoading(true);
     setError('');
-    void (async () => {
+
+    const loadChat = async () => {
       if (!id || !currentUser) return;
       try {
         const token = await currentUser.getIdToken();
-        const response = await fetch(`/api/communication/conversations/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload?.conversation) {
-          throw new Error(payload?.error?.message ?? 'Failed to load conversation.');
+        const [conversationResponse, messagesResponse] = await Promise.all([
+          fetch(`/api/communication/conversations/${id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`/api/communication/conversations/${id}/messages?limit=100`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+        const conversationPayload = await conversationResponse.json().catch(() => null);
+        const messagesPayload = await messagesResponse.json().catch(() => null);
+        if (!conversationResponse.ok || !conversationPayload?.conversation) {
+          throw new Error(conversationPayload?.error?.message ?? 'Failed to load conversation.');
+        }
+        if (!messagesResponse.ok || !Array.isArray(messagesPayload?.messages)) {
+          throw new Error(messagesPayload?.error?.message ?? 'Failed to load conversation messages.');
         }
         if (!active) return;
-        setConversation(payload.conversation);
-        unsubscribe = await subscribeToMessagesForConversation(
-          id,
-          (items) => {
-            if (!active) return;
-            setMessages(items);
-            setLoading(false);
-          },
-          (subscriptionError) => {
-            if (!active) return;
-            setError(subscriptionError.message);
-            setLoading(false);
-          },
-        );
+        setConversation(conversationPayload.conversation);
+        setMessages(messagesPayload.messages);
+        setLoading(false);
       } catch (err) {
         console.error(err);
         if (active) {
-          setError('Unable to load this conversation.');
+          setError(err instanceof Error ? err.message : 'Unable to load this conversation.');
           setLoading(false);
         }
       }
-    })();
+    };
+
+    void loadChat();
+    pollTimer = window.setInterval(() => { void loadChat(); }, 3000);
+
     return () => {
       active = false;
-      unsubscribe?.();
+      if (pollTimer !== undefined) window.clearInterval(pollTimer);
     };
   }, [id, currentUser]);
 
