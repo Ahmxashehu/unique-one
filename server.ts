@@ -469,8 +469,31 @@ async function startServer() {
       }
       const membersSnapshot = await adminDb.collection('conversationMembers')
         .where('conversationId', '==', conversationId).get();
+      const conversationData = conversationSnapshot.data() as Record<string, unknown>;
+      let enrichedConversation = conversationData;
+      const otherUid = membersSnapshot.docs
+        .map((member) => member.data().uid)
+        .find((memberUid) => typeof memberUid === 'string' && memberUid !== uid);
+      if (conversationData.type === 'direct' && typeof otherUid === 'string' && isSafeFirebaseUid(otherUid)) {
+        const userSnapshot = await adminDb.collection('users').doc(otherUid).get();
+        if (userSnapshot.exists) {
+          const user = userSnapshot.data() as Record<string, unknown>;
+          const fullName = typeof user.fullName === 'string' && user.fullName.trim()
+            ? user.fullName.trim()
+            : 'Unique One User';
+          const avatarUrl = typeof user.profilePhotoUrl === 'string' && user.profilePhotoUrl.trim()
+            ? user.profilePhotoUrl.trim()
+            : undefined;
+          enrichedConversation = {
+            ...conversationData,
+            title: fullName,
+            ...(avatarUrl ? { avatarUrl } : {}),
+            otherUid,
+          };
+        }
+      }
       return res.status(200).json({
-        conversation: conversationSnapshot.data(),
+        conversation: enrichedConversation,
         members: membersSnapshot.docs.map((member) => member.data()),
       });
     } catch (error) {
@@ -901,7 +924,35 @@ async function startServer() {
       const conversations = [];
       for (const conversationId of conversationIds.slice(0, 100)) {
         const snapshot = await adminDb.collection('conversations').doc(conversationId).get();
-        if (snapshot.exists) conversations.push(snapshot.data());
+        if (!snapshot.exists) continue;
+        const conversation = snapshot.data() as Record<string, unknown>;
+        if (conversation.type === 'direct') {
+          const memberSnapshot = await adminDb.collection('conversationMembers')
+            .where('conversationId', '==', conversationId).get();
+          const otherUid = memberSnapshot.docs
+            .map((doc) => doc.data().uid)
+            .find((memberUid) => typeof memberUid === 'string' && memberUid !== uid);
+          if (typeof otherUid === 'string' && isSafeFirebaseUid(otherUid)) {
+            const userSnapshot = await adminDb.collection('users').doc(otherUid).get();
+            if (userSnapshot.exists) {
+              const user = userSnapshot.data() as Record<string, unknown>;
+              const fullName = typeof user.fullName === 'string' && user.fullName.trim()
+                ? user.fullName.trim()
+                : 'Unique One User';
+              const avatarUrl = typeof user.profilePhotoUrl === 'string' && user.profilePhotoUrl.trim()
+                ? user.profilePhotoUrl.trim()
+                : undefined;
+              conversations.push({
+                ...conversation,
+                title: fullName,
+                ...(avatarUrl ? { avatarUrl } : {}),
+                otherUid,
+              });
+              continue;
+            }
+          }
+        }
+        conversations.push(conversation);
       }
       conversations.sort((a: any, b: any) =>
         new Date(String(b?.lastMessageAt ?? b?.updatedAt ?? b?.createdAt ?? 0)).getTime()
