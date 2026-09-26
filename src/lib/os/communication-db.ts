@@ -6,6 +6,7 @@ import {
   getDocs,
   limit as fbLimit,
   orderBy,
+  onSnapshot,
   query,
   where,
   type DocumentData,
@@ -255,6 +256,39 @@ function mapMessage(snapshotId: string, data: DocumentData | undefined): Message
 function clampMessageLimit(requested: number | undefined): number {
   if (requested === undefined || !Number.isSafeInteger(requested) || requested <= 0) return DEFAULT_MESSAGE_LIMIT;
   return Math.min(requested, MAX_MESSAGE_LIMIT);
+}
+
+/** Subscribes to top-level Communication Core messages. Firestore rules still enforce conversation membership. */
+export async function subscribeToMessagesForConversation(
+  conversationId: string,
+  onMessages: (messages: Message[]) => void,
+  onError: (error: CommunicationDbError) => void,
+  requestedLimit?: number,
+): () => void {
+  const uid = requireAuthenticatedUid();
+  const id = requireId(conversationId, 'conversationId');
+  const membershipSnapshot = await safeRead(() => getDoc(doc(db, CONVERSATION_MEMBERS_COLLECTION, `${id}_${uid}`)));
+  if (!membershipSnapshot.exists()) {
+    onMessages([]);
+    onError(new CommunicationDbError('NOT_FOUND', `Conversation ${id} was not found.`));
+    return () => undefined;
+  }
+  const messageQuery = query(
+    collection(db, MESSAGES_COLLECTION),
+    where('conversationId', '==', id),
+    orderBy('createdAt', 'asc'),
+    fbLimit(clampMessageLimit(requestedLimit)),
+  );
+  return onSnapshot(messageQuery, (snapshot) => {
+    try {
+      onMessages(snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data())));
+    } catch (error) {
+      onError(error instanceof CommunicationDbError ? error : new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'A message document is malformed.'));
+    }
+  }, (error) => {
+    console.error('Communication message subscription failed:', error);
+    onError(new CommunicationDbError('READ_FAILED', 'Failed to receive live Communication messages.'));
+  });
 }
 
 /** Reads top-level Communication Core messages, never legacy nested messages. */
