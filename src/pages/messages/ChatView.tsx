@@ -63,12 +63,12 @@ export default function ChatView() {
         return;
       }
       const presenceToken = await currentUser.getIdToken();
-      const response = await fetch(`/api/communication/conversations/${id}/presence`, {
+      const presenceResponse = await fetch(`/api/communication/conversations/${id}/presence`, {
         headers: { Authorization: `Bearer ${presenceToken}` },
       });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to load presence.');
-      const presence = Array.isArray(payload?.presences)
+      const presencePayload = await presenceResponse.json().catch(() => null);
+      if (!presenceResponse.ok) throw new Error(presencePayload?.error?.message ?? 'Failed to load presence.');
+      const presence = Array.isArray(presencePayload?.presences)
         ? payload.presences.find((item: { uid?: string }) => item.uid === otherMember.uid)
         : null;
       setOtherPresence(presence ?? { uid: otherMember.uid, status: 'offline', lastSeenAt: null });
