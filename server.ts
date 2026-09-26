@@ -6,7 +6,8 @@ import rateLimit, { type Store } from "express-rate-limit";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import type { Conversation, ConversationMember, ConversationType } from "./src/lib/os/communication-types";
+import type { Conversation, ConversationMember, ConversationType, Message } from "./src/lib/os/communication-types";
+import { validateMessageDraft, CommunicationValidationError } from "./communicationCore";
 
 interface WalletDocument {
   uid: string;
@@ -458,6 +459,78 @@ async function startServer() {
     } catch (error) {
       console.error('Conversation creation failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to create the conversation.');
+    }
+  });
+  app.post("/api/communication/messages", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMessageRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      if (isSafeFirebaseUid(uid)) return uid;
+      const ip = req.ip;
+      return typeof ip === 'string' && ip.length > 0 ? ip : 'anonymous';
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many message requests. Please try again shortly.'),
+  }), async (req, res) => {
+    let senderUid: string;
+    let draft: ReturnType<typeof validateMessageDraft>;
+    try {
+      senderUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      draft = validateMessageDraft(req.body, { uid: senderUid });
+      if (draft.type !== 'text') {
+        return errorResponse(res, 'INVALID_REQUEST', 'Only text messages are enabled in this communication step.');
+      }
+    } catch (error) {
+      if (error instanceof CommunicationValidationError) {
+        return errorResponse(res, 'INVALID_REQUEST', error.message);
+      }
+      if (error instanceof RequestValidationError) {
+        return errorResponse(res, error.code, error.message);
+      }
+      console.error('Message request validation failed:', error);
+      return errorResponse(res, 'INVALID_REQUEST', 'The message request is invalid.');
+    }
+    try {
+      const conversationRef = adminDb.collection('conversations').doc(draft.conversationId);
+      const messageRef = adminDb.collection('messages').doc();
+      const now = Timestamp.now();
+      const nowIso = now.toDate().toISOString();
+      const message: Message = {
+        id: messageRef.id,
+        conversationId: draft.conversationId,
+        senderId: senderUid,
+        type: 'text',
+        text: draft.text,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        status: 'sent',
+      };
+      await adminDb.runTransaction(async (transaction) => {
+        const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(draft.conversationId, senderUid));
+        const [conversationSnapshot, membershipSnapshot] = await Promise.all([
+          transaction.get(conversationRef),
+          transaction.get(membershipRef),
+        ]);
+        if (!conversationSnapshot.exists || !membershipSnapshot.exists) {
+          throw new RequestValidationError('INVALID_REQUEST', 'You are not a member of this conversation.');
+        }
+        transaction.create(messageRef, message);
+        transaction.update(conversationRef, {
+          lastMessageId: messageRef.id,
+          lastMessageAt: nowIso,
+          updatedAt: nowIso,
+        });
+      });
+      return res.status(201).json({ message });
+    } catch (error) {
+      if (error instanceof RequestValidationError) {
+        return errorResponse(res, error.code, error.message);
+      }
+      console.error('Message creation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to send the message.');
     }
   });
   app.get("/api/calendar/events", async (req, res) => {
