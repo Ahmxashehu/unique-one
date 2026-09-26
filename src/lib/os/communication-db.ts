@@ -264,7 +264,7 @@ export async function subscribeToMessagesForConversation(
   onMessages: (messages: Message[]) => void,
   onError: (error: CommunicationDbError) => void,
   requestedLimit?: number,
-): () => void {
+): Promise<() => void> {
   const uid = requireAuthenticatedUid();
   const id = requireId(conversationId, 'conversationId');
   const membershipSnapshot = await safeRead(() => getDoc(doc(db, CONVERSATION_MEMBERS_COLLECTION, `${id}_${uid}`)));
