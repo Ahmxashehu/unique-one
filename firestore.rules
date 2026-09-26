@@ -1,7 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Reusable authentication functions
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -9,7 +8,6 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == uid;
     }
 
-    // Secure RBAC Role check (Roles are stored as an array in `roles`)
     function isAdmin() {
       return isAuthenticated() && 
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data != null &&
@@ -19,23 +17,19 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      // Users can create their own record, but cannot grant themselves administrator rights
       allow create: if isOwner(userId) && (!('roles' in request.resource.data) || !('administrator' in request.resource.data.roles));
       allow update: if (isOwner(userId) && request.resource.data.roles == resource.data.roles) || isAdmin();
       allow delete: if isAdmin();
     }
 
     match /profiles/{userId} {
-      // Public reading allowed for ecosystem discovery
       allow read: if true;
       allow create, update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
     }
 
     match /businesses/{businessId} {
-      // Public can discover businesses
-      allow read: if true; 
-      // Any authenticated user can register a business
+      allow read: if true;
       allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid;
       allow update: if isOwner(resource.data.ownerUid) || isAdmin();
       allow delete: if isAdmin();
@@ -52,7 +46,6 @@ service cloud.firestore {
     }
 
     match /sessions/{sessionId} {
-      // Session updates
       allow read, update, delete: if isOwner(resource.data.uid);
       allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
     }
@@ -63,11 +56,9 @@ service cloud.firestore {
     }
 
     match /audit_logs/{logId} {
-      // Admins read audits
       allow read: if isAdmin();
-      // Anyone can create a log, but they are immutable
-      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if false; 
+      allow create: if false;
+      allow update, delete: if false;
     }
 
     match /products/{productId} {
@@ -130,14 +121,14 @@ service cloud.firestore {
 
     match /receipts/{recId} {
       allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      allow create: if false;
+      allow update, delete: if false;
     }
 
     match /transactions/{txId} {
       allow read: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isAdmin();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      allow create: if false;
+      allow update, delete: if false;
     }
 
     match /locations/{locationId} {
@@ -150,7 +141,7 @@ service cloud.firestore {
       allow read, update: if isAuthenticated() && request.auth.uid in resource.data.participants;
       allow create: if isAuthenticated() && request.auth.uid in request.resource.data.participants;
       allow delete: if isAdmin();
-      
+
       match /messages/{messageId} {
         allow read, update: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
         allow create: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants && request.resource.data.senderId == request.auth.uid;
