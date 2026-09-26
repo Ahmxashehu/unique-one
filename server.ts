@@ -863,7 +863,7 @@ async function startServer() {
 
         if (message.senderId !== uid) {
           const messageStatus = nextStatus === 'read' ? 'read' : 'delivered';
-          if (message.status !== 'read') transaction.update(messageRef, { status: messageStatus, updatedAt: nowIso });
+          transaction.update(messageRef, { status: messageStatus, updatedAt: nowIso });
         }
         return { delivery, messageStatus: message.senderId === uid ? message.status : (nextStatus === 'read' ? 'read' : 'delivered') };
       });
