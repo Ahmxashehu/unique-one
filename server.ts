@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from "express";
 import http from "http";
+import { createHash } from "crypto";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import rateLimit, { type Store } from "express-rate-limit";
@@ -469,6 +470,114 @@ async function startServer() {
       if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
       console.error('Message request creation failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to create the message request.');
+    }
+  });
+
+  app.post("/api/communication/message-requests/:requestId/respond", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMessageRequestResponseRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : (req.ip || 'anonymous');
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many message request responses. Please try again shortly.'),
+  }), async (req, res) => {
+    let responderUid: string;
+    try {
+      responderUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const requestId = req.params.requestId;
+      if (!isSafeFirebaseUid(requestId) && !/^[A-Za-z0-9_-]{1,128}$/.test(requestId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The message request ID is invalid.');
+      }
+      if (!isPlainObject(req.body)) return errorResponse(res, 'INVALID_REQUEST', 'The response body must be a plain object.');
+      const payload = req.body as Record<string, unknown>;
+      if (Object.keys(payload).some((key) => key !== 'action')) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Only action is supported.');
+      }
+      if (payload.action !== 'accept' && payload.action !== 'decline') {
+        return errorResponse(res, 'INVALID_REQUEST', 'action must be accept or decline.');
+      }
+      const action = payload.action as 'accept' | 'decline';
+      const requestRef = adminDb.collection('messageRequests').doc(requestId);
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const requestSnapshot = await transaction.get(requestRef);
+        if (!requestSnapshot.exists) throw new Error('REQUEST_NOT_FOUND');
+        const requestData = requestSnapshot.data() as Partial<MessageRequest>;
+        if (requestData.toUid !== responderUid) throw new Error('FORBIDDEN');
+        if (requestData.status !== 'pending') {
+          return { request: requestData, conversation: undefined, alreadyHandled: true };
+        }
+        if (!requestData.fromUid || !isSafeFirebaseUid(requestData.fromUid)) throw new Error('INVALID_REQUEST');
+        if (action === 'decline') {
+          const now = Timestamp.now().toDate().toISOString();
+          transaction.update(requestRef, { status: 'declined', updatedAt: now });
+          return {
+            request: { ...requestData, id: requestId, status: 'declined', updatedAt: now },
+            conversation: undefined,
+            alreadyHandled: false,
+          };
+        }
+
+        const memberUids = [requestData.fromUid, responderUid].sort();
+        const conversationId = createHash('sha256').update(memberUids.join(':')).digest('hex').slice(0, 40);
+        const conversationRef = adminDb.collection('conversations').doc(conversationId);
+        const memberRefs = memberUids.map((uid) =>
+          adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationId, uid))
+        );
+        const conversationSnapshot = await transaction.get(conversationRef);
+        const memberSnapshots = await Promise.all(memberRefs.map((ref) => transaction.get(ref)));
+        const now = Timestamp.now();
+        const nowIso = now.toDate().toISOString();
+
+        const conversation: Conversation = conversationSnapshot.exists
+          ? (conversationSnapshot.data() as Conversation)
+          : {
+              id: conversationId,
+              type: 'direct',
+              createdBy: requestData.fromUid,
+              createdAt: nowIso,
+              updatedAt: nowIso,
+              status: 'active',
+            };
+
+        if (!conversationSnapshot.exists) {
+          transaction.create(conversationRef, conversation);
+          const members = buildConversationMembers(conversationId, memberUids, requestData.fromUid, nowIso);
+          memberRefs.forEach((ref, index) => transaction.create(ref, members[index]));
+        } else {
+          transaction.update(conversationRef, { status: 'active', updatedAt: nowIso });
+          memberRefs.forEach((ref, index) => {
+            if (!memberSnapshots[index].exists) {
+              const member: ConversationMember = {
+                conversationId,
+                uid: memberUids[index],
+                role: memberUids[index] === requestData.fromUid ? 'owner' : 'member',
+                joinedAt: nowIso,
+              };
+              transaction.create(ref, member);
+            }
+          });
+        }
+
+        transaction.update(requestRef, { status: 'accepted', conversationId, updatedAt: nowIso });
+        return {
+          request: { ...requestData, id: requestId, status: 'accepted', conversationId, updatedAt: nowIso },
+          conversation,
+          alreadyHandled: false,
+        };
+      });
+
+      return res.status(200).json(result);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'REQUEST_NOT_FOUND') return errorResponse(res, 'INVALID_REQUEST', 'The message request was not found.', 404);
+      if (code === 'FORBIDDEN') return errorResponse(res, 'INVALID_REQUEST', 'Only the request recipient can respond to this request.', 403);
+      if (code === 'INVALID_REQUEST') return errorResponse(res, 'INVALID_REQUEST', 'The message request data is invalid.');
+      console.error('Message request response failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to respond to the message request.');
     }
   });
 
