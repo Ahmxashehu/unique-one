@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Search, UserPlus, Loader2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Search, MessageSquare, Loader2, CheckCircle2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -19,7 +19,7 @@ export default function AddUserPage() {
   const [results, setResults] = useState<UserResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [sendingUid, setSendingUid] = useState<string | null>(null);
-  const [sentUids, setSentUids] = useState<string[]>([]);
+  const [sentUids] = useState<string[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -46,22 +46,24 @@ export default function AddUserPage() {
     } finally { setLoading(false); }
   };
 
-  const sendRequest = async (uid: string) => {
+  const startConversation = async (uid: string) => {
     if (!currentUser || sendingUid) return;
     setSendingUid(uid);
     setError('');
     try {
       const token = await currentUser.getIdToken();
-      const response = await fetch('/api/communication/message-requests', {
+      const response = await fetch('/api/communication/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ toUid: uid }),
+        body: JSON.stringify({ type: 'direct', memberUids: [currentUser.uid, uid] }),
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to send request.');
-      setSentUids((current) => current.includes(uid) ? current : [...current, uid]);
+      if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to start conversation.');
+      const conversationId = payload?.conversation?.id;
+      if (!conversationId) throw new Error('Conversation could not be created.');
+      navigate('/os/messages/' + conversationId + '?new=1');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send request.');
+      setError(err instanceof Error ? err.message : 'Failed to start conversation.');
     } finally { setSendingUid(null); }
   };
 
