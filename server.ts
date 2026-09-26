@@ -1,12 +1,13 @@
 import express, { Request, Response, NextFunction } from "express";
 import http from "http";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import rateLimit, { ipKeyGenerator, type Store } from "express-rate-limit";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import type { Conversation, ConversationMember, ConversationType, Message, MessageRequest } from "./src/lib/os/communication-types";
 import { validateMessageDraft, CommunicationValidationError } from "./communicationCore";
 
@@ -1010,6 +1011,63 @@ async function startServer() {
     } catch (error) {
       console.error('Conversation list read failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to load messages.');
+    }
+  });
+
+  app.post("/api/communication/media/upload-url", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = typeof req.body?.conversationId === 'string' ? req.body.conversationId.trim() : '';
+      const contentType = typeof req.body?.contentType === 'string' ? req.body.contentType.trim().toLowerCase() : '';
+      const originalName = typeof req.body?.originalName === 'string' ? req.body.originalName.trim() : '';
+      const sizeBytes = req.body?.sizeBytes;
+      if (!isSafeConversationId(conversationId)) return errorResponse(res, 'INVALID_REQUEST', 'The conversation ID is invalid.');
+      if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > 100 * 1024 * 1024) return errorResponse(res, 'INVALID_REQUEST', 'The attachment size is invalid or too large.');
+      const allowedTypes = new Set([
+        'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+        'application/pdf', 'text/plain', 'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ]);
+      if (!allowedTypes.has(contentType)) return errorResponse(res, 'INVALID_REQUEST', 'This attachment type is not supported.');
+      if (originalName.length < 1 || originalName.length > 255) return errorResponse(res, 'INVALID_REQUEST', 'The attachment filename is invalid.');
+      const membershipSnapshot = await adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationId, uid)).get();
+      if (!membershipSnapshot.exists) return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      const isImage = contentType.startsWith('image/');
+      const maxBytes = isImage ? 5 * 1024 * 1024 : 20 * 1024 * 1024;
+      if (sizeBytes > maxBytes) return errorResponse(res, 'INVALID_REQUEST', 'The attachment exceeds the allowed size.');
+      const extension = isImage ? 'webp' : (originalName.includes('.') ? originalName.split('.').pop()?.toLowerCase() : 'bin');
+      const fileId = randomUUID();
+      const storagePath = `messages/${conversationId}/${uid}/${fileId}.${extension}`;
+      const bucket = getStorage().bucket();
+      const file = bucket.file(storagePath);
+      const token = randomUUID();
+      await file.setMetadata({
+        contentType: isImage ? 'image/webp' : contentType,
+        metadata: {
+          firebaseStorageDownloadTokens: token,
+          originalName,
+          originalMimeType: contentType,
+          originalBytes: String(sizeBytes),
+        },
+      });
+      const [uploadUrl] = await file.getSignedUrl({
+        version: 'v4',
+        action: 'write',
+        expires: Date.now() + 15 * 60 * 1000,
+        contentType: isImage ? 'image/webp' : contentType,
+      });
+      const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucket.name)}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`;
+      return res.status(200).json({ fileId, storagePath, uploadUrl, downloadUrl });
+    } catch (error) {
+      console.error('Communication media upload URL failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to prepare the attachment upload.');
     }
   });
 
