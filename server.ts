@@ -3,7 +3,7 @@ import http from "http";
 import { createHash } from "crypto";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import rateLimit, { type Store } from "express-rate-limit";
+import rateLimit, { ipKeyGenerator, type Store } from "express-rate-limit";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
@@ -416,7 +416,7 @@ async function startServer() {
     store: createFirestoreRateLimitStore('communicationPresenceRateLimits', 60_000),
     keyGenerator: (req) => {
       const uid = (req as any).user?.uid;
-      return isSafeFirebaseUid(uid) ? uid : (req.ip || 'anonymous');
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
     },
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many presence updates. Please try again shortly.'),
   }), async (req, res) => {
@@ -566,7 +566,7 @@ async function startServer() {
     keyGenerator: (req) => {
       const uid = (req as any).user?.uid;
       if (isSafeFirebaseUid(uid)) return uid;
-      return req.ip || 'anonymous';
+      return ipKeyGenerator(req.ip);
     },
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many message request attempts. Please try again shortly.'),
   }), async (req, res) => {
@@ -741,8 +741,7 @@ async function startServer() {
     keyGenerator: (req) => {
       const uid = (req as any).user?.uid;
       if (isSafeFirebaseUid(uid)) return uid;
-      const ip = req.ip;
-      return typeof ip === 'string' && ip.length > 0 ? ip : 'anonymous';
+      return ipKeyGenerator(req.ip);
     },
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conversation creation requests. Please try again shortly.'),
   }), async (req, res) => {
