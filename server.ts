@@ -499,12 +499,18 @@ async function startServer() {
       if (rawQuery.length < 2 || rawQuery.length > 128) {
         return errorResponse(res, 'INVALID_REQUEST', 'Search must contain between 2 and 128 characters.');
       }
+
       const usersRef = adminDb.collection('users');
       const candidates = new Map<string, FirebaseFirestore.DocumentData>();
       const normalized = rawQuery.toLowerCase();
       const addCandidate = (uid: string, data: FirebaseFirestore.DocumentData | undefined) => {
         if (uid !== requesterUid) candidates.set(uid, data ?? {});
       };
+
+      // Support exact and prefix matching for the identifiers users actually see.
+      // Prefix queries let "Ham", "@hamza", or "US-ABJ" find a user without
+      // requiring a separate search index, while keeping the query bounded.
+      const prefixEnd = (value: string) => value + "\uf8ff";
       const queries = [
         usersRef.where('email', '==', rawQuery).limit(10),
         usersRef.where('email', '==', normalized).limit(10),
@@ -513,13 +519,24 @@ async function startServer() {
         usersRef.where('uniqueOneId', '==', rawQuery).limit(10),
         usersRef.where('uniqueOneId', '==', normalized).limit(10),
         usersRef.where('phone', '==', rawQuery).limit(10),
+        usersRef.where('fullName', '==', rawQuery).limit(10),
+        usersRef.where('fullName', '==', normalized).limit(10),
+        usersRef.where('fullName', '>=', rawQuery).where('fullName', '<=', prefixEnd(rawQuery)).limit(10),
+        usersRef.where('fullName', '>=', normalized).where('fullName', '<=', prefixEnd(normalized)).limit(10),
+        usersRef.where('username', '>=', rawQuery).where('username', '<=', prefixEnd(rawQuery)).limit(10),
+        usersRef.where('username', '>=', normalized).where('username', '<=', prefixEnd(normalized)).limit(10),
+        usersRef.where('uniqueOneId', '>=', rawQuery).where('uniqueOneId', '<=', prefixEnd(rawQuery)).limit(10),
+        usersRef.where('uniqueOneId', '>=', normalized).where('uniqueOneId', '<=', prefixEnd(normalized)).limit(10),
       ];
+
       const snapshots = await Promise.all(queries.map((query) => query.get()));
       for (const snapshot of snapshots) {
         for (const doc of snapshot.docs) addCandidate(doc.id, doc.data());
       }
-      // Fall back to Firebase Auth for email/phone so users remain discoverable
-      // even when those identifiers are not yet copied into their profile document.
+
+      // Firebase Auth fallback covers accounts whose profile document has not
+      // copied email/phone yet. Auth does not provide general name search here,
+      // so Firestore profile search remains the source for names/usernames/IDs.
       try {
         const auth = getAuth();
         if (rawQuery.includes('@')) {
@@ -542,11 +559,12 @@ async function startServer() {
       } catch (error) {
         console.warn('Firebase Auth user lookup skipped:', error);
       }
+
       const results = Array.from(candidates.entries()).slice(0, 10).map(([uid, data]) => ({
         uid,
-        fullName: typeof data.fullName === 'string' ? data.fullName : 'Unique One User',
-        username: typeof data.username === 'string' ? data.username : undefined,
-        uniqueOneId: typeof data.uniqueOneId === 'string' ? data.uniqueOneId : undefined,
+        fullName: typeof data.fullName === 'string' && data.fullName.trim() ? data.fullName : 'Unique One User',
+        username: typeof data.username === 'string' && data.username.trim() ? data.username : undefined,
+        uniqueOneId: typeof data.uniqueOneId === 'string' && data.uniqueOneId.trim() ? data.uniqueOneId : undefined,
         profilePhotoUrl: typeof data.profilePhotoUrl === 'string' ? data.profilePhotoUrl : undefined,
         verificationStatus: typeof data.verificationStatus === 'string' ? data.verificationStatus : 'unverified',
       }));
@@ -556,7 +574,6 @@ async function startServer() {
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to search for users.');
     }
   });
-
   app.post("/api/communication/message-requests", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 20,
