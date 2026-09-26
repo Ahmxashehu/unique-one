@@ -875,6 +875,44 @@ async function startServer() {
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to create the conversation.');
     }
   });
+  app.get("/api/communication/conversations/:conversationId/messages", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMessageReadRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many message reads. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = req.params.conversationId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(conversationId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The conversation ID is invalid.');
+      }
+      const membershipSnapshot = await adminDb.collection('conversationMembers')
+        .doc(conversationMemberDocumentId(conversationId, uid)).get();
+      if (!membershipSnapshot.exists) {
+        return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      }
+      const rawLimit = Number(req.query.limit ?? 50);
+      const messageLimit = Number.isSafeInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
+      const messagesSnapshot = await adminDb.collection('messages')
+        .where('conversationId', '==', conversationId)
+        .orderBy('createdAt', 'asc')
+        .limit(messageLimit)
+        .get();
+      const messages = messagesSnapshot.docs.map((message) => message.data());
+      return res.status(200).json({ messages });
+    } catch (error) {
+      console.error('Conversation message read failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to load conversation messages.');
+    }
+  });
+
   app.post("/api/communication/messages/:messageId/delivery", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 120,
