@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, ShieldAlert, Ban, CornerUpLeft, X, Smile, Trash2, VolumeX, Volume2 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -240,7 +240,7 @@ export default function ChatView() {
     }
   };
 
-  const handleAttachmentSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAttachmentSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     event.target.value = '';
     if (!id || !currentUser || files.length === 0) return;
@@ -271,6 +271,7 @@ export default function ChatView() {
           contentType: metadata.mimeType,
           sizeBytes: metadata.sizeBytes,
           url: metadata.downloadUrl,
+          storagePath: metadata.storagePath,
         });
       }
       setAttachments((current) => [...current, ...uploaded]);
@@ -298,7 +299,7 @@ export default function ChatView() {
           ...(text ? { text } : {}),
           ...(attachments.length > 0 ? { attachments: attachments.map((item) => ({
             ...item,
-            storagePath: `messages/${id}/${currentUser.uid}/${item.id}.webp`,
+            storagePath: item.storagePath,
           })) } : {}),
           replyToMessageId: replyingTo?.id,
         }),
