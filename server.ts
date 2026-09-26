@@ -288,7 +288,7 @@ async function readUserExists(uid: string): Promise<boolean> {
 function idempotencyDocumentId(senderUid: string, idempotencyKey: string) { return `${senderUid}_${idempotencyKey}`; }
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
   const httpServer = http.createServer(app);
   // Codespaces forwards requests through a trusted proxy and supplies X-Forwarded-For.
   app.set('trust proxy', 1);
