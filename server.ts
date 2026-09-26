@@ -405,6 +405,73 @@ async function startServer() {
       return res.status(200).json(transactionResult);
     } catch (error) { console.error('Transfer execution failed:', error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The transfer service is temporarily unavailable.'); }
   });
+  app.post("/api/communication/message-requests", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMessageRequestRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      if (isSafeFirebaseUid(uid)) return uid;
+      return req.ip || 'anonymous';
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many message request attempts. Please try again shortly.'),
+  }), async (req, res) => {
+    let fromUid: string;
+    try {
+      fromUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!isPlainObject(req.body)) return errorResponse(res, 'INVALID_REQUEST', 'The message request body must be a plain object.');
+      const payload = req.body as Record<string, unknown>;
+      const allowedKeys = new Set(['toUid']);
+      for (const key of Object.keys(payload)) {
+        if (!allowedKeys.has(key)) return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
+      }
+      if (typeof payload.toUid !== 'string' || !isSafeFirebaseUid(payload.toUid.trim())) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid recipient UID is required.');
+      }
+      const toUid = payload.toUid.trim();
+      if (toUid === fromUid) return errorResponse(res, 'INVALID_REQUEST', 'You cannot send a message request to yourself.');
+      if (!(await readUserExists(toUid))) return errorResponse(res, 'INVALID_RECIPIENT', 'The recipient user does not exist.');
+
+      const requestQuery = await adminDb.collection('messageRequests')
+        .where('fromUid', '==', fromUid)
+        .where('toUid', '==', toUid)
+        .where('status', '==', 'pending')
+        .limit(1)
+        .get();
+      if (!requestQuery.empty) return res.status(200).json({ request: requestQuery.docs[0].data(), alreadyPending: true });
+
+      const reverseQuery = await adminDb.collection('messageRequests')
+        .where('fromUid', '==', toUid)
+        .where('toUid', '==', fromUid)
+        .where('status', '==', 'pending')
+        .limit(1)
+        .get();
+      if (!reverseQuery.empty) {
+        return errorResponse(res, 'INVALID_REQUEST', 'This user already has a pending message request to you.');
+      }
+
+      const requestRef = adminDb.collection('messageRequests').doc();
+      const now = Timestamp.now();
+      const nowIso = now.toDate().toISOString();
+      const request: MessageRequest = {
+        id: requestRef.id,
+        fromUid,
+        toUid,
+        status: 'pending',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      await requestRef.create(request);
+      return res.status(201).json({ request });
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Message request creation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to create the message request.');
+    }
+  });
+
   app.post("/api/communication/conversations", authenticate, rateLimit({
     windowMs: CONVERSATION_CREATE_WINDOW_MS,
     limit: MAX_CONVERSATION_CREATES_PER_WINDOW,
