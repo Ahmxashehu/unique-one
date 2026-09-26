@@ -69,7 +69,7 @@ export default function ChatView() {
       const presencePayload = await presenceResponse.json().catch(() => null);
       if (!presenceResponse.ok) throw new Error(presencePayload?.error?.message ?? 'Failed to load presence.');
       const presence = Array.isArray(presencePayload?.presences)
-        ? payload.presences.find((item: { uid?: string }) => item.uid === otherMember.uid)
+        ? presencePayload.presences.find((item: { uid?: string }) => item.uid === otherMember.uid)
         : null;
       setOtherPresence(presence ?? { uid: otherMember.uid, status: 'offline', lastSeenAt: null });
     } catch (err) {
