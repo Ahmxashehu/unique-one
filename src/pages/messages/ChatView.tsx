@@ -549,7 +549,6 @@ export default function ChatView() {
               <input type="file" multiple accept=".pdf,.txt,.doc,.docx,.xls,.xlsx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void handleAttachmentSelect(event)} disabled={uploadingAttachment || sending} />
             </label>
           </div>
-}
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSend(); }
           }} placeholder="Type a message..." className="flex-1 bg-transparent border-none py-3 focus:ring-0 resize-none max-h-32 text-sm focus:outline-none" rows={1} />
