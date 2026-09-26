@@ -24,7 +24,7 @@ type TransferErrorCode =
   | 'SELF_TRANSFER_NOT_ALLOWED' | 'INVALID_AMOUNT' | 'INVALID_CURRENCY'
   | 'INVALID_IDEMPOTENCY_KEY' | 'IDEMPOTENCY_KEY_CONFLICT' | 'TRANSFER_ALREADY_COMPLETED'
   | 'TRANSFER_IN_PROGRESS' | 'WALLET_NOT_FOUND' | 'WALLET_UNAVAILABLE' | 'INSUFFICIENT_FUNDS' | 'RATE_LIMITED'
-  | 'TRANSACTION_FAILED' | 'SERVICE_UNAVAILABLE';
+  | 'TRANSACTION_FAILED' | 'SERVICE_UNAVAILABLE' | 'NOT_FOUND' | 'BLOCKED';
 interface TransferErrorResponse { error: { code: TransferErrorCode; message: string } }
 interface TransferRequestInput { recipientId: string; amountMinor: number; currency: 'NGN'; idempotencyKey: string; description?: string }
 interface CreateConversationRequestInput { type: ConversationType; title?: string; avatarUrl?: string; memberUids: string[] }
@@ -894,7 +894,7 @@ async function startServer() {
           messageId,
           uid,
           status: nextStatus,
-          ...(nextStatus !== 'sent' ? { deliveredAt: typeof current.deliveredAt === 'string' ? current.deliveredAt : nowIso } : {}),
+          deliveredAt: typeof current.deliveredAt === 'string' ? current.deliveredAt : nowIso,
           ...(nextStatus === 'read' ? { readAt: typeof current.readAt === 'string' ? current.readAt : nowIso } : {}),
         };
         if (deliverySnapshot.exists) transaction.update(deliveryRef, delivery);
