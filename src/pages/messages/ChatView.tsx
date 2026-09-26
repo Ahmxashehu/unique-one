@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, ShieldAlert, Ban, CornerUpLeft, X, Smile, Trash2, VolumeX, Volume2 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { subscribeToMessagesForConversation } from '../../lib/os/communication-db';
 import type { Conversation, Message, MessageAttachmentMetadata } from '../../lib/os/communication-types';
 import { uploadMedia } from '../../lib/media/upload';
 
@@ -137,12 +136,31 @@ export default function ChatView() {
         if (showNewContactWarning && typeof window !== 'undefined' && window.localStorage.getItem('unique-one:contact-reply:' + id) === '1') {
           setShowNewContactWarning(false);
         }
-        unsubscribe = await subscribeToMessagesForConversation(
-          id,
-          (items) => { if (active) { setMessages(items); setLoading(false); } },
-          (subscriptionError) => { if (active) { setError(subscriptionError.message); setLoading(false); } },
-          100,
-        );
+        const loadMessages = async () => {
+          try {
+            const messagesToken = await currentUser.getIdToken();
+            const messagesResponse = await fetch(`/api/communication/conversations/${id}/messages?limit=100`, {
+              headers: { Authorization: 'Bearer ' + messagesToken },
+            });
+            const messagesPayload = await messagesResponse.json().catch(() => null);
+            if (!messagesResponse.ok || !Array.isArray(messagesPayload?.messages)) {
+              throw new Error(messagesPayload?.error?.message ?? 'Failed to read Communication messages.');
+            }
+            if (!active) return;
+            setMessages(messagesPayload.messages as Message[]);
+            setLoading(false);
+          } catch (messageError) {
+            if (active) {
+              console.error('Communication message read failed:', messageError);
+              setError(messageError instanceof Error ? messageError.message : 'Failed to read Communication messages.');
+              setLoading(false);
+            }
+          }
+        };
+
+        await loadMessages();
+        const messageRefreshTimer = window.setInterval(() => { void loadMessages(); }, 2000);
+        unsubscribe = () => window.clearInterval(messageRefreshTimer);
       } catch (err) {
         console.error(err);
         if (active) {
