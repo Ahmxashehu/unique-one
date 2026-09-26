@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import MessagesCenter from './MessagesCenter';
 import ChatView from './ChatView';
 import NewMessagePage from './NewMessagePage';
+import AddUserPage from './AddUserPage';
 
 
 export default function MessagesPage() {
@@ -14,6 +15,12 @@ export default function MessagesPage() {
       <div className="hidden md:block h-full">
         <Routes>
           <Route path="/" element={<MessagesCenter />} />
+          <Route path="/add" element={
+            <div className="flex h-[calc(100vh-64px)] -m-4 md:-m-6 lg:-m-8">
+              <div className="w-80 lg:w-96 shrink-0 z-10 relative bg-white border-r border-slate-200"><MessagesCenter /></div>
+              <div className="flex-1 min-w-0 bg-slate-50 relative z-20 p-4 md:p-6 lg:p-8 h-full"><AddUserPage /></div>
+            </div>
+          } />
           <Route path="/new" element={
             <div className="flex h-[calc(100vh-64px)] -m-4 md:-m-6 lg:-m-8">
               <div className="w-80 lg:w-96 shrink-0 z-10 relative bg-white border-r border-slate-200">
@@ -42,6 +49,7 @@ export default function MessagesPage() {
       <div className="md:hidden h-full">
         <Routes>
           <Route path="/" element={<MessagesCenter />} />
+          <Route path="/add" element={<AddUserPage />} />
           <Route path="/new" element={<NewMessagePage />} />
           <Route path="/:id" element={<ChatView />} />
         </Routes>
