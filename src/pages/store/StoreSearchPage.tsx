@@ -2,49 +2,115 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Search, Filter, Store as StoreIcon, Heart, Loader2 } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { useAuth } from '../../contexts/AuthContext';
+import { collection, query, where, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Product } from '../../lib/os/types';
 
 export default function StoreSearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
   const filterCat = searchParams.get('cat') || '';
-  
+  const minPrice = Number(searchParams.get('min') || 0);
+  const maxPriceParam = searchParams.get('max');
+  const maxPrice = maxPriceParam ? Number(maxPriceParam) : null;
+
+  const { currentUser } = useAuth();
   const [searchInput, setSearchInput] = useState(initialQuery);
+  const [minPriceInput, setMinPriceInput] = useState(minPrice ? String(minPrice) : '');
+  const [maxPriceInput, setMaxPriceInput] = useState(maxPrice !== null ? String(maxPrice) : '');
   const [products, setProducts] = useState<Product[]>([]);
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [wishlistLoading, setWishlistLoading] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
         let q = query(collection(db, 'products'), where('status', '==', 'published'));
-        if (filterCat) {
-          q = query(q, where('category', '==', filterCat));
-        }
-        // Note: Firestore doesn't support full-text search natively without extensions like Algolia,
-        // so we'll just fetch and filter client-side for this prototype if there's a search term.
+        if (filterCat) q = query(q, where('category', '==', filterCat));
+
         const querySnapshot = await getDocs(q);
-        let results = querySnapshot.docs.map(doc => doc.data() as Product);
-        
+        let results = querySnapshot.docs.map(d => d.data() as Product);
+
         if (initialQuery) {
           const lowerQ = initialQuery.toLowerCase();
           results = results.filter(p => p.name.toLowerCase().includes(lowerQ) || p.description.toLowerCase().includes(lowerQ));
         }
-        
+
+        results = results.filter(p => {
+          const price = Number(p.price);
+          return Number.isFinite(price) && price >= minPrice && (maxPrice === null || price <= maxPrice);
+        });
+
         setProducts(results);
       } catch (err) {
-        console.error("Error fetching products:", err);
+        console.error('Error fetching products:', err);
       } finally {
         setLoading(false);
       }
     };
     fetchProducts();
-  }, [initialQuery, filterCat]);
+  }, [initialQuery, filterCat, minPrice, maxPrice]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setWishlistIds(new Set());
+      return;
+    }
+
+    const loadWishlist = async () => {
+      try {
+        const snapshot = await getDocs(query(collection(db, 'wishlists'), where('customerId', '==', currentUser.uid)));
+        setWishlistIds(new Set(snapshot.docs.map(d => String(d.data().productId))));
+      } catch (err) {
+        console.error('Error loading wishlist:', err);
+      }
+    };
+    loadWishlist();
+  }, [currentUser]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setSearchParams({ q: searchInput, cat: filterCat });
+    const next: Record<string, string> = {};
+    if (searchInput.trim()) next.q = searchInput.trim();
+    if (filterCat) next.cat = filterCat;
+    if (minPriceInput.trim() && Number.isFinite(Number(minPriceInput))) next.min = String(Math.max(0, Number(minPriceInput)));
+    if (maxPriceInput.trim() && Number.isFinite(Number(maxPriceInput))) next.max = String(Math.max(0, Number(maxPriceInput)));
+    setSearchParams(next);
+  };
+
+  const toggleWishlist = async (product: Product, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!currentUser || !product.id || wishlistLoading) return;
+
+    const wishlistId = `${product.id}_${currentUser.uid}`;
+    setWishlistLoading(product.id);
+
+    try {
+      if (wishlistIds.has(product.id)) {
+        await deleteDoc(doc(db, 'wishlists', wishlistId));
+        setWishlistIds(prev => {
+          const next = new Set(prev);
+          next.delete(product.id);
+          return next;
+        });
+      } else {
+        await setDoc(doc(db, 'wishlists', wishlistId), {
+          id: wishlistId,
+          customerId: currentUser.uid,
+          productId: product.id,
+          updatedAt: serverTimestamp(),
+        });
+        setWishlistIds(prev => new Set(prev).add(product.id));
+      }
+    } catch (err) {
+      console.error('Error updating wishlist:', err);
+    } finally {
+      setWishlistLoading(null);
+    }
   };
 
   return (
@@ -56,7 +122,7 @@ export default function StoreSearchPage() {
           </h1>
           <p className="text-sm text-slate-500 mt-1">{products.length} products found.</p>
         </div>
-        
+
         <form onSubmit={handleSearch} className="flex items-center gap-2 w-full md:w-96">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -68,14 +134,16 @@ export default function StoreSearchPage() {
               className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
             />
           </div>
-          <button type="button" className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">
+          <button type="submit" className="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium">
+            Search
+          </button>
+          <button type="button" className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50" aria-label="Filter">
             <Filter className="w-5 h-5" />
           </button>
         </form>
       </div>
 
       <div className="flex flex-col md:flex-row gap-8">
-        {/* Sidebar Filters */}
         <div className="hidden md:block w-64 shrink-0 space-y-6">
           <div>
             <h3 className="font-semibold text-slate-900 mb-3">Categories</h3>
@@ -90,28 +158,21 @@ export default function StoreSearchPage() {
           </div>
           <div>
             <h3 className="font-semibold text-slate-900 mb-3">Price Range</h3>
-            <div className="flex gap-2">
-              <input type="number" placeholder="Min" className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-slate-900" />
-              <input type="number" placeholder="Max" className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-slate-900" />
-            </div>
+            <form onSubmit={handleSearch} className="flex gap-2">
+              <input type="number" min="0" placeholder="Min" value={minPriceInput} onChange={e => setMinPriceInput(e.target.value)} className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-slate-900" />
+              <input type="number" min="0" placeholder="Max" value={maxPriceInput} onChange={e => setMaxPriceInput(e.target.value)} className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-slate-900" />
+            </form>
           </div>
         </div>
 
-        {/* Results */}
         <div className="flex-1">
           {loading ? (
-            <div className="flex justify-center p-12">
-              <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-            </div>
+            <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
           ) : products.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
-              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Search className="w-10 h-10 text-slate-400" />
-              </div>
+              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><Search className="w-10 h-10 text-slate-400" /></div>
               <h3 className="text-xl font-semibold text-slate-900">No products found</h3>
-              <p className="text-slate-500 mt-2 max-w-sm mx-auto">
-                Try adjusting your search terms or filters to find what you're looking for.
-              </p>
+              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Try adjusting your search terms or filters to find what you're looking for.</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -123,8 +184,8 @@ export default function StoreSearchPage() {
                     ) : (
                       <StoreIcon className="w-8 h-8 text-slate-300" />
                     )}
-                    <button className="absolute top-2 right-2 p-2 bg-white/80 backdrop-blur rounded-full text-slate-400 hover:text-red-500 transition-colors z-10" onClick={(e) => { e.preventDefault(); /* Add to wishlist logic */ }}>
-                      <Heart className="w-4 h-4" />
+                    <button className={`absolute top-2 right-2 p-2 bg-white/80 backdrop-blur rounded-full transition-colors z-10 ${wishlistIds.has(product.id) ? 'text-red-500' : 'text-slate-400 hover:text-red-500'}`} onClick={(e) => toggleWishlist(product, e)} aria-label={wishlistIds.has(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}>
+                      {wishlistLoading === product.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className={`w-4 h-4 ${wishlistIds.has(product.id) ? 'fill-current' : ''}`} />}
                     </button>
                     <div className="absolute bottom-2 left-2 px-2 py-1 bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider rounded text-slate-700">
                       {product.condition}
@@ -133,10 +194,7 @@ export default function StoreSearchPage() {
                   <div className="p-4 flex flex-col flex-1">
                     <h3 className="text-sm font-medium text-slate-900 line-clamp-2 mb-1 group-hover:text-blue-600 transition-colors">{product.name}</h3>
                     <p className="text-lg font-bold text-slate-900 mt-auto">{product.currency === 'NGN' ? '₦' : '$'}{product.price.toLocaleString()}</p>
-                    <div className="flex items-center gap-1 text-xs text-slate-500 mt-2">
-                      <StoreIcon className="w-3 h-3" />
-                      <span className="truncate">Seller View</span>
-                    </div>
+                    <div className="flex items-center gap-1 text-xs text-slate-500 mt-2"><StoreIcon className="w-3 h-3" /><span className="truncate">Seller View</span></div>
                   </div>
                 </Link>
               ))}
