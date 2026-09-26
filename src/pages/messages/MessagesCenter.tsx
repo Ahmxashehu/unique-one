@@ -45,7 +45,11 @@ export default function MessagesCenter() {
       }
     }
     void load();
-    return () => { cancelled = true; };
+    const refreshTimer = window.setInterval(() => { void load(); }, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(refreshTimer);
+    };
   }, [currentUser]);
 
   useEffect(() => {
