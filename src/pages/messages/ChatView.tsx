@@ -63,7 +63,7 @@ export default function ChatView() {
         return;
       }
       const presenceToken = await currentUser.getIdToken();
-      const response = await fetch(`/api/communication/conversations/${id}/presence`,
+      const response = await fetch(`/api/communication/conversations/${id}/presence`, {
         headers: { Authorization: `Bearer ${presenceToken}` },
       });
       const payload = await response.json().catch(() => null);
