@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, Clock } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getConversation, getMessagesForConversation } from '../../lib/os/communication-db';
+import { getConversation, getConversationMembers, getMessagesForConversation } from '../../lib/os/communication-db';
 import type { Conversation, Message } from '../../lib/os/communication-types';
 
 export default function ChatView() {
@@ -15,6 +15,7 @@ export default function ChatView() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [otherPresence, setOtherPresence] = useState<{ uid: string; status: 'online' | 'offline'; lastSeenAt: string | null } | null>(null);
 
   const loadChat = useCallback(async () => {
     if (!id || !currentUser) return;
@@ -60,6 +61,32 @@ export default function ChatView() {
     };
   }, [updatePresence]);
 
+  const loadOtherPresence = useCallback(async () => {
+    if (!id || !currentUser) return;
+    try {
+      const members = await getConversationMembers(id);
+      const otherMember = members.find((member) => member.uid !== currentUser.uid);
+      if (!otherMember) {
+        setOtherPresence(null);
+        return;
+      }
+      const token = await currentUser.getIdToken();
+      const response = await fetch(`/api/communication/conversations/${id}/presence`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to load presence.');
+      const presence = Array.isArray(payload?.presences)
+        ? payload.presences.find((item: { uid?: string }) => item.uid === otherMember.uid)
+        : null;
+      setOtherPresence(presence ?? { uid: otherMember.uid, status: 'offline', lastSeenAt: null });
+    } catch (err) {
+      console.error('Presence read failed:', err);
+    }
+  }, [id, currentUser]);
+
+  useEffect(() => { void loadOtherPresence(); }, [loadOtherPresence]);
+
   useEffect(() => { void loadChat(); }, [loadChat]);
 
   const markVisibleMessagesRead = useCallback(async (items: Message[]) => {
@@ -80,7 +107,7 @@ export default function ChatView() {
 
   useEffect(() => {
     if (!id || !currentUser) return;
-    const timer = window.setInterval(() => { void loadChat(); }, 5000);
+    const timer = window.setInterval(() => { void loadChat(); void loadOtherPresence(); }, 5000);
     return () => window.clearInterval(timer);
   }, [id, currentUser, loadChat]);
 
@@ -120,7 +147,7 @@ export default function ChatView() {
           </div>
           <div>
             <h2 className="font-bold text-slate-900 text-sm md:text-base">{conversation?.title ?? 'Conversation'}</h2>
-            <p className="text-xs text-slate-500">{conversation?.status ?? 'Loading...'}</p>
+            <p className="text-xs text-slate-500">{otherPresence?.status === 'online' ? 'Online' : otherPresence?.lastSeenAt ? `Last seen ${new Date(otherPresence.lastSeenAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : conversation?.status ?? 'Loading...'}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
