@@ -32,6 +32,34 @@ export default function ChatView() {
     }
   }, [id, currentUser]);
 
+  const updatePresence = useCallback(async (status: 'online' | 'offline') => {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.getIdToken();
+      await fetch('/api/communication/presence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status }),
+        keepalive: status === 'offline',
+      });
+    } catch (err) {
+      console.error('Presence update failed:', err);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    void updatePresence('online');
+    const handleVisibility = () => { void updatePresence(document.visibilityState === 'visible' ? 'online' : 'offline'); };
+    document.addEventListener('visibilitychange', handleVisibility);
+    const handleBeforeUnload = () => { void updatePresence('offline'); };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      void updatePresence('offline');
+    };
+  }, [updatePresence]);
+
   useEffect(() => { void loadChat(); }, [loadChat]);
 
   const markVisibleMessagesRead = useCallback(async (items: Message[]) => {
