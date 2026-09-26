@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Search, UserPlus, Loader2, CheckCircle2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 type UserResult = {
@@ -13,6 +13,7 @@ type UserResult = {
 
 export default function AddUserPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser } = useAuth();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UserResult[]>([]);
@@ -20,6 +21,11 @@ export default function AddUserPage() {
   const [sendingUid, setSendingUid] = useState<string | null>(null);
   const [sentUids, setSentUids] = useState<string[]>([]);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const initialQuery = new URLSearchParams(location.search).get('q')?.trim() ?? '';
+    if (initialQuery && initialQuery !== query) setQuery(initialQuery);
+  }, [location.search]);
 
   const searchUsers = async () => {
     if (!currentUser) return;
