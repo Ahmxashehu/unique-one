@@ -200,12 +200,9 @@ service cloud.firestore {
     // Presence is self-managed. Cross-user presence reads require a future
     // explicit relationship/index; this foundation therefore defaults to self-only.
     match /userPresence/{uid} {
-      allow read: if isOwner(uid);
-      allow create: if isOwner(uid) && request.resource.data.uid == request.auth.uid;
-      allow update: if isOwner(uid)
-        && resource.data.uid == request.auth.uid
-        && request.resource.data.uid == resource.data.uid;
-      allow delete: if false;
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      // Presence is updated by the trusted Communication API.
+      allow create, update, delete: if false;
     }
 
     match /locations/{locationId} {
