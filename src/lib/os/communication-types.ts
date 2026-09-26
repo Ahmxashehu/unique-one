@@ -40,6 +40,8 @@ export interface Conversation {
   lastMessageAt?: string;
   lastMessageId?: string;
   status: ConversationStatus;
+  muted?: boolean;
+  unreadCount?: number;
 }
 
 /** Per-user membership and read/mute state for a conversation. */
