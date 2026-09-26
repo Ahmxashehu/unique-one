@@ -47,7 +47,14 @@ export default function AddProductPage() {
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError('');
-    const selected: File[] = [];\n    const fileList = e.target.files;\n    if (fileList) {\n      for (let i = 0; i < fileList.length; i++) {\n        const file = fileList.item(i);\n        if (file) selected.push(file);\n      }\n    }
+    const selected: File[] = [];
+    const fileList = e.target.files;
+    if (fileList) {
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList.item(i);
+        if (file) selected.push(file);
+      }
+    }
     if (!selected.length) return;
     if (imageFiles.length + selected.length > MAX_IMAGES) { setError(`You can upload up to ${MAX_IMAGES} product images.`); return; }
     const invalid = selected.find(file => !file.type.startsWith('image/') || file.size > MAX_IMAGE_SIZE);
