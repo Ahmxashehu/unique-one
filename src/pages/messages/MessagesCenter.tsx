@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Search, Plus, MessageSquare, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getUserConversations } from '../../lib/os/communication-db';
 import type { Conversation } from '../../lib/os/communication-types';
 
 export default function MessagesCenter() {
@@ -27,9 +26,16 @@ export default function MessagesCenter() {
       setLoading(true);
       setError('');
       try {
-        const result = await getUserConversations();
+        const token = await currentUser.getIdToken();
+        const response = await fetch('/api/communication/conversations', {
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !Array.isArray(payload?.conversations)) {
+          throw new Error(payload?.error?.message ?? 'Failed to load messages.');
+        }
         if (!cancelled) {
-          setConversations(result);
+          setConversations(payload.conversations);
         }
       } catch (err) {
         console.error(err);
