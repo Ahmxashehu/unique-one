@@ -437,6 +437,45 @@ async function startServer() {
     }
   });
 
+  app.get("/api/communication/conversations/:conversationId", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationConversationReadRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conversation reads. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = req.params.conversationId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(conversationId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The conversation ID is invalid.');
+      }
+      const membershipSnapshot = await adminDb.collection('conversationMembers')
+        .doc(conversationMemberDocumentId(conversationId, uid)).get();
+      if (!membershipSnapshot.exists) {
+        return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      }
+      const conversationSnapshot = await adminDb.collection('conversations').doc(conversationId).get();
+      if (!conversationSnapshot.exists) {
+        return errorResponse(res, 'NOT_FOUND', 'The conversation was not found.', 404);
+      }
+      const membersSnapshot = await adminDb.collection('conversationMembers')
+        .where('conversationId', '==', conversationId).get();
+      return res.status(200).json({
+        conversation: conversationSnapshot.data(),
+        members: membersSnapshot.docs.map((member) => member.data()),
+      });
+    } catch (error) {
+      console.error('Conversation read failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to load the conversation.');
+    }
+  });
+
   app.get("/api/communication/conversations/:conversationId/presence", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 120,
