@@ -444,7 +444,7 @@ async function startServer() {
     store: createFirestoreRateLimitStore('communicationPresenceReadRateLimits', 60_000),
     keyGenerator: (req) => {
       const uid = (req as any).user?.uid;
-      return isSafeFirebaseUid(uid) ? uid : (req.ip || 'anonymous');
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
     },
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many presence requests. Please try again shortly.'),
   }), async (req, res) => {
@@ -489,7 +489,7 @@ async function startServer() {
     store: createFirestoreRateLimitStore('communicationUserSearchRateLimits', 60_000),
     keyGenerator: (req) => {
       const uid = (req as any).user?.uid;
-      return isSafeFirebaseUid(uid) ? uid : (req.ip || 'anonymous');
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
     },
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many user searches. Please try again shortly.'),
   }), async (req, res) => {
@@ -632,7 +632,7 @@ async function startServer() {
     store: createFirestoreRateLimitStore('communicationMessageRequestResponseRateLimits', 60_000),
     keyGenerator: (req) => {
       const uid = (req as any).user?.uid;
-      return isSafeFirebaseUid(uid) ? uid : (req.ip || 'anonymous');
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
     },
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many message request responses. Please try again shortly.'),
   }), async (req, res) => {
@@ -795,7 +795,7 @@ async function startServer() {
     store: createFirestoreRateLimitStore('communicationMessageDeliveryRateLimits', 60_000),
     keyGenerator: (req) => {
       const uid = (req as any).user?.uid;
-      return isSafeFirebaseUid(uid) ? uid : (req.ip || 'anonymous');
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
     },
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many delivery updates. Please try again shortly.'),
   }), async (req, res) => {
@@ -859,8 +859,7 @@ async function startServer() {
     keyGenerator: (req) => {
       const uid = (req as any).user?.uid;
       if (isSafeFirebaseUid(uid)) return uid;
-      const ip = req.ip;
-      return typeof ip === 'string' && ip.length > 0 ? ip : 'anonymous';
+      return ipKeyGenerator(req.ip);
     },
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many message requests. Please try again shortly.'),
   }), async (req, res) => {
