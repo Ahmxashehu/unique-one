@@ -979,11 +979,23 @@ async function startServer() {
               const avatarUrl = typeof user.profilePhotoUrl === 'string' && user.profilePhotoUrl.trim()
                 ? user.profilePhotoUrl.trim()
                 : undefined;
+              const memberData = ownMembership.exists ? ownMembership.data() as Record<string, unknown> : {};
+              const lastReadAt = typeof memberData.lastReadAt === 'string' ? memberData.lastReadAt : null;
+              const unreadSnapshot = await adminDb.collection('messages')
+                .where('conversationId', '==', conversationId)
+                .where('senderId', '!=', uid)
+                .get();
+              const unreadCount = unreadSnapshot.docs.filter((doc) => {
+                const createdAt = doc.data().createdAt;
+                return !lastReadAt || (typeof createdAt === 'string' && createdAt > lastReadAt);
+              }).length;
               conversations.push({
                 ...conversation,
                 title: fullName,
                 ...(avatarUrl ? { avatarUrl } : {}),
                 otherUid,
+                muted: memberData.muted === true,
+                unreadCount,
               });
               continue;
             }
@@ -1032,8 +1044,27 @@ async function startServer() {
         .orderBy('createdAt', 'asc')
         .limit(messageLimit)
         .get();
-      const messages = messagesSnapshot.docs.map((message) => message.data());
-      return res.status(200).json({ messages });
+      const messages = messagesSnapshot.docs.map((message) => message.data() as Record<string, unknown>);
+      const reactionSnapshot = await adminDb.collection('messageReactions')
+        .where('conversationId', '==', conversationId)
+        .get();
+      const reactionMap = new Map<string, Array<{ uid: string; reaction: string }>>();
+      reactionSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        if (typeof data.messageId === 'string' && typeof data.uid === 'string' && typeof data.reaction === 'string') {
+          const list = reactionMap.get(data.messageId) ?? [];
+          list.push({ uid: data.uid, reaction: data.reaction });
+          reactionMap.set(data.messageId, list);
+        }
+      });
+      const enrichedMessages = messages.map((message) => {
+        const reactions = reactionMap.get(String(message.id)) ?? [];
+        const counts: Record<string, number> = {};
+        reactions.forEach((item) => { counts[item.reaction] = (counts[item.reaction] ?? 0) + 1; });
+        const mine = reactions.find((item) => item.uid === uid)?.reaction;
+        return { ...message, reactions: counts, ...(mine ? { myReaction: mine } : {}) };
+      });
+      return res.status(200).json({ messages: enrichedMessages });
     } catch (error) {
       console.error('Conversation message read failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to load conversation messages.');
@@ -1090,6 +1121,7 @@ async function startServer() {
         if (message.senderId !== uid) {
           const messageStatus = nextStatus === 'read' ? 'read' : 'delivered';
           transaction.update(messageRef, { status: messageStatus, updatedAt: nowIso });
+          if (action === 'read') transaction.update(membershipRef, { lastReadAt: nowIso });
         }
         return { delivery, messageStatus: message.senderId === uid ? message.status : (nextStatus === 'read' ? 'read' : 'delivered') };
       });
@@ -1100,6 +1132,153 @@ async function startServer() {
       if (code === 'FORBIDDEN') return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
       console.error('Message delivery update failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to update message delivery status.');
+    }
+  });
+
+  app.post("/api/communication/messages/:messageId/reactions", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationReactionRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many reaction requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const messageId = req.params.messageId;
+      const reaction = typeof req.body?.reaction === 'string' ? req.body.reaction.trim() : '';
+      const allowed = new Set(['👍', '❤️', '😂', '😮', '😢', '🙏']);
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(messageId) || !allowed.has(reaction)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid reaction is required.');
+      }
+      const messageRef = adminDb.collection('messages').doc(messageId);
+      const reactionRef = adminDb.collection('messageReactions').doc(messageId + '_' + uid);
+      await adminDb.runTransaction(async (transaction) => {
+        const messageSnapshot = await transaction.get(messageRef);
+        if (!messageSnapshot.exists) throw new RequestValidationError('INVALID_REQUEST', 'The message was not found.');
+        const message = messageSnapshot.data() as Partial<Message>;
+        const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(String(message.conversationId), uid));
+        const membershipSnapshot = await transaction.get(membershipRef);
+        if (!membershipSnapshot.exists) throw new RequestValidationError('INVALID_REQUEST', 'You are not a member of this conversation.');
+        transaction.set(reactionRef, {
+          messageId,
+          conversationId: message.conversationId,
+          uid,
+          reaction,
+          updatedAt: Timestamp.now().toDate().toISOString(),
+        }, { merge: true });
+      });
+      return res.status(200).json({ reaction });
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Message reaction failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to update the reaction.');
+    }
+  });
+
+  app.delete("/api/communication/messages/:messageId/reactions", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationReactionRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many reaction requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const messageId = req.params.messageId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(messageId)) return errorResponse(res, 'INVALID_REQUEST', 'The message ID is invalid.');
+      const messageRef = adminDb.collection('messages').doc(messageId);
+      const reactionRef = adminDb.collection('messageReactions').doc(messageId + '_' + uid);
+      await adminDb.runTransaction(async (transaction) => {
+        const messageSnapshot = await transaction.get(messageRef);
+        if (!messageSnapshot.exists) throw new RequestValidationError('INVALID_REQUEST', 'The message was not found.');
+        const message = messageSnapshot.data() as Partial<Message>;
+        const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(String(message.conversationId), uid));
+        const membershipSnapshot = await transaction.get(membershipRef);
+        if (!membershipSnapshot.exists) throw new RequestValidationError('INVALID_REQUEST', 'You are not a member of this conversation.');
+        transaction.delete(reactionRef);
+      });
+      return res.status(200).json({ reaction: null });
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Message reaction removal failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to remove the reaction.');
+    }
+  });
+
+  app.delete("/api/communication/messages/:messageId", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMessageDeleteRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many delete requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const messageId = req.params.messageId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(messageId)) return errorResponse(res, 'INVALID_REQUEST', 'The message ID is invalid.');
+      const messageRef = adminDb.collection('messages').doc(messageId);
+      await adminDb.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(messageRef);
+        if (!snapshot.exists) throw new RequestValidationError('INVALID_REQUEST', 'The message was not found.');
+        const message = snapshot.data() as Partial<Message>;
+        if (message.senderId !== uid) throw new RequestValidationError('INVALID_REQUEST', 'You can only delete your own messages.',);
+        transaction.update(messageRef, {
+          text: 'This message was deleted',
+          deleted: true,
+          deletedAt: Timestamp.now().toDate().toISOString(),
+          updatedAt: Timestamp.now().toDate().toISOString(),
+          attachments: [],
+        });
+      });
+      return res.status(200).json({ deleted: true });
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Message deletion failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to delete the message.');
+    }
+  });
+
+  app.post("/api/communication/conversations/:conversationId/mute", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMuteRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many mute requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = req.params.conversationId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(conversationId) || typeof req.body?.muted !== 'boolean') {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid conversation and muted value are required.');
+      }
+      const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationId, uid));
+      const membershipSnapshot = await membershipRef.get();
+      if (!membershipSnapshot.exists) return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      await membershipRef.update({ muted: req.body.muted });
+      return res.status(200).json({ muted: req.body.muted });
+    } catch (error) {
+      console.error('Conversation mute failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to update mute state.');
     }
   });
 
