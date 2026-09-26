@@ -1445,16 +1445,14 @@ async function startServer() {
         .where('conversationId', '==', conversationId)
         .limit(messageLimit)
         .get();
-      const messages = snapshot.docs
-        .map((messageDoc) => {
-          const data = messageDoc.data() as Partial<Message>;
-          return {
-            ...data,
-            id: messageDoc.id,
-            createdAt: typeof data.createdAt === 'string' ? data.createdAt : '',
-          } satisfies Partial<Message> & { id: string; createdAt: string };
-        })
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      const messages: Array<Message & { id: string }> = snapshot.docs.map((messageDoc) => {
+        const data = messageDoc.data() as Record<string, unknown>;
+        return {
+          ...(data as Omit<Message, 'id' | 'createdAt'>),
+          id: messageDoc.id,
+          createdAt: typeof data.createdAt === 'string' ? data.createdAt : '',
+        } as Message & { id: string };
+      }).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
       return res.status(200).json({ messages });
     } catch (error) {
       console.error('Communication message read failed:', error);
