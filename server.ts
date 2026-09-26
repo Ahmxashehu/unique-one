@@ -1446,7 +1446,7 @@ async function startServer() {
         .limit(messageLimit)
         .get();
       const messages = snapshot.docs
-        .map((messageDoc) => ({ id: messageDoc.id, ...messageDoc.data() }))
+        .map((messageDoc) => ({ id: messageDoc.id, ...messageDoc.data() }) as Message & { id: string })
         .sort((a, b) => String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')));
       return res.status(200).json({ messages });
     } catch (error) {
