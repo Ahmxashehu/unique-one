@@ -3,7 +3,7 @@ import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check,
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Conversation, Message, MessageAttachmentMetadata } from '../../lib/os/communication-types';
-import { uploadMedia } from '../../lib/media/upload';
+import { optimizeImage } from '../../lib/media/image';
 
 const formatMessageDate = (value: string) => {
   const date = new Date(value);
@@ -266,29 +266,63 @@ export default function ChatView() {
     try {
       const uploaded: MessageAttachmentMetadata[] = [];
       for (const file of files) {
-        setAttachmentStage('preparing');
-        const metadata = await uploadMedia(file, {
-          ownerId: currentUser.uid,
-          pathPrefix: `messages/${id}/${currentUser.uid}`,
-          maxBytes: file.type.startsWith('image/') ? 5 * 1024 * 1024 : 20 * 1024 * 1024,
-          allowedMimeTypes: file.type.startsWith('image/')
-            ? ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-            : ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
-          optimizeImage: file.type.startsWith('image/'),
-          imageMaxDimension: 1600,
-          imageTargetBytes: 450 * 1024,
-          onProgress: (progress) => {
-            setAttachmentStage('uploading');
-            setAttachmentProgress(progress);
-          },
+        const isImage = file.type.startsWith('image/');
+        const allowed = isImage
+          ? ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+          : ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+        if (!allowed.includes(file.type)) throw new Error('This attachment type is not supported.');
+        if (file.size > (isImage ? 5 : 20) * 1024 * 1024) throw new Error('The attachment is too large.');
+
+        let body: Blob = file;
+        let contentType = file.type;
+        if (isImage) {
+          const optimized = await optimizeImage(file, 1600, 450 * 1024);
+          body = optimized.blob;
+          contentType = 'image/webp';
+        }
+
+        setAttachmentStage('uploading');
+        setAttachmentProgress(0);
+        const token = await currentUser.getIdToken();
+        const result = await new Promise<{ fileId: string; storagePath: string; downloadUrl: string; mimeType: string; sizeBytes: number }>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/communication/media/upload');
+          xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+          xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+          xhr.setRequestHeader('X-Conversation-Id', id);
+          xhr.setRequestHeader('X-Content-Type', contentType);
+          xhr.setRequestHeader('X-Original-Name', file.name.slice(0, 255));
+          xhr.upload.onprogress = (progressEvent) => {
+            if (progressEvent.lengthComputable) {
+              setAttachmentProgress(Math.round((progressEvent.loaded / progressEvent.total) * 100));
+            }
+          };
+          xhr.onerror = () => reject(new Error('Network error while uploading the attachment.'));
+          xhr.onload = () => {
+            let payload: { fileId?: string; storagePath?: string; downloadUrl?: string; mimeType?: string; sizeBytes?: number; error?: { message?: string } } | null = null;
+            try { payload = JSON.parse(xhr.responseText); } catch (_) { /* handled below */ }
+            if (xhr.status < 200 || xhr.status >= 300 || !payload?.downloadUrl) {
+              reject(new Error(payload?.error?.message ?? 'Failed to upload attachment.'));
+              return;
+            }
+            resolve({
+              fileId: payload.fileId!,
+              storagePath: payload.storagePath!,
+              downloadUrl: payload.downloadUrl!,
+              mimeType: payload.mimeType ?? contentType,
+              sizeBytes: payload.sizeBytes ?? body.size,
+            });
+          };
+          xhr.send(body);
         });
+
         uploaded.push({
-          id: metadata.fileId,
-          name: metadata.originalName,
-          contentType: metadata.mimeType,
-          sizeBytes: metadata.sizeBytes,
-          url: metadata.downloadUrl,
-          storagePath: metadata.storagePath,
+          id: result.fileId,
+          name: file.name,
+          contentType: result.mimeType,
+          sizeBytes: result.sizeBytes,
+          url: result.downloadUrl,
+          storagePath: result.storagePath,
         });
       }
       setAttachments((current) => [...current, ...uploaded]);
