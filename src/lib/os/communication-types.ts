@@ -22,6 +22,7 @@ export interface MessageAttachmentMetadata {
   contentType: string;
   sizeBytes: number;
   url: string;
+  storagePath?: string;
 }
 
 /**
