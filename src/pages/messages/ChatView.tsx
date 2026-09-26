@@ -193,7 +193,7 @@ export default function ChatView() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-128px)] min-h-0 -m-4 md:-m-6 lg:-m-8 bg-slate-50 md:rounded-3xl md:h-[calc(100vh-100px)] overflow-hidden">
+    <div className="flex flex-col h-full min-h-0 -m-4 md:-m-6 lg:-m-8 bg-slate-50 md:rounded-3xl overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/os/messages')} className="p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-full md:hidden" aria-label="Back">
@@ -253,7 +253,7 @@ export default function ChatView() {
         })}
       </div>
 
-      {!blocked && <div className="bg-white border-t border-slate-200 p-3 sm:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shrink-0">
+      {!blocked && <div className="sticky bottom-0 z-30 bg-white border-t border-slate-200 p-3 sm:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shrink-0">
         <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1 pr-2">
           <button className="p-3 text-slate-400 shrink-0" aria-label="Attach file"><Paperclip className="w-5 h-5" /></button>
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => {
