@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, Clock, ShieldAlert, Ban } from 'lucide-react';
+import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, ShieldAlert, Ban, CornerUpLeft, X } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { subscribeToMessagesForConversation } from '../../lib/os/communication-db';
@@ -19,6 +19,7 @@ export default function ChatView() {
   const [otherUid, setOtherUid] = useState<string | null>(null);
   const [showNewContactWarning, setShowNewContactWarning] = useState(() => new URLSearchParams(window.location.search).get('new') === '1');
   const [blocked, setBlocked] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
 
   const updatePresence = useCallback(async (status: 'online' | 'offline') => {
     if (!currentUser) return;
@@ -179,11 +180,12 @@ export default function ChatView() {
       const response = await fetch('/api/communication/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId: id, type: 'text', text }),
+        body: JSON.stringify({ conversationId: id, type: 'text', text, replyToMessageId: replyingTo?.id }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to send message.');
       setMessage('');
+      setReplyingTo(null);
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'Failed to send message.');
@@ -238,20 +240,47 @@ export default function ChatView() {
         {!loading && messages.map((msg) => {
           const mine = msg.senderId === currentUser?.uid;
           return (
-            <div key={msg.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[75%] md:max-w-[60%] rounded-2xl px-4 py-2 ${mine ? 'bg-slate-900 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-900 rounded-tl-sm'}`}>
-                {msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>}
-                <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${mine ? 'text-slate-400' : 'text-slate-400'}`}>
-                  <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  {mine && msg.status === 'sent' && <Check className="w-3 h-3" />}
-                  {mine && msg.status === 'delivered' && <CheckCheck className="w-3 h-3" />}
-                  {mine && msg.status === 'read' && <CheckCheck className="w-3 h-3 text-blue-400" />}
+            <div key={msg.id} id={`message-${msg.id}`} className={`flex ${mine ? 'justify-end' : 'justify-start'} group`}>
+              <div className="relative max-w-[75%] md:max-w-[60%]">
+                <button onClick={() => setReplyingTo(msg)} className={`absolute -top-3 ${mine ? '-left-10' : '-right-10'} hidden group-hover:flex items-center justify-center w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm text-slate-500 hover:text-slate-900`} aria-label="Reply to message" title="Reply">
+                  <CornerUpLeft className="w-4 h-4" />
+                </button>
+                <div className={`rounded-2xl px-4 py-2 ${mine ? 'bg-slate-900 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-900 rounded-tl-sm'}`}>
+                  {msg.replyToMessageId && (() => {
+                    const replied = messages.find((item) => item.id === msg.replyToMessageId);
+                    return replied ? (
+                      <button onClick={() => document.getElementById(`message-${replied.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="w-full text-left mb-2 rounded-lg bg-black/10 px-2.5 py-1.5 border-l-2 border-current/40">
+                        <p className="text-[10px] font-semibold opacity-80">{replied.senderId === currentUser?.uid ? 'You' : (conversation?.title ?? 'User')}</p>
+                        <p className="text-xs opacity-75 truncate">{replied.text ?? 'Message'}</p>
+                      </button>
+                    ) : null;
+                  })()}
+                  {msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>}
+                  <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-slate-400">
+                    <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    {mine && msg.status === 'sent' && <Check className="w-3 h-3" />}
+                    {mine && msg.status === 'delivered' && <CheckCheck className="w-3 h-3" />}
+                    {mine && msg.status === 'read' && <CheckCheck className="w-3 h-3 text-blue-400" />}
+                  </div>
                 </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {replyingTo && !blocked && (
+        <div className="border-t border-slate-200 bg-slate-50 px-3 pt-2">
+          <div className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-3 py-2">
+            <CornerUpLeft className="w-4 h-4 text-slate-500 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold text-slate-500">Replying to {replyingTo.senderId === currentUser?.uid ? 'yourself' : (conversation?.title ?? 'user')}</p>
+              <p className="text-xs text-slate-600 truncate">{replyingTo.text ?? 'Message'}</p>
+            </div>
+            <button onClick={() => setReplyingTo(null)} className="p-1 text-slate-400 hover:text-slate-700" aria-label="Cancel reply"><X className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
 
       {!blocked && <div className="sticky bottom-0 z-30 bg-white border-t border-slate-200 p-3 sm:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shrink-0">
         <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1 pr-2">
