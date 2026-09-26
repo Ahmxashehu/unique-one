@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, Clock, ShieldAlert, Ban } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getConversation, getConversationMembers, subscribeToMessagesForConversation } from '../../lib/os/communication-db';
+import { subscribeToMessagesForConversation } from '../../lib/os/communication-db';
 import type { Conversation, Message } from '../../lib/os/communication-types';
 
 export default function ChatView() {
@@ -51,16 +51,20 @@ export default function ChatView() {
   const loadOtherPresence = useCallback(async () => {
     if (!id || !currentUser) return;
     try {
-      const members = await getConversationMembers(id);
+      const token = await currentUser.getIdToken();
+      const response = await fetch(`/api/communication/conversations/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to load conversation.');
+      const members = Array.isArray(payload?.members) ? payload.members : [];
       const otherMember = members.find((member) => member.uid !== currentUser.uid);
       setOtherUid(otherMember?.uid ?? null);
       if (!otherMember) {
         setOtherPresence(null);
         return;
       }
-      const token = await currentUser.getIdToken();
-      const response = await fetch(`/api/communication/conversations/${id}/presence`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const presenceToken = await currentUser.getIdToken();
+      const response = await fetch(`/api/communication/conversations/${id}/presence`,
+        headers: { Authorization: `Bearer ${presenceToken}` },
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to load presence.');
@@ -100,9 +104,16 @@ export default function ChatView() {
     void (async () => {
       if (!id || !currentUser) return;
       try {
-        const conv = await getConversation(id);
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`/api/communication/conversations/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.conversation) {
+          throw new Error(payload?.error?.message ?? 'Failed to load conversation.');
+        }
         if (!active) return;
-        setConversation(conv);
+        setConversation(payload.conversation);
         unsubscribe = await subscribeToMessagesForConversation(
           id,
           (items) => {
