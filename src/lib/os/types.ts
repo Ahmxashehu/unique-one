@@ -319,6 +319,26 @@ export interface LedgerEntry {
   createdAt: string;
 }
 
+// Canonical wallet currency for UniquePay internal wallet transfers.
+export type WalletCurrency = 'NGN';
+
+// Canonical UniquePay double-entry ledger schema (server-only collection: ledgerEntries).
+// This is the authoritative financial contract record. It is distinct from the legacy
+// LedgerEntry interface above, which is retained unmodified for compatibility.
+// Financial amounts are stored as integers in NGN minor units (kobo): ₦1 = 100.
+export interface LedgerEntryRecord {
+  id: string;
+  transactionId: string;
+  reference: string;
+  uid: string;
+  direction: 'debit' | 'credit';
+  amountMinor: number;
+  currency: WalletCurrency;
+  status: TransactionStatus;
+  idempotencyKey: string;
+  createdAt: string;
+}
+
 export interface PaymentProvider {
   id: string;
   name: string; // 'paystack', 'flutterwave', 'monnify', 'remita', 'interswitch'
