@@ -170,6 +170,7 @@ export interface ValidatedMessageDraft {
   senderId: string;
   type: CommunicationMessageType;
   text: string;
+  replyToMessageId?: string;
   createdAt: string;
 }
 
@@ -185,6 +186,7 @@ export interface MessageDraftInput {
   conversationId: unknown;
   type: unknown;
   text: unknown;
+  replyToMessageId?: unknown;
   senderId?: unknown;
 }
 
@@ -210,11 +212,17 @@ export function validateMessageDraft(input: MessageDraftInput, authenticatedUser
   const conversationId = validateConversationId(input.conversationId);
   const type = validateMessageType(input.type);
   const text = validateMessageText(input.text);
+  let replyToMessageId: string | undefined;
+  if (input.replyToMessageId !== undefined && input.replyToMessageId !== null && input.replyToMessageId !== '') {
+    if (!isBoundedIdentifier(input.replyToMessageId, 128)) throw new CommunicationValidationError('INVALID_REQUEST', 'replyToMessageId must be a valid message ID.');
+    replyToMessageId = input.replyToMessageId;
+  }
   return {
     conversationId,
     senderId: uid,
     type,
     text,
+    ...(replyToMessageId ? { replyToMessageId } : {}),
     createdAt: serverTimestamp(),
   };
 }
