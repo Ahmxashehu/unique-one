@@ -130,15 +130,19 @@ export default function MessagesCenter() {
           {!loading && error && <div className="p-8 text-center text-sm text-red-600">{error}</div>}
           {!loading && !error && filtered.map((conv) => (
             <button key={conv.id} onClick={() => navigate(`/os/messages/${conv.id}`)} className="w-full text-left flex items-start gap-3 p-4 border-b border-slate-50 hover:bg-slate-50">
-              <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center text-lg font-bold text-slate-500 shrink-0">
-                {(conv.title ?? 'U').charAt(0).toUpperCase()}
+              <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center text-lg font-bold text-slate-500 shrink-0 overflow-hidden">
+                {conv.avatarUrl ? (
+                  <img src={conv.avatarUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  (conv.title ?? 'U').charAt(0).toUpperCase()
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between gap-2">
-                  <h4 className="font-semibold text-slate-900 truncate">{conv.title ?? 'Conversation'}</h4>
+                  <h4 className="font-semibold text-slate-900 truncate">{conv.title ?? 'Messages'}</h4>
                   <span className="text-xs text-slate-500 whitespace-nowrap">{conv.lastMessageAt ? new Date(conv.lastMessageAt).toLocaleDateString() : ''}</span>
                 </div>
-                <p className="text-sm text-slate-500 truncate mt-0.5">{conv.type === 'business' ? 'Business conversation' : 'Conversation'}</p>
+                <p className="text-sm text-slate-500 truncate mt-0.5">{conv.type === 'business' ? 'Business conversation' : 'Tap to open chat'}</p>
               </div>
             </button>
           ))}
