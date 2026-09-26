@@ -43,7 +43,7 @@ const transferErrorStatus: Record<TransferErrorCode, number> = {
   SELF_TRANSFER_NOT_ALLOWED: 400, INVALID_AMOUNT: 400, INVALID_CURRENCY: 400, INVALID_IDEMPOTENCY_KEY: 400,
   IDEMPOTENCY_KEY_CONFLICT: 409, TRANSFER_ALREADY_COMPLETED: 200, TRANSFER_IN_PROGRESS: 409, RATE_LIMITED: 429,
   WALLET_NOT_FOUND: 404, WALLET_UNAVAILABLE: 403, INSUFFICIENT_FUNDS: 409, TRANSACTION_FAILED: 500,
-  SERVICE_UNAVAILABLE: 503,
+  SERVICE_UNAVAILABLE: 503, NOT_FOUND: 404, BLOCKED: 403,
 };
 class RequestValidationError extends Error {
   code: 'UNAUTHENTICATED' | 'INVALID_REQUEST';
@@ -328,7 +328,7 @@ async function startServer() {
       const code = (error as Error).message as TransferErrorCode;
       const messages: Record<TransferErrorCode, string> = {
         UNAUTHENTICATED: 'Authentication is required to initiate a transfer.', INVALID_REQUEST: 'The transfer request body is malformed or contains unsupported fields.', INVALID_RECIPIENT: 'A valid recipient UID is required.', RECIPIENT_NOT_FOUND: 'The recipient does not exist.', SELF_TRANSFER_NOT_ALLOWED: 'A wallet transfer to yourself is not allowed.', INVALID_AMOUNT: 'Transfer amount must be a positive integer minor-unit amount.', INVALID_CURRENCY: 'Only NGN transfers are supported.', INVALID_IDEMPOTENCY_KEY: 'The idempotency key is invalid or exceeds the allowed length.', IDEMPOTENCY_KEY_CONFLICT: 'This idempotency key was already used with different transfer parameters.', TRANSFER_ALREADY_COMPLETED: 'This transfer has already been completed.', TRANSFER_IN_PROGRESS: 'A transfer with this idempotency key is already in progress.', WALLET_NOT_FOUND: 'A wallet record is missing for this transfer.', WALLET_UNAVAILABLE: 'The wallet status or currency configuration is not valid for transfer.', INSUFFICIENT_FUNDS: 'The sender wallet does not have enough funds.', TRANSACTION_FAILED: 'The transfer failed while processing the transaction.', SERVICE_UNAVAILABLE: 'The transfer service is temporarily unavailable.',
-        RATE_LIMITED: 'Too many requests were made. Please try again shortly.',
+        RATE_LIMITED: 'Too many requests were made. Please try again shortly.', NOT_FOUND: 'The requested resource was not found.', BLOCKED: 'Messaging is unavailable because one of the users has blocked the other.',
       };
       return errorResponse(res, code, messages[code] ?? 'Invalid transfer request.');
     }
