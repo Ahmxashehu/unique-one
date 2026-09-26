@@ -497,8 +497,7 @@ async function startServer() {
       const requesterMembership = await adminDb.collection('conversationMembers')
         .doc(conversationMemberDocumentId(conversationId, requesterUid)).get();
       if (!requesterMembership.exists) {
-        return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
-      }
+        return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);      }
       const membersSnapshot = await adminDb.collection('conversationMembers')
         .where('conversationId', '==', conversationId).get();
       const presences = await Promise.all(membersSnapshot.docs.map(async (memberDoc) => {
@@ -875,6 +874,43 @@ async function startServer() {
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to create the conversation.');
     }
   });
+  app.get("/api/communication/conversations", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationConversationListRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conversation list requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const membershipSnapshot = await adminDb.collection('conversationMembers').where('uid', '==', uid).get();
+      const conversationIds = Array.from(new Set(
+        membershipSnapshot.docs
+          .map((doc) => doc.data().conversationId)
+          .filter((id): id is string => typeof id === 'string' && isSafeConversationId(id)),
+      ));
+      if (conversationIds.length === 0) return res.status(200).json({ conversations: [] });
+      const conversations = [];
+      for (const conversationId of conversationIds.slice(0, 100)) {
+        const snapshot = await adminDb.collection('conversations').doc(conversationId).get();
+        if (snapshot.exists) conversations.push(snapshot.data());
+      }
+      conversations.sort((a: any, b: any) =>
+        new Date(String(b?.lastMessageAt ?? b?.updatedAt ?? b?.createdAt ?? 0)).getTime()
+        - new Date(String(a?.lastMessageAt ?? a?.updatedAt ?? a?.createdAt ?? 0)).getTime()
+      );
+      return res.status(200).json({ conversations });
+    } catch (error) {
+      console.error('Conversation list read failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to load messages.');
+    }
+  });
+
   app.get("/api/communication/conversations/:conversationId/messages", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 120,
@@ -997,8 +1033,7 @@ async function startServer() {
       if (blockerUid === blockedUid) return errorResponse(res, 'INVALID_REQUEST', 'You cannot block yourself.');
       if (!(await readUserExists(blockedUid))) return errorResponse(res, 'INVALID_RECIPIENT', 'The user does not exist.');
       const blockId = createHash('sha256').update(blockerUid + ':' + blockedUid).digest('hex').slice(0, 40);
-      await adminDb.collection('communicationBlocks').doc(blockId).set({ id: blockId, blockerUid, blockedUid, createdAt: Timestamp.now().toDate().toISOString() }, { merge: true });
-      return res.status(200).json({ blocked: true });
+      await adminDb.collection('communicationBlocks').doc(blockId).set({ id: blockId, blockerUid, blockedUid, createdAt: Timestamp.now().toDate().toISOString() }, { merge: true });      return res.status(200).json({ blocked: true });
     } catch (error) {
       console.error('Communication block failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to block this user.');
