@@ -915,17 +915,54 @@ async function startServer() {
     try {
       const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
       const membershipSnapshot = await adminDb.collection('conversationMembers').where('uid', '==', uid).get();
-      const conversationIds = Array.from(new Set(
+      const conversationIdSet = new Set<string>(
         membershipSnapshot.docs
           .map((doc) => doc.data().conversationId)
           .filter((id): id is string => typeof id === 'string' && isSafeConversationId(id)),
-      ));
+      );
+
+      // Recover older conversations whose membership record may be missing for
+      // this user. Sent messages still identify the conversation, so use them
+      // as a safe legacy discovery path and repair the missing membership.
+      const sentMessagesSnapshot = await adminDb.collection('messages')
+        .where('senderId', '==', uid)
+        .limit(100)
+        .get();
+      for (const messageDoc of sentMessagesSnapshot.docs) {
+        const conversationId = messageDoc.data().conversationId;
+        if (typeof conversationId === 'string' && isSafeConversationId(conversationId)) {
+          conversationIdSet.add(conversationId);
+        }
+      }
+
+      const conversationIds = Array.from(conversationIdSet);
       if (conversationIds.length === 0) return res.status(200).json({ conversations: [] });
       const conversations = [];
       for (const conversationId of conversationIds.slice(0, 100)) {
         const snapshot = await adminDb.collection('conversations').doc(conversationId).get();
         if (!snapshot.exists) continue;
         const conversation = snapshot.data() as Record<string, unknown>;
+
+        const ownMembershipRef = adminDb.collection('conversationMembers')
+          .doc(conversationMemberDocumentId(conversationId, uid));
+        const ownMembership = await ownMembershipRef.get();
+        if (!ownMembership.exists) {
+          const memberSnapshot = await adminDb.collection('conversationMembers')
+            .where('conversationId', '==', conversationId).get();
+          const existingMembers = memberSnapshot.docs.map((doc) => doc.data().uid).filter((memberUid) => typeof memberUid === 'string');
+          if (existingMembers.includes(uid)) {
+            // No-op: a differently keyed legacy membership already exists.
+          } else if (conversation.type === 'direct' && existingMembers.length > 0) {
+            const createdAt = typeof conversation.createdAt === 'string' ? conversation.createdAt : Timestamp.now().toDate().toISOString();
+            await ownMembershipRef.set({
+              conversationId,
+              uid,
+              role: 'member',
+              joinedAt: createdAt,
+            }, { merge: true });
+          }
+        }
+
         if (conversation.type === 'direct') {
           const memberSnapshot = await adminDb.collection('conversationMembers')
             .where('conversationId', '==', conversationId).get();
