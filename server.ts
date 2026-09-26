@@ -823,7 +823,29 @@ async function startServer() {
         : adminDb.collection('conversations').doc();
       const existingConversation = await conversationRef.get();
       if (existingConversation.exists) {
-        return res.status(200).json({ conversation: existingConversation.data() as Conversation });
+        // Repair any missing membership records for an existing direct conversation.
+        // This is safe for conversations created before the current membership flow.
+        const existingData = existingConversation.data() as Conversation;
+        const expectedMembers = buildConversationMembers(
+          conversationRef.id,
+          validatedRequest.memberUids,
+          creatorUid,
+          typeof existingData.createdAt === 'string' ? existingData.createdAt : Timestamp.now().toDate().toISOString(),
+        );
+        const membershipRefs = expectedMembers.map((member) =>
+          adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationRef.id, member.uid)),
+        );
+        const membershipSnapshots = await adminDb.getAll(...membershipRefs);
+        const repairBatch = adminDb.batch();
+        let repaired = false;
+        membershipSnapshots.forEach((snapshot, index) => {
+          if (!snapshot.exists) {
+            repairBatch.create(membershipRefs[index], expectedMembers[index]);
+            repaired = true;
+          }
+        });
+        if (repaired) await repairBatch.commit();
+        return res.status(200).json({ conversation: existingData, members: expectedMembers });
       }
       const now = Timestamp.now();
       const nowIso = now.toDate().toISOString();
