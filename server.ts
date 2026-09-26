@@ -1446,8 +1446,15 @@ async function startServer() {
         .limit(messageLimit)
         .get();
       const messages = snapshot.docs
-        .map((messageDoc) => ({ id: messageDoc.id, ...messageDoc.data() }) as Message & { id: string })
-        .sort((a, b) => String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')));
+        .map((messageDoc) => {
+          const data = messageDoc.data() as Partial<Message>;
+          return {
+            ...data,
+            id: messageDoc.id,
+            createdAt: typeof data.createdAt === 'string' ? data.createdAt : '',
+          } satisfies Partial<Message> & { id: string; createdAt: string };
+        })
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
       return res.status(200).json({ messages });
     } catch (error) {
       console.error('Communication message read failed:', error);
