@@ -776,7 +776,16 @@ async function startServer() {
       return errorResponse(res, 'INVALID_REQUEST', 'The conversation request is invalid.');
     }
     try {
-      const conversationRef = adminDb.collection('conversations').doc();
+      const directConversationId = validatedRequest.type === 'direct' && validatedRequest.memberUids.length === 2
+        ? createHash('sha256').update([...validatedRequest.memberUids].sort().join(':')).digest('hex').slice(0, 40)
+        : null;
+      const conversationRef = directConversationId
+        ? adminDb.collection('conversations').doc(directConversationId)
+        : adminDb.collection('conversations').doc();
+      const existingConversation = await conversationRef.get();
+      if (existingConversation.exists) {
+        return res.status(200).json({ conversation: existingConversation.data() as Conversation });
+      }
       const now = Timestamp.now();
       const nowIso = now.toDate().toISOString();
       const conversation: Conversation = {
@@ -868,6 +877,35 @@ async function startServer() {
     }
   });
 
+  app.post("/api/communication/blocks", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationBlockRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many block attempts. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const blockerUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!isPlainObject(req.body) || typeof req.body.blockedUid !== 'string' || !isSafeFirebaseUid(req.body.blockedUid.trim())) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid blocked user UID is required.');
+      }
+      const blockedUid = req.body.blockedUid.trim();
+      if (blockerUid === blockedUid) return errorResponse(res, 'INVALID_REQUEST', 'You cannot block yourself.');
+      if (!(await readUserExists(blockedUid))) return errorResponse(res, 'INVALID_RECIPIENT', 'The user does not exist.');
+      const blockId = createHash('sha256').update(blockerUid + ':' + blockedUid).digest('hex').slice(0, 40);
+      await adminDb.collection('communicationBlocks').doc(blockId).set({ id: blockId, blockerUid, blockedUid, createdAt: Timestamp.now().toDate().toISOString() }, { merge: true });
+      return res.status(200).json({ blocked: true });
+    } catch (error) {
+      console.error('Communication block failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to block this user.');
+    }
+  });
+
   app.post("/api/communication/messages", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 60,
@@ -901,6 +939,17 @@ async function startServer() {
     }
     try {
       const conversationRef = adminDb.collection('conversations').doc(draft.conversationId);
+      const membershipQuery = await adminDb.collection('conversationMembers').where('conversationId', '==', draft.conversationId).get();
+      const otherUids = membershipQuery.docs.map((doc) => (doc.data() as Partial<ConversationMember>).uid).filter((uid): uid is string => Boolean(uid) && uid !== senderUid);
+      for (const otherUid of otherUids) {
+        const forwardId = createHash('sha256').update(senderUid + ':' + otherUid).digest('hex').slice(0, 40);
+        const reverseId = createHash('sha256').update(otherUid + ':' + senderUid).digest('hex').slice(0, 40);
+        const [forwardBlock, reverseBlock] = await Promise.all([
+          adminDb.collection('communicationBlocks').doc(forwardId).get(),
+          adminDb.collection('communicationBlocks').doc(reverseId).get(),
+        ]);
+        if (forwardBlock.exists || reverseBlock.exists) return errorResponse(res, 'BLOCKED', 'Messaging is unavailable because one of the users has blocked the other.');
+      }
       const messageRef = adminDb.collection('messages').doc();
       const now = Timestamp.now();
       const nowIso = now.toDate().toISOString();
