@@ -530,6 +530,50 @@ async function startServer() {
     }
   });
 
+  app.get("/api/communication/users/search", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationUserSearchRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : (req.ip || 'anonymous');
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many user searches. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const requesterUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const rawQuery = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+      if (rawQuery.length < 2 || rawQuery.length > 128) return errorResponse(res, 'INVALID_REQUEST', 'Search must contain between 2 and 128 characters.');
+      const usersRef = adminDb.collection('users');
+      const candidates = new Map<string, FirebaseFirestore.DocumentData>();
+      const normalized = rawQuery.toLowerCase();
+      const queries = [
+        usersRef.where('email', '==', rawQuery).limit(10),
+        usersRef.where('email', '==', normalized).limit(10),
+        usersRef.where('username', '==', rawQuery).limit(10),
+        usersRef.where('username', '==', normalized).limit(10),
+        usersRef.where('uniqueOneId', '==', rawQuery).limit(10),
+        usersRef.where('uniqueOneId', '==', normalized).limit(10),
+        usersRef.where('phone', '==', rawQuery).limit(10),
+      ];
+      const snapshots = await Promise.all(queries.map((query) => query.get()));
+      for (const snapshot of snapshots) for (const doc of snapshot.docs) if (doc.id !== requesterUid) candidates.set(doc.id, doc.data());
+      const results = Array.from(candidates.entries()).slice(0, 10).map(([uid, data]) => ({
+        uid,
+        fullName: typeof data.fullName === 'string' ? data.fullName : 'Unique One User',
+        username: typeof data.username === 'string' ? data.username : undefined,
+        uniqueOneId: typeof data.uniqueOneId === 'string' ? data.uniqueOneId : undefined,
+        profilePhotoUrl: typeof data.profilePhotoUrl === 'string' ? data.profilePhotoUrl : undefined,
+      }));
+      return res.status(200).json({ users: results });
+    } catch (error) {
+      console.error('Communication user search failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to search for users.');
+    }
+  });
+
   app.post("/api/communication/message-requests", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 20,
