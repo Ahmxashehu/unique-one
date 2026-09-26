@@ -115,7 +115,7 @@ export default function ChatView() {
 
   useEffect(() => {
     let active = true;
-    let pollTimer: number | undefined;
+    let unsubscribe: (() => void) | null = null;
     setLoading(true);
     setError('');
 
@@ -123,30 +123,25 @@ export default function ChatView() {
       if (!id || !currentUser) return;
       try {
         const token = await currentUser.getIdToken();
-        const [conversationResponse, messagesResponse] = await Promise.all([
-          fetch(`/api/communication/conversations/${id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`/api/communication/conversations/${id}/messages?limit=100`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
+        const conversationResponse = await fetch('/api/communication/conversations/' + id, {
+          headers: { Authorization: 'Bearer ' + token },
+        });
         const conversationPayload = await conversationResponse.json().catch(() => null);
-        const messagesPayload = await messagesResponse.json().catch(() => null);
         if (!conversationResponse.ok || !conversationPayload?.conversation) {
           throw new Error(conversationPayload?.error?.message ?? 'Failed to load conversation.');
-        }
-        if (!messagesResponse.ok || !Array.isArray(messagesPayload?.messages)) {
-          throw new Error(messagesPayload?.error?.message ?? 'Failed to load conversation messages.');
         }
         if (!active) return;
         setConversation(conversationPayload.conversation);
         setMuted(conversationPayload.conversation?.muted === true);
-        setMessages(messagesPayload.messages);
-        if (showNewContactWarning && typeof window !== 'undefined' && window.localStorage.getItem(`unique-one:contact-reply:${id}`) === '1') {
+        if (showNewContactWarning && typeof window !== 'undefined' && window.localStorage.getItem('unique-one:contact-reply:' + id) === '1') {
           setShowNewContactWarning(false);
         }
-        setLoading(false);
+        unsubscribe = await subscribeToMessagesForConversation(
+          id,
+          (items) => { if (active) { setMessages(items); setLoading(false); } },
+          (subscriptionError) => { if (active) { setError(subscriptionError.message); setLoading(false); } },
+          100,
+        );
       } catch (err) {
         console.error(err);
         if (active) {
@@ -157,14 +152,11 @@ export default function ChatView() {
     };
 
     void loadChat();
-    pollTimer = window.setInterval(() => { void loadChat(); }, 3000);
-
     return () => {
       active = false;
-      if (pollTimer !== undefined) window.clearInterval(pollTimer);
+      unsubscribe?.();
     };
   }, [id, currentUser]);
-
   const markVisibleMessagesRead = useCallback(async (items: Message[]) => {
     if (!currentUser) return;
     const unread = items.filter((item) => item.senderId !== currentUser.uid && item.status !== 'read');
@@ -241,7 +233,7 @@ export default function ChatView() {
   };
 
   const handleAttachmentSelect = async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []);
+    const files = Array.from(event.target.files ?? []) as File[];
     event.target.value = '';
     if (!id || !currentUser || files.length === 0) return;
     if (files.length + attachments.length > 5) {
@@ -434,10 +426,20 @@ export default function ChatView() {
 
       {!blocked && <div className="sticky bottom-0 z-30 bg-white border-t border-slate-200 p-3 sm:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shrink-0">
         <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1 pr-2">
-          <label className="p-3 text-slate-500 shrink-0 cursor-pointer hover:bg-slate-100 rounded-xl" aria-label="Attach file" title="Attach file">
-            <Paperclip className="w-5 h-5" />
-            <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,.pdf,.txt,.doc,.docx,.xls,.xlsx" className="hidden" onChange={(event) => void handleAttachmentSelect(event)} disabled={uploadingAttachment || sending} />
-          </label>
+          <div className="flex items-center shrink-0">
+            <label className="p-3 text-slate-500 cursor-pointer hover:bg-slate-100 rounded-xl" aria-label="Gallery" title="Choose from gallery">
+              <span className="text-base">🖼️</span>
+              <input type="file" multiple accept="image/*" className="hidden" onChange={(event) => void handleAttachmentSelect(event)} disabled={uploadingAttachment || sending} />
+            </label>
+            <label className="p-3 text-slate-500 cursor-pointer hover:bg-slate-100 rounded-xl" aria-label="Camera" title="Take a photo">
+              <span className="text-base">📷</span>
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => void handleAttachmentSelect(event)} disabled={uploadingAttachment || sending} />
+            </label>
+            <label className="p-3 text-slate-500 cursor-pointer hover:bg-slate-100 rounded-xl" aria-label="Attach file" title="Attach document">
+              <Paperclip className="w-5 h-5" />
+              <input type="file" multiple accept=".pdf,.txt,.doc,.docx,.xls,.xlsx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void handleAttachmentSelect(event)} disabled={uploadingAttachment || sending} />
+            </label>
+          </div>
           {(attachments.length > 0 || uploadingAttachment) && <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-slate-200 rounded-xl p-2 shadow-sm">
           {uploadingAttachment ? <p className="text-xs text-slate-500">Uploading attachment {attachmentProgress}%</p> : <div className="flex flex-wrap gap-1">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((entry) => entry.id !== item.id))} className="text-xs bg-slate-100 rounded-full px-2 py-1">{item.name} ×</button>)}</div>}
         </div>}
