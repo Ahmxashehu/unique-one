@@ -48,6 +48,7 @@ export type CommunicationErrorCode =
   | 'INVALID_MESSAGE_TYPE'
   | 'INVALID_MESSAGE_TEXT'
   | 'INVALID_METADATA'
+  | 'INVALID_ATTACHMENT'
   | 'INVALID_REQUEST';
 
 export class CommunicationValidationError extends Error {
@@ -165,11 +166,21 @@ export function serverTimestamp(): string {
 }
 
 /** Validated shape of a message draft, ready for persistence by a future step. */
+export interface ValidatedMessageAttachment {
+  id: string;
+  name: string;
+  contentType: string;
+  sizeBytes: number;
+  url: string;
+  storagePath: string;
+}
+
 export interface ValidatedMessageDraft {
   conversationId: string;
   senderId: string;
   type: CommunicationMessageType;
-  text: string;
+  text?: string;
+  attachments?: ValidatedMessageAttachment[];
   replyToMessageId?: string;
   createdAt: string;
 }
@@ -185,7 +196,8 @@ export interface ValidatedMessageDraft {
 export interface MessageDraftInput {
   conversationId: unknown;
   type: unknown;
-  text: unknown;
+  text?: unknown;
+  attachments?: unknown;
   replyToMessageId?: unknown;
   senderId?: unknown;
 }
@@ -201,6 +213,39 @@ export interface MessageDraftInput {
  * existing `validateTransferRequest()` convention in `server.ts`, which
  * rejects any request body containing a client-supplied `senderUid`.
  */
+function validateMessageAttachments(value: unknown, senderId: string, conversationId: string): ValidatedMessageAttachment[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value) || value.length < 1 || value.length > 5) {
+    throw new CommunicationValidationError('INVALID_ATTACHMENT', 'Up to 5 attachments are allowed.');
+  }
+  const result: ValidatedMessageAttachment[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') throw new CommunicationValidationError('INVALID_ATTACHMENT', 'Invalid attachment metadata.');
+    const attachment = item as Record<string, unknown>;
+    const id = attachment.id;
+    const name = attachment.name;
+    const contentType = attachment.contentType;
+    const sizeBytes = attachment.sizeBytes;
+    const url = attachment.url;
+    const storagePath = attachment.storagePath;
+    if (
+      typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(id) ||
+      typeof name !== 'string' || name.trim().length < 1 || name.length > 255 ||
+      typeof contentType !== 'string' || contentType.length < 1 || contentType.length > 128 ||
+      typeof sizeBytes !== 'number' || !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > 20 * 1024 * 1024 ||
+      typeof url !== 'string' || url.length < 1 || url.length > 4096 ||
+      typeof storagePath !== 'string' || storagePath !== `messages/${conversationId}/${senderId}/${id}.webp` && !storagePath.startsWith(`messages/${conversationId}/${senderId}/`)
+    ) {
+      throw new CommunicationValidationError('INVALID_ATTACHMENT', 'Invalid attachment metadata.');
+    }
+    if (!/^(image\/(jpeg|png|webp|gif)|application\/pdf|text\/plain|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document|application\/vnd\.ms-excel|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet)$/.test(contentType)) {
+      throw new CommunicationValidationError('INVALID_ATTACHMENT', 'Unsupported attachment type.');
+    }
+    result.push({ id, name: name.trim(), contentType, sizeBytes, url, storagePath });
+  }
+  return result;
+}
+
 export function validateMessageDraft(input: MessageDraftInput, authenticatedUser: unknown): ValidatedMessageDraft {
   if (typeof input !== 'object' || input === null) {
     throw new CommunicationValidationError('INVALID_REQUEST', 'The message draft payload must be a plain object.');
@@ -211,7 +256,18 @@ export function validateMessageDraft(input: MessageDraftInput, authenticatedUser
   const { uid } = validateAuthenticatedUser(authenticatedUser);
   const conversationId = validateConversationId(input.conversationId);
   const type = validateMessageType(input.type);
-  const text = validateMessageText(input.text);
+  const hasText = typeof input.text === 'string' && input.text.trim().length > 0;
+  const text = hasText ? validateMessageText(input.text) : undefined;
+  const attachments = validateMessageAttachments(input.attachments, uid, conversationId);
+  if (!text && !attachments?.length) {
+    throw new CommunicationValidationError('INVALID_MESSAGE_TEXT', 'Message text or an attachment is required.');
+  }
+  if (type === 'text' && !text) {
+    throw new CommunicationValidationError('INVALID_MESSAGE_TYPE', 'Text messages require message text.');
+  }
+  if (type !== 'text' && !attachments?.length) {
+    throw new CommunicationValidationError('INVALID_MESSAGE_TYPE', 'This message type requires an attachment.');
+  }
   let replyToMessageId: string | undefined;
   if (input.replyToMessageId !== undefined && input.replyToMessageId !== null && input.replyToMessageId !== '') {
     if (!isBoundedIdentifier(input.replyToMessageId, 128)) throw new CommunicationValidationError('INVALID_REQUEST', 'replyToMessageId must be a valid message ID.');
@@ -221,7 +277,8 @@ export function validateMessageDraft(input: MessageDraftInput, authenticatedUser
     conversationId,
     senderId: uid,
     type,
-    text,
+    ...(text ? { text } : {}),
+    ...(attachments ? { attachments } : {}),
     ...(replyToMessageId ? { replyToMessageId } : {}),
     createdAt: serverTimestamp(),
   };
