@@ -34,6 +34,22 @@ export default function ChatView() {
 
   useEffect(() => { void loadChat(); }, [loadChat]);
 
+  const markVisibleMessagesRead = useCallback(async (items: Message[]) => {
+    if (!currentUser) return;
+    const unread = items.filter((item) => item.senderId !== currentUser.uid && item.status !== 'read');
+    if (unread.length === 0) return;
+    const token = await currentUser.getIdToken();
+    await Promise.all(unread.map((item) => fetch(`/api/communication/messages/${item.id}/delivery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: 'read' }),
+    })));
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (messages.length > 0) void markVisibleMessagesRead(messages);
+  }, [messages, markVisibleMessages]);
+
   useEffect(() => {
     if (!id || !currentUser) return;
     const timer = window.setInterval(() => { void loadChat(); }, 5000);
