@@ -67,7 +67,11 @@ export interface Message {
   replyToMessageId?: string;
   createdAt: string;
   updatedAt?: string;
+  deleted?: boolean;
+  deletedAt?: string;
   status: MessageStatus;
+  reactions?: Record<string, number>;
+  myReaction?: string;
 }
 
 /** Per-recipient delivery/read state for one message. */
