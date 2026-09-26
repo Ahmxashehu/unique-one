@@ -193,24 +193,12 @@ service cloud.firestore {
     }
 
     match /messageRequests/{requestId} {
+      // Message requests are created and state-transitioned by the trusted
+      // Communication API so requester identity and request lifecycle cannot
+      // be forged by the client.
       allow read: if isAuthenticated()
         && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
-      allow create: if isAuthenticated()
-        && request.resource.data.fromUid == request.auth.uid
-        && request.resource.data.keys().hasOnly(['fromUid', 'toUid', 'conversationId', 'status', 'createdAt', 'updatedAt'])
-        && request.resource.data.toUid is string
-        && request.resource.data.fromUid is string
-        && request.resource.data.status == 'pending'
-        && request.resource.data.createdAt == request.resource.data.updatedAt
-        && (!('conversationId' in request.resource.data) || request.resource.data.conversationId is string);
-      allow update: if isAuthenticated()
-        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid)
-        && request.resource.data.fromUid == resource.data.fromUid
-        && request.resource.data.toUid == resource.data.toUid
-        && request.resource.data.conversationId == resource.data.conversationId
-        && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     // Presence is self-managed. Cross-user presence reads require a future
