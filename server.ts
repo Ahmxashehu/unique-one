@@ -406,6 +406,34 @@ async function startServer() {
       return res.status(200).json(transactionResult);
     } catch (error) { console.error('Transfer execution failed:', error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The transfer service is temporarily unavailable.'); }
   });
+  app.post("/api/communication/presence", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationPresenceRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : (req.ip || 'anonymous');
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many presence updates. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!isPlainObject(req.body) || (req.body.status !== 'online' && req.body.status !== 'offline')) {
+        return errorResponse(res, 'INVALID_REQUEST', 'status must be online or offline.');
+      }
+      const status = req.body.status as 'online' | 'offline';
+      const nowIso = Timestamp.now().toDate().toISOString();
+      const ref = adminDb.collection('userPresence').doc(uid);
+      await ref.set({ uid, status, lastSeenAt: nowIso }, { merge: true });
+      return res.status(200).json({ presence: { uid, status, lastSeenAt: nowIso } });
+    } catch (error) {
+      console.error('Presence update failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to update presence.');
+    }
+  });
+
   app.post("/api/communication/message-requests", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 20,
