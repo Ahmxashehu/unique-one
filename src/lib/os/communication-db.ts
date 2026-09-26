@@ -5,7 +5,6 @@ import {
   getDoc,
   getDocs,
   limit as fbLimit,
-  orderBy,
   onSnapshot,
   query,
   where,
@@ -276,12 +275,13 @@ export async function subscribeToMessagesForConversation(
   const messageQuery = query(
     collection(db, MESSAGES_COLLECTION),
     where('conversationId', '==', id),
-    orderBy('createdAt', 'asc'),
     fbLimit(clampMessageLimit(requestedLimit)),
   );
   return onSnapshot(messageQuery, (snapshot) => {
     try {
-      onMessages(snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data())));
+      const mapped = snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data()));
+      mapped.sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
+      onMessages(mapped);
     } catch (error) {
       onError(error instanceof CommunicationDbError ? error : new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'A message document is malformed.'));
     }
@@ -302,11 +302,12 @@ export async function getMessagesForConversation(conversationId: string, limit?:
   const messageQuery = query(
     collection(db, MESSAGES_COLLECTION),
     where('conversationId', '==', id),
-    orderBy('createdAt', 'asc'),
     fbLimit(clampMessageLimit(limit)),
   );
   const snapshot = await safeRead(() => getDocs(messageQuery));
-  return snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data()));
+  const mapped = snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data()));
+  mapped.sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
+  return mapped;
 }
 
 /** Reads a message from the top-level Communication Core messages collection. */
