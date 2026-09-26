@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PackagePlus, Upload, Save, Loader2, AlertCircle, X, ImagePlus } from 'lucide-react';
+import { PackagePlus, Save, Loader2, AlertCircle, X, ImagePlus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { db, storage } from '../../lib/firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
@@ -19,6 +19,34 @@ const CATEGORIES: { value: ProductCategory; label: string }[] = [
 
 const MAX_IMAGES = 5;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 1600;
+const TARGET_IMAGE_BYTES = 450 * 1024;
+
+function compressImage(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight));
+      const width = Math.max(1, Math.round(image.naturalWidth * scale));
+      const height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      if (!context) { reject(new Error('Image processing is not supported on this device.')); return; }
+      context.drawImage(image, 0, 0, width, height);
+      const quality = file.size > TARGET_IMAGE_BYTES ? 0.78 : 0.86;
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('Unable to optimize this image.')); return; }
+        resolve(blob);
+      }, 'image/webp', quality);
+    };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Unable to read one of the selected images.')); };
+    image.src = url;
+  });
+}
 
 export default function AddProductPage() {
   const { currentUser, userData } = useAuth();
@@ -49,15 +77,9 @@ export default function AddProductPage() {
     setError('');
     const selected = Array.from(e.target.files || []);
     if (!selected.length) return;
-    if (imageFiles.length + selected.length > MAX_IMAGES) {
-      setError(`You can upload up to ${MAX_IMAGES} product images.`);
-      return;
-    }
+    if (imageFiles.length + selected.length > MAX_IMAGES) { setError(`You can upload up to ${MAX_IMAGES} product images.`); return; }
     const invalid = selected.find(file => !file.type.startsWith('image/') || file.size > MAX_IMAGE_SIZE);
-    if (invalid) {
-      setError('Each image must be an image file no larger than 5 MB.');
-      return;
-    }
+    if (invalid) { setError('Each image must be an image file no larger than 5 MB.'); return; }
     setImageFiles(current => [...current, ...selected]);
     setImagePreviews(current => [...current, ...selected.map(file => URL.createObjectURL(file))]);
     e.target.value = '';
@@ -69,23 +91,27 @@ export default function AddProductPage() {
     setImagePreviews(current => current.filter((_, i) => i !== index));
   };
 
-  const uploadImage = (file: File, productId: string, index: number, total: number) => new Promise<string>((resolve, reject) => {
-    const fileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const storageRef = ref(storage, `products/${currentUser!.uid}/${productId}/${Date.now()}_${index}_${fileName}`);
-    const task = uploadBytesResumable(storageRef, file, { contentType: file.type });
-    task.on('state_changed',
-      snapshot => setUploadProgress(Math.round(((index + snapshot.bytesTransferred / snapshot.totalBytes) / total) * 100)),
-      reject,
-      async () => {
-        try { resolve(await getDownloadURL(task.snapshot.ref)); } catch (err) { reject(err); }
-      }
-    );
-  });
+  const uploadImage = async (file: File, productId: string, index: number, total: number) => {
+    const optimized = await compressImage(file);
+    const storageRef = ref(storage, `products/${currentUser!.uid}/${productId}/image-${index + 1}.webp`);
+    return new Promise<string>((resolve, reject) => {
+      const task = uploadBytesResumable(storageRef, optimized, {
+        contentType: 'image/webp',
+        customMetadata: { originalName: file.name, optimizedFromBytes: String(file.size) },
+      });
+      task.on('state_changed',
+        snapshot => setUploadProgress(Math.round(((index + snapshot.bytesTransferred / snapshot.totalBytes) / total) * 100)),
+        reject,
+        async () => {
+          try { resolve(await getDownloadURL(task.snapshot.ref)); } catch (err) { reject(err); }
+        }
+      );
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent, status: ProductStatus) => {
     e.preventDefault();
     if (!currentUser) { setError('Please sign in before adding a product.'); navigate('/login'); return; }
-
     const cleanName = name.trim(), cleanDescription = description.trim();
     const parsedPrice = Number(price), parsedQuantity = Number(quantity), parsedMinOrder = Number(minOrderQuantity);
     const parsedDiscount = discount ? Number(discount) : undefined, parsedWholesale = wholesalePrice ? Number(wholesalePrice) : undefined, parsedBulk = bulkPrice ? Number(bulkPrice) : undefined;
@@ -120,7 +146,7 @@ export default function AddProductPage() {
       window.setTimeout(() => navigate('/os/business/dashboard'), 800);
     } catch (err) {
       console.error('Failed to save product:', err);
-      setError(err instanceof Error ? err.message : 'Unable to upload images or save product. Please try again.');
+      setError(err instanceof Error ? err.message : 'Unable to optimize, upload images, or save product. Please try again.');
     } finally { setLoading(false); }
   };
 
@@ -128,8 +154,7 @@ export default function AddProductPage() {
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
       <div><h1 className="text-2xl font-bold tracking-tight text-slate-900">Add New Product</h1><p className="text-sm text-slate-500 mt-1">List a product or service to the Unique Store marketplace.</p></div>
       {error && <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-center gap-3"><AlertCircle className="w-5 h-5 shrink-0" /><p className="text-sm font-medium break-words">{error}</p></div>}
-      {success && <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-4 rounded-xl flex items-center gap-3"><PackagePlus className="w-5 h-5 shrink-0" /><p className="text-sm font-medium">Product and images saved successfully! Redirecting...</p></div>}
-
+      {success && <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-4 rounded-xl flex items-center gap-3"><PackagePlus className="w-5 h-5 shrink-0" /><p className="text-sm font-medium">Product and optimized images saved successfully! Redirecting...</p></div>}
       <form className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="p-6 md:p-8 space-y-8">
           <section className="space-y-4"><h3 className="text-lg font-semibold text-slate-900 border-b border-slate-100 pb-2">Basic Information</h3><div className="space-y-4">
@@ -137,7 +162,6 @@ export default function AddProductPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-slate-700 mb-1">Category *</label><select value={category} onChange={e => setCategory(e.target.value as ProductCategory)} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white">{CATEGORIES.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}</select></div><div><label className="block text-sm font-medium text-slate-700 mb-1">Condition</label><select value={condition} onChange={e => setCondition(e.target.value as ProductCondition)} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"><option value="new">Brand New</option><option value="used">Used / Second Hand</option><option value="refurbished">Refurbished</option></select></div></div>
             <div><label className="block text-sm font-medium text-slate-700 mb-1">Description *</label><textarea rows={4} value={description} onChange={e => setDescription(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none" placeholder="Describe your product..." required /></div>
           </div></section>
-
           <section className="space-y-4"><h3 className="text-lg font-semibold text-slate-900 border-b border-slate-100 pb-2">Pricing & Inventory</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div><label className="block text-sm font-medium text-slate-700 mb-1">Retail Price *</label><div className="flex"><select value={currency} onChange={e => setCurrency(e.target.value)} className="px-4 py-3 border border-r-0 border-slate-200 rounded-l-xl bg-slate-50 focus:outline-none"><option value="NGN">₦ NGN</option><option value="USD">$ USD</option></select><input type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="w-full px-4 py-3 rounded-r-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="0.00" required /></div></div>
             <div><label className="block text-sm font-medium text-slate-700 mb-1">Available Quantity *</label><input type="number" min="0" step="1" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="100" required /></div>
@@ -146,26 +170,15 @@ export default function AddProductPage() {
             <div><label className="block text-sm font-medium text-slate-700 mb-1">Min Order Quantity</label><input type="number" min="1" step="1" value={minOrderQuantity} onChange={e => setMinOrderQuantity(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="1" /></div>
             <div><label className="block text-sm font-medium text-slate-700 mb-1">Discount (Optional)</label><input type="number" min="0" step="0.01" value={discount} onChange={e => setDiscount(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="0" /></div>
           </div></section>
-
           <section className="space-y-4"><h3 className="text-lg font-semibold text-slate-900 border-b border-slate-100 pb-2">Logistics</h3><div><label className="block text-sm font-medium text-slate-700 mb-1">Item Location</label><input type="text" value={locationAddress} onChange={e => setLocationAddress(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="City, State, or exact address" /></div><div className="flex gap-6"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={deliveryOption} onChange={e => setDeliveryOption(e.target.checked)} className="w-5 h-5 rounded text-slate-900 focus:ring-slate-900" /><span className="text-sm font-medium text-slate-700">Offers Delivery</span></label><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={pickupOption} onChange={e => setPickupOption(e.target.checked)} className="w-5 h-5 rounded text-slate-900 focus:ring-slate-900" /><span className="text-sm font-medium text-slate-700">Allows Pickup</span></label></div></section>
-
-          <section className="space-y-4"><h3 className="text-lg font-semibold text-slate-900 border-b border-slate-100 pb-2">Media</h3>
-            <div>
-              <label htmlFor="product-images" className="block cursor-pointer border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors">
-                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3"><ImagePlus className="w-6 h-6 text-slate-400" /></div>
-                <p className="font-medium text-slate-900">Choose product images</p><p className="text-sm text-slate-500 mt-1">Up to 5 images, maximum 5 MB each.</p>
-              </label>
-              <input id="product-images" type="file" accept="image/*" multiple onChange={handleImageSelect} className="hidden" disabled={loading} />
-              {imagePreviews.length > 0 && <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">{imagePreviews.map((src, index) => <div key={src} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100"><img src={src} alt={`Product preview ${index + 1}`} className="w-full h-full object-cover" /><button type="button" onClick={() => removeImage(index)} disabled={loading} className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center" aria-label="Remove image"><X className="w-4 h-4" /></button>{index === 0 && <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[10px] px-2 py-1 rounded">Main</span>}</div>)}</div>}
-              {loading && imageFiles.length > 0 && <div className="mt-4"><div className="flex justify-between text-xs text-slate-500 mb-1"><span>Uploading images...</span><span>{uploadProgress}%</span></div><div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-slate-900 transition-all" style={{ width: `${uploadProgress}%` }} /></div></div>}
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer mt-4"><input type="checkbox" checked={hasVideo} onChange={e => setHasVideo(e.target.checked)} className="w-5 h-5 rounded text-slate-900 focus:ring-slate-900" /><span className="text-sm font-medium text-slate-700">I have a product video ready</span></label>
-          </section>
+          <section className="space-y-4"><h3 className="text-lg font-semibold text-slate-900 border-b border-slate-100 pb-2">Media</h3><div>
+            <label htmlFor="product-images" className="block cursor-pointer border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors"><div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3"><ImagePlus className="w-6 h-6 text-slate-400" /></div><p className="font-medium text-slate-900">Choose product images</p><p className="text-sm text-slate-500 mt-1">Up to 5 images, maximum 5 MB each. Images are optimized automatically.</p></label>
+            <input id="product-images" type="file" accept="image/*" multiple onChange={handleImageSelect} className="hidden" disabled={loading} />
+            {imagePreviews.length > 0 && <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">{imagePreviews.map((src, index) => <div key={src} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100"><img src={src} alt={`Product preview ${index + 1}`} className="w-full h-full object-cover" /><button type="button" onClick={() => removeImage(index)} disabled={loading} className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center" aria-label="Remove image"><X className="w-4 h-4" /></button>{index === 0 && <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[10px] px-2 py-1 rounded">Main</span>}</div>)}</div>}
+            {loading && imageFiles.length > 0 && <div className="mt-4"><div className="flex justify-between text-xs text-slate-500 mb-1"><span>Optimizing & uploading images...</span><span>{uploadProgress}%</span></div><div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-slate-900 transition-all" style={{ width: `${uploadProgress}%` }} /></div></div>}
+          </div><label className="flex items-center gap-2 cursor-pointer mt-4"><input type="checkbox" checked={hasVideo} onChange={e => setHasVideo(e.target.checked)} className="w-5 h-5 rounded text-slate-900 focus:ring-slate-900" /><span className="text-sm font-medium text-slate-700">I have a product video ready</span></label></section>
         </div>
-        <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-end gap-3">
-          <button type="button" onClick={(e) => handleSubmit(e, 'draft')} disabled={loading} className="px-6 py-2.5 rounded-xl font-medium border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50">Save as Draft</button>
-          <button type="button" onClick={(e) => handleSubmit(e, 'published')} disabled={loading} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-70">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} {loading ? 'Saving...' : 'Publish Product'}</button>
-        </div>
+        <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-end gap-3"><button type="button" onClick={(e) => handleSubmit(e, 'draft')} disabled={loading} className="px-6 py-2.5 rounded-xl font-medium border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50">Save as Draft</button><button type="button" onClick={(e) => handleSubmit(e, 'published')} disabled={loading} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-70">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{loading ? 'Saving...' : 'Publish Product'}</button></div>
       </form>
     </div>
   );
