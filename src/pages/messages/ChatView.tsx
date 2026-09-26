@@ -144,7 +144,7 @@ export default function ChatView() {
 
   useEffect(() => {
     if (messages.length > 0) void markVisibleMessagesRead(messages);
-  }, [messages, markVisibleMessages]);
+  }, [messages, markVisibleMessagesRead]);
 
   useEffect(() => {
     if (!id || !currentUser) return;
