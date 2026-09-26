@@ -54,7 +54,8 @@ class RequestValidationError extends Error {
   }
 }
 if (getApps().length === 0) initializeApp({ projectId: "gen-lang-client-0680695304" });
-const adminDb = getFirestore();
+const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || "ai-studio-b70619c6-f4be-40e5-9c65-a5d586353cd7";
+const adminDb = getFirestore(FIRESTORE_DATABASE_ID);
 function errorResponse(res: Response, code: TransferErrorCode, message: string, statusOverride?: number) {
   return res.status(statusOverride ?? transferErrorStatus[code] ?? 500).json({ error: { code, message } });
 }
