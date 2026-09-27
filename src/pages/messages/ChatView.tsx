@@ -359,6 +359,7 @@ export default function ChatView() {
           storagePath: result.storagePath,
         };
         setAttachments((current) => [...current, uploadedAttachment]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload attachment.');
     } finally {
