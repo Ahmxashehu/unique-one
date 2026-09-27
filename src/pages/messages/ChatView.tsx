@@ -4,7 +4,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Conversation, Message, MessageAttachmentMetadata } from '../../lib/os/communication-types';
 import { optimizeImage } from '../../lib/media/image';
-import { subscribeToMessagesForConversation } from '../../lib/os/communication-db';\nimport { decryptFromUser, encryptForUser, ensureDeviceKeyPair, getUserPublicKey, registerPublicKey } from '../../lib/os/communication-crypto';
+import { subscribeToMessagesForConversation } from '../../lib/os/communication-db';
+import { decryptFromUser, encryptForUser, ensureDeviceKeyPair, getUserPublicKey, registerPublicKey } from '../../lib/os/communication-crypto';
 
 const formatMessageDate = (value: string) => {
   const date = new Date(value);
