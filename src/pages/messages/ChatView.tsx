@@ -162,6 +162,22 @@ export default function ChatView() {
     setLoading(true);
     setError('');
 
+    if (id) {
+      try {
+        const cached = window.sessionStorage.getItem(`unique-one:chat-cache:${id}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed?.messages)) {
+            setMessages(parsed.messages as Message[]);
+            setLoading(false);
+          }
+          if (parsed?.conversation) setConversation(parsed.conversation as Conversation);
+        }
+      } catch (err) {
+        console.warn('Could not restore cached conversation:', err);
+      }
+    }
+
     const loadChat = async () => {
       if (!id || !currentUser) return;
       try {
@@ -196,6 +212,14 @@ export default function ChatView() {
                   }
                 }));
                 if (!active) return;
+                try {
+                  window.sessionStorage.setItem(`unique-one:chat-cache:${id}`, JSON.stringify({
+                    conversation: conversationPayload.conversation,
+                    messages: hydrated,
+                  }));
+                } catch (cacheError) {
+                  console.warn('Could not cache conversation messages:', cacheError);
+                }
                 setMessages((current) => {
                   if (current.length === hydrated.length && current.every((item, index) => {
                     const next = hydrated[index];
