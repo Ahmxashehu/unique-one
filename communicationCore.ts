@@ -49,6 +49,7 @@ export type CommunicationErrorCode =
   | 'INVALID_MESSAGE_TEXT'
   | 'INVALID_METADATA'
   | 'INVALID_ATTACHMENT'
+  | 'INVALID_ENCRYPTED_MESSAGE'
   | 'INVALID_REQUEST';
 
 export class CommunicationValidationError extends Error {
