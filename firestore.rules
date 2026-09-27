@@ -20,7 +20,7 @@ service cloud.firestore {
       allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['roles', 'verificationStatus', 'verificationUpdatedAt', 'verificationUpdatedBy', 'uniqueOneId', 'email', 'phone'])) || isAdmin();
       allow delete: if isAdmin();
     }
-    match /profiles/{userId} { allow read: if true; allow create, update: if isOwner(userId) || isAdmin(); allow delete: if isAdmin(); }
+    match /profiles/{userId} { allow read: if isOwner(userId) || isAdmin(); allow create, update: if isOwner(userId) || isAdmin(); allow delete: if isAdmin(); }
     match /businesses/{businessId} { allow read: if true; allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid; allow update: if (isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid) || isAdmin(); allow delete: if isAdmin(); }
     match /roles/{roleId} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
     match /organizations/{orgId} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
