@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FileText, Loader2, PackageSearch, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { collection, getDocs, orderBy, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -12,8 +12,25 @@ type ProductRequest = {
   quantity: number;
   budget: number;
   status: 'draft' | 'published' | string;
-  createdAt?: string;
+  createdAt?: unknown;
 };
+
+function getTimestampMillis(value: unknown) {
+  if (!value) return 0;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const millis = new Date(value).getTime();
+    return Number.isNaN(millis) ? 0 : millis;
+  }
+  if (typeof value === 'object' && value !== null && 'toMillis' in value && typeof (value as { toMillis?: unknown }).toMillis === 'function') {
+    return (value as { toMillis: () => number }).toMillis();
+  }
+  return 0;
+}
+
+function formatRequestDate(value: unknown) {
+  const millis = getTimestampMillis(value);
+  return millis ? new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(millis)) : '';
+}
 
 export default function StoreQuoteRequestPage() {
   const { currentUser } = useAuth();
@@ -33,14 +50,12 @@ export default function StoreQuoteRequestPage() {
       setError('');
       try {
         const snap = await getDocs(
-          query(
-            collection(db, 'productRequests'),
-            where('customerId', '==', currentUser.uid),
-            orderBy('createdAt', 'desc')
-          )
+          query(collection(db, 'productRequests'), where('customerId', '==', currentUser.uid))
         );
 
-        setRequests(snap.docs.map((item) => item.data() as ProductRequest));
+        const loaded = snap.docs.map((item) => ({ id: item.id, ...item.data() } as ProductRequest));
+        loaded.sort((a, b) => getTimestampMillis(b.createdAt) - getTimestampMillis(a.createdAt));
+        setRequests(loaded);
       } catch (err: any) {
         setError(err.message || 'Could not load your requests.');
       } finally {
@@ -92,7 +107,7 @@ export default function StoreQuoteRequestPage() {
               <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600">
                 <span>Quantity: {request.quantity}</span>
                 {request.budget > 0 && <span>Budget: ₦{request.budget.toLocaleString()}</span>}
-                {request.createdAt && <span>{new Date(request.createdAt).toLocaleDateString()}</span>}
+                {request.createdAt && formatRequestDate(request.createdAt) && <span>{formatRequestDate(request.createdAt)}</span>}
               </div>
             </div>
           ))}
