@@ -18,7 +18,7 @@ jobs:
   deploy-storage-rules:
     runs-on: ubuntu-latest
     env:
-      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_UNIQUE_ONE }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
-            echo "::error::GitHub Actions secret FIREBASE_SERVICE_ACCOUNT is missing or unavailable to this workflow."
+            echo "::error::GitHub Actions secret FIREBASE_SERVICE_ACCOUNT_UNIQUE_ONE is missing or unavailable to this workflow."
             exit 1
           fi
           echo "Firebase credential secret is available."
@@ -38,4 +38,4 @@ jobs:
           credentials_json: ${{ env.FIREBASE_SERVICE_ACCOUNT }}
 
       - name: Deploy Firebase Storage rules
-        run: npx --yes firebase-tools@latest deploy --only storage --project gen-lang-client-0680695304
+        run: npx --yes firebase-tools@latest deploy --only storage --project unique-one-9731b
