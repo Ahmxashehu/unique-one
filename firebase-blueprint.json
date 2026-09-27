@@ -1,5 +1,5 @@
 {
-  "project_id": "gen-lang-client-0680695304",
+  "project_id": "unique-one-9731b",
   "collections": [
     {
       "name": "users",
@@ -35,60 +35,11 @@
         { "name": "createdAt", "type": "timestamp" }
       ]
     },
-    {
-      "name": "roles",
-      "description": "System roles and permissions",
-      "fields": [
-        { "name": "name", "type": "string" },
-        { "name": "permissions", "type": "array" }
-      ]
-    },
-    {
-      "name": "organizations",
-      "description": "Organizational groupings",
-      "fields": [
-        { "name": "name", "type": "string" },
-        { "name": "type", "type": "string" }
-      ]
-    },
-    {
-      "name": "sessions",
-      "description": "User session tracking",
-      "fields": [
-        { "name": "uid", "type": "string" },
-        { "name": "deviceInfo", "type": "string" },
-        { "name": "lastActive", "type": "timestamp" }
-      ]
-    },
-    {
-      "name": "notifications",
-      "description": "System notifications for users",
-      "fields": [
-        { "name": "uid", "type": "string" },
-        { "name": "title", "type": "string" },
-        { "name": "message", "type": "string" },
-        { "name": "read", "type": "boolean" },
-        { "name": "createdAt", "type": "timestamp" }
-      ]
-    },
-    {
-      "name": "audit_logs",
-      "description": "Immutable logs of critical actions",
-      "fields": [
-        { "name": "uid", "type": "string" },
-        { "name": "action", "type": "string" },
-        { "name": "resource", "type": "string" },
-        { "name": "timestamp", "type": "timestamp" }
-      ]
-    },
-    {
-      "name": "locations",
-      "description": "Geospatial data for services and businesses",
-      "fields": [
-        { "name": "referenceId", "type": "string", "description": "ID of business or user" },
-        { "name": "lat", "type": "number" },
-        { "name": "lng", "type": "number" }
-      ]
-    }
+    { "name": "roles", "description": "System roles and permissions", "fields": [{ "name": "name", "type": "string" }, { "name": "permissions", "type": "array" }] },
+    { "name": "organizations", "description": "Organizational groupings", "fields": [{ "name": "name", "type": "string" }, { "name": "type", "type": "string" }] },
+    { "name": "sessions", "description": "User session tracking", "fields": [{ "name": "uid", "type": "string" }, { "name": "deviceInfo", "type": "string" }, { "name": "lastActive", "type": "timestamp" }] },
+    { "name": "notifications", "description": "System notifications for users", "fields": [{ "name": "uid", "type": "string" }, { "name": "title", "type": "string" }, { "name": "message", "type": "string" }, { "name": "read", "type": "boolean" }, { "name": "createdAt", "type": "timestamp" }] },
+    { "name": "audit_logs", "description": "Immutable logs of critical actions", "fields": [{ "name": "uid", "type": "string" }, { "name": "action", "type": "string" }, { "name": "resource", "type": "string" }, { "name": "timestamp", "type": "timestamp" }] },
+    { "name": "locations", "description": "Geospatial data for services and businesses", "fields": [{ "name": "referenceId", "type": "string", "description": "ID of business or user" }, { "name": "lat", "type": "number" }, { "name": "lng", "type": "number" }] }
   ]
 }
