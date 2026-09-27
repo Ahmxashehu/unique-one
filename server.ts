@@ -1544,6 +1544,7 @@ async function startServer() {
         senderId: senderUid,
         type: draft.type,
         ...(draft.text ? { text: draft.text } : {}),
+        ...(draft.encryptedPayload ? { encryptedPayload: draft.encryptedPayload } : {}),
         ...(draft.attachments ? { attachments: draft.attachments } : {}),
         createdAt: nowIso,
         updatedAt: nowIso,
