@@ -72,9 +72,9 @@ export default function BusinessProfilePage() {
       {error && <div className="p-3 bg-red-50 border border-red-100 text-red-700 rounded-xl text-sm">{error}</div>}
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="h-40 sm:h-48 bg-slate-900 relative overflow-hidden">
-          {business.coverImageUrl && <img src={business.coverImageUrl} alt="" className="w-full h-full object-cover" />}
-          <label className="absolute right-3 top-3 bg-white/95 backdrop-blur px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 shadow-sm cursor-pointer flex items-center gap-2">
+        <div className="h-40 sm:h-48 bg-slate-900 relative">
+          <div className="absolute inset-0 overflow-hidden">{business.coverImageUrl && <img src={business.coverImageUrl} alt="" className="w-full h-full object-cover" />}</div>
+          <label className="absolute right-3 top-3 z-10 bg-white/95 backdrop-blur px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 shadow-sm cursor-pointer flex items-center gap-2">
             {uploading === 'cover' ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
             {uploading === 'cover' ? 'Uploading…' : 'Change cover'}
             <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={e => void handleImage(e, 'cover')} disabled={!!uploading} />
