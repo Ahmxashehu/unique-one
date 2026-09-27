@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Conversation, Message, MessageAttachmentMetadata } from '../../lib/os/communication-types';
 import { optimizeImage } from '../../lib/media/image';
+import { subscribeToMessagesForConversation } from '../../lib/os/communication-db';
 
 const formatMessageDate = (value: string) => {
   const date = new Date(value);
@@ -143,45 +144,40 @@ export default function ChatView() {
         if (showNewContactWarning && typeof window !== 'undefined' && window.localStorage.getItem('unique-one:contact-reply:' + id) === '1') {
           setShowNewContactWarning(false);
         }
-        const loadMessages = async () => {
-          try {
-            const messagesToken = await currentUser.getIdToken();
-            const messagesResponse = await fetch(`/api/communication/conversations/${id}/messages?limit=100`, {
-              headers: { Authorization: 'Bearer ' + messagesToken },
-            });
-            const messagesPayload = await messagesResponse.json().catch(() => null);
-            if (!messagesResponse.ok || !Array.isArray(messagesPayload?.messages)) {
-              throw new Error(messagesPayload?.error?.message ?? 'Failed to read Communication messages.');
-            }
-            if (!active) return;
-            const nextMessages = messagesPayload.messages as Message[];
-            setMessages((current) => {
-              if (current.length === nextMessages.length && current.every((item, index) => {
-                const next = nextMessages[index];
-                return item.id === next.id
-                  && item.updatedAt === next.updatedAt
-                  && item.status === next.status
-                  && item.deleted === next.deleted
-                  && JSON.stringify(item.reactions ?? {}) === JSON.stringify(next.reactions ?? {})
-                  && JSON.stringify(item.attachments ?? []) === JSON.stringify(next.attachments ?? []);
-              })) return current;
-              return nextMessages;
-            });
-            setLoading(false);
-          } catch (messageError) {
-            if (active) {
-              console.error('Communication message read failed:', messageError);
-              setError(messageError instanceof Error ? messageError.message : 'Failed to read Communication messages.');
+        try {
+          unsubscribe = await subscribeToMessagesForConversation(
+            id,
+            (nextMessages) => {
+              if (!active) return;
+              setMessages((current) => {
+                if (current.length === nextMessages.length && current.every((item, index) => {
+                  const next = nextMessages[index];
+                  return item.id === next.id
+                    && item.updatedAt === next.updatedAt
+                    && item.status === next.status
+                    && item.deleted === next.deleted
+                    && JSON.stringify(item.reactions ?? {}) === JSON.stringify(next.reactions ?? {})
+                    && JSON.stringify(item.attachments ?? []) === JSON.stringify(next.attachments ?? []);
+                });
+                return nextMessages;
+              });
               setLoading(false);
-            }
+            },
+            (messageError) => {
+              if (!active) return;
+              console.error('Communication live message subscription failed:', messageError);
+              setError(messageError.message);
+              setLoading(false);
+            },
+            100,
+          );
+        } catch (messageError) {
+          if (active) {
+            console.error('Communication live message subscription failed:', messageError);
+            setError(messageError instanceof Error ? messageError.message : 'Failed to receive live Communication messages.');
+            setLoading(false);
           }
-        };
-
-        await loadMessages();
-        const messageRefreshTimer = window.setInterval(() => {
-          if (document.visibilityState === 'visible') void loadMessages();
-        }, 3000);
-        unsubscribe = () => window.clearInterval(messageRefreshTimer);
+        }
       } catch (err) {
         console.error(err);
         if (active) {
