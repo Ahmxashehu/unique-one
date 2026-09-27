@@ -418,6 +418,9 @@ async function startServer() {
     const { recipientId, amountMinor, currency, idempotencyKey, description } = validatedRequest;
     try {
       if (!(await readUserExists(recipientId))) return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'The recipient user does not exist.');
+      // Wallets are provisioned lazily so a valid Unique One user can receive
+      // their first transfer without having to open the wallet screen first.
+      await Promise.all([ensureWalletForUser(senderUid), ensureWalletForUser(recipientId)]);
     } catch (error) {
       console.error('Recipient lookup failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to validate the recipient at this time.');
