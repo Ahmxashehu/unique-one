@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, ShieldAlert, Ban, CornerUpLeft, X, Smile, Trash2, VolumeX, Volume2, Copy } from 'lucide-react';
+import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, ShieldAlert, Ban, CornerUpLeft, X, Smile, Trash2, VolumeX, Volume2, Copy, Search } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Conversation, Message, MessageAttachmentMetadata } from '../../lib/os/communication-types';
@@ -34,6 +34,9 @@ export default function ChatView() {
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [reactionTarget, setReactionTarget] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMatchIndex, setSearchMatchIndex] = useState(0);
   const [attachments, setAttachments] = useState<MessageAttachmentMetadata[]>([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [attachmentStage, setAttachmentStage] = useState<'preparing' | 'uploading' | null>(null);
@@ -286,6 +289,25 @@ export default function ChatView() {
     }
   };
 
+  const searchMatches = searchQuery.trim()
+    ? messages.filter((item) => !item.deleted && (item.text ?? '').toLocaleLowerCase().includes(searchQuery.trim().toLocaleLowerCase()))
+    : [];
+
+  useEffect(() => {
+    setSearchMatchIndex(0);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (!searchOpen || searchMatches.length === 0) return;
+    const target = searchMatches[searchMatchIndex];
+    document.getElementById(`message-${target.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [searchOpen, searchMatchIndex, searchMatches]);
+
+  const goToSearchMatch = (direction: 1 | -1) => {
+    if (searchMatches.length === 0) return;
+    setSearchMatchIndex((current) => (current + direction + searchMatches.length) % searchMatches.length);
+  };
+
   const copyMessage = async (text: string) => {
     if (!text || typeof navigator === 'undefined' || !navigator.clipboard) return;
     try {
@@ -485,6 +507,7 @@ export default function ChatView() {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <button onClick={() => { setSearchOpen((current) => !current); if (searchOpen) setSearchQuery(''); }} className={`p-2 rounded-full hover:bg-slate-100 ${searchOpen ? 'text-slate-900 bg-slate-100' : 'text-slate-500'}`} aria-label="Search messages" title="Search messages"><Search className="w-5 h-5" /></button>
           <button disabled className="p-2 text-slate-300 rounded-full hidden sm:block cursor-not-allowed" aria-label="Voice calls coming soon" title="Voice calls coming soon"><Phone className="w-5 h-5" /></button>
           <button disabled className="p-2 text-slate-300 rounded-full hidden sm:block cursor-not-allowed" aria-label="Video calls coming soon" title="Video calls coming soon"><Video className="w-5 h-5" /></button>
           <button onClick={() => void toggleMute()} className="p-2 text-slate-500 rounded-full hover:bg-slate-100" aria-label={muted ? 'Unmute conversation' : 'Mute conversation'} title={muted ? 'Unmute conversation' : 'Mute conversation'}>{muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}</button>
@@ -509,6 +532,33 @@ export default function ChatView() {
             </div>
           </div>
         )}
+      {searchOpen && (
+        <div className="border-b border-slate-200 bg-white px-3 py-2 shrink-0">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+            <Search className="w-4 h-4 text-slate-400 shrink-0" />
+            <input
+              autoFocus
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') { event.preventDefault(); goToSearchMatch(event.shiftKey ? -1 : 1); }
+                if (event.key === 'Escape') { setSearchOpen(false); setSearchQuery(''); }
+              }}
+              placeholder="Search messages…"
+              className="min-w-0 flex-1 bg-transparent border-none outline-none text-sm text-slate-800 placeholder:text-slate-400"
+              aria-label="Search messages"
+            />
+            {searchQuery.trim() && <span className="text-[10px] text-slate-500 whitespace-nowrap">{searchMatches.length ? `${searchMatchIndex + 1}/${searchMatches.length}` : 'No matches'}</span>}
+            {searchQuery.trim() && searchMatches.length > 1 && (
+              <>
+                <button onClick={() => goToSearchMatch(-1)} className="p-1 rounded hover:bg-slate-200 text-slate-500" aria-label="Previous match" title="Previous match">↑</button>
+                <button onClick={() => goToSearchMatch(1)} className="p-1 rounded hover:bg-slate-200 text-slate-500" aria-label="Next match" title="Next match">↓</button>
+              </>
+            )}
+            <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} className="p-1 rounded hover:bg-slate-200 text-slate-500" aria-label="Close search" title="Close search"><X className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
       <div className="unique-chat-motion flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 sm:px-4 sm:py-5 space-y-3 sm:space-y-4">
         {loading && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center min-h-[220px] text-slate-400">
