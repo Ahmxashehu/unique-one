@@ -17,14 +17,25 @@ permissions:
 jobs:
   deploy-storage-rules:
     runs-on: ubuntu-latest
+    env:
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Verify Firebase credential is configured
+        shell: bash
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::GitHub Actions secret FIREBASE_SERVICE_ACCOUNT is missing or unavailable to this workflow."
+            exit 1
+          fi
+          echo "Firebase credential secret is available."
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          credentials_json: ${{ env.FIREBASE_SERVICE_ACCOUNT }}
 
       - name: Deploy Firebase Storage rules
         run: npx --yes firebase-tools@latest deploy --only storage --project gen-lang-client-0680695304
