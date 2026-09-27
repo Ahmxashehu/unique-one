@@ -259,6 +259,30 @@ export default function ChatView() {
   }, [messages.length]);
 
   useEffect(() => {
+    if (!currentUser || !id) return;
+    try {
+      const saved = window.localStorage.getItem(`unique-one:message-draft:${currentUser.uid}:${id}`);
+      if (saved !== null) setMessage(saved);
+    } catch (err) {
+      console.warn('Could not restore message draft:', err);
+    }
+  }, [currentUser, id]);
+
+  useEffect(() => {
+    if (!currentUser || !id) return;
+    const timer = window.setTimeout(() => {
+      try {
+        const key = `unique-one:message-draft:${currentUser.uid}:${id}`;
+        if (message.trim()) window.localStorage.setItem(key, message);
+        else window.localStorage.removeItem(key);
+      } catch (err) {
+        console.warn('Could not save message draft:', err);
+      }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [currentUser, id, message]);
+
+  useEffect(() => {
     composerRef.current?.focus();
   }, [id]);
 
@@ -476,6 +500,11 @@ export default function ChatView() {
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to send message.');
       setMessage('');
+      try {
+        window.localStorage.removeItem(`unique-one:message-draft:${currentUser.uid}:${id}`);
+      } catch (err) {
+        console.warn('Could not clear message draft:', err);
+      }
       setAttachments([]);
       setReplyingTo(null);
     } catch (err) {
