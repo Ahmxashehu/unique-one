@@ -33,6 +33,7 @@ export default function ChatView() {
   const [blocked, setBlocked] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [reactionTarget, setReactionTarget] = useState<string | null>(null);
+  const [actionMenuTarget, setActionMenuTarget] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -645,11 +646,18 @@ export default function ChatView() {
                     {Object.entries(msg.reactions).map(([emoji, count]) => <button key={emoji} onClick={() => void updateReaction(msg.id, emoji)} className={`px-1.5 py-0.5 rounded-full text-xs border ${msg.myReaction === emoji ? 'border-slate-900 bg-slate-100' : 'border-slate-200 bg-white/80'}`}>{emoji} {count}</button>)}
                   </div>}
                   <div className="flex items-center justify-between gap-2 mt-1 text-[10px] text-slate-400">
-                    <div className="flex gap-1">
-  <button onClick={() => setReactionTarget(reactionTarget === msg.id ? null : msg.id)} className="p-1 rounded hover:bg-black/10" aria-label="React"><Smile className="w-3 h-3" /></button>
-  {msg.text && !msg.deleted && <button onClick={() => void copyMessage(msg.text ?? '')} className="p-1 rounded hover:bg-black/10" aria-label="Copy message" title="Copy message"><Copy className="w-3 h-3" /></button>}
-  {mine && !msg.deleted && <button onClick={() => void deleteMessage(msg.id)} className="p-1 rounded hover:bg-black/10" aria-label="Delete"><Trash2 className="w-3 h-3" /></button>}
-</div>
+                    <div className="flex gap-1 relative">
+                      <button onClick={() => setReactionTarget(reactionTarget === msg.id ? null : msg.id)} className="p-1 rounded hover:bg-black/10" aria-label="React" title="React"><Smile className="w-3 h-3" /></button>
+                      <button onClick={() => setActionMenuTarget(actionMenuTarget === msg.id ? null : msg.id)} className="p-1 rounded hover:bg-black/10" aria-label="Message actions" title="More actions"><MoreVertical className="w-3 h-3" /></button>
+                      {actionMenuTarget === msg.id && (
+                        <div className={`absolute bottom-7 z-30 min-w-36 rounded-xl bg-white border border-slate-200 shadow-xl p-1 text-xs text-slate-700 ${mine ? 'left-0' : 'right-0'}`}>
+                          <button onClick={() => { setReplyingTo(msg); setActionMenuTarget(null); }} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">Reply</button>
+                          {msg.text && !msg.deleted && <button onClick={() => { void copyMessage(msg.text ?? ''); setActionMenuTarget(null); }} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">Copy</button>}
+                          <button onClick={() => { setReactionTarget(msg.id); setActionMenuTarget(null); }} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">React</button>
+                          {mine && !msg.deleted && <button onClick={() => { void deleteMessage(msg.id); setActionMenuTarget(null); }} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 text-red-600">Delete</button>}
+                        </div>
+                      )}
+                    </div>
                     <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     {mine && msg.status === 'sent' && <Check className="w-3 h-3" />}
                     {mine && msg.status === 'delivered' && <CheckCheck className="w-3 h-3" />}
