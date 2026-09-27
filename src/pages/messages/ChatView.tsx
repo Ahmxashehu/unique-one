@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, ShieldAlert, Ban, CornerUpLeft, X, Smile, Trash2, VolumeX, Volume2 } from 'lucide-react';
+import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, ShieldAlert, Ban, CornerUpLeft, X, Smile, Trash2, VolumeX, Volume2, Copy } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Conversation, Message, MessageAttachmentMetadata } from '../../lib/os/communication-types';
@@ -286,6 +286,16 @@ export default function ChatView() {
     }
   };
 
+  const copyMessage = async (text: string) => {
+    if (!text || typeof navigator === 'undefined' || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (err) {
+      console.error('Message copy failed:', err);
+      setError('Could not copy this message.');
+    }
+  };
+
   const deleteMessage = async (messageId: string) => {
     if (!currentUser || !window.confirm('Delete this message?')) return;
     try {
@@ -556,7 +566,12 @@ export default function ChatView() {
                     {Object.entries(msg.reactions).map(([emoji, count]) => <button key={emoji} onClick={() => void updateReaction(msg.id, emoji)} className={`px-1.5 py-0.5 rounded-full text-xs border ${msg.myReaction === emoji ? 'border-slate-900 bg-slate-100' : 'border-slate-200 bg-white/80'}`}>{emoji} {count}</button>)}
                   </div>}
                   <div className="flex items-center justify-between gap-2 mt-1 text-[10px] text-slate-400">
-                    <div className="flex gap-1"><button onClick={() => setReactionTarget(reactionTarget === msg.id ? null : msg.id)} className="p-1 rounded hover:bg-black/10" aria-label="React"><Smile className="w-3 h-3" /></button>{mine && !msg.deleted && <button onClick={() => void deleteMessage(msg.id)} className="p-1 rounded hover:bg-black/10" aria-label="Delete"><Trash2 className="w-3 h-3" /></button>}</div>
+                    <div className="flex gap-1">
+  <button onClick={() => void updateReaction(msg.id, '')} className="hidden" aria-hidden="true" tabIndex={-1} />
+  <button onClick={() => setReactionTarget(reactionTarget === msg.id ? null : msg.id)} className="p-1 rounded hover:bg-black/10" aria-label="React"><Smile className="w-3 h-3" /></button>
+  {msg.text && !msg.deleted && <button onClick={() => void copyMessage(msg.text ?? '')} className="p-1 rounded hover:bg-black/10" aria-label="Copy message" title="Copy message"><Copy className="w-3 h-3" /></button>}
+  {mine && !msg.deleted && <button onClick={() => void deleteMessage(msg.id)} className="p-1 rounded hover:bg-black/10" aria-label="Delete"><Trash2 className="w-3 h-3" /></button>}
+</div>
                     <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     {mine && msg.status === 'sent' && <Check className="w-3 h-3" />}
                     {mine && msg.status === 'delivered' && <CheckCheck className="w-3 h-3" />}
