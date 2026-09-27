@@ -38,13 +38,16 @@ export default function ChatView() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMatchIndex, setSearchMatchIndex] = useState(0);
+  const [newMessagesPending, setNewMessagesPending] = useState(0);
   const [attachments, setAttachments] = useState<MessageAttachmentMetadata[]>([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [attachmentStage, setAttachmentStage] = useState<'preparing' | 'uploading' | null>(null);
   const [attachmentProgress, setAttachmentProgress] = useState(0);
   const [encryptionReady, setEncryptionReady] = useState(false);
   const [peerPublicKey, setPeerPublicKey] = useState<JsonWebKey | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const previousMessageCountRef = useRef(0);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   const updatePresence = useCallback(async (status: 'online' | 'offline') => {
@@ -255,8 +258,39 @@ export default function ChatView() {
     if (messages.length > 0) void markVisibleMessagesRead(messages);
   }, [messages, markVisibleMessagesRead]);
 
+  const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
+    setNewMessagesPending(0);
+  }, []);
+
+  const handleMessagesScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (distanceFromBottom < 80) setNewMessagesPending(0);
+  };
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: messages.length > 1 ? 'smooth' : 'auto', block: 'end' });
+    const previousCount = previousMessageCountRef.current;
+    if (messages.length === 0) {
+      previousMessageCountRef.current = 0;
+      return;
+    }
+    const isInitialLoad = previousCount === 0;
+    const countIncreased = messages.length > previousCount;
+    const container = messagesContainerRef.current;
+    const distanceFromBottom = container
+      ? container.scrollHeight - container.scrollTop - container.clientHeight
+      : 0;
+    if (isInitialLoad) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+    } else if (countIncreased && distanceFromBottom < 160) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      setNewMessagesPending(0);
+    } else if (countIncreased) {
+      setNewMessagesPending((current) => current + (messages.length - previousCount));
+    }
+    previousMessageCountRef.current = messages.length;
   }, [messages.length]);
 
   useEffect(() => {
@@ -589,7 +623,7 @@ export default function ChatView() {
           </div>
         </div>
       )}
-      <div className="unique-chat-motion flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 sm:px-4 sm:py-5 space-y-3 sm:space-y-4">
+      <div ref={messagesContainerRef} onScroll={handleMessagesScroll} className="unique-chat-motion flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 sm:px-4 sm:py-5 space-y-3 sm:space-y-4">
         {loading && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center min-h-[220px] text-slate-400">
             <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center mb-3"><Loader2 className="w-5 h-5 animate-spin" /></div>
@@ -673,6 +707,13 @@ export default function ChatView() {
           );
         })}
         <div ref={messagesEndRef} aria-hidden="true" />
+        {newMessagesPending > 0 && (
+          <div className="sticky bottom-2 flex justify-center pointer-events-none">
+            <button onClick={() => scrollMessagesToBottom('smooth')} className="pointer-events-auto rounded-full bg-slate-900 text-white px-3 py-1.5 text-xs font-medium shadow-lg">
+              {newMessagesPending} new {newMessagesPending === 1 ? 'message' : 'messages'} ↓
+            </button>
+          </div>
+        )}
       </div>
 
       {replyingTo && !blocked && (
