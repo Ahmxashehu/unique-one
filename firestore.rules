@@ -17,7 +17,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && (!('roles' in request.resource.data) || !('administrator' in request.resource.data.roles));
-      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['roles', 'verificationStatus', 'verificationUpdatedAt', 'verificationUpdatedBy'])) || isAdmin();
+      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['roles', 'verificationStatus', 'verificationUpdatedAt', 'verificationUpdatedBy', 'uniqueOneId', 'email', 'phone'])) || isAdmin();
       allow delete: if isAdmin();
     }
     match /profiles/{userId} { allow read: if true; allow create, update: if isOwner(userId) || isAdmin(); allow delete: if isAdmin(); }
