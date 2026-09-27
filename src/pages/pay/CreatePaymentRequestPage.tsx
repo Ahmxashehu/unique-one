@@ -23,14 +23,19 @@ export default function CreatePaymentRequestPage() {
     if (!recipientIdentifier || !Number.isFinite(amountValue) || amountValue <= 0 || !requestDescription) {
       return setError('Enter a recipient, a valid amount, and a description.');
     }
-
     setLoading(true);
     setError(null);
     try {
+      const token = await currentUser.getIdToken();
+      const resolveResponse = await fetch('/api/users/resolve?identifier=' + encodeURIComponent(recipientIdentifier), { headers: { Authorization: 'Bearer ' + token } });
+      const resolvePayload = await resolveResponse.json().catch(() => null);
+      if (!resolveResponse.ok || !resolvePayload?.uid) throw new Error(resolvePayload?.error?.message || 'The recipient could not be verified.');
       const now = new Date().toISOString();
       await addDoc(collection(db, 'payment_requests'), {
         senderId: currentUser.uid,
+        recipientId: resolvePayload.uid,
         recipientIdentifier,
+        recipientName: typeof resolvePayload.fullName === 'string' ? resolvePayload.fullName : 'Unique One user',
         amount: Math.round(amountValue * 100) / 100,
         currency: 'NGN',
         description: requestDescription,
@@ -42,7 +47,7 @@ export default function CreatePaymentRequestPage() {
       navigate('/os/payment-requests');
     } catch (submitError) {
       console.error('Unable to create payment request:', submitError);
-      setError('We could not save this payment request. Please try again.');
+      setError(submitError instanceof Error ? submitError.message : 'We could not save this payment request. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -50,42 +55,13 @@ export default function CreatePaymentRequestPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-12">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Request Payment</h1>
-        <p className="mt-1 text-sm text-slate-500">Create a real payment request stored in your UniquePay account.</p>
-      </div>
-
+      <div><h1 className="text-2xl font-bold tracking-tight text-slate-900">Request Payment</h1><p className="mt-1 text-sm text-slate-500">Create a real payment request stored in your UniquePay account.</p></div>
       {error && <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><span>{error}</span></div>}
-
       <div className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 md:p-8">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Recipient *</label>
-          <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} required placeholder="Email, phone, or Unique One ID" className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900" />
-          <p className="mt-1 text-xs text-slate-500">Recipient identity resolution will be connected through the trusted payment identity layer.</p>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Amount *</label>
-            <div className="flex"><span className="rounded-l-xl border border-r-0 border-slate-200 bg-slate-50 px-4 py-3 text-slate-500">₦</span><input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required placeholder="0.00" className="w-full rounded-r-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900" /></div>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Due Date</label>
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900" />
-          </div>
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Description *</label>
-          <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} required placeholder="What is this payment for?" className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900" />
-        </div>
-
-        <div className="flex flex-col justify-end gap-3 border-t border-slate-100 pt-6 sm:flex-row">
-          <button type="button" onClick={() => void handleSubmit(true)} disabled={loading} className="rounded-xl border border-slate-200 px-6 py-2.5 font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-60">Save Draft</button>
-          <button type="button" onClick={() => void handleSubmit(false)} disabled={loading} className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send Request
-          </button>
-        </div>
+        <div><label className="mb-1 block text-sm font-medium text-slate-700">Recipient *</label><input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} required placeholder="Email, phone, or Unique One ID" className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900" disabled={loading} /><p className="mt-1 text-xs text-slate-500">The recipient is verified before the request is saved.</p></div>
+        <div className="grid gap-6 md:grid-cols-2"><div><label className="mb-1 block text-sm font-medium text-slate-700">Amount *</label><div className="flex"><span className="rounded-l-xl border border-r-0 border-slate-200 bg-slate-50 px-4 py-3 text-slate-500">₦</span><input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required placeholder="0.00" className="w-full rounded-r-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900" disabled={loading} /></div></div><div><label className="mb-1 block text-sm font-medium text-slate-700">Due Date</label><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900" disabled={loading} /></div></div>
+        <div><label className="mb-1 block text-sm font-medium text-slate-700">Description *</label><textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} required placeholder="What is this payment for?" className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900" disabled={loading} /></div>
+        <div className="flex flex-col justify-end gap-3 border-t border-slate-100 pt-6 sm:flex-row"><button type="button" onClick={() => void handleSubmit(true)} disabled={loading} className="rounded-xl border border-slate-200 px-6 py-2.5 font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-60">{loading ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : 'Save Draft'}</button><button type="button" onClick={() => void handleSubmit(false)} disabled={loading} className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send Request</button></div>
       </div>
     </div>
   );
