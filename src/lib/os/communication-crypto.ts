@@ -71,7 +71,26 @@ export async function decryptFromUser(uid: string, senderPublicKey: JsonWebKey, 
   return new TextDecoder().decode(plaintext);
 }
 
-export async function registerPublicKey(uid: string, token: string, publicKey: JsonWebKey): Promise<void> {\n  const response = await fetch('/api/communication/keys', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },\n    body: JSON.stringify({ publicKey }),\n  });\n  const payload = await response.json().catch(() => null);\n  if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to register this device encryption key.');\n}\n\nexport async function getUserPublicKey(uid: string, token: string): Promise<JsonWebKey | null> {\n  if (!uid) return null;\n  const response = await fetch(`/api/communication/keys/${encodeURIComponent(uid)}`, { headers: { Authorization: `Bearer ${token}` } });\n  if (response.status === 404) return null;\n  const payload = await response.json().catch(() => null);\n  if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to load the recipient encryption key.');\n  return payload?.publicKey ?? null;\n}\n\nexport function isEncryptedMessage(value: unknown): value is { recipientId: string; senderPublicKey: JsonWebKey; iv: string; ciphertext: string } {
+export async function registerPublicKey(uid: string, token: string, publicKey: JsonWebKey): Promise<void> {
+  const response = await fetch('/api/communication/keys', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ publicKey }),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to register this device encryption key.');
+}
+
+export async function getUserPublicKey(uid: string, token: string): Promise<JsonWebKey | null> {
+  if (!uid) return null;
+  const response = await fetch(`/api/communication/keys/${encodeURIComponent(uid)}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (response.status === 404) return null;
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to load the recipient encryption key.');
+  return payload?.publicKey ?? null;
+}
+
+export function isEncryptedMessage(value: unknown): value is { recipientId: string; senderPublicKey: JsonWebKey; iv: string; ciphertext: string } {
   if (!value || typeof value !== 'object') return false;
   const item = value as Record<string, unknown>;
   return typeof item.recipientId === 'string' && typeof item.iv === 'string' && typeof item.ciphertext === 'string' && !!item.senderPublicKey;
