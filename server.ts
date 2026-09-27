@@ -344,6 +344,47 @@ async function startServer() {
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'We could not verify that recipient right now.');
     }
   });
+  app.post("/api/payment-requests", authenticate, rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), async (req, res) => {
+    const senderId = (req as any).user?.uid as string | undefined;
+    if (!senderId) return errorResponse(res, 'UNAUTHENTICATED', 'Missing authenticated user.');
+    try {
+      const body = req.body as Record<string, unknown>;
+      const recipientIdentifier = typeof body?.recipientIdentifier === 'string' ? body.recipientIdentifier.trim() : '';
+      const description = typeof body?.description === 'string' ? body.description.trim() : '';
+      const amount = body?.amount;
+      const dueDate = typeof body?.dueDate === 'string' ? body.dueDate : undefined;
+      const status = body?.status === 'draft' ? 'draft' : body?.status === 'sent' ? 'sent' : '';
+      if (!recipientIdentifier || recipientIdentifier.length > 320 || !description || description.length > 500) return errorResponse(res, 'INVALID_REQUEST', 'Recipient and description are required and must be valid.');
+      if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 1000000000000) return errorResponse(res, 'INVALID_AMOUNT', 'The payment request amount is invalid.');
+      if (!status) return errorResponse(res, 'INVALID_REQUEST', 'A valid payment request status is required.');
+      const normalizedEmail = recipientIdentifier.toLowerCase();
+      const [emailSnapshot, phoneSnapshot, uniqueOneIdSnapshot] = await Promise.all([
+        adminDb.collection('users').where('email', '==', recipientIdentifier).limit(1).get(),
+        adminDb.collection('users').where('phone', '==', recipientIdentifier).limit(1).get(),
+        adminDb.collection('users').where('uniqueOneId', '==', recipientIdentifier).limit(1).get(),
+      ]);
+      const normalizedEmailSnapshot = normalizedEmail !== recipientIdentifier ? await adminDb.collection('users').where('email', '==', normalizedEmail).limit(1).get() : null;
+      const match = [emailSnapshot, normalizedEmailSnapshot, phoneSnapshot, uniqueOneIdSnapshot].find((snapshot) => snapshot && !snapshot.empty);
+      if (!match || match.empty) return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'No Unique One user matches that recipient identifier.');
+      const recipientDoc = match.docs[0];
+      if (recipientDoc.id === senderId) return errorResponse(res, 'SELF_TRANSFER_NOT_ALLOWED', 'You cannot create a payment request to yourself.');
+      const recipientData = recipientDoc.data() as Record<string, unknown>;
+      const now = Timestamp.now().toDate().toISOString();
+      const ref = adminDb.collection('payment_requests').doc();
+      await ref.create({
+        senderId, recipientId: recipientDoc.id,
+        recipientIdentifier,
+        recipientName: typeof recipientData.fullName === 'string' ? recipientData.fullName : 'Unique One user',
+        amount: Math.round(amount * 100) / 100, currency: 'NGN', description,
+        ...(dueDate ? { dueDate } : {}), status, createdAt: now, updatedAt: now,
+      });
+      return res.status(201).json({ id: ref.id, recipientId: recipientDoc.id, status });
+    } catch (error) {
+      console.error('Payment request creation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'We could not create the payment request right now.');
+    }
+  });
+
   app.get("/api/wallet", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = (req as any).user?.uid as string | undefined;
     if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Missing authenticated user.');
