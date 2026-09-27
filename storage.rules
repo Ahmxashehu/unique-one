@@ -45,11 +45,15 @@ service firebase.storage {
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 
-    // Communication media. Upload ownership is enforced by the UID path.
-    // Access requires authentication; the application also enforces conversation membership.
+    // Communication media. Access is restricted to authenticated conversation members.
+    function isConversationMember(conversationId) {
+      return signedIn() &&
+        firestore.get(/databases/(default)/documents/conversationMembers/$(conversationId + '_' + request.auth.uid)).data.uid == request.auth.uid;
+    }
+
     match /messages/{conversationId}/{uid}/{fileName} {
-      allow read: if signedIn();
-      allow create, update: if signedIn()
+      allow read: if isConversationMember(conversationId);
+      allow create, update: if isConversationMember(conversationId)
         && request.auth.uid == uid
         && (
           (validImage() && request.resource.size <= 5 * 1024 * 1024) ||
@@ -57,7 +61,7 @@ service firebase.storage {
           (validAudio() && request.resource.size <= 25 * 1024 * 1024) ||
           (validVideo() && request.resource.size <= 100 * 1024 * 1024)
         );
-      allow delete: if signedIn() && request.auth.uid == uid;
+      allow delete: if isConversationMember(conversationId) && request.auth.uid == uid;
     }
 
     // Public business branding media. Storefront visitors may read it; only the owner may upload/replace/delete.
