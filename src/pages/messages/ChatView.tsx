@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Loader2, Check, CheckCheck, ShieldAlert, Ban, CornerUpLeft, X, Smile, Trash2, VolumeX, Volume2 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -40,6 +40,8 @@ export default function ChatView() {
   const [attachmentProgress, setAttachmentProgress] = useState(0);
   const [encryptionReady, setEncryptionReady] = useState(false);
   const [peerPublicKey, setPeerPublicKey] = useState<JsonWebKey | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   const updatePresence = useCallback(async (status: 'online' | 'offline') => {
     if (!currentUser) return;
@@ -250,6 +252,14 @@ export default function ChatView() {
   }, [messages, markVisibleMessagesRead]);
 
   useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: messages.length > 1 ? 'smooth' : 'auto', block: 'end' });
+  }, [messages.length]);
+
+  useEffect(() => {
+    composerRef.current?.focus();
+  }, [id]);
+
+  useEffect(() => {
     if (!id || !currentUser) return;
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') void loadOtherPresence();
@@ -446,22 +456,27 @@ export default function ChatView() {
 
   return (
     <div className="flex flex-col h-full min-h-0 -m-4 md:-m-6 lg:-m-8 bg-slate-50 md:rounded-3xl overflow-hidden">
+      <style>{`@media (prefers-reduced-motion: reduce) { .unique-chat-motion { scroll-behavior: auto !important; transition: none !important; } }`}</style>
       <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/os/messages')} className="p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-full md:hidden" aria-label="Back">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600">
+          <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-slate-900 to-slate-600 text-white flex items-center justify-center font-bold shadow-sm">
             {(conversation?.title ?? 'U').charAt(0).toUpperCase()}
           </div>
           <div>
             <h2 className="font-bold text-slate-900 text-sm md:text-base">{conversation?.title ?? 'Messages'}</h2>
-            <p className="text-xs text-slate-500">{otherPresence?.status === 'online' ? 'Online' : otherPresence?.lastSeenAt ? `Last seen ${new Date(otherPresence.lastSeenAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : conversation?.status ?? 'Loading...'}</p>
+            <p className="text-xs text-slate-500 flex items-center gap-1.5">
+              {otherPresence?.status === 'online' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+              {otherPresence?.status === 'online' ? 'Online' : otherPresence?.lastSeenAt ? `Last seen ${new Date(otherPresence.lastSeenAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : conversation?.status ?? 'Loading...'}
+              {conversation?.type === 'direct' && encryptionReady && <span title="End-to-end encrypted" aria-label="End-to-end encrypted">· 🔒</span>}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <button className="p-2 text-slate-400 rounded-full hidden sm:block" aria-label="Voice call"><Phone className="w-5 h-5" /></button>
-          <button className="p-2 text-slate-400 rounded-full hidden sm:block" aria-label="Video call"><Video className="w-5 h-5" /></button>
+          <button disabled className="p-2 text-slate-300 rounded-full hidden sm:block cursor-not-allowed" aria-label="Voice calls coming soon" title="Voice calls coming soon"><Phone className="w-5 h-5" /></button>
+          <button disabled className="p-2 text-slate-300 rounded-full hidden sm:block cursor-not-allowed" aria-label="Video calls coming soon" title="Video calls coming soon"><Video className="w-5 h-5" /></button>
           <button onClick={() => void toggleMute()} className="p-2 text-slate-500 rounded-full hover:bg-slate-100" aria-label={muted ? 'Unmute conversation' : 'Mute conversation'} title={muted ? 'Unmute conversation' : 'Mute conversation'}>{muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}</button>
         </div>
       </div>
@@ -484,9 +499,21 @@ export default function ChatView() {
             </div>
           </div>
         )}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-        {loading && <div className="flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>}
-        {error && <div className="text-center text-xs text-red-600 bg-red-50 rounded-lg p-2">{error}</div>}
+      <div className="unique-chat-motion flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 sm:px-4 sm:py-5 space-y-3 sm:space-y-4">
+        {loading && messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center min-h-[220px] text-slate-400">
+            <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center mb-3"><Loader2 className="w-5 h-5 animate-spin" /></div>
+            <p className="text-xs">Loading conversation…</p>
+          </div>
+        )}
+        {error && <div className="mx-auto max-w-xl text-center text-xs text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</div>}
+        {!loading && !error && messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center min-h-[260px] text-center">
+            <div className="w-14 h-14 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-2xl mb-3">💬</div>
+            <p className="font-semibold text-slate-800">Start the conversation</p>
+            <p className="text-xs text-slate-500 mt-1 max-w-xs">Send a message, photo, or document. Your conversation will appear here.</p>
+          </div>
+        )}
         {!loading && messages.map((msg, index) => {
           const mine = msg.senderId === currentUser?.uid;
           const previous = index > 0 ? messages[index - 1] : null;
@@ -495,11 +522,11 @@ export default function ChatView() {
             <div key={msg.id}>
               {showDate && <div className="flex justify-center my-2"><span className="px-3 py-1 rounded-full bg-slate-200 text-slate-500 text-[10px] font-medium">{formatMessageDate(msg.createdAt)}</span></div>}
               <div id={`message-${msg.id}`} className={`flex ${mine ? 'justify-end' : 'justify-start'} group`}>
-              <div className="relative max-w-[75%] md:max-w-[60%]">
+              <div className="relative max-w-[86%] sm:max-w-[75%] md:max-w-[60%]">
                 <button onClick={() => setReplyingTo(msg)} className={`absolute -top-10 ${mine ? '-left-1' : '-right-1'} sm:-top-3 ${mine ? 'sm:-left-10' : 'sm:-right-10'} flex items-center justify-center w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm text-slate-500 hover:text-slate-900 z-10`} aria-label="Reply to message" title="Reply">
                   <CornerUpLeft className="w-4 h-4" />
                 </button>
-                <div className={`rounded-2xl px-4 py-2 ${mine ? 'bg-slate-900 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-900 rounded-tl-sm'}`}>
+                <div className={`rounded-[20px] px-4 py-2.5 shadow-sm ${mine ? 'bg-slate-900 text-white rounded-tr-md' : 'bg-white border border-slate-200 text-slate-900 rounded-tl-md'}`}>
                   {msg.replyToMessageId && (() => {
                     const replied = messages.find((item) => item.id === msg.replyToMessageId);
                     return replied ? (
@@ -544,6 +571,7 @@ export default function ChatView() {
             </div>
           );
         })}
+        <div ref={messagesEndRef} aria-hidden="true" />
       </div>
 
       {replyingTo && !blocked && (
@@ -559,7 +587,7 @@ export default function ChatView() {
         </div>
       )}
 
-      {!blocked && <div className="sticky bottom-0 z-30 bg-white border-t border-slate-200 p-3 sm:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shrink-0">
+      {!blocked && <div className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 p-2.5 sm:p-4 pb-[calc(0.65rem+env(safe-area-inset-bottom))] shrink-0">
         {(attachments.length > 0 || uploadingAttachment) && (
           <div className="mb-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
             {uploadingAttachment ? (
@@ -585,7 +613,7 @@ export default function ChatView() {
             )}
           </div>
         )}
-        <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1 pr-2">
+        <div className="flex items-end gap-1.5 bg-slate-50 border border-slate-200 rounded-[22px] p-1 pr-1.5 shadow-sm focus-within:border-slate-300 focus-within:ring-2 focus-within:ring-slate-100">
           <div className="flex items-center shrink-0">
             <label className="p-3 text-slate-500 cursor-pointer hover:bg-slate-100 rounded-xl" aria-label="Gallery" title="Choose from gallery">
               <span className="text-base">🖼️</span>
@@ -600,10 +628,10 @@ export default function ChatView() {
               <input type="file" multiple accept=".pdf,.txt,.doc,.docx,.xls,.xlsx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void handleAttachmentSelect(event)} disabled={uploadingAttachment || sending} />
             </label>
           </div>
-          <textarea value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => {
+          <textarea ref={composerRef} value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSend(); }
-          }} placeholder="Type a message..." className="flex-1 bg-transparent border-none py-3 focus:ring-0 resize-none max-h-32 text-sm focus:outline-none" rows={1} />
-          <button onClick={() => void handleSend()} disabled={(!message.trim() && attachments.length === 0) || sending || uploadingAttachment} className="p-3 bg-slate-900 text-white rounded-xl disabled:opacity-50 shrink-0 mb-1" aria-label="Send">
+          }} placeholder="Message…" className="flex-1 bg-transparent border-none py-3 px-1 focus:ring-0 resize-none max-h-32 text-sm leading-5 focus:outline-none placeholder:text-slate-400" rows={1} aria-label="Message" />
+          <button onClick={() => void handleSend()} disabled={(!message.trim() && attachments.length === 0) || sending || uploadingAttachment} className="p-3 bg-slate-900 text-white rounded-full disabled:opacity-40 shrink-0 mb-1 transition-transform active:scale-95" aria-label="Send">
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
