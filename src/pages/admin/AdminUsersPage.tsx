@@ -1,7 +1,67 @@
-import React from 'react';
-import { Users, Search, Filter } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Users, Search, Loader2, AlertCircle } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+
+interface AdminUser {
+  id: string;
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  uniqueOneId?: string;
+  roles?: string[];
+  createdAt?: unknown;
+}
+
+function formatDate(value: unknown) {
+  if (value && typeof value === 'object' && 'toDate' in value && typeof (value as { toDate?: unknown }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate().toLocaleDateString();
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date.toLocaleDateString();
+  }
+  return '—';
+}
 
 export default function AdminUsersPage() {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    const loadUsers = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const snapshot = await getDocs(collection(db, 'users'));
+        if (!active) return;
+        setUsers(snapshot.docs.map(item => ({ id: item.id, ...item.data() } as AdminUser)));
+      } catch (loadError) {
+        console.error('Failed to load admin users:', loadError);
+        if (active) setError('Unable to load users. Check administrator access and try again.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void loadUsers();
+    return () => { active = false; };
+  }, []);
+
+  const filteredUsers = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return users;
+    return users.filter(user =>
+      [user.fullName, user.email, user.phone, user.uniqueOneId, user.id]
+        .filter(Boolean)
+        .some(value => String(value).toLowerCase().includes(term))
+    );
+  }, [users, search]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -9,25 +69,70 @@ export default function AdminUsersPage() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Ecosystem Users</h1>
           <p className="text-sm text-slate-500 mt-1">Manage accounts across the Unique One platform.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input type="text" placeholder="Search users by name, email..." className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-          </div>
-          <button className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">
-            <Filter className="w-5 h-5" />
-          </button>
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            placeholder="Search name, email, phone, ID..."
+            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+          />
         </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="p-12 text-center">
-          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Users className="w-8 h-8 text-slate-400" />
+        {loading ? (
+          <div className="p-12 flex items-center justify-center gap-3 text-slate-500">
+            <Loader2 className="w-5 h-5 animate-spin" /> Loading users...
           </div>
-          <h3 className="text-lg font-semibold text-slate-900">User database empty</h3>
-          <p className="text-slate-500 mt-1">Registered users will populate this ledger.</p>
-        </div>
+        ) : error ? (
+          <div className="p-12 text-center">
+            <AlertCircle className="w-8 h-8 mx-auto text-rose-500 mb-3" />
+            <p className="text-sm text-rose-700">{error}</p>
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="p-12 text-center">
+            <Users className="w-8 h-8 text-slate-400 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-slate-900">
+              {users.length === 0 ? 'No registered users' : 'No matching users'}
+            </h3>
+            <p className="text-slate-500 mt-1">
+              {users.length === 0 ? 'Registered users will appear here.' : 'Try a different search term.'}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-700">User</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-700">Contact</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-700">Unique ID</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-700">Roles</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-700">Joined</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredUsers.map(user => (
+                  <tr key={user.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-slate-900">{user.fullName || 'Unnamed user'}</div>
+                      <div className="text-xs text-slate-500">{user.id}</div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      <div>{user.email || '—'}</div>
+                      <div className="text-xs">{user.phone || '—'}</div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{user.uniqueOneId || '—'}</td>
+                    <td className="px-4 py-3 text-slate-600">{user.roles?.join(', ') || 'user'}</td>
+                    <td className="px-4 py-3 text-slate-600">{formatDate(user.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
