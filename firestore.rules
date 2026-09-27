@@ -21,7 +21,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     match /profiles/{userId} { allow read: if true; allow create, update: if isOwner(userId) || isAdmin(); allow delete: if isAdmin(); }
-    match /businesses/{businessId} { allow read: if true; allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid; allow update: if isOwner(resource.data.ownerUid) || isAdmin(); allow delete: if isAdmin(); }
+    match /businesses/{businessId} { allow read: if true; allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid; allow update: if (isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid) || isAdmin(); allow delete: if isAdmin(); }
     match /roles/{roleId} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
     match /organizations/{orgId} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
     match /sessions/{sessionId} { allow read, update, delete: if isOwner(resource.data.uid); allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid; }
@@ -29,9 +29,9 @@ service cloud.firestore {
     match /audit_logs/{logId} { allow read: if isAdmin(); allow create, update, delete: if false; }
     match /products/{productId} { allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isAdmin(); allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid; allow update: if (isAuthenticated() && resource.data.sellerId == request.auth.uid && request.resource.data.sellerId == resource.data.sellerId) || isAdmin(); allow delete: if isAdmin(); }
     match /orders/{orderId} { allow read: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.sellerId == request.auth.uid) || isAdmin(); allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid; allow update: if isAuthenticated() && (request.resource.data.customerId == resource.data.customerId) && (request.resource.data.sellerId == resource.data.sellerId) && (resource.data.customerId == request.auth.uid || resource.data.sellerId == request.auth.uid) || isAdmin(); allow delete: if isAdmin(); }
-    match /productRequests/{requestId} { allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.customerId == request.auth.uid) || isAdmin(); allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid; allow update: if (isAuthenticated() && resource.data.customerId == request.auth.uid) || isAdmin(); allow delete: if isAdmin(); }
+    match /productRequests/{requestId} { allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.customerId == request.auth.uid) || isAdmin(); allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid; allow update: if (isAuthenticated() && resource.data.customerId == request.auth.uid && request.resource.data.customerId == resource.data.customerId) || isAdmin(); allow delete: if isAdmin(); }
     match /quotes/{quoteId} { allow read: if isAuthenticated() || isAdmin(); allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid; allow update: if isAuthenticated() && request.resource.data.sellerId == resource.data.sellerId || isAdmin(); allow delete: if isAdmin(); }
-    match /carts/{cartId} { allow read, update, delete: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid; }
+    match /carts/{cartId} { allow read: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow update: if isAuthenticated() && resource.data.customerId == request.auth.uid && request.resource.data.customerId == resource.data.customerId; allow delete: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid; }
     match /wishlists/{wishlistId} { allow read, update, delete: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid; }
     match /reviews/{reviewId} { allow read: if true; allow create: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid; allow update, delete: if isAdmin(); }
     match /payment_requests/{reqId} { allow read: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isAdmin(); allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid; allow update: if isAuthenticated() && request.resource.data.senderId == resource.data.senderId && request.resource.data.recipientId == resource.data.recipientId && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isAdmin(); allow delete: if isAdmin(); }
@@ -45,14 +45,14 @@ service cloud.firestore {
     match /staffInvites/{inviteId} {
       allow read: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.inviteeEmail == request.auth.token.email);
       allow create: if isAuthenticated() && request.resource.data.businessOwnerUid == request.auth.uid && request.resource.data.status == 'pending' && request.resource.data.role in ['admin','manager','sales','cashier','accountant','inventory','support','delivery','branch_manager','viewer'];
-      allow update: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.inviteeEmail == request.auth.token.email);
+      allow update: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.inviteeEmail == request.auth.token.email) && request.resource.data.businessOwnerUid == resource.data.businessOwnerUid;
       allow delete: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
     }
     match /staffMembers/{staffId} { allow read: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.uid == request.auth.uid); allow create, update, delete: if false; }
     match /suppliers/{supplierId} {
       allow read: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.businessOwnerUid == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid && request.resource.data.businessOwnerUid == resource.data.businessOwnerUid; allow delete: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
     }
 
     match /conversations/{conversationId} { allow read: if isConversationMember(conversationId); allow create, update, delete: if false; }
