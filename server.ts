@@ -301,7 +301,7 @@ async function startServer() {
   const httpServer = http.createServer(app);
   // Codespaces forwards requests through a trusted proxy and supplies X-Forwarded-For.
   app.set('trust proxy', 1);
-  app.use(express.json());
+  app.use(express.json({ limit: "1mb" }));
   app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
   const authenticate = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
@@ -1573,44 +1573,6 @@ async function startServer() {
     } catch (error) {
       console.error('Communication block failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to block this user.');
-    }
-  });
-
-  app.get("/api/communication/conversations/:conversationId/messages", authenticate, rateLimit({
-    windowMs: 60_000,
-    limit: 120,
-    standardHeaders: true,
-    legacyHeaders: false,
-  }), async (req, res) => {
-    try {
-      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
-      const conversationId = req.params.conversationId;
-      if (!isSafeConversationId(conversationId)) {
-        return errorResponse(res, 'INVALID_REQUEST', 'The conversation ID is invalid.');
-      }
-      const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationId, uid));
-      const membershipSnapshot = await membershipRef.get();
-      if (!membershipSnapshot.exists) {
-        return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
-      }
-      const limitValue = Number(req.query.limit);
-      const messageLimit = Number.isSafeInteger(limitValue) && limitValue > 0 ? Math.min(limitValue, 100) : 100;
-      const snapshot = await adminDb.collection('messages')
-        .where('conversationId', '==', conversationId)
-        .limit(messageLimit)
-        .get();
-      const messages: Array<Message & { id: string }> = snapshot.docs.map((messageDoc) => {
-        const data = messageDoc.data() as Record<string, unknown>;
-        return {
-          ...(data as Omit<Message, 'id' | 'createdAt'>),
-          id: messageDoc.id,
-          createdAt: typeof data.createdAt === 'string' ? data.createdAt : '',
-        } as Message & { id: string };
-      }).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
-      return res.status(200).json({ messages });
-    } catch (error) {
-      console.error('Communication message read failed:', error);
-      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to read Communication messages.');
     }
   });
 
