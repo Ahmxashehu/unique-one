@@ -88,7 +88,14 @@ export default function ChatView() {
       const presence = Array.isArray(presencePayload?.presences)
         ? presencePayload.presences.find((item: { uid?: string }) => item.uid === otherMember.uid)
         : null;
-      setOtherPresence(presence ?? { uid: otherMember.uid, status: 'offline', lastSeenAt: null });
+      const nextPresence = presence ?? { uid: otherMember.uid, status: 'offline', lastSeenAt: null };
+      setOtherPresence((current) => (
+        current?.uid === nextPresence.uid
+        && current?.status === nextPresence.status
+        && current?.lastSeenAt === nextPresence.lastSeenAt
+          ? current
+          : nextPresence
+      ));
     } catch (err) {
       console.error('Presence read failed:', err);
     }
@@ -171,7 +178,9 @@ export default function ChatView() {
         };
 
         await loadMessages();
-        const messageRefreshTimer = window.setInterval(() => { void loadMessages(); }, 2000);
+        const messageRefreshTimer = window.setInterval(() => {
+          if (document.visibilityState === 'visible') void loadMessages();
+        }, 3000);
         unsubscribe = () => window.clearInterval(messageRefreshTimer);
       } catch (err) {
         console.error(err);
@@ -206,7 +215,9 @@ export default function ChatView() {
 
   useEffect(() => {
     if (!id || !currentUser) return;
-    const timer = window.setInterval(() => { void loadOtherPresence(); }, 5000);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void loadOtherPresence();
+    }, 5000);
     return () => window.clearInterval(timer);
   }, [id, currentUser, loadOtherPresence]);
 
@@ -276,7 +287,6 @@ export default function ChatView() {
     setAttachmentProgress(0);
     setError('');
     try {
-      const uploaded: MessageAttachmentMetadata[] = [];
       for (const file of files) {
         const isImage = file.type.startsWith('image/');
         const allowed = isImage
@@ -340,16 +350,15 @@ export default function ChatView() {
           xhr.send(body);
         });
 
-        uploaded.push({
+        const uploadedAttachment: MessageAttachmentMetadata = {
           id: result.fileId,
           name: file.name,
           contentType: result.mimeType,
           sizeBytes: result.sizeBytes,
           url: result.downloadUrl,
           storagePath: result.storagePath,
-        });
-      }
-      setAttachments((current) => [...current, ...uploaded]);
+        };
+        setAttachments((current) => [...current, uploadedAttachment]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload attachment.');
     } finally {
