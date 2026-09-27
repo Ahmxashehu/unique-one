@@ -293,6 +293,10 @@ export async function subscribeToMessagesForConversation(
     where('conversationId', '==', id),
     fbLimit(messageLimit),
   );
+
+  let unsubscribe = () => undefined;
+  let fallbackToUnordered = false;
+
   const handleSnapshot = (snapshot: import('firebase/firestore').QuerySnapshot<DocumentData>) => {
     try {
       const mapped = snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data()));
@@ -302,33 +306,33 @@ export async function subscribeToMessagesForConversation(
       onError(error instanceof CommunicationDbError ? error : new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'A message document is malformed.'));
     }
   };
-  let fallbackToUnordered = false;
-  return onSnapshot(latestMessageQuery, (snapshot) => {
-    handleSnapshot(snapshot);
-  }, (error) => {
-    console.error('Communication ordered message subscription failed:', error);
-    if (!fallbackToUnordered) {
-      fallbackToUnordered = true;
-      onSnapshot(fallbackMessageQuery, handleSnapshot, (fallbackError) => {
+
+  const subscribeFallback = () => {
+    unsubscribe = onSnapshot(
+      fallbackMessageQuery,
+      handleSnapshot,
+      (fallbackError) => {
         console.error('Communication message subscription fallback failed:', fallbackError);
         onError(new CommunicationDbError('READ_FAILED', 'Failed to receive live Communication messages.'));
-      });
-      return;
-    }
-    onError(new CommunicationDbError('READ_FAILED', 'Failed to receive live Communication messages.'));
-  });
-    try {
-      const mapped = snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data()));
-      mapped.sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
-      onMessages(mapped);
-    } catch (error) {
-      onError(error instanceof CommunicationDbError ? error : new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'A message document is malformed.'));
-    }
-  }, (error) => {
-    console.error('Communication message subscription failed:', error);
-    onError(new CommunicationDbError('READ_FAILED', 'Failed to receive live Communication messages.'));
-  });
-}
+      },
+    );
+  };
+
+  unsubscribe = onSnapshot(
+    latestMessageQuery,
+    handleSnapshot,
+    (error) => {
+      console.error('Communication ordered message subscription failed:', error);
+      if (!fallbackToUnordered) {
+        fallbackToUnordered = true;
+        subscribeFallback();
+        return;
+      }
+      onError(new CommunicationDbError('READ_FAILED', 'Failed to receive live Communication messages.'));
+    },
+  );
+
+  return () => unsubscribe();
 
 /** Reads top-level Communication Core messages, never legacy nested messages. */
 export async function getMessagesForConversation(conversationId: string, limit?: number): Promise<Message[]> {
