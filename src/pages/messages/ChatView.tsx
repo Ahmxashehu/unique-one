@@ -105,7 +105,30 @@ export default function ChatView() {
     }
   }, [id, currentUser]);
 
-  useEffect(() => { void loadOtherPresence(); }, [loadOtherPresence]);
+  useEffect(() => {
+    let active = true;
+    const prepareEncryption = async () => {
+      setEncryptionReady(false);
+      setPeerPublicKey(null);
+      if (!currentUser || conversation?.type !== 'direct' || !otherUid) return;
+      try {
+        const token = await currentUser.getIdToken();
+        const publicKey = await ensureDeviceKeyPair(currentUser.uid);
+        await registerPublicKey(currentUser.uid, token, publicKey);
+        const peerKey = await getUserPublicKey(otherUid, token);
+        if (!active) return;
+        setPeerPublicKey(peerKey);
+        setEncryptionReady(Boolean(peerKey));
+      } catch (err) {
+        if (!active) return;
+        console.error('Communication encryption setup failed:', err);
+        setPeerPublicKey(null);
+        setEncryptionReady(false);
+      }
+    };
+    void prepareEncryption();
+    return () => { active = false; };
+  }, [currentUser, conversation?.type, otherUid]);
 
   const blockUser = async () => {
     if (!currentUser || !otherUid || blocked) return;
@@ -152,19 +175,33 @@ export default function ChatView() {
             id,
             (nextMessages) => {
               if (!active) return;
-              setMessages((current) => {
-                if (current.length === nextMessages.length && current.every((item, index) => {
-                  const next = nextMessages[index];
-                  return item.id === next.id
-                    && item.updatedAt === next.updatedAt
-                    && item.status === next.status
-                    && item.deleted === next.deleted
-                    && JSON.stringify(item.reactions ?? {}) === JSON.stringify(next.reactions ?? {})
-                    && JSON.stringify(item.attachments ?? []) === JSON.stringify(next.attachments ?? []);
-                })) return current;
-                return nextMessages;
-              });
-              setLoading(false);
+              void (async () => {
+                const hydrated = await Promise.all(nextMessages.map(async (item) => {
+                  if (item.deleted || !item.encryptedPayload) return item;
+                  try {
+                    const text = await decryptFromUser(currentUser.uid, item.encryptedPayload.senderPublicKey, item.encryptedPayload);
+                    return { ...item, text };
+                  } catch (decryptError) {
+                    console.error('Communication encrypted message decryption failed:', decryptError);
+                    return { ...item, text: '[Unable to decrypt this message on this device]' };
+                  }
+                }));
+                if (!active) return;
+                setMessages((current) => {
+                  if (current.length === hydrated.length && current.every((item, index) => {
+                    const next = hydrated[index];
+                    return item.id === next.id
+                      && item.updatedAt === next.updatedAt
+                      && item.status === next.status
+                      && item.deleted === next.deleted
+                      && item.text === next.text
+                      && JSON.stringify(item.reactions ?? {}) === JSON.stringify(next.reactions ?? {})
+                      && JSON.stringify(item.attachments ?? []) === JSON.stringify(next.attachments ?? []);
+                  })) return current;
+                  return hydrated;
+                });
+                setLoading(false);
+              })();
             },
             (messageError) => {
               if (!active) return;
@@ -377,7 +414,7 @@ export default function ChatView() {
       const token = await currentUser.getIdToken();
       let encryptedPayload: { version: 1; recipientId: string; senderPublicKey: JsonWebKey; iv: string; ciphertext: string } | undefined;
       if (text && conversation?.type === 'direct') {
-        if (!peerPublicKey || !otherUid) throw new Error('The recipient has not registered an encryption key on this device yet. Open the conversation on the other device, then try again.');
+        if (!encryptionReady || !peerPublicKey || !otherUid) throw new Error('The recipient has not registered an encryption key on this device yet. Open the conversation on the other device, then try again.');
         const senderPublicKey = await ensureDeviceKeyPair(currentUser.uid);
         const encrypted = await encryptForUser(currentUser.uid, peerPublicKey, text);
         encryptedPayload = { version: 1, recipientId: otherUid, senderPublicKey, ...encrypted };
