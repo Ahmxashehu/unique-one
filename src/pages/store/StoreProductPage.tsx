@@ -170,7 +170,7 @@ export default function StoreProductPage() {
               <button onClick={handleSaveWishlist} disabled={savingWishlist} className={`px-6 py-4 rounded-xl border font-medium transition-colors flex items-center justify-center gap-2 ${isWishlisted ? 'border-red-200 bg-red-50 text-red-600' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>{savingWishlist ? <Loader2 className="w-5 h-5 animate-spin" /> : <Heart className={`w-5 h-5 ${isWishlisted ? 'fill-current' : ''}`} />} {isWishlisted ? 'Saved' : 'Save'}</button>
             </div>
             <div className="flex gap-3">
-              <button className="flex-1 px-4 py-3 bg-blue-50 text-blue-700 font-medium rounded-xl hover:bg-blue-100 transition-colors flex justify-center items-center gap-2"><Handshake className="w-4 h-4" /> Request Quote</button>
+              <button onClick={() => navigate(`/store/product-request?productName=${encodeURIComponent(product.name)}&description=${encodeURIComponent(product.description || "")}&quantity=${quantity}&price=${product.price}`)} className="flex-1 px-4 py-3 bg-blue-50 text-blue-700 font-medium rounded-xl hover:bg-blue-100 transition-colors flex justify-center items-center gap-2"><Handshake className="w-4 h-4" /> Request Quote</button>
               <Link to={`/os/messages/new?product=${product.id}&seller=${product.sellerId}`} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition-colors flex justify-center items-center gap-2"><MessageSquare className="w-4 h-4" /> Message Seller</Link>
             </div>
           </div>
