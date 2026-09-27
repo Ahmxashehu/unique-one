@@ -4,10 +4,13 @@ on:
   push:
     branches:
       - main
-      - feature/transaction-history-readonly
+      - "feature/**"
   pull_request:
     branches:
       - main
+
+permissions:
+  contents: read
 
 jobs:
   validate:
