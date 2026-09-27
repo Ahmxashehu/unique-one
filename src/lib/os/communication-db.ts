@@ -243,7 +243,7 @@ function mapMessage(snapshotId: string, data: DocumentData | undefined): Message
   if (data.encryptedPayload && typeof data.encryptedPayload === 'object' && !Array.isArray(data.encryptedPayload)) {
     const encrypted = data.encryptedPayload as Record<string, unknown>;
     if (encrypted.version === 1 && typeof encrypted.recipientId === 'string' && typeof encrypted.iv === 'string' && typeof encrypted.ciphertext === 'string' && encrypted.senderPublicKey && typeof encrypted.senderPublicKey === 'object') {
-      message.encryptedPayload = encrypted as Message['encryptedPayload'];
+      message.encryptedPayload = encrypted as unknown as Message['encryptedPayload'];
     } else {
       throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'Encrypted message payload is malformed.');
     }
