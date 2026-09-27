@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag, Trash2, ArrowRight, Loader2, Minus, Plus } from 'lucide-react';
-import { collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Product, CartItem } from '../../lib/os/types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,9 +10,11 @@ type CartRow = CartItem & { product: Product };
 
 export default function StoreCartPage() {
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState<CartRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [checkingOut, setCheckingOut] = useState(false);
 
   const loadCart = async () => {
     if (!currentUser) { setItems([]); setLoading(false); return; }
@@ -62,6 +64,60 @@ export default function StoreCartPage() {
     } catch (err: any) { setError(err.message || 'Could not update quantity.'); }
   };
 
+  const handleCheckout = async () => {
+    if (!currentUser || items.length === 0 || checkingOut) return;
+    setCheckingOut(true);
+    setError('');
+    try {
+      const groups = new Map<string, CartRow[]>();
+      items.forEach((item) => {
+        const group = groups.get(item.product.sellerId) || [];
+        group.push(item);
+        groups.set(item.product.sellerId, group);
+      });
+
+      const batch = writeBatch(db);
+      const now = new Date().toISOString();
+
+      groups.forEach((sellerItems, sellerId) => {
+        const orderRef = doc(collection(db, 'orders'));
+        const orderItems = sellerItems.map((item) => ({
+          productId: item.product.id,
+          name: item.product.name,
+          price: item.product.price,
+          quantity: item.quantity,
+        }));
+        const orderTotal = sellerItems.reduce(
+          (sum, item) => sum + item.product.price * item.quantity,
+          0
+        );
+
+        batch.set(orderRef, {
+          id: orderRef.id,
+          customerId: currentUser.uid,
+          sellerId,
+          items: orderItems,
+          totalAmount: orderTotal,
+          currency: sellerItems[0].product.currency || 'NGN',
+          status: 'pending',
+          createdAt: now,
+          updatedAt: now,
+        });
+      });
+
+      items.forEach((item) => {
+        batch.delete(doc(db, 'carts', item.id));
+      });
+
+      await batch.commit();
+      navigate('/os/orders');
+    } catch (err: any) {
+      setError(err?.message || 'Could not create your order. Your cart is still available.');
+    } finally {
+      setCheckingOut(false);
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>;
 
   const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
@@ -107,8 +163,15 @@ export default function StoreCartPage() {
             <h2 className="font-semibold text-slate-900">Order Summary</h2>
             <div className="flex justify-between mt-4 text-sm text-slate-600"><span>Subtotal</span><span>{items[0]?.product.currency === 'NGN' ? '₦' : '$'}{total.toLocaleString()}</span></div>
             <div className="flex justify-between mt-3 pt-3 border-t font-bold text-slate-900"><span>Total</span><span>{items[0]?.product.currency === 'NGN' ? '₦' : '$'}{total.toLocaleString()}</span></div>
-            <button disabled className="w-full mt-6 bg-slate-900 text-white py-3 rounded-xl font-medium opacity-50 cursor-not-allowed flex items-center justify-center gap-2">Checkout <ArrowRight className="w-4 h-4" /></button>
-            <p className="text-xs text-slate-500 mt-3">Checkout and payment will be connected after the order workflow is implemented.</p>
+            <button
+              onClick={handleCheckout}
+              disabled={checkingOut}
+              className="w-full mt-6 bg-slate-900 text-white py-3 rounded-xl font-medium hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {checkingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+              {checkingOut ? 'Creating order…' : 'Place Order'}
+            </button>
+            <p className="text-xs text-slate-500 mt-3">Your order is created first. Payment will be connected through UniquePay in the payment step.</p>
           </div>
         </div>
       )}
