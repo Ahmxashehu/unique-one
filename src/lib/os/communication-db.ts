@@ -239,7 +239,7 @@ function mapMessage(snapshotId: string, data: DocumentData | undefined): Message
     createdAt: coerceTimestampToIso(data.createdAt, 'createdAt'),
     status: data.status as Message['status'],
   };
-  if (typeof data.text === 'string') message.text = data.text;
+  if (typeof data.text === 'string') message.text = data.text;\n  if (data.encryptedPayload && typeof data.encryptedPayload === 'object' && !Array.isArray(data.encryptedPayload)) {\n    const encrypted = data.encryptedPayload as Record<string, unknown>;\n    if (encrypted.version === 1 && typeof encrypted.recipientId === 'string' && typeof encrypted.iv === 'string' && typeof encrypted.ciphertext === 'string' && encrypted.senderPublicKey && typeof encrypted.senderPublicKey === 'object') {\n      message.encryptedPayload = encrypted as Message['encryptedPayload'];\n    } else {\n      throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'Encrypted message payload is malformed.');\n    }\n  }
   if (Array.isArray(data.attachments)) {
     if (!data.attachments.every(isMessageAttachmentMetadata)) {
       throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'Message attachments contain invalid metadata.');
