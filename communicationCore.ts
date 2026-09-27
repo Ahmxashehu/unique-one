@@ -180,6 +180,13 @@ export interface ValidatedMessageDraft {
   senderId: string;
   type: CommunicationMessageType;
   text?: string;
+  encryptedPayload?: {
+    version: 1;
+    recipientId: string;
+    senderPublicKey: JsonWebKey;
+    iv: string;
+    ciphertext: string;
+  };
   attachments?: ValidatedMessageAttachment[];
   replyToMessageId?: string;
   createdAt: string;
@@ -199,6 +206,7 @@ export interface MessageDraftInput {
   text?: unknown;
   attachments?: unknown;
   replyToMessageId?: unknown;
+  encryptedPayload?: unknown;
   senderId?: unknown;
 }
 
@@ -275,11 +283,13 @@ export function validateMessageDraft(input: MessageDraftInput, authenticatedUser
   const hasText = typeof input.text === 'string' && input.text.trim().length > 0;
   const text = hasText ? validateMessageText(input.text) : undefined;
   const attachments = validateMessageAttachments(input.attachments, uid, conversationId);
+  const encryptedPayload = validateEncryptedPayload(input.encryptedPayload, uid);
+  if (text && encryptedPayload) throw new CommunicationValidationError('INVALID_ENCRYPTED_MESSAGE', 'Encrypted messages must not also include plaintext text.');
   if (!text && !attachments?.length) {
     throw new CommunicationValidationError('INVALID_MESSAGE_TEXT', 'Message text or an attachment is required.');
   }
-  if (type === 'text' && !text) {
-    throw new CommunicationValidationError('INVALID_MESSAGE_TYPE', 'Text messages require message text.');
+  if (type === 'text' && !text && !encryptedPayload) {
+    throw new CommunicationValidationError('INVALID_MESSAGE_TYPE', 'Text messages require message text or encrypted message payload.');
   }
   if (type !== 'text' && !attachments?.length) {
     throw new CommunicationValidationError('INVALID_MESSAGE_TYPE', 'This message type requires an attachment.');
@@ -294,6 +304,7 @@ export function validateMessageDraft(input: MessageDraftInput, authenticatedUser
     senderId: uid,
     type,
     ...(text ? { text } : {}),
+    ...(encryptedPayload ? { encryptedPayload } : {}),
     ...(attachments ? { attachments } : {}),
     ...(replyToMessageId ? { replyToMessageId } : {}),
     createdAt: serverTimestamp(),
