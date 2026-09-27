@@ -306,6 +306,44 @@ async function startServer() {
     catch (_) { return errorResponse(res, 'UNAUTHENTICATED', 'The supplied Firebase token is invalid or expired.'); }
   };
   app.get("/api/health", (req, res) => res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" }));
+  app.get("/api/users/resolve", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+    try {
+      const identifier = typeof req.query.identifier === 'string' ? req.query.identifier.trim() : '';
+      if (!identifier || identifier.length > 320) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A recipient identifier is required.');
+      }
+
+      const normalizedEmail = identifier.toLowerCase();
+      const [emailSnapshot, phoneSnapshot, uniqueOneIdSnapshot] = await Promise.all([
+        adminDb.collection('users').where('email', '==', identifier).limit(1).get(),
+        adminDb.collection('users').where('phone', '==', identifier).limit(1).get(),
+        adminDb.collection('users').where('uniqueOneId', '==', identifier).limit(1).get(),
+      ]);
+
+      const normalizedEmailSnapshot = normalizedEmail !== identifier
+        ? await adminDb.collection('users').where('email', '==', normalizedEmail).limit(1).get()
+        : null;
+
+      const match = [emailSnapshot, normalizedEmailSnapshot, phoneSnapshot, uniqueOneIdSnapshot]
+        .find((snapshot) => snapshot && !snapshot.empty);
+
+      if (!match || match.empty) {
+        return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'No Unique One user matches that recipient identifier.');
+      }
+
+      const userDoc = match.docs[0];
+      const data = userDoc.data() as Record<string, unknown>;
+      return res.status(200).json({
+        uid: userDoc.id,
+        fullName: typeof data.fullName === 'string' ? data.fullName : 'Unique One user',
+        uniqueOneId: typeof data.uniqueOneId === 'string' ? data.uniqueOneId : undefined,
+        profilePhotoUrl: typeof data.profilePhotoUrl === 'string' ? data.profilePhotoUrl : undefined,
+      });
+    } catch (error) {
+      console.error('Recipient lookup failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'We could not verify that recipient right now.');
+    }
+  });
   app.get("/api/wallet", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = (req as any).user?.uid as string | undefined;
     if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Missing authenticated user.');
