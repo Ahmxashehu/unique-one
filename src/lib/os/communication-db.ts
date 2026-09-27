@@ -6,6 +6,7 @@ import {
   getDocs,
   limit as fbLimit,
   onSnapshot,
+  orderBy,
   query,
   where,
   type DocumentData,
@@ -280,12 +281,42 @@ export async function subscribeToMessagesForConversation(
     onError(new CommunicationDbError('NOT_FOUND', `Conversation ${id} was not found.`));
     return () => undefined;
   }
-  const messageQuery = query(
+  const messageLimit = clampMessageLimit(requestedLimit);
+  const latestMessageQuery = query(
     collection(db, MESSAGES_COLLECTION),
     where('conversationId', '==', id),
-    fbLimit(clampMessageLimit(requestedLimit)),
+    orderBy('createdAt', 'desc'),
+    fbLimit(messageLimit),
   );
-  return onSnapshot(messageQuery, (snapshot) => {
+  const fallbackMessageQuery = query(
+    collection(db, MESSAGES_COLLECTION),
+    where('conversationId', '==', id),
+    fbLimit(messageLimit),
+  );
+  const handleSnapshot = (snapshot: import('firebase/firestore').QuerySnapshot<DocumentData>) => {
+    try {
+      const mapped = snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data()));
+      mapped.sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
+      onMessages(mapped);
+    } catch (error) {
+      onError(error instanceof CommunicationDbError ? error : new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'A message document is malformed.'));
+    }
+  };
+  let fallbackToUnordered = false;
+  return onSnapshot(latestMessageQuery, (snapshot) => {
+    handleSnapshot(snapshot);
+  }, (error) => {
+    console.error('Communication ordered message subscription failed:', error);
+    if (!fallbackToUnordered) {
+      fallbackToUnordered = true;
+      onSnapshot(fallbackMessageQuery, handleSnapshot, (fallbackError) => {
+        console.error('Communication message subscription fallback failed:', fallbackError);
+        onError(new CommunicationDbError('READ_FAILED', 'Failed to receive live Communication messages.'));
+      });
+      return;
+    }
+    onError(new CommunicationDbError('READ_FAILED', 'Failed to receive live Communication messages.'));
+  });
     try {
       const mapped = snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data()));
       mapped.sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
@@ -307,15 +338,29 @@ export async function getMessagesForConversation(conversationId: string, limit?:
   if (!membershipSnapshot.exists()) {
     return [];
   }
-  const messageQuery = query(
+  const messageLimit = clampMessageLimit(limit);
+  const latestMessageQuery = query(
     collection(db, MESSAGES_COLLECTION),
     where('conversationId', '==', id),
-    fbLimit(clampMessageLimit(limit)),
+    orderBy('createdAt', 'desc'),
+    fbLimit(messageLimit),
   );
-  const snapshot = await safeRead(() => getDocs(messageQuery));
-  const mapped = snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data()));
-  mapped.sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
-  return mapped;
+  try {
+    const snapshot = await safeRead(() => getDocs(latestMessageQuery));
+    const mapped = snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data()));
+    mapped.sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
+    return mapped;
+  } catch (_) {
+    const fallbackMessageQuery = query(
+      collection(db, MESSAGES_COLLECTION),
+      where('conversationId', '==', id),
+      fbLimit(messageLimit),
+    );
+    const snapshot = await safeRead(() => getDocs(fallbackMessageQuery));
+    const mapped = snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data()));
+    mapped.sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
+    return mapped;
+  }
 }
 
 /** Reads a message from the top-level Communication Core messages collection. */
