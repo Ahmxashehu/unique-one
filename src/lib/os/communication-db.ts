@@ -333,6 +333,7 @@ export async function subscribeToMessagesForConversation(
   );
 
   return () => unsubscribe();
+}
 
 /** Reads top-level Communication Core messages, never legacy nested messages. */
 export async function getMessagesForConversation(conversationId: string, limit?: number): Promise<Message[]> {
