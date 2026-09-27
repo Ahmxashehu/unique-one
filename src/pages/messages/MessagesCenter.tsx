@@ -23,7 +23,7 @@ export default function MessagesCenter() {
         setLoading(false);
         return;
       }
-      setLoading(true);
+      if (conversations.length === 0) setLoading(true);
       setError('');
       try {
         const token = await currentUser.getIdToken();
@@ -50,7 +50,7 @@ export default function MessagesCenter() {
       cancelled = true;
       window.clearInterval(refreshTimer);
     };
-  }, [currentUser]);
+  }, [currentUser, conversations.length]);
 
   useEffect(() => {
     const term = search.trim();
