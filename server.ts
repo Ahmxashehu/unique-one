@@ -1126,7 +1126,37 @@ async function startServer() {
     }
   });
 
-  app.post("/api/communication/keys", authenticate, rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), async (req, res) => {\n    try {\n      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);\n      const key = req.body?.publicKey;\n      if (!key || typeof key !== 'object' || Array.isArray(key) || key.kty !== 'EC' || key.crv !== 'P-256' || typeof key.x !== 'string' || typeof key.y !== 'string' || key.x.length > 256 || key.y.length > 256) {\n        return errorResponse(res, 'INVALID_REQUEST', 'A valid P-256 public encryption key is required.');\n      }\n      await adminDb.collection('communicationKeys').doc(uid).set({ uid, publicKey: key, version: 1, updatedAt: Timestamp.now().toDate().toISOString() }, { merge: true });\n      return res.status(200).json({ registered: true, version: 1 });\n    } catch (error) {\n      console.error('Communication encryption key registration failed:', error);\n      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to register the encryption key.');\n    }\n  });\n\n  app.get("/api/communication/keys/:uid", authenticate, rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), async (req, res) => {\n    try {\n      sanitizeRequiredAuthUid((req as any).user?.uid);\n      const uid = req.params.uid;\n      if (!isSafeFirebaseUid(uid)) return errorResponse(res, 'INVALID_REQUEST', 'The user ID is invalid.');\n      const snapshot = await adminDb.collection('communicationKeys').doc(uid).get();\n      if (!snapshot.exists) return errorResponse(res, 'NOT_FOUND', 'The user has not registered an encryption key on this device.', 404);\n      const data = snapshot.data() as Record<string, unknown>;\n      return res.status(200).json({ uid, publicKey: data.publicKey, version: data.version ?? 1 });\n    } catch (error) {\n      console.error('Communication encryption key read failed:', error);\n      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to read the encryption key.');\n    }\n  });\n\n  app.get("/api/communication/conversations/:conversationId/messages", authenticate, rateLimit({
+  app.post("/api/communication/keys", authenticate, rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const key = req.body?.publicKey;
+      if (!key || typeof key !== 'object' || Array.isArray(key) || key.kty !== 'EC' || key.crv !== 'P-256' || typeof key.x !== 'string' || typeof key.y !== 'string' || key.x.length > 256 || key.y.length > 256) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid P-256 public encryption key is required.');
+      }
+      await adminDb.collection('communicationKeys').doc(uid).set({ uid, publicKey: key, version: 1, updatedAt: Timestamp.now().toDate().toISOString() }, { merge: true });
+      return res.status(200).json({ registered: true, version: 1 });
+    } catch (error) {
+      console.error('Communication encryption key registration failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to register the encryption key.');
+    }
+  });
+
+  app.get("/api/communication/keys/:uid", authenticate, rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), async (req, res) => {
+    try {
+      sanitizeRequiredAuthUid((req as any).user?.uid);
+      const uid = req.params.uid;
+      if (!isSafeFirebaseUid(uid)) return errorResponse(res, 'INVALID_REQUEST', 'The user ID is invalid.');
+      const snapshot = await adminDb.collection('communicationKeys').doc(uid).get();
+      if (!snapshot.exists) return errorResponse(res, 'NOT_FOUND', 'The user has not registered an encryption key on this device.', 404);
+      const data = snapshot.data() as Record<string, unknown>;
+      return res.status(200).json({ uid, publicKey: data.publicKey, version: data.version ?? 1 });
+    } catch (error) {
+      console.error('Communication encryption key read failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to read the encryption key.');
+    }
+  });
+
+  app.get("/api/communication/conversations/:conversationId/messages", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 120,
     standardHeaders: true,
@@ -1491,7 +1521,10 @@ async function startServer() {
     try {
       const conversationRef = adminDb.collection('conversations').doc(draft.conversationId);
       const membershipQuery = await adminDb.collection('conversationMembers').where('conversationId', '==', draft.conversationId).get();
-      const otherUids = membershipQuery.docs.map((doc) => (doc.data() as Partial<ConversationMember>).uid).filter((uid): uid is string => Boolean(uid) && uid !== senderUid);\n      if (draft.encryptedPayload && !otherUids.includes(draft.encryptedPayload.recipientId)) {\n        return errorResponse(res, 'INVALID_REQUEST', 'The encrypted recipient is not a member of this conversation.');\n      }
+      const otherUids = membershipQuery.docs.map((doc) => (doc.data() as Partial<ConversationMember>).uid).filter((uid): uid is string => Boolean(uid) && uid !== senderUid);
+      if (draft.encryptedPayload && !otherUids.includes(draft.encryptedPayload.recipientId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The encrypted recipient is not a member of this conversation.');
+      }
       for (const otherUid of otherUids) {
         const forwardId = createHash('sha256').update(senderUid + ':' + otherUid).digest('hex').slice(0, 40);
         const reverseId = createHash('sha256').update(otherUid + ':' + senderUid).digest('hex').slice(0, 40);
