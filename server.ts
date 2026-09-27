@@ -306,6 +306,47 @@ async function startServer() {
     catch (_) { return errorResponse(res, 'UNAUTHENTICATED', 'The supplied Firebase token is invalid or expired.'); }
   };
   app.get("/api/health", (req, res) => res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" }));
+
+  app.patch("/api/admin/users/verification", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+    const adminUid = (req as any).user?.uid as string | undefined;
+    if (!adminUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+    try {
+      const adminSnapshot = await adminDb.collection('users').doc(adminUid).get();
+      const adminData = adminSnapshot.data() as Record<string, unknown> | undefined;
+      const roles = Array.isArray(adminData?.roles) ? adminData.roles : [];
+      if (!roles.includes('administrator')) return errorResponse(res, 'BLOCKED', 'Administrator access is required.', 403);
+
+      const body = req.body as Record<string, unknown>;
+      const uid = typeof body?.uid === 'string' ? body.uid.trim() : '';
+      const allowedStatuses = new Set(['unverified', 'email_verified', 'phone_verified', 'fully_verified']);
+      const verificationStatus = typeof body?.verificationStatus === 'string' ? body.verificationStatus : '';
+      if (!isSafeFirebaseUid(uid) || !allowedStatuses.has(verificationStatus)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid user ID and verification status are required.');
+      }
+      if (uid === adminUid) return errorResponse(res, 'INVALID_REQUEST', 'Administrator self-verification changes are not allowed through this endpoint.');
+
+      const userRef = adminDb.collection('users').doc(uid);
+      const userSnapshot = await userRef.get();
+      if (!userSnapshot.exists) return errorResponse(res, 'NOT_FOUND', 'The requested user does not exist.');
+
+      const now = Timestamp.now();
+      await adminDb.runTransaction(async transaction => {
+        transaction.update(userRef, { verificationStatus, verificationUpdatedAt: now, verificationUpdatedBy: adminUid });
+        const auditRef = adminDb.collection('audit_logs').doc();
+        transaction.set(auditRef, {
+          action: 'user_verification_status_changed',
+          actorUid: adminUid,
+          targetUid: uid,
+          verificationStatus,
+          createdAt: now,
+        });
+      });
+      return res.status(200).json({ uid, verificationStatus });
+    } catch (error) {
+      console.error('Admin verification update failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to update verification status right now.');
+    }
+  });
   app.get("/api/users/resolve", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     try {
       const identifier = typeof req.query.identifier === 'string' ? req.query.identifier.trim() : '';
