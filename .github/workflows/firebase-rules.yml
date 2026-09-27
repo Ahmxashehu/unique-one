@@ -1,10 +1,11 @@
-name: Deploy Firebase Storage Rules
+name: Deploy Firebase Rules
 
 on:
   push:
     branches:
       - main
     paths:
+      - firestore.rules
       - storage.rules
       - firebase.json
       - .firebaserc
@@ -15,7 +16,7 @@ permissions:
   contents: read
 
 jobs:
-  deploy-storage-rules:
+  deploy-firebase-rules:
     runs-on: ubuntu-latest
     env:
       FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_UNIQUE_ONE }}
@@ -37,5 +38,5 @@ jobs:
         with:
           credentials_json: ${{ env.FIREBASE_SERVICE_ACCOUNT }}
 
-      - name: Deploy Firebase Storage rules
-        run: npx --yes firebase-tools@latest deploy --only storage --project unique-one-9731b
+      - name: Deploy Firebase Firestore and Storage rules
+        run: npx --yes firebase-tools@latest deploy --only firestore,storage --project unique-one-9731b
