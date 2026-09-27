@@ -45,7 +45,16 @@ service cloud.firestore {
     match /staffInvites/{inviteId} {
       allow read: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.inviteeEmail == request.auth.token.email);
       allow create: if isAuthenticated() && request.resource.data.businessOwnerUid == request.auth.uid && request.resource.data.status == 'pending' && request.resource.data.role in ['admin','manager','sales','cashier','accountant','inventory','support','delivery','branch_manager','viewer'];
-      allow update: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.inviteeEmail == request.auth.token.email) && request.resource.data.businessOwnerUid == resource.data.businessOwnerUid;
+      allow update: if isAdmin() ||
+        (isAuthenticated() &&
+          resource.data.inviteeEmail == request.auth.token.email &&
+          request.resource.data.businessOwnerUid == resource.data.businessOwnerUid &&
+          request.resource.data.inviteeEmail == resource.data.inviteeEmail &&
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.branchName == resource.data.branchName &&
+          request.resource.data.createdAt == resource.data.createdAt &&
+          request.resource.data.invitedAt == resource.data.invitedAt &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
       allow delete: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
     }
     match /staffMembers/{staffId} { allow read: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.uid == request.auth.uid); allow create, update, delete: if false; }
