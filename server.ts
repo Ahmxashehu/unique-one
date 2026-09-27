@@ -1044,7 +1044,7 @@ async function startServer() {
       const extension = contentType === 'image/webp' ? 'webp' : (originalName.includes('.') ? originalName.split('.').pop()?.toLowerCase() : 'bin');
       const fileId = randomUUID();
       const storagePath = `messages/${conversationId}/${uid}/${fileId}.${extension}`;
-      const bucket = getStorage().bucket('gen-lang-client-0680695304.firebasestorage.app');
+      const bucket = getStorage().bucket();
       const file = bucket.file(storagePath);
       await file.save(body, {
         resumable: false,
