@@ -154,7 +154,7 @@ export default function ChatView() {
               if (!active) return;
               setMessages((current) => {
                 if (current.length === nextMessages.length && current.every((item, index) => {
-                  const next = decryptedMessages[index];
+                  const next = nextMessages[index];
                   return item.id === next.id
                     && item.updatedAt === next.updatedAt
                     && item.status === next.status
