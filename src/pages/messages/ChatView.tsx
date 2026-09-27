@@ -567,7 +567,6 @@ export default function ChatView() {
                   </div>}
                   <div className="flex items-center justify-between gap-2 mt-1 text-[10px] text-slate-400">
                     <div className="flex gap-1">
-  <button onClick={() => void updateReaction(msg.id, '')} className="hidden" aria-hidden="true" tabIndex={-1} />
   <button onClick={() => setReactionTarget(reactionTarget === msg.id ? null : msg.id)} className="p-1 rounded hover:bg-black/10" aria-label="React"><Smile className="w-3 h-3" /></button>
   {msg.text && !msg.deleted && <button onClick={() => void copyMessage(msg.text ?? '')} className="p-1 rounded hover:bg-black/10" aria-label="Copy message" title="Copy message"><Copy className="w-3 h-3" /></button>}
   {mine && !msg.deleted && <button onClick={() => void deleteMessage(msg.id)} className="p-1 rounded hover:bg-black/10" aria-label="Delete"><Trash2 className="w-3 h-3" /></button>}
