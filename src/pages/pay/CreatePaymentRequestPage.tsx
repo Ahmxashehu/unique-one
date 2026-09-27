@@ -1,82 +1,92 @@
-import React, { useState } from 'react';
-import { ArrowDownRight, Send, AlertCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useOfflineQueue } from '../../contexts/OfflineQueueContext';
+import { useState } from 'react';
+import { AlertCircle, Loader2, Send } from 'lucide-react';
+import { addDoc, collection } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { db } from '../../lib/firebase';
 
 export default function CreatePaymentRequestPage() {
-  const { enqueueOperation } = useOfflineQueue();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
-  
-  const handleSubmit = (e: React.FormEvent, isDraft: boolean) => {
-    e.preventDefault();
-    if (!recipient || !amount || !description) return;
+  const [dueDate, setDueDate] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (isDraft: boolean) => {
+    if (!currentUser) return setError('You must be signed in to create a payment request.');
+    const recipientIdentifier = recipient.trim();
+    const requestDescription = description.trim();
+    const amountValue = Number(amount);
+    if (!recipientIdentifier || !Number.isFinite(amountValue) || amountValue <= 0 || !requestDescription) {
+      return setError('Enter a recipient, a valid amount, and a description.');
+    }
+
     setLoading(true);
-
-    enqueueOperation(`Save Payment Request for ${recipient}`, async () => {
-       await new Promise(r => setTimeout(r, 800));
-    });
-
-    setTimeout(() => {
-      setLoading(false);
+    setError(null);
+    try {
+      const now = new Date().toISOString();
+      await addDoc(collection(db, 'payment_requests'), {
+        senderId: currentUser.uid,
+        recipientIdentifier,
+        amount: Math.round(amountValue * 100) / 100,
+        currency: 'NGN',
+        description: requestDescription,
+        ...(dueDate ? { dueDate } : {}),
+        status: isDraft ? 'draft' : 'sent',
+        createdAt: now,
+        updatedAt: now,
+      });
       navigate('/os/payment-requests');
-    }, 1000);
+    } catch (submitError) {
+      console.error('Unable to create payment request:', submitError);
+      setError('We could not save this payment request. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-12">
+    <div className="mx-auto max-w-3xl space-y-6 pb-12">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Request Payment</h1>
-        <p className="text-sm text-slate-500 mt-1">Send a payment request to a customer, business, or parent.</p>
+        <p className="mt-1 text-sm text-slate-500">Create a real payment request stored in your UniquePay account.</p>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
-        <div className="text-sm text-blue-800">
-          <span className="font-semibold">Demo Notice: </span>
-          This request will be created but no actual emails/SMS or real financial charges will be processed.
-        </div>
-      </div>
+      {error && <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><span>{error}</span></div>}
 
-      <form className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 space-y-6">
+      <div className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 md:p-8">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Recipient *</label>
-          <input type="text" value={recipient} onChange={e=>setRecipient(e.target.value)} required placeholder="Email, Phone, or Unique ID" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900" />
-          <p className="text-xs text-slate-500 mt-1">We will securely look up the recipient before confirming.</p>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Recipient *</label>
+          <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} required placeholder="Email, phone, or Unique One ID" className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+          <p className="mt-1 text-xs text-slate-500">Recipient identity resolution will be connected through the trusted payment identity layer.</p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid gap-6 md:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Amount *</label>
-            <div className="flex">
-              <span className="px-4 py-3 bg-slate-50 border border-r-0 border-slate-200 rounded-l-xl text-slate-500">₦</span>
-              <input type="number" min="0" step="0.01" value={amount} onChange={e=>setAmount(e.target.value)} required placeholder="0.00" className="w-full px-4 py-3 rounded-r-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900" />
-            </div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Amount *</label>
+            <div className="flex"><span className="rounded-l-xl border border-r-0 border-slate-200 bg-slate-50 px-4 py-3 text-slate-500">₦</span><input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required placeholder="0.00" className="w-full rounded-r-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900" /></div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Due Date</label>
-            <input type="date" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            <label className="mb-1 block text-sm font-medium text-slate-700">Due Date</label>
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900" />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Description *</label>
-          <textarea rows={3} value={description} onChange={e=>setDescription(e.target.value)} required placeholder="What is this payment for?" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none" />
+          <label className="mb-1 block text-sm font-medium text-slate-700">Description *</label>
+          <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} required placeholder="What is this payment for?" className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900" />
         </div>
 
-        <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row justify-end gap-3">
-          <button type="button" onClick={(e)=>handleSubmit(e, true)} disabled={loading} className="px-6 py-2.5 rounded-xl font-medium border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors">
-            Save Draft
-          </button>
-          <button type="button" onClick={(e)=>handleSubmit(e, false)} disabled={loading} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Send Request
+        <div className="flex flex-col justify-end gap-3 border-t border-slate-100 pt-6 sm:flex-row">
+          <button type="button" onClick={() => void handleSubmit(true)} disabled={loading} className="rounded-xl border border-slate-200 px-6 py-2.5 font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-60">Save Draft</button>
+          <button type="button" onClick={() => void handleSubmit(false)} disabled={loading} className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send Request
           </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }
