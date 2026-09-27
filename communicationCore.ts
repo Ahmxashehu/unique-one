@@ -285,8 +285,8 @@ export function validateMessageDraft(input: MessageDraftInput, authenticatedUser
   const attachments = validateMessageAttachments(input.attachments, uid, conversationId);
   const encryptedPayload = validateEncryptedPayload(input.encryptedPayload, uid);
   if (text && encryptedPayload) throw new CommunicationValidationError('INVALID_ENCRYPTED_MESSAGE', 'Encrypted messages must not also include plaintext text.');
-  if (!text && !attachments?.length) {
-    throw new CommunicationValidationError('INVALID_MESSAGE_TEXT', 'Message text or an attachment is required.');
+  if (!text && !encryptedPayload && !attachments?.length) {
+    throw new CommunicationValidationError('INVALID_MESSAGE_TEXT', 'Message text, encrypted message payload, or an attachment is required.');
   }
   if (type === 'text' && !text && !encryptedPayload) {
     throw new CommunicationValidationError('INVALID_MESSAGE_TYPE', 'Text messages require message text or encrypted message payload.');
