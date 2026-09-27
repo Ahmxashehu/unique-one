@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { AlertCircle, Loader2, Send } from 'lucide-react';
-import { addDoc, collection } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { db } from '../../lib/firebase';
 
 export default function CreatePaymentRequestPage() {
   const { currentUser } = useAuth();
@@ -27,23 +25,19 @@ export default function CreatePaymentRequestPage() {
     setError(null);
     try {
       const token = await currentUser.getIdToken();
-      const resolveResponse = await fetch('/api/users/resolve?identifier=' + encodeURIComponent(recipientIdentifier), { headers: { Authorization: 'Bearer ' + token } });
-      const resolvePayload = await resolveResponse.json().catch(() => null);
-      if (!resolveResponse.ok || !resolvePayload?.uid) throw new Error(resolvePayload?.error?.message || 'The recipient could not be verified.');
-      const now = new Date().toISOString();
-      await addDoc(collection(db, 'payment_requests'), {
-        senderId: currentUser.uid,
-        recipientId: resolvePayload.uid,
-        recipientIdentifier,
-        recipientName: typeof resolvePayload.fullName === 'string' ? resolvePayload.fullName : 'Unique One user',
-        amount: Math.round(amountValue * 100) / 100,
-        currency: 'NGN',
-        description: requestDescription,
-        ...(dueDate ? { dueDate } : {}),
-        status: isDraft ? 'draft' : 'sent',
-        createdAt: now,
-        updatedAt: now,
+      const response = await fetch('/api/payment-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({
+          recipientIdentifier,
+          amount: amountValue,
+          description: requestDescription,
+          ...(dueDate ? { dueDate } : {}),
+          status: isDraft ? 'draft' : 'sent',
+        }),
       });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.id) throw new Error(payload?.error?.message || 'We could not create the payment request.');
       navigate('/os/payment-requests');
     } catch (submitError) {
       console.error('Unable to create payment request:', submitError);
