@@ -74,6 +74,7 @@ export interface Message {
   senderId: string;
   type: CommunicationMessageType;
   text?: string;
+  encryptedPayload?: EncryptedMessagePayload;
   attachments?: MessageAttachmentMetadata[];
   replyToMessageId?: string;
   createdAt: string;
