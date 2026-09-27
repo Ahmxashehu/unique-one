@@ -1709,7 +1709,7 @@ async function startServer() {
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to send the message.');
     }
   });
-  app.get("/api/calendar/events", async (req, res) => {
+  app.get("/api/calendar/events", authenticate, async (req, res) => {
     try {
       const authHeader = req.headers.authorization; if (!authHeader) return res.status(401).json({ error: "No authorization header" });
       const response = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=" + new Date().toISOString() + "&maxResults=10&singleEvents=true&orderBy=startTime", { headers: { Authorization: authHeader, Accept: "application/json" } });
