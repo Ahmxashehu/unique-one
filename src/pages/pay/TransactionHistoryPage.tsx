@@ -109,9 +109,6 @@ export default function TransactionHistoryPage() {
             <option value="sent">Sent</option>
             <option value="received">Received</option>
           </select>
-          <button type="button" className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 sm:hidden">
-            <Filter className="h-4 w-4" /> Filter
-          </button>
         </div>
       </div>
 
