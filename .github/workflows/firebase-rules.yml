@@ -1,0 +1,30 @@
+name: Deploy Firebase Storage Rules
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - storage.rules
+      - firebase.json
+      - .firebaserc
+      - .github/workflows/firebase-rules.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-storage-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy Firebase Storage rules
+        run: npx --yes firebase-tools@latest deploy --only storage --project gen-lang-client-0680695304
