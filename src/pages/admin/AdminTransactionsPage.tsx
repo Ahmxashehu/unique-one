@@ -13,6 +13,9 @@ interface AdminTransaction {
   type?: string;
   status?: string;
   sourceModule?: string;
+  recordKind?: string;
+  schemaVersion?: number;
+  amountUnit?: string;
   createdAt?: unknown;
 }
 
