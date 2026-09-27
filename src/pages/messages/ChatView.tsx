@@ -158,7 +158,7 @@ export default function ChatView() {
                     && item.deleted === next.deleted
                     && JSON.stringify(item.reactions ?? {}) === JSON.stringify(next.reactions ?? {})
                     && JSON.stringify(item.attachments ?? []) === JSON.stringify(next.attachments ?? []);
-                });
+                })) return current;
                 return nextMessages;
               });
               setLoading(false);
