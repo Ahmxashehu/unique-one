@@ -60,6 +60,16 @@ service firebase.storage {
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 
+    // Public business branding media. Storefront visitors may read it; only the owner may upload/replace/delete.
+    match /businesses/{businessId}/media/{uid}/{fileName} {
+      allow read: if true;
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && validImage()
+        && request.resource.size <= 5 * 1024 * 1024;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
     // Business documents remain private and can only be uploaded by the business owner.
     match /businesses/{businessId}/documents/{uid}/{fileName} {
       allow read: if signedIn() && request.auth.uid == uid;
