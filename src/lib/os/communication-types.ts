@@ -16,7 +16,7 @@ export type MessageDeliveryStatus = 'sent' | 'delivered' | 'read';
 export type MessageRequestStatus = 'pending' | 'accepted' | 'declined' | 'blocked';
 export type PresenceStatus = 'online' | 'offline';
 
-export interface MessageAttachmentMetadata {
+export interface EncryptedMessagePayload {\n  version: 1;\n  recipientId: string;\n  senderPublicKey: JsonWebKey;\n  iv: string;\n  ciphertext: string;\n}\n\nexport interface MessageAttachmentMetadata {
   id: string;
   name: string;
   contentType: string;
