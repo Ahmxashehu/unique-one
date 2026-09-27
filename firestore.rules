@@ -34,8 +34,30 @@ service cloud.firestore {
     match /carts/{cartId} { allow read: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow update: if isAuthenticated() && resource.data.customerId == request.auth.uid && request.resource.data.customerId == resource.data.customerId; allow delete: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid; }
     match /wishlists/{wishlistId} { allow read: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow update: if isAuthenticated() && resource.data.customerId == request.auth.uid && request.resource.data.customerId == resource.data.customerId; allow delete: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid; }
     match /reviews/{reviewId} { allow read: if true; allow create: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5 && request.resource.data.targetId is string && request.resource.data.targetType in ['product', 'seller'] && request.resource.data.verifiedPurchase == false; allow update, delete: if isAdmin(); }
-    match /payment_requests/{reqId} { allow read: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isAdmin(); allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid; allow update: if isAuthenticated() && request.resource.data.senderId == resource.data.senderId && request.resource.data.recipientId == resource.data.recipientId && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isAdmin(); allow delete: if isAdmin(); }
-    match /invoices/{invId} { allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin(); allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid; allow update: if isAuthenticated() && request.resource.data.sellerId == resource.data.sellerId && request.resource.data.customerId == resource.data.customerId && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin(); allow delete: if isAdmin(); }
+    match /payment_requests/{reqId} {
+      allow read: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
+      allow update: if isAuthenticated()
+        && request.resource.data.senderId == resource.data.senderId
+        && request.resource.data.recipientId == resource.data.recipientId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status in ['draft', 'sent', 'viewed', 'pending_approval', 'approved', 'rejected', 'cancelled', 'expired']
+        && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid)
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /invoices/{invId} {
+      allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid;
+      allow update: if isAuthenticated()
+        && request.resource.data.sellerId == resource.data.sellerId
+        && request.resource.data.customerId == resource.data.customerId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status in ['draft', 'sent', 'viewed', 'overdue', 'cancelled', 'disputed']
+        && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid)
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
     match /receipts/{recId} { allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin(); allow create, update, delete: if false; }
     match /transactions/{txId} { allow read: if isAdmin() || (isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid)); allow create, update, delete: if false; }
     match /wallets/{uid} { allow read, create, update, delete: if false; }
