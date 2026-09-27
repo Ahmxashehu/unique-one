@@ -168,6 +168,12 @@ The transfer implementation creates and updates this collection server-side.
 
 Internal transfer execution uses one Firebase Admin Firestore transaction to validate request semantics, check idempotency state, read both wallets, verify balances, create financial records, update both wallets, write double-entry ledger rows, and persist the idempotency result atomically. No client-controlled financial fields determine authoritative identity, balances, transaction IDs, references, timestamps, or final status.
 
+### 8.1 Wallet provisioning boundary
+
+Transfer execution does not create wallets. Both the sender and recipient wallets must already exist before the atomic transfer transaction can proceed. Wallet creation remains a separate authenticated onboarding operation (`POST /api/wallet`).
+
+This prevents a financial transfer from silently creating or changing wallet lifecycle state.
+
 ## UniquePay Internal Wallet Transfer Contract
 
 **This contract is implemented for internal wallet transfer execution in the server-authoritative flow. It does not imply external payment rail integration or live-money settlement guarantees.**
@@ -225,11 +231,13 @@ Transfer limits are **NOT currently defined**. Do not invent numeric limits. Fut
 
 Every transfer request requires an idempotency key.
 
-Proposed storage:
+Storage:
 
 ```text
-walletIdempotency/{senderUid}_{idempotencyKey}
+walletIdempotency/{sha256(senderUid + NUL + idempotencyKey)}
 ```
+
+The document ID is a deterministic SHA-256 hash of the authenticated sender UID and idempotency key. This avoids separator-based composite-key collisions while keeping the Firestore document ID bounded.
 
 Required behavior:
 

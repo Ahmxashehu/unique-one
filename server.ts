@@ -290,7 +290,11 @@ async function readUserExists(uid: string): Promise<boolean> {
     throw error;
   }
 }
-function idempotencyDocumentId(senderUid: string, idempotencyKey: string) { return `${senderUid}_${idempotencyKey}`; }
+function idempotencyDocumentId(senderUid: string, idempotencyKey: string) {
+  // Hash the composite identity so UID/key combinations cannot collide because
+  // of separator characters, while keeping the Firestore document ID bounded.
+  return createHash('sha256').update(senderUid + '\0' + idempotencyKey).digest('hex');
+}
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
@@ -459,9 +463,6 @@ async function startServer() {
     const { recipientId, amountMinor, currency, idempotencyKey, description } = validatedRequest;
     try {
       if (!(await readUserExists(recipientId))) return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'The recipient user does not exist.');
-      // Wallets are provisioned lazily so a valid Unique One user can receive
-      // their first transfer without having to open the wallet screen first.
-      await Promise.all([ensureWalletForUser(senderUid), ensureWalletForUser(recipientId)]);
     } catch (error) {
       console.error('Recipient lookup failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to validate the recipient at this time.');
@@ -497,9 +498,9 @@ async function startServer() {
         transaction.set(adminDb.collection('transactions').doc(transactionId), transactionRecord);
         transaction.update(senderWalletRef, { availableBalanceMinor: newSenderBalance, updatedAt: now });
         transaction.update(recipientWalletRef, { availableBalanceMinor: newRecipientBalance, updatedAt: now });
-        // Step 11A-2: Double-entry ledger. Two server-generated ledgerEntries documents
-        // (LedgerEntryRecord schema) are written atomically within this same transaction:
-        // one debit for the sender, one credit for the recipient. Both share the same
+        // Double-entry ledger: two server-generated ledgerEntries documents are
+        // written atomically with the wallet mutations and financial transaction:
+        // one debit for the sender and one credit for the recipient. Both share the
         // transactionId, reference, amountMinor, currency, status, and idempotencyKey.
         const senderLedgerRef = adminDb.collection('ledgerEntries').doc();
         const recipientLedgerRef = adminDb.collection('ledgerEntries').doc();
