@@ -37,7 +37,9 @@ export default function ChatView() {
   const [attachments, setAttachments] = useState<MessageAttachmentMetadata[]>([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [attachmentStage, setAttachmentStage] = useState<'preparing' | 'uploading' | null>(null);
-  const [attachmentProgress, setAttachmentProgress] = useState(0);\n  const [encryptionReady, setEncryptionReady] = useState(false);\n  const [peerPublicKey, setPeerPublicKey] = useState<JsonWebKey | null>(null);
+  const [attachmentProgress, setAttachmentProgress] = useState(0);
+  const [encryptionReady, setEncryptionReady] = useState(false);
+  const [peerPublicKey, setPeerPublicKey] = useState<JsonWebKey | null>(null);
 
   const updatePresence = useCallback(async (status: 'online' | 'offline') => {
     if (!currentUser) return;
@@ -373,7 +375,24 @@ export default function ChatView() {
     setError('');
     try {
       const token = await currentUser.getIdToken();
-      let encryptedPayload: { version: 1; recipientId: string; senderPublicKey: JsonWebKey; iv: string; ciphertext: string } | undefined;\n      if (text && conversation?.type === 'direct') {\n        if (!peerPublicKey || !otherUid) throw new Error('The recipient has not registered an encryption key on this device yet. Open the conversation on the other device, then try again.');\n        const senderPublicKey = await ensureDeviceKeyPair(currentUser.uid);\n        const encrypted = await encryptForUser(currentUser.uid, peerPublicKey, text);\n        encryptedPayload = { version: 1, recipientId: otherUid, senderPublicKey, ...encrypted };\n      }\n      const response = await fetch('/api/communication/messages', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },\n        body: JSON.stringify({\n          conversationId: id,\n          type: attachments.length > 0 ? (attachments.every((item) => item.contentType.startsWith('image/')) ? 'image' : 'file') : 'text',\n          ...(text && !encryptedPayload ? { text } : {}),\n          ...(encryptedPayload ? { encryptedPayload } : {}),\n          ...(attachments.length > 0 ? { attachments: attachments.map((item) => ({ ...item, storagePath: item.storagePath })) } : {}),\n          replyToMessageId: replyingTo?.id,\n        }),
+      let encryptedPayload: { version: 1; recipientId: string; senderPublicKey: JsonWebKey; iv: string; ciphertext: string } | undefined;
+      if (text && conversation?.type === 'direct') {
+        if (!peerPublicKey || !otherUid) throw new Error('The recipient has not registered an encryption key on this device yet. Open the conversation on the other device, then try again.');
+        const senderPublicKey = await ensureDeviceKeyPair(currentUser.uid);
+        const encrypted = await encryptForUser(currentUser.uid, peerPublicKey, text);
+        encryptedPayload = { version: 1, recipientId: otherUid, senderPublicKey, ...encrypted };
+      }
+      const response = await fetch('/api/communication/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({
+          conversationId: id,
+          type: attachments.length > 0 ? (attachments.every((item) => item.contentType.startsWith('image/')) ? 'image' : 'file') : 'text',
+          ...(text && !encryptedPayload ? { text } : {}),
+          ...(encryptedPayload ? { encryptedPayload } : {}),
+          ...(attachments.length > 0 ? { attachments: attachments.map((item) => ({ ...item, storagePath: item.storagePath })) } : {}),
+          replyToMessageId: replyingTo?.id,
+        }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to send message.');
