@@ -354,7 +354,7 @@ async function startServer() {
         return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
       }
       const message = payload.message;
-      const responseText = await generateUniqueAiResponse(message);
+      const responseText = await generateUniqueAiResponse({ uid, message });
       return res.status(200).json({ message: responseText, readOnly: true });
     } catch (error) {
       if (error instanceof UniqueAiValidationError) {
