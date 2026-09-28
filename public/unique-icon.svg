@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title>Unique One</title><desc>Unique One app icon</desc>
+<rect width="512" height="512" rx="112" fill="#ffffff"/>
+<rect x="48" y="48" width="416" height="416" rx="92" fill="#0b7a3b"/>
+<path d="M145 142v126c0 78 45 120 111 120s111-42 111-120V142h-58v122c0 42-18 66-53 66s-53-24-53-66V142z" fill="#ffffff"/>
+<circle cx="256" cy="105" r="24" fill="#ffffff"/>
+</svg>
