@@ -1,8 +1,64 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Wallet, ArrowUpRight, ArrowDownRight, FileText, Receipt, ShieldCheck, HelpCircle, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function PayPage() {
+  const { currentUser, loading: authLoading } = useAuth();
+  const [balanceMinor, setBalanceMinor] = useState<number | null>(null);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletError, setWalletError] = useState('');
+
+  useEffect(() => {
+    if (authLoading) return;
+    let cancelled = false;
+
+    const loadWallet = async () => {
+      if (!currentUser) {
+        setWalletLoading(false);
+        return;
+      }
+
+      setWalletLoading(true);
+      setWalletError('');
+      try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch('/api/wallet', {
+          headers: { Authorization: 'Bearer ' + token },
+        });
+
+        if (response.status === 404) {
+          const initializeResponse = await fetch('/api/wallet', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + token },
+          });
+          if (!initializeResponse.ok) throw new Error('Unable to initialize wallet');
+          const wallet = await initializeResponse.json() as { availableBalanceMinor?: unknown };
+          const balance = Number(wallet.availableBalanceMinor);
+          if (!Number.isSafeInteger(balance) || balance < 0) throw new Error('Invalid wallet balance');
+          if (!cancelled) setBalanceMinor(balance);
+          return;
+        }
+
+        if (!response.ok) throw new Error('Unable to load wallet');
+        const wallet = await response.json() as { availableBalanceMinor?: unknown };
+        const balance = Number(wallet.availableBalanceMinor);
+        if (!Number.isSafeInteger(balance) || balance < 0) throw new Error('Invalid wallet balance');
+        if (!cancelled) setBalanceMinor(balance);
+      } catch (error) {
+        console.error('Unable to load UniquePay wallet:', error);
+        if (!cancelled) setWalletError('Your wallet balance could not be loaded.');
+      } finally {
+        if (!cancelled) setWalletLoading(false);
+      }
+    };
+
+    void loadWallet();
+    return () => { cancelled = true; };
+  }, [authLoading, currentUser]);
+
+  if (authLoading) return null;
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       
@@ -22,23 +78,15 @@ export default function PayPage() {
       </div>
 
 
-      {/* Demo Warning */}
-      <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-start gap-3">
-        <ShieldCheck className="w-5 h-5 text-blue-600 mt-0.5" />
-        <div>
-          <h4 className="font-semibold text-blue-900">Demo Environment</h4>
-          <p className="text-sm text-blue-800 mt-1">
-            UniquePay is currently running in a simulated mode. No real banking APIs or payment processors are connected. Any balances or transactions shown are placeholders.
-          </p>
-        </div>
-      </div>
-
       <div className="grid md:grid-cols-3 gap-6">
         {/* Balances */}
         <div className="md:col-span-2 bg-slate-900 text-white p-8 rounded-3xl relative overflow-hidden">
           <div className="relative z-10">
-            <p className="text-slate-400 font-medium">Available Balance (Demo)</p>
-            <h2 className="text-4xl md:text-5xl font-bold mt-2">₦0.00</h2>
+            <p className="text-slate-400 font-medium">Available Balance</p>
+            <h2 className="text-4xl md:text-5xl font-bold mt-2">
+              {walletLoading ? 'Loading…' : balanceMinor === null ? '—' : '₦' + (balanceMinor / 100).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </h2>
+            {walletError && <p className="text-sm text-amber-300 mt-2">{walletError}</p>}
             <div className="flex gap-4 mt-8">
               <Link to="/os/payment-requests/new" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
                 <ArrowDownRight className="w-4 h-4" /> Request Money
