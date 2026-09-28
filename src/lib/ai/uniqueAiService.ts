@@ -8,6 +8,8 @@ const MAX_PROMPT_LENGTH = 4_000;
 const MAX_OUTPUT_LENGTH = 8_000;
 const MAX_HISTORY_TURNS = 6;
 const MAX_HISTORY_TEXT_LENGTH = 1_000;
+const MAX_CONTEXT_JSON_LENGTH = 60_000;
+const MAX_MODEL_NAME_LENGTH = 100;
 
 const SYSTEM_INSTRUCTION = [
   "You are Unique AI, the assistant for the Unique One platform.",
@@ -89,6 +91,40 @@ function getHistory(value: unknown): UniqueAiConversationTurn[] {
   });
 }
 
+function validateAuthorizedContext(
+  context: Awaited<ReturnType<typeof getAuthorizedPlatformContext>>,
+): void {
+  const { summary } = context;
+  if (context.orders.length > summary.contextLimits.orders ||
+      context.businesses.length > summary.contextLimits.businesses ||
+      context.products.length > summary.contextLimits.products) {
+    throw new UniqueAiValidationError("Authorized AI context exceeded its configured bounds.");
+  }
+
+  const orderSideTotal = summary.customerOrderCount + summary.sellerOrderCount;
+  if (orderSideTotal !== summary.orderCount) {
+    throw new UniqueAiValidationError("Authorized AI order summary is inconsistent.");
+  }
+
+  const orderStatusTotal = Object.values(summary.orderStatusCounts).reduce((total, count) => total + count, 0);
+  if (orderStatusTotal !== summary.orderCount) {
+    throw new UniqueAiValidationError("Authorized AI order status summary is inconsistent.");
+  }
+
+  const businessCategoryTotal = Object.values(summary.businessCategoryCounts).reduce((total, count) => total + count, 0);
+  const businessStatusTotal = Object.values(summary.businessStatusCounts).reduce((total, count) => total + count, 0);
+  const businessVerificationTotal = Object.values(summary.businessVerificationCounts).reduce((total, count) => total + count, 0);
+  if (businessCategoryTotal !== summary.businessCount || businessStatusTotal !== summary.businessCount || businessVerificationTotal !== summary.businessCount) {
+    throw new UniqueAiValidationError("Authorized AI business summary is inconsistent.");
+  }
+
+  const productCategoryTotal = Object.values(summary.productCategoryCounts).reduce((total, count) => total + count, 0);
+  const productStatusTotal = Object.values(summary.productStatusCounts).reduce((total, count) => total + count, 0);
+  if (productCategoryTotal !== summary.productCount || productStatusTotal !== summary.productCount) {
+    throw new UniqueAiValidationError("Authorized AI product summary is inconsistent.");
+  }
+}
+
 function buildContextualPrompt(
   message: string,
   history: UniqueAiConversationTurn[],
@@ -98,17 +134,22 @@ function buildContextualPrompt(
     ? JSON.stringify(history)
     : "[]";
 
+  const authorizedContext = JSON.stringify({
+    user: context.user,
+    summary: context.summary,
+    orders: context.orders,
+    businesses: context.businesses,
+    products: context.products,
+    contextLoadedAt: context.summary.contextLoadedAt,
+    contextWarnings: context.summary.contextWarnings,
+  });
+  if (authorizedContext.length > MAX_CONTEXT_JSON_LENGTH) {
+    throw new UniqueAiValidationError("Authorized AI context is too large for this request.");
+  }
+
   return [
     "<AUTHORIZED_PLATFORM_CONTEXT>",
-    JSON.stringify({
-      user: context.user,
-      summary: context.summary,
-      orders: context.orders,
-      businesses: context.businesses,
-      products: context.products,
-      contextLoadedAt: context.summary.contextLoadedAt,
-      contextWarnings: context.summary.contextWarnings,
-    }),
+    authorizedContext,
     "</AUTHORIZED_PLATFORM_CONTEXT>",
     "<UNTRUSTED_CONVERSATION_HISTORY>",
     historyText,
@@ -178,11 +219,16 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
   const prompt = getPrompt(input.message);
   const history = getHistory(input.history);
   const context = await getAuthorizedPlatformContext(input.uid);
+  validateAuthorizedContext(context);
   const contextualPrompt = buildContextualPrompt(prompt, history, context);
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
 
-  const model = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+  const configuredModel = process.env.GEMINI_MODEL?.trim();
+  if (configuredModel && (configuredModel.length > MAX_MODEL_NAME_LENGTH || !/^[A-Za-z0-9._:-]+$/.test(configuredModel))) {
+    throw new UniqueAiValidationError("GEMINI_MODEL is invalid.");
+  }
+  const model = configuredModel || DEFAULT_MODEL;
   const startedAt = Date.now();
   try {
     const ai = new GoogleGenAI({ apiKey });
