@@ -301,6 +301,8 @@ async function writeAiAuditLog(input: {
   model: string;
   success: boolean;
   durationMs: number;
+  outputLength: number;
+  errorType?: string;
   context: Awaited<ReturnType<typeof getAuthorizedPlatformContext>>;
 }): Promise<void> {
   try {
@@ -316,6 +318,8 @@ async function writeAiAuditLog(input: {
       },
       contextTruncated: input.context.summary.contextTruncated,
       contextWarningCount: input.context.summary.contextWarnings.length,
+      outputLength: input.outputLength,
+      ...(input.errorType ? { errorType: input.errorType } : {}),
       createdAt: Timestamp.now(),
     });
   } catch (error) {
@@ -381,10 +385,25 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
       },
     });
     const output = validateAiOutput(response.text);
-    await writeAiAuditLog({ uid: input.uid, model, success: true, durationMs: Date.now() - startedAt, context });
+    await writeAiAuditLog({
+      uid: input.uid,
+      model,
+      success: true,
+      durationMs: Date.now() - startedAt,
+      outputLength: output.length,
+      context,
+    });
     return output;
   } catch (error) {
-    await writeAiAuditLog({ uid: input.uid, model, success: false, durationMs: Date.now() - startedAt, context });
+    await writeAiAuditLog({
+      uid: input.uid,
+      model,
+      success: false,
+      durationMs: Date.now() - startedAt,
+      outputLength: 0,
+      errorType: error instanceof UniqueAiValidationError ? "validation" : "generation",
+      context,
+    });
     throw error;
   }
 }
