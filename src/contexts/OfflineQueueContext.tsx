@@ -40,13 +40,16 @@ export const OfflineQueueProvider: React.FC<{ children: ReactNode }> = ({ childr
       const op = queueRef.current[0];
       setCurrentSyncItem(op);
       
-      // Remove from the queue immediately so it moves to "currently syncing"
-      setQueue(prev => prev.slice(1));
-
       try {
         await op.action();
+        // Remove only after the operation succeeds so failed work is not silently lost.
+        setQueue(prev => prev.filter(item => item.id !== op.id));
       } catch (err) {
         console.error(`Failed to sync operation ${op.name}:`, err);
+        // Keep the failed operation queued for a later retry.
+        setCurrentSyncItem(null);
+        setIsSyncing(false);
+        return;
       }
     }
 
