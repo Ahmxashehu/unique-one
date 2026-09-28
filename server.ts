@@ -1556,6 +1556,7 @@ async function startServer() {
         const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(message.conversationId, uid));
         const membershipSnapshot = await transaction.get(membershipRef);
         if (!membershipSnapshot.exists) throw new Error('FORBIDDEN');
+        if (message.senderId === uid) throw new Error('SENDER_CANNOT_UPDATE_DELIVERY');
 
         const deliverySnapshot = await transaction.get(deliveryRef);
         const nowIso = Timestamp.now().toDate().toISOString();
@@ -1584,6 +1585,7 @@ async function startServer() {
       const code = error instanceof Error ? error.message : '';
       if (code === 'MESSAGE_NOT_FOUND') return errorResponse(res, 'INVALID_REQUEST', 'The message was not found.', 404);
       if (code === 'FORBIDDEN') return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      if (code === 'SENDER_CANNOT_UPDATE_DELIVERY') return errorResponse(res, 'INVALID_REQUEST', 'Only a message recipient can update delivery status.', 403);
       console.error('Message delivery update failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to update message delivery status.');
     }
