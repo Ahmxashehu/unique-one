@@ -325,7 +325,7 @@ function validateAiOutput(value: unknown): string {
   if (forbiddenMarkers.some((marker) => text.includes(marker))) {
     throw new Error("Gemini returned an invalid response.");
   }
-  if (/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]/.test(text)) {
+  if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(text)) {
     throw new Error("Gemini returned an invalid response.");
   }
 
