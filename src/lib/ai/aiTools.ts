@@ -77,7 +77,7 @@ export async function getAuthorizedOrderContext(uid: string): Promise<UniqueAiOr
       createdAt: toIsoString(data.createdAt),
     });
   }
-  return Array.from(orders.values()).slice(0, MAX_ORDER_CONTEXT);
+  return Array.from(orders.values());
 }
 
 export async function getAuthorizedBusinessContext(uid: string): Promise<UniqueAiBusinessContext[]> {
@@ -97,7 +97,7 @@ export async function getAuthorizedBusinessContext(uid: string): Promise<UniqueA
       verificationStatus: safeString(data.verificationStatus),
       createdAt: toIsoString(data.createdAt),
     };
-  });
+  }).slice(0, MAX_BUSINESS_CONTEXT + 1);
 }
 
 export async function getAuthorizedProductContext(uid: string): Promise<UniqueAiProductContext[]> {
@@ -122,7 +122,7 @@ export async function getAuthorizedProductContext(uid: string): Promise<UniqueAi
           : undefined,
       status: safeString(data.status),
     };
-  });
+  }).slice(0, MAX_PRODUCT_CONTEXT + 1);
 }
 
 export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueAiPlatformContext> {
