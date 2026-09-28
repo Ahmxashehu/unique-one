@@ -89,7 +89,13 @@ function buildContextualPrompt(
 
   return [
     "<AUTHORIZED_PLATFORM_CONTEXT>",
-    JSON.stringify({ user: context.user, orders: context.orders, businesses: context.businesses, products: context.products }),
+    JSON.stringify({
+      user: context.user,
+      summary: context.summary,
+      orders: context.orders,
+      businesses: context.businesses,
+      products: context.products,
+    }),
     "</AUTHORIZED_PLATFORM_CONTEXT>",
     "<UNTRUSTED_CONVERSATION_HISTORY>",
     historyText,
