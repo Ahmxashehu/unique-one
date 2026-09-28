@@ -11,7 +11,7 @@ export type UniqueAiOrderContext = {
   id: string;
   side: "customer" | "seller";
   status: string;
-  totalAmount: number;
+  totalAmount?: number;
   currency: string;
   itemCount: number;
   createdAt?: string;
@@ -68,6 +68,8 @@ export type UniqueAiPlatformSummary = {
   productsOutOfStock: number;
   contextLimits: { orders: number; businesses: number; products: number };
   contextTruncated: { orders: boolean; businesses: boolean; products: boolean };
+  contextLoadedAt: string;
+  contextWarnings: string[];
 };
 
 export type UniqueAiPlatformContext = {
