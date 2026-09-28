@@ -133,9 +133,27 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
     return counts;
   }, {});
 
+  const orderSideStatusCounts = orders.reduce<Record<string, number>>((counts, order) => {
+    const key = `${order.side}:${order.status}`;
+    counts[key] = (counts[key] ?? 0) + 1;
+    return counts;
+  }, {});
+
   const businessCategoryCounts = businesses.reduce<Record<string, number>>((counts, business) => {
     const category = business.category ?? "Uncategorized";
     counts[category] = (counts[category] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  const businessStatusCounts = businesses.reduce<Record<string, number>>((counts, business) => {
+    const status = business.status ?? "unknown";
+    counts[status] = (counts[status] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  const businessVerificationCounts = businesses.reduce<Record<string, number>>((counts, business) => {
+    const status = business.verificationStatus ?? "unknown";
+    counts[status] = (counts[status] ?? 0) + 1;
     return counts;
   }, {});
 
@@ -144,6 +162,18 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
     counts[category] = (counts[category] ?? 0) + 1;
     return counts;
   }, {});
+
+  const productStatusCounts = products.reduce<Record<string, number>>((counts, product) => {
+    const status = product.status ?? "unknown";
+    counts[status] = (counts[status] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  const productsWithoutCategory = products.filter((product) => !product.category).length;
+  const inventoryUnitCount = products.reduce(
+    (total, product) => total + (typeof product.quantity === "number" && product.quantity > 0 ? product.quantity : 0),
+    0,
+  );
 
   const activeOrderCount = orders.filter(
     (order) => !["cancelled", "refunded"].includes(order.status),
