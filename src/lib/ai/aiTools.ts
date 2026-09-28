@@ -237,18 +237,14 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
         products: MAX_PRODUCT_CONTEXT,
       },
       contextTruncated: {
-        orders:
-          customerSnapshot.size >= MAX_ORDER_CONTEXT || sellerSnapshot.size >= MAX_ORDER_CONTEXT,
+        orders: orders.length >= MAX_ORDER_CONTEXT,
         businesses: businesses.length >= MAX_BUSINESS_CONTEXT,
         products: products.length >= MAX_PRODUCT_CONTEXT,
       },
       contextLoadedAt: new Date().toISOString(),
       contextWarnings: [
-        ...(customerSnapshot.size >= MAX_ORDER_CONTEXT
-          ? [`Customer order context reached its limit of ${MAX_ORDER_CONTEXT}.`]
-          : []),
-        ...(sellerSnapshot.size >= MAX_ORDER_CONTEXT
-          ? [`Seller order context reached its limit of ${MAX_ORDER_CONTEXT}.`]
+        ...(orders.length >= MAX_ORDER_CONTEXT
+          ? [`Order context reached its limit of ${MAX_ORDER_CONTEXT} loaded records.`]
           : []),
         ...(businesses.length >= MAX_BUSINESS_CONTEXT
           ? [`Business context reached its limit of ${MAX_BUSINESS_CONTEXT}.`]
