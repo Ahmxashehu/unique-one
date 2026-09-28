@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { PackagePlus, Save, Loader2, AlertCircle, X, ImagePlus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { db } from '../../lib/firebase';
+import { db, storage } from '../../lib/firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
+import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { uploadMedia } from '../../lib/media/upload';
 import { useNavigate } from 'react-router-dom';
 import { ProductCategory, ProductCondition, ProductStatus, Product } from '../../lib/os/types';
@@ -81,7 +82,7 @@ export default function AddProductPage() {
       imageTargetBytes: 450 * 1024,
       onProgress: progress => setUploadProgress(Math.round(((index + progress / 100) / total) * 100)),
     });
-    return result.downloadUrl;
+    return result;
   };
 
   const handleSubmit = async (e: React.FormEvent, status: ProductStatus) => {
@@ -100,10 +101,16 @@ export default function AddProductPage() {
     if (parsedBulk !== undefined && (!Number.isFinite(parsedBulk) || parsedBulk < 0)) { setError('Enter a valid bulk price.'); return; }
 
     setLoading(true); setError(''); setSuccess(false); setUploadProgress(0);
+    let uploadedStoragePaths: string[] = [];
     try {
       const productId = doc(collection(db, 'products')).id;
       const uploadedImages: string[] = [];
-      for (let i = 0; i < imageFiles.length; i++) uploadedImages.push(await uploadImage(imageFiles[i], productId, i, imageFiles.length || 1));
+      uploadedStoragePaths = [];
+      for (let i = 0; i < imageFiles.length; i++) {
+        const result = await uploadImage(imageFiles[i], productId, i, imageFiles.length || 1);
+        uploadedImages.push(result.downloadUrl);
+        uploadedStoragePaths.push(result.storagePath);
+      }
       const now = new Date().toISOString();
       const productData: Product = {
         id: productId, sellerId: currentUser.uid, name: cleanName, description: cleanDescription, category,
@@ -120,6 +127,9 @@ export default function AddProductPage() {
       setSuccess(true);
       window.setTimeout(() => navigate('/os/business/dashboard'), 800);
     } catch (err) {
+      if (uploadedStoragePaths.length) {
+        await Promise.allSettled(uploadedStoragePaths.map(path => deleteObject(storageRef(storage, path))));
+      }
       console.error('Failed to save product:', err);
       setError(err instanceof Error ? err.message : 'Unable to optimize, upload images, or save product. Please try again.');
     } finally { setLoading(false); }
