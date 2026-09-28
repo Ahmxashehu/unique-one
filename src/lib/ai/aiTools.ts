@@ -128,6 +128,34 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
     getAuthorizedProductContext(uid),
   ]);
 
+  const orderStatusCounts = orders.reduce<Record<string, number>>((counts, order) => {
+    counts[order.status] = (counts[order.status] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  const businessCategoryCounts = businesses.reduce<Record<string, number>>((counts, business) => {
+    const category = business.category ?? "Uncategorized";
+    counts[category] = (counts[category] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  const productCategoryCounts = products.reduce<Record<string, number>>((counts, product) => {
+    const category = product.category ?? "Uncategorized";
+    counts[category] = (counts[category] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  const activeOrderCount = orders.filter(
+    (order) => !["cancelled", "refunded"].includes(order.status),
+  ).length;
+  const cancelledOrderCount = orders.filter((order) => order.status === "cancelled").length;
+  const productsWithQuantity = products.filter(
+    (product) => typeof product.quantity === "number" && product.quantity > 0,
+  ).length;
+  const productsOutOfStock = products.filter(
+    (product) => typeof product.quantity === "number" && product.quantity <= 0,
+  ).length;
+
   return {
     user,
     orders,
@@ -137,11 +165,15 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
       orderCount: orders.length,
       customerOrderCount: orders.filter((order) => order.side === "customer").length,
       sellerOrderCount: orders.filter((order) => order.side === "seller").length,
+      orderStatusCounts,
+      activeOrderCount,
+      cancelledOrderCount,
       businessCount: businesses.length,
+      businessCategoryCounts,
       productCount: products.length,
-      productsWithQuantity: products.filter(
-        (product) => typeof product.quantity === "number" && product.quantity > 0,
-      ).length,
+      productCategoryCounts,
+      productsWithQuantity,
+      productsOutOfStock,
     },
   };
 }
