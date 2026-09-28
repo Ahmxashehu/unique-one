@@ -349,6 +349,12 @@ async function startServer() {
       const userRef = adminDb.collection('users').doc(uid);
 
       await adminDb.runTransaction(async transaction => {
+        const userSnapshot = await transaction.get(userRef);
+        const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+        const existingRoles = Array.isArray(userData?.roles)
+          ? userData.roles.filter((role): role is string => typeof role === 'string')
+          : [];
+
         transaction.set(businessRef, {
           ownerUid: uid,
           name,
@@ -362,7 +368,7 @@ async function startServer() {
           createdAt: now,
           updatedAt: now,
         });
-        transaction.update(userRef, { roles: Array.from(new Set([...(Array.isArray((await transaction.get(userRef)).data()?.roles) ? (await transaction.get(userRef)).data()?.roles as string[] : []), 'business_owner'])) });
+        transaction.update(userRef, { roles: Array.from(new Set([...existingRoles, 'business_owner'])) });
       });
 
       return res.status(201).json({ businessId: businessRef.id, status: 'pending' });
