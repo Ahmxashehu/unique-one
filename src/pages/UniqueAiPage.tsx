@@ -13,6 +13,10 @@ const QUICK_PROMPTS = [
   "Summarize my current orders.",
   "What businesses and products do I have?",
   "How many orders, businesses, and products do I have?",
+  "How many of my orders are active or cancelled?",
+  "What order statuses do I currently have?",
+  "How are my businesses grouped by category?",
+  "How are my products grouped by category?",
   "What is my account verification status?",
   "Can you change a payment or order for me?",
 ];
