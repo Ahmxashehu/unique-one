@@ -98,6 +98,8 @@ function validateAuthorizedContext(
 
   const nonNegativeSafeInteger = (value: number): boolean =>
     Number.isSafeInteger(value) && value >= 0;
+  const nonNegativeFiniteNumber = (value: number): boolean =>
+    Number.isFinite(value) && value >= 0;
   const countMaps = [
     summary.orderStatusCounts,
     summary.orderSideStatusCounts,
@@ -123,7 +125,6 @@ function validateAuthorizedContext(
       summary.productsWithoutCategory,
       summary.productsWithUnknownStatus,
       summary.productsWithoutQuantity,
-      summary.inventoryUnitCount,
       summary.productsWithQuantity,
       summary.productsOutOfStock,
       summary.contextLimits.orders,
@@ -132,6 +133,9 @@ function validateAuthorizedContext(
     ].every(nonNegativeSafeInteger)
   ) {
     throw new UniqueAiValidationError("Authorized AI summary contains invalid numeric values.");
+  }
+  if (!nonNegativeFiniteNumber(summary.inventoryUnitCount)) {
+    throw new UniqueAiValidationError("Authorized AI inventory quantity summary is invalid.");
   }
   if (
     countMaps.some((counts) =>
