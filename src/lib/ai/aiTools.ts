@@ -68,9 +68,10 @@ export async function getAuthorizedOrderContext(uid: string): Promise<UniqueAiOr
       id: snapshot.doc.id,
       side: snapshot.side,
       status: safeString(data.status, "unknown")!,
-      totalAmount: typeof data.totalAmount === "number" && Number.isFinite(data.totalAmount)
-        ? data.totalAmount
-        : 0,
+      totalAmount:
+        typeof data.totalAmount === "number" && Number.isFinite(data.totalAmount)
+          ? data.totalAmount
+          : 0,
       currency: safeString(data.currency, "NGN")!,
       itemCount: items.length,
       createdAt: toIsoString(data.createdAt),
@@ -112,9 +113,13 @@ export async function getAuthorizedProductContext(uid: string): Promise<UniqueAi
       id: doc.id,
       name: safeString(data.name, "Unnamed product")!,
       category: safeString(data.category),
-      price: typeof data.price === "number" && Number.isFinite(data.price) ? data.price : undefined,
+      price:
+        typeof data.price === "number" && Number.isFinite(data.price) ? data.price : undefined,
       currency: safeString(data.currency, "NGN")!,
-      quantity: typeof data.quantity === "number" && Number.isFinite(data.quantity) ? data.quantity : undefined,
+      quantity:
+        typeof data.quantity === "number" && Number.isFinite(data.quantity)
+          ? data.quantity
+          : undefined,
       status: safeString(data.status),
     };
   });
@@ -170,8 +175,18 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
   }, {});
 
   const productsWithoutCategory = products.filter((product) => !product.category).length;
+  const productsWithoutQuantity = products.filter((product) => product.quantity === undefined).length;
+  const productsWithUnknownStatus = products.filter((product) => !product.status).length;
+  const businessesWithoutCategory = businesses.filter((business) => !business.category).length;
+  const businessesWithUnknownStatus = businesses.filter((business) => !business.status).length;
+  const businessesWithUnknownVerification = businesses.filter(
+    (business) => !business.verificationStatus,
+  ).length;
+  const ordersWithUnknownStatus = orders.filter((order) => order.status === "unknown").length;
+
   const inventoryUnitCount = products.reduce(
-    (total, product) => total + (typeof product.quantity === "number" && product.quantity > 0 ? product.quantity : 0),
+    (total, product) =>
+      total + (typeof product.quantity === "number" && product.quantity > 0 ? product.quantity : 0),
     0,
   );
 
@@ -199,14 +214,20 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
       orderSideStatusCounts,
       activeOrderCount,
       cancelledOrderCount,
+      ordersWithUnknownStatus,
       businessCount: businesses.length,
       businessCategoryCounts,
       businessStatusCounts,
       businessVerificationCounts,
+      businessesWithoutCategory,
+      businessesWithUnknownStatus,
+      businessesWithUnknownVerification,
       productCount: products.length,
       productCategoryCounts,
       productStatusCounts,
       productsWithoutCategory,
+      productsWithUnknownStatus,
+      productsWithoutQuantity,
       inventoryUnitCount,
       productsWithQuantity,
       productsOutOfStock,
@@ -214,6 +235,11 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
         orders: MAX_ORDER_CONTEXT,
         businesses: MAX_BUSINESS_CONTEXT,
         products: MAX_PRODUCT_CONTEXT,
+      },
+      contextTruncated: {
+        orders: orders.length >= MAX_ORDER_CONTEXT,
+        businesses: businesses.length >= MAX_BUSINESS_CONTEXT,
+        products: products.length >= MAX_PRODUCT_CONTEXT,
       },
     },
   };
