@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag, Trash2, ArrowRight, Loader2, Minus, Plus } from 'lucide-react';
-import { collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Product, CartItem } from '../../lib/os/types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -69,47 +69,15 @@ export default function StoreCartPage() {
     setCheckingOut(true);
     setError('');
     try {
-      const groups = new Map<string, CartRow[]>();
-      items.forEach((item) => {
-        const group = groups.get(item.product.sellerId) || [];
-        group.push(item);
-        groups.set(item.product.sellerId, group);
+      const token = await currentUser.getIdToken();
+      const idempotencyKey = `store-${currentUser.uid}-${Date.now()}-${crypto.randomUUID()}`;
+      const response = await fetch('/api/store/checkout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idempotencyKey }),
       });
-
-      const batch = writeBatch(db);
-      const now = new Date().toISOString();
-
-      groups.forEach((sellerItems, sellerId) => {
-        const orderRef = doc(collection(db, 'orders'));
-        const orderItems = sellerItems.map((item) => ({
-          productId: item.product.id,
-          name: item.product.name,
-          price: item.product.price,
-          quantity: item.quantity,
-        }));
-        const orderTotal = sellerItems.reduce(
-          (sum, item) => sum + item.product.price * item.quantity,
-          0
-        );
-
-        batch.set(orderRef, {
-          id: orderRef.id,
-          customerId: currentUser.uid,
-          sellerId,
-          items: orderItems,
-          totalAmount: orderTotal,
-          currency: sellerItems[0].product.currency || 'NGN',
-          status: 'pending',
-          createdAt: now,
-          updatedAt: now,
-        });
-      });
-
-      items.forEach((item) => {
-        batch.delete(doc(db, 'carts', item.id));
-      });
-
-      await batch.commit();
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error?.message || 'Could not create your order.');
       navigate('/os/orders');
     } catch (err: any) {
       setError(err?.message || 'Could not create your order. Your cart is still available.');
