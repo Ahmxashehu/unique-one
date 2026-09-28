@@ -71,7 +71,7 @@ export async function getAuthorizedOrderContext(uid: string): Promise<UniqueAiOr
       totalAmount:
         typeof data.totalAmount === "number" && Number.isFinite(data.totalAmount)
           ? data.totalAmount
-          : 0,
+          : undefined,
       currency: safeString(data.currency, "NGN")!,
       itemCount: items.length,
       createdAt: toIsoString(data.createdAt),
@@ -237,10 +237,26 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
         products: MAX_PRODUCT_CONTEXT,
       },
       contextTruncated: {
-        orders: orders.length >= MAX_ORDER_CONTEXT,
+        orders:
+          customerSnapshot.size >= MAX_ORDER_CONTEXT || sellerSnapshot.size >= MAX_ORDER_CONTEXT,
         businesses: businesses.length >= MAX_BUSINESS_CONTEXT,
         products: products.length >= MAX_PRODUCT_CONTEXT,
       },
+      contextLoadedAt: new Date().toISOString(),
+      contextWarnings: [
+        ...(customerSnapshot.size >= MAX_ORDER_CONTEXT
+          ? [`Customer order context reached its limit of ${MAX_ORDER_CONTEXT}.`]
+          : []),
+        ...(sellerSnapshot.size >= MAX_ORDER_CONTEXT
+          ? [`Seller order context reached its limit of ${MAX_ORDER_CONTEXT}.`]
+          : []),
+        ...(businesses.length >= MAX_BUSINESS_CONTEXT
+          ? [`Business context reached its limit of ${MAX_BUSINESS_CONTEXT}.`]
+          : []),
+        ...(products.length >= MAX_PRODUCT_CONTEXT
+          ? [`Product context reached its limit of ${MAX_PRODUCT_CONTEXT}.`]
+          : []),
+      ],
     },
   };
 }
