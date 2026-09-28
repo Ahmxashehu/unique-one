@@ -1844,6 +1844,21 @@ async function startServer() {
         return errorResponse(res, 'INVALID_REQUEST', 'A valid idempotency key is required.');
       }
       const idempotencyRef = adminDb.collection('communicationMessageIdempotency').doc(idempotencyDocumentId(senderUid, idempotencyKey));
+      if (draft.attachments?.length) {
+        const bucket = getStorage().bucket();
+        for (const attachment of draft.attachments) {
+          try {
+            const [metadata] = await bucket.file(attachment.storagePath).getMetadata();
+            const actualSize = Number(metadata.size);
+            const actualContentType = typeof metadata.contentType === 'string' ? metadata.contentType : '';
+            if (!Number.isSafeInteger(actualSize) || actualSize <= 0 || actualSize !== attachment.sizeBytes || actualContentType !== attachment.contentType) {
+              return errorResponse(res, 'INVALID_REQUEST', 'One or more message attachments are invalid or incomplete.');
+            }
+          } catch {
+            return errorResponse(res, 'INVALID_REQUEST', 'One or more message attachments could not be verified.');
+          }
+        }
+      }
       const messageRef = adminDb.collection('messages').doc();
       const replyMessageRef = draft.replyToMessageId ? adminDb.collection('messages').doc(draft.replyToMessageId) : null;
       const now = Timestamp.now();
