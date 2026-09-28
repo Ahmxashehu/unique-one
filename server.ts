@@ -25,7 +25,7 @@ type TransferErrorCode =
   | 'SELF_TRANSFER_NOT_ALLOWED' | 'INVALID_AMOUNT' | 'INVALID_CURRENCY'
   | 'INVALID_IDEMPOTENCY_KEY' | 'IDEMPOTENCY_KEY_CONFLICT' | 'TRANSFER_ALREADY_COMPLETED'
   | 'TRANSFER_IN_PROGRESS' | 'WALLET_NOT_FOUND' | 'WALLET_UNAVAILABLE' | 'INSUFFICIENT_FUNDS' | 'RATE_LIMITED'
-  | 'TRANSACTION_FAILED' | 'SERVICE_UNAVAILABLE' | 'NOT_FOUND' | 'BLOCKED';
+  | 'TRANSACTION_FAILED' | 'SERVICE_UNAVAILABLE' | 'NOT_FOUND' | 'BLOCKED' | 'FORBIDDEN' | 'INSUFFICIENT_STOCK';
 interface TransferErrorResponse { error: { code: TransferErrorCode; message: string } }
 interface TransferRequestInput { recipientId: string; amountMinor: number; currency: 'NGN'; idempotencyKey: string; description?: string }
 interface CreateConversationRequestInput { type: ConversationType; title?: string; avatarUrl?: string; memberUids: string[] }
@@ -44,7 +44,7 @@ const transferErrorStatus: Record<TransferErrorCode, number> = {
   SELF_TRANSFER_NOT_ALLOWED: 400, INVALID_AMOUNT: 400, INVALID_CURRENCY: 400, INVALID_IDEMPOTENCY_KEY: 400,
   IDEMPOTENCY_KEY_CONFLICT: 409, TRANSFER_ALREADY_COMPLETED: 200, TRANSFER_IN_PROGRESS: 409, RATE_LIMITED: 429,
   WALLET_NOT_FOUND: 404, WALLET_UNAVAILABLE: 403, INSUFFICIENT_FUNDS: 409, TRANSACTION_FAILED: 500,
-  SERVICE_UNAVAILABLE: 503, NOT_FOUND: 404, BLOCKED: 403,
+  SERVICE_UNAVAILABLE: 503, NOT_FOUND: 404, BLOCKED: 403, FORBIDDEN: 403, INSUFFICIENT_STOCK: 409,
 };
 class RequestValidationError extends Error {
   code: 'UNAUTHENTICATED' | 'INVALID_REQUEST';
