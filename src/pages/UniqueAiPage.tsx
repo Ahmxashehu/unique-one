@@ -39,6 +39,7 @@ export default function UniqueAiPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
+  const [requestStartedAt, setRequestStartedAt] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -62,6 +63,7 @@ export default function UniqueAiPage() {
       setMessages((current) => [...current, userMessage]);
     }
     setLoading(true);
+    setRequestStartedAt(Date.now());
 
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
@@ -104,6 +106,7 @@ export default function UniqueAiPage() {
       }
     } finally {
       window.clearTimeout(timeoutId);
+      setRequestStartedAt(null);
       setLoading(false);
     }
   };
@@ -235,9 +238,10 @@ export default function UniqueAiPage() {
               Send
             </button>
           </div>
-          <p className="mt-2 px-1 text-xs text-slate-400">
-            Read-only assistant for now. It cannot change payments, orders, products, or other platform records. Some summaries are bounded by the records loaded for the request and may be incomplete when a context limit is reached.
-          </p>
+          <div className="mt-2 flex items-center justify-between gap-3 px-1 text-xs text-slate-400">
+            <span>Read-only assistant for now. It cannot change payments, orders, products, or other platform records.  Some summaries are bounded by the records loaded for the request and may be incomplete when a context limit is reached.</span>
+            <span aria-live="polite">{message.length}/4000</span>
+          </div>
         </form>
       </div>
     </div>
