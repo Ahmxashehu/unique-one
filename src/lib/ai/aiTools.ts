@@ -128,5 +128,20 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
     getAuthorizedProductContext(uid),
   ]);
 
-  return { user, orders, businesses, products };
+  return {
+    user,
+    orders,
+    businesses,
+    products,
+    summary: {
+      orderCount: orders.length,
+      customerOrderCount: orders.filter((order) => order.side === "customer").length,
+      sellerOrderCount: orders.filter((order) => order.side === "seller").length,
+      businessCount: businesses.length,
+      productCount: products.length,
+      productsWithQuantity: products.filter(
+        (product) => typeof product.quantity === "number" && product.quantity > 0,
+      ).length,
+    },
+  };
 }
