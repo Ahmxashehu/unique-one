@@ -166,11 +166,11 @@ export default function SellerDashboardPage() {
 
   const quickActions = [
     { label: 'Add Product', icon: Box, to: '/os/business/catalog/new-product' },
-    { label: 'Create Order', icon: ShoppingBag, to: '/os/business/orders/new' },
+    { label: 'Orders', icon: ShoppingBag, to: '/os/business/orders' },
     { label: 'Create Invoice', icon: FileText, to: '/os/invoices/new' },
     { label: 'Request Payment', icon: ArrowDownRight, to: '/os/payment-requests/new' },
-    { label: 'Add Customer', icon: UserPlus, to: '/os/business/customers/new' },
-    { label: 'Record Expense', icon: CreditCard, to: '/os/business/finance/expense' },
+    { label: 'Customers', icon: UserPlus, to: '/os/business/customers' },
+    { label: 'Finance', icon: CreditCard, to: '/os/business/finance' },
   ];
 
   return (
