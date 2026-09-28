@@ -97,6 +97,7 @@ import ReceiveMoneyPage from "./pages/pay/ReceiveMoneyPage";
 import BeneficiariesPage from "./pages/pay/BeneficiariesPage";
 import PaySettingsPage from "./pages/pay/PaySettingsPage";
 import PaySecurityPage from "./pages/pay/PaySecurityPage";
+import UniqueAiPage from "./pages/UniqueAiPage";
 
 
 
@@ -150,6 +151,7 @@ export default function App() {
               <Route path="requests" element={<UserRequestsPage />} />
               <Route path="pay" element={<PayPage />} />
               <Route path="store" element={<StorePage />} />
+              <Route path="ai" element={<UniqueAiPage />} />
 
               {/* Business Tools */}
               <Route path="business/register" element={<BusinessRegisterPage />} />
