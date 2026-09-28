@@ -1713,6 +1713,7 @@ async function startServer() {
           deletedAt: nowIso,
           updatedAt: nowIso,
           attachments: [],
+          encryptedPayload: null,
         });
       });
       if (attachmentStoragePaths.length > 0) {
