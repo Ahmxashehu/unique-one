@@ -19,9 +19,9 @@ export default function NearMePage() {
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
         <div className="relative z-10 text-center p-8 bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-sm max-w-sm">
           <MapPin className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-          <h3 className="font-semibold text-slate-900 text-lg">Map View Placeholder</h3>
+          <h3 className="font-semibold text-slate-900 text-lg">Map integration unavailable</h3>
           <p className="text-slate-500 mt-2 text-sm">
-            Integration with Google Maps Platform will display real-time local businesses, services, and ecosystem partners near your location.
+            Live map and location-based business discovery are not connected yet. No businesses or locations are being invented or shown as sample data.
           </p>
         </div>
       </div>
