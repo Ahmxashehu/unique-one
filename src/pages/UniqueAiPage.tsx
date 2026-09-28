@@ -60,6 +60,9 @@ export default function UniqueAiPage() {
     setMessages((current) => [...current, userMessage]);
     setLoading(true);
 
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
+
     try {
       const token = await currentUser.getIdToken();
       const historySource = retryMessage ? messages.slice(0, -1) : messages;
@@ -71,6 +74,7 @@ export default function UniqueAiPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ message: trimmed, history }),
+        signal: controller.signal,
       });
 
       const payload = (await response.json().catch(() => null)) as
@@ -91,8 +95,13 @@ export default function UniqueAiPage() {
       ]);
     } catch (err) {
       setLastFailedMessage(trimmed);
-      setError(err instanceof Error ? err.message : "Unable to contact Unique AI.");
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("Unique AI took too long to respond. Please try again.");
+      } else {
+        setError(err instanceof Error ? err.message : "Unable to contact Unique AI.");
+      }
     } finally {
+      window.clearTimeout(timeoutId);
       setLoading(false);
     }
   };
