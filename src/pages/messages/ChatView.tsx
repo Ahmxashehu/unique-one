@@ -281,11 +281,20 @@ export default function ChatView() {
     const unread = items.filter((item) => item.senderId !== currentUser.uid && item.status !== 'read');
     if (unread.length === 0) return;
     const token = await currentUser.getIdToken();
-    await Promise.all(unread.map((item) => fetch(`/api/communication/messages/${item.id}/delivery`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ action: 'read' }),
-    })));
+    const batchSize = 20;
+    for (let start = 0; start < unread.length; start += batchSize) {
+      const batch = unread.slice(start, start + batchSize);
+      await Promise.all(batch.map(async (item) => {
+        const response = await fetch(`/api/communication/messages/${item.id}/delivery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ action: 'read' }),
+        });
+        if (!response.ok) {
+          console.warn('Failed to mark message as read:', item.id, response.status);
+        }
+      }));
+    }
   }, [currentUser]);
 
   useEffect(() => {
