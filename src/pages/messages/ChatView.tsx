@@ -292,7 +292,11 @@ export default function ChatView() {
         });
         if (!response.ok) {
           console.warn('Failed to mark message as read:', item.id, response.status);
+          return;
         }
+        setMessages((current) => current.map((message) => (
+          message.id === item.id ? { ...message, status: 'read' } : message
+        )));
       }));
     }
   }, [currentUser]);
