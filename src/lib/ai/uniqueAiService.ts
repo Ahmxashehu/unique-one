@@ -3,12 +3,15 @@ import { getFirestore } from "firebase-admin/firestore";
 
 const DEFAULT_MODEL = "gemini-3.8-flash";
 const MAX_PROMPT_LENGTH = 4_000;
+const MAX_ORDER_CONTEXT = 20;
 
 const SYSTEM_INSTRUCTION = [
   "You are Unique AI, the assistant for the Unique One platform.",
   "Be accurate, practical, and concise.",
   "Do not invent Unique One platform data, balances, orders, businesses, listings, bookings, users, or other records.",
-  "This initial service is read-only: do not claim that you completed an action or changed platform data.",
+  "This service is read-only: do not claim that you completed an action or changed platform data.",
+  "Only use platform records explicitly supplied as authoritative context.",
+  "Never reveal another user's private identifiers, contact details, payment credentials, authentication data, or sensitive identity data.",
   "If a platform-specific fact is not provided to you, say that you do not have that data yet.",
 ].join(" ");
 
@@ -28,6 +31,16 @@ type UniqueAiUserContext = {
   verificationStatus?: string;
 };
 
+type UniqueAiOrderContext = {
+  id: string;
+  side: "customer" | "seller";
+  status: string;
+  totalAmount: number;
+  currency: string;
+  itemCount: number;
+  createdAt?: string;
+};
+
 async function getAuthorizedUserContext(uid: string): Promise<UniqueAiUserContext> {
   const snapshot = await getFirestore().collection("users").doc(uid).get();
   if (!snapshot.exists) {
@@ -40,13 +53,60 @@ async function getAuthorizedUserContext(uid: string): Promise<UniqueAiUserContex
     uniqueOneId: typeof data.uniqueOneId === "string" ? data.uniqueOneId : undefined,
     preferredLanguage: typeof data.preferredLanguage === "string" ? data.preferredLanguage : undefined,
     roles: Array.isArray(data.roles)
-      ? data.roles
-          .filter((role): role is string => typeof role === "string")
-          .slice(0, 20)
+      ? data.roles.filter((role): role is string => typeof role === "string").slice(0, 20)
       : [],
     status: typeof data.status === "string" ? data.status : undefined,
     verificationStatus: typeof data.verificationStatus === "string" ? data.verificationStatus : undefined,
   };
+}
+
+function toIsoString(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (
+    value &&
+    typeof value === "object" &&
+    "toDate" in value &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    const date = (value as { toDate: () => Date }).toDate();
+    return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+  }
+  return undefined;
+}
+
+async function getAuthorizedOrderContext(uid: string): Promise<UniqueAiOrderContext[]> {
+  const db = getFirestore();
+  const [customerSnapshot, sellerSnapshot] = await Promise.all([
+    db.collection("orders").where("customerId", "==", uid).limit(MAX_ORDER_CONTEXT).get(),
+    db.collection("orders").where("sellerId", "==", uid).limit(MAX_ORDER_CONTEXT).get(),
+  ]);
+
+  const orders = new Map<string, UniqueAiOrderContext>();
+
+  for (const snapshot of [
+    ...customerSnapshot.docs.map((doc) => ({ doc, side: "customer" as const })),
+    ...sellerSnapshot.docs.map((doc) => ({ doc, side: "seller" as const })),
+  ]) {
+    const data = snapshot.doc.data();
+    const items = Array.isArray(data.items) ? data.items : [];
+    const totalAmount = typeof data.totalAmount === "number" && Number.isFinite(data.totalAmount)
+      ? data.totalAmount
+      : 0;
+    const currency = typeof data.currency === "string" ? data.currency : "NGN";
+    const status = typeof data.status === "string" ? data.status : "unknown";
+
+    orders.set(snapshot.doc.id, {
+      id: snapshot.doc.id,
+      side: snapshot.side,
+      status,
+      totalAmount,
+      currency,
+      itemCount: items.length,
+      createdAt: toIsoString(data.createdAt),
+    });
+  }
+
+  return Array.from(orders.values()).slice(0, MAX_ORDER_CONTEXT);
 }
 
 function getPrompt(value: unknown): string {
@@ -72,9 +132,14 @@ export async function generateUniqueAiResponse(input: {
   message: unknown;
 }): Promise<string> {
   const prompt = getPrompt(input.message);
-  const userContext = await getAuthorizedUserContext(input.uid);
+  const [userContext, orderContext] = await Promise.all([
+    getAuthorizedUserContext(input.uid),
+    getAuthorizedOrderContext(input.uid),
+  ]);
+
   const contextualPrompt = [
     `Authenticated user context (read-only, authoritative): ${JSON.stringify(userContext)}`,
+    `Authorized order context (read-only, authoritative; only this user's customer/seller orders): ${JSON.stringify(orderContext)}`,
     `User request: ${prompt}`,
   ].join("\n");
 
