@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Building2, ArrowRight, Loader2, Upload, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { getIdToken } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 
 export default function BusinessRegisterPage() {
@@ -28,25 +28,19 @@ export default function BusinessRegisterPage() {
     setError('');
     
     try {
-      // 1. Create Business Document
-      const businessRef = await addDoc(collection(db, 'businesses'), {
-        ownerUid: currentUser.uid,
-        name: formData.name,
-        registrationNumber: formData.registrationNumber,
-        description: formData.description,
-        contactEmail: formData.contactEmail,
-        contactPhone: formData.contactPhone,
-        categories: [formData.category],
-        status: 'pending',
-        verificationStatus: 'unverified',
-        createdAt: new Date().toISOString()
+      const token = await getIdToken(currentUser);
+      const response = await fetch('/api/business/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(formData),
       });
-
-      // 2. Update User Document Roles
-      const userRef = doc(db, 'users', currentUser.uid);
-      await updateDoc(userRef, {
-        roles: arrayUnion('business_owner')
-      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(result?.error?.message || 'Failed to submit business registration.');
+      }
 
       navigate('/os/business/dashboard');
     } catch (err: any) {
