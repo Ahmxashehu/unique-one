@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Tag, Building2, Store as StoreIcon, Heart, Loader2, ShoppingBag } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Product } from '../../lib/os/types';
 import { useAuth } from '../../contexts/AuthContext';
-import { doc, setDoc, deleteDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function StoreDiscoverPage() {
   const navigate = useNavigate();
@@ -96,6 +95,9 @@ export default function StoreDiscoverPage() {
         });
         setWishlistIds(prev => new Set(prev).add(product.id));
       }
+    } catch (err: any) {
+      console.error('Error updating wishlist:', err);
+      setError(err?.message || 'Could not update wishlist.');
     } finally {
       setWishlistLoading(null);
     }
@@ -109,13 +111,7 @@ export default function StoreDiscoverPage() {
           <p className="text-slate-300 text-lg">Find products, services, and wholesale deals directly from verified sellers.</p>
           <form onSubmit={handleSearch} className="relative flex items-center">
             <Search className="absolute left-4 w-5 h-5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search products, sellers, or services..."
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              className="w-full pl-12 pr-32 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <input type="text" placeholder="Search products, sellers, or services..." value={searchText} onChange={e => setSearchText(e.target.value)} className="w-full pl-12 pr-32 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" />
             <button type="submit" className="absolute right-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors">Search</button>
           </form>
           <div className="flex flex-wrap justify-center gap-3">
@@ -129,8 +125,7 @@ export default function StoreDiscoverPage() {
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
         {categories.map(cat => (
           <Link key={cat.name} to={cat.path} className="flex flex-col items-center gap-3 p-4 bg-white border border-slate-100 rounded-2xl hover:shadow-md hover:border-slate-200 transition-all text-center">
-            <div className="text-3xl">{cat.icon}</div>
-            <span className="text-xs sm:text-sm font-medium text-slate-700">{cat.name}</span>
+            <div className="text-3xl">{cat.icon}</div><span className="text-xs sm:text-sm font-medium text-slate-700">{cat.name}</span>
           </Link>
         ))}
       </div>
@@ -155,46 +150,27 @@ export default function StoreDiscoverPage() {
           <h2 className="text-xl font-bold text-slate-900">Featured Products</h2>
           <Link to="/store/search" className="text-sm font-medium text-blue-600 hover:underline">View all</Link>
         </div>
-
-        {loading ? (
-          <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
-        ) : error ? (
-          <div className="bg-white border border-red-100 rounded-2xl p-10 text-center">
-            <p className="font-medium text-slate-900">Could not load products</p>
-            <p className="text-sm text-slate-500 mt-2">{error}</p>
-          </div>
-        ) : products.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center">
-            <ShoppingBag className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <h3 className="text-lg font-semibold text-slate-900">No products available yet</h3>
-            <p className="text-sm text-slate-500 mt-2">Published products from real sellers will appear here.</p>
-            <Link to="/store/product-request" className="inline-block mt-5 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium">Request a Product</Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-            {products.map(product => (
-              <Link key={product.id} to={`/store/product/${product.id}`} className="group flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all">
-                <div className="aspect-square bg-slate-100 relative overflow-hidden flex items-center justify-center">
-                  {product.images?.length ? <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <StoreIcon className="w-8 h-8 text-slate-300" />}
-                  <button
-                    type="button"
-                    onClick={e => toggleWishlist(product, e)}
-                    className={`absolute top-2 right-2 p-2 bg-white/80 backdrop-blur rounded-full transition-colors z-10 ${wishlistIds.has(product.id) ? 'text-red-500' : 'text-slate-400 hover:text-red-500'}`}
-                    aria-label={wishlistIds.has(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                  >
-                    {wishlistLoading === product.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className={`w-4 h-4 ${wishlistIds.has(product.id) ? 'fill-current' : ''}`} />}
-                  </button>
-                  <div className="absolute bottom-2 left-2 px-2 py-1 bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider rounded text-slate-700">{product.condition}</div>
-                </div>
-                <div className="p-4 flex flex-col flex-1">
-                  <h3 className="text-sm font-medium text-slate-900 line-clamp-2 mb-1">{product.name}</h3>
-                  <p className="text-lg font-bold text-slate-900 mt-auto">{product.currency === 'NGN' ? '₦' : '$'}{Number(product.price).toLocaleString()}</p>
-                  <div className="flex items-center gap-1 text-xs text-slate-500 mt-2"><StoreIcon className="w-3 h-3" /><span className="truncate">Seller</span></div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
+        {loading ? <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div> :
+        error ? <div className="bg-white border border-red-100 rounded-2xl p-10 text-center"><p className="font-medium text-slate-900">Could not load products</p><p className="text-sm text-slate-500 mt-2">{error}</p></div> :
+        products.length === 0 ? <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center"><ShoppingBag className="w-10 h-10 text-slate-300 mx-auto mb-3" /><h3 className="text-lg font-semibold text-slate-900">No products available yet</h3><p className="text-sm text-slate-500 mt-2">Published products from real sellers will appear here.</p><Link to="/store/product-request" className="inline-block mt-5 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium">Request a Product</Link></div> :
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+          {products.map(product => (
+            <Link key={product.id} to={`/store/product/${product.id}`} className="group flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all">
+              <div className="aspect-square bg-slate-100 relative overflow-hidden flex items-center justify-center">
+                {product.images?.length ? <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <StoreIcon className="w-8 h-8 text-slate-300" />}
+                <button type="button" onClick={e => toggleWishlist(product, e)} className={`absolute top-2 right-2 p-2 bg-white/80 backdrop-blur rounded-full transition-colors z-10 ${wishlistIds.has(product.id) ? 'text-red-500' : 'text-slate-400 hover:text-red-500'}`} aria-label={wishlistIds.has(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}>
+                  {wishlistLoading === product.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className={`w-4 h-4 ${wishlistIds.has(product.id) ? 'fill-current' : ''}`} />}
+                </button>
+                <div className="absolute bottom-2 left-2 px-2 py-1 bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider rounded text-slate-700">{product.condition}</div>
+              </div>
+              <div className="p-4 flex flex-col flex-1">
+                <h3 className="text-sm font-medium text-slate-900 line-clamp-2 mb-1">{product.name}</h3>
+                <p className="text-lg font-bold text-slate-900 mt-auto">{product.currency === 'NGN' ? '₦' : '$'}{Number(product.price).toLocaleString()}</p>
+                <div className="flex items-center gap-1 text-xs text-slate-500 mt-2"><StoreIcon className="w-3 h-3" /><span className="truncate">Seller ID: {product.sellerId || 'Unavailable'}</span></div>
+              </div>
+            </Link>
+          ))}
+        </div>}
       </div>
     </div>
   );
