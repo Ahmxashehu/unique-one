@@ -229,10 +229,10 @@ function validateMessageAttachments(value: unknown, senderId: string, conversati
   }
   const result: ValidatedMessageAttachment[] = [];
   const extensionByContentType: Record<string, string> = {
-    'image/jpeg': 'webp',
-    'image/png': 'webp',
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
     'image/webp': 'webp',
-    'image/gif': 'webp',
+    'image/gif': 'gif',
     'application/pdf': 'pdf',
     'text/plain': 'txt',
     'application/msword': 'doc',
