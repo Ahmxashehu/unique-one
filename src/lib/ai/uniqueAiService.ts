@@ -144,6 +144,13 @@ function validateAuthorizedContext(
   ) {
     throw new UniqueAiValidationError("Authorized AI summary contains invalid breakdown counts.");
   }
+  if (!Number.isFinite(Date.parse(summary.contextLoadedAt))) {
+    throw new UniqueAiValidationError("Authorized AI context timestamp is invalid.");
+  }
+  if (summary.contextWarnings.some((warning) => typeof warning !== "string" || warning.length > 240)) {
+    throw new UniqueAiValidationError("Authorized AI context warnings are invalid.");
+  }
+
   const contextCollections = [
     ["orders", context.orders.length, summary.contextLimits.orders, summary.contextTruncated.orders],
     ["businesses", context.businesses.length, summary.contextLimits.businesses, summary.contextTruncated.businesses],
