@@ -17,16 +17,19 @@ export default function InstallPrompt() {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     
-    window.addEventListener('appinstalled', () => {
+    const handleAppInstalled = () => {
       // Hide the app-provided install promotion
       setShowInstall(false);
       // Clear the deferredPrompt so it can be garbage collected
       setDeferredPrompt(null);
       console.log('Unique One App was installed successfully');
-    });
+    };
+
+    window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
