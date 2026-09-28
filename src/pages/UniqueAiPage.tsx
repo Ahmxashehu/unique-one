@@ -27,9 +27,9 @@ export default function UniqueAiPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, loading, error]);
 
-  const sendMessage = async (event?: FormEvent) => {
+  const sendMessage = async (event?: FormEvent, retryMessage?: string) => {
     event?.preventDefault();
-    const trimmed = message.trim();
+    const trimmed = (retryMessage ?? message).trim();
     if (!trimmed || loading || !currentUser) return;
 
     setError("");
@@ -169,8 +169,7 @@ export default function UniqueAiPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setMessage(lastFailedMessage);
-                  setError("");
+                  void sendMessage(undefined, lastFailedMessage);
                 }}
                 className="shrink-0 rounded-lg border border-red-200 bg-white px-3 py-1.5 font-medium text-red-700 hover:bg-red-100"
               >
