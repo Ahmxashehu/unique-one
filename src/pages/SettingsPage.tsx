@@ -1,7 +1,13 @@
 import React from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { User, Shield, Key, Bell, LogOut } from 'lucide-react';
 
 export default function SettingsPage() {
+  const { currentUser, userData, logout } = useAuth();
+  const displayName = userData?.fullName || currentUser?.displayName || 'User Account';
+  const identifier = userData?.uniqueOneId || currentUser?.email || 'Account identifier unavailable';
+  const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'U';
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
@@ -15,8 +21,8 @@ export default function SettingsPage() {
             U
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-slate-900">User Account</h3>
-            <p className="text-slate-500">user@unique.one</p>
+            <h3 className="text-lg font-semibold text-slate-900">{displayName}</h3>
+            <p className="text-slate-500">{identifier}</p>
           </div>
           <button className="ml-auto px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors">
             Edit Profile
@@ -32,7 +38,7 @@ export default function SettingsPage() {
           <SettingRow 
             icon={<Key className="w-5 h-5 text-slate-400" />}
             title="Permissions & Verification"
-            description="NIN verification and document upload placeholders"
+            description="Manage identity verification and supporting documents"
           />
           <SettingRow 
             icon={<Bell className="w-5 h-5 text-slate-400" />}
@@ -42,7 +48,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <button className="flex items-center gap-2 text-red-600 font-medium px-4 py-3 hover:bg-red-50 rounded-lg transition-colors w-full sm:w-auto">
+      <button onClick={() => void logout()} className="flex items-center gap-2 text-red-600 font-medium px-4 py-3 hover:bg-red-50 rounded-lg transition-colors w-full sm:w-auto">
         <LogOut className="w-5 h-5" />
         Sign Out of UniqueOS
       </button>
