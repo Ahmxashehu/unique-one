@@ -53,12 +53,14 @@ export default function UniqueAiPage() {
     setError("");
     setLastFailedMessage(null);
     setMessage("");
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      text: trimmed,
-    };
-    setMessages((current) => [...current, userMessage]);
+    if (!retryMessage) {
+      const userMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "user",
+        text: trimmed,
+      };
+      setMessages((current) => [...current, userMessage]);
+    }
     setLoading(true);
 
     const controller = new AbortController();
@@ -66,8 +68,7 @@ export default function UniqueAiPage() {
 
     try {
       const token = await currentUser.getIdToken();
-      const historySource = retryMessage ? messages.slice(0, -1) : messages;
-      const history = historySource.slice(-6).map(({ role, text }) => ({ role, text }));
+      const history = messages.slice(-6).map(({ role, text }) => ({ role, text }));
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: {
