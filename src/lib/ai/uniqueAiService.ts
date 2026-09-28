@@ -144,6 +144,17 @@ function validateAuthorizedContext(
   ) {
     throw new UniqueAiValidationError("Authorized AI summary contains invalid breakdown counts.");
   }
+  const contextCollections = [
+    ["orders", context.orders.length, summary.contextLimits.orders, summary.contextTruncated.orders],
+    ["businesses", context.businesses.length, summary.contextLimits.businesses, summary.contextTruncated.businesses],
+    ["products", context.products.length, summary.contextLimits.products, summary.contextTruncated.products],
+  ] as const;
+  for (const [name, loadedCount, limit, truncated] of contextCollections) {
+    if (loadedCount > limit || (truncated && loadedCount !== limit) || (!truncated && loadedCount === limit)) {
+      throw new UniqueAiValidationError(`Authorized AI ${name} context truncation metadata is inconsistent.`);
+    }
+  }
+
   if (
     summary.contextWarnings.length !==
     Object.values(summary.contextTruncated).filter(Boolean).length
