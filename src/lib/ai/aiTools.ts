@@ -126,12 +126,21 @@ export async function getAuthorizedProductContext(uid: string): Promise<UniqueAi
 }
 
 export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueAiPlatformContext> {
-  const [user, orders, businesses, products] = await Promise.all([
+  const [user, loadedOrders, loadedBusinesses, loadedProducts] = await Promise.all([
     getAuthorizedUserContext(uid),
     getAuthorizedOrderContext(uid),
     getAuthorizedBusinessContext(uid),
     getAuthorizedProductContext(uid),
   ]);
+
+  const contextTruncated = {
+    orders: loadedOrders.length > MAX_ORDER_CONTEXT,
+    businesses: loadedBusinesses.length > MAX_BUSINESS_CONTEXT,
+    products: loadedProducts.length > MAX_PRODUCT_CONTEXT,
+  };
+  const orders = loadedOrders.slice(0, MAX_ORDER_CONTEXT);
+  const businesses = loadedBusinesses.slice(0, MAX_BUSINESS_CONTEXT);
+  const products = loadedProducts.slice(0, MAX_PRODUCT_CONTEXT);
 
   const orderStatusCounts = orders.reduce<Record<string, number>>((counts, order) => {
     counts[order.status] = (counts[order.status] ?? 0) + 1;
@@ -237,20 +246,20 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
         products: MAX_PRODUCT_CONTEXT,
       },
       contextTruncated: {
-        orders: orders.length > MAX_ORDER_CONTEXT,
-        businesses: businesses.length > MAX_BUSINESS_CONTEXT,
-        products: products.length > MAX_PRODUCT_CONTEXT,
+        orders: contextTruncated.orders,
+        businesses: contextTruncated.businesses,
+        products: contextTruncated.products,
       },
       contextLoadedAt: new Date().toISOString(),
       contextWarnings: [
-        ...(orders.length > MAX_ORDER_CONTEXT
-          ? [`Order context reached its limit of ${MAX_ORDER_CONTEXT} loaded records.`]
+        ...(contextTruncated.orders
+          ? [`Order context reached its limit of ${MAX_ORDER_CONTEXT} loaded records; additional records were not included.`]
           : []),
-        ...(businesses.length > MAX_BUSINESS_CONTEXT
-          ? [`Business context reached its limit of ${MAX_BUSINESS_CONTEXT}.`]
+        ...(contextTruncated.businesses
+          ? [`Business context reached its limit of ${MAX_BUSINESS_CONTEXT} loaded records; additional records were not included.`]
           : []),
-        ...(products.length > MAX_PRODUCT_CONTEXT
-          ? [`Product context reached its limit of ${MAX_PRODUCT_CONTEXT}.`]
+        ...(contextTruncated.products
+          ? [`Product context reached its limit of ${MAX_PRODUCT_CONTEXT} loaded records; additional records were not included.`]
           : []),
       ],
     },
