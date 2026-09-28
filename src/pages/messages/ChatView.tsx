@@ -435,6 +435,21 @@ export default function ChatView() {
     }
   };
 
+  const cleanupUploadedAttachment = async (attachment: MessageAttachmentMetadata) => {
+    try {
+      const token = await currentUser?.getIdToken();
+      if (!token || !id) return;
+      const response = await fetch('/api/communication/media/upload', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ conversationId: id, fileId: attachment.id, storagePath: attachment.storagePath }),
+      });
+      if (!response.ok) console.warn('Attachment cleanup failed:', response.status);
+    } catch (error) {
+      console.warn('Attachment cleanup request failed:', error);
+    }
+  };
+
   const handleAttachmentSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []) as File[];
     event.target.value = '';
@@ -447,6 +462,7 @@ export default function ChatView() {
     setAttachmentStage('preparing');
     setAttachmentProgress(0);
     setError('');
+    const uploadedAttachments: MessageAttachmentMetadata[] = [];
     try {
       for (const file of files) {
         const isImage = file.type.startsWith('image/');
@@ -485,9 +501,7 @@ export default function ChatView() {
           xhr.setRequestHeader('X-Original-Name', file.name.slice(0, 255));
           xhr.upload.onloadstart = () => setAttachmentProgress(0);
           xhr.upload.onprogress = (progressEvent) => {
-            if (progressEvent.lengthComputable) {
-              setAttachmentProgress(Math.min(99, Math.round((progressEvent.loaded / progressEvent.total) * 100)));
-            }
+            if (progressEvent.lengthComputable) setAttachmentProgress(Math.min(99, Math.round((progressEvent.loaded / progressEvent.total) * 100)));
           };
           xhr.onerror = () => reject(new Error('Network error while uploading the attachment. Please check your connection and try again.'));
           xhr.ontimeout = () => reject(new Error('The attachment upload timed out. Please try again.'));
@@ -519,9 +533,14 @@ export default function ChatView() {
           url: result.downloadUrl,
           storagePath: result.storagePath,
         };
+        uploadedAttachments.push(uploadedAttachment);
         setAttachments((current) => [...current, uploadedAttachment]);
       }
     } catch (err) {
+      await Promise.all(uploadedAttachments.map((attachment) => cleanupUploadedAttachment(attachment)));
+      if (uploadedAttachments.length > 0) {
+        setAttachments((current) => current.filter((entry) => !uploadedAttachments.some((uploaded) => uploaded.id === entry.id)));
+      }
       setError(err instanceof Error ? err.message : 'Failed to upload attachment.');
     } finally {
       setUploadingAttachment(false);
@@ -568,6 +587,8 @@ export default function ChatView() {
       setReplyingTo(null);
     } catch (err) {
       console.error(err);
+      await Promise.all(attachments.map((attachment) => cleanupUploadedAttachment(attachment)));
+      setAttachments([]);
       setError(err instanceof Error ? err.message : 'Failed to send message.');
     } finally {
       setSending(false);
@@ -770,7 +791,10 @@ export default function ChatView() {
                     ) : (
                       <div className="w-20 h-20 rounded-xl border border-slate-200 bg-white flex items-center justify-center px-2 text-[10px] text-slate-600 text-center">{item.name}</div>
                     )}
-                    <button type="button" onClick={() => setAttachments((current) => current.filter((entry) => entry.id !== item.id))} className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center shadow" aria-label={`Remove ${item.name}`}>
+                    <button type="button" onClick={async () => {
+                                  await cleanupUploadedAttachment(item);
+                                  setAttachments((current) => current.filter((entry) => entry.id !== item.id));
+                                }} className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center shadow" aria-label={`Remove ${item.name}`}>
                       <X className="w-3 h-3" />
                     </button>
                   </div>
