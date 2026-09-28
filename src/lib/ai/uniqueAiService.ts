@@ -135,10 +135,34 @@ function validateAuthorizedContext(
   const productOutOfStockCount = context.products.filter(
     (product) => typeof product.quantity === "number" && product.quantity <= 0,
   ).length;
+  const productWithoutCategoryCount = context.products.filter((product) => !product.category).length;
+  const productWithoutStatusCount = context.products.filter((product) => !product.status).length;
+  const businessWithoutCategoryCount = context.businesses.filter((business) => !business.category).length;
+  const businessWithoutStatusCount = context.businesses.filter((business) => !business.status).length;
+  const businessWithoutVerificationCount = context.businesses.filter(
+    (business) => !business.verificationStatus,
+  ).length;
+  const inventoryMissingQuantityCount = context.products.filter(
+    (product) => product.quantity === undefined,
+  ).length;
+  const inventoryKnownCount = productQuantityCount + productOutOfStockCount;
+  const inventoryUnitCount = context.products.reduce(
+    (total, product) =>
+      total + (typeof product.quantity === "number" && product.quantity > 0 ? product.quantity : 0),
+    0,
+  );
   if (summary.productsWithQuantity !== productQuantityCount ||
       summary.productsOutOfStock !== productOutOfStockCount ||
-      summary.productsWithoutQuantity !== context.products.filter((product) => product.quantity === undefined).length) {
-    throw new UniqueAiValidationError("Authorized AI inventory summary is inconsistent.");
+      summary.productsWithoutQuantity !== inventoryMissingQuantityCount ||
+      summary.productsWithQuantity + summary.productsOutOfStock + summary.productsWithoutQuantity !== summary.productCount ||
+      summary.productsWithoutCategory !== productWithoutCategoryCount ||
+      summary.productsWithUnknownStatus !== productWithoutStatusCount ||
+      summary.businessesWithoutCategory !== businessWithoutCategoryCount ||
+      summary.businessesWithUnknownStatus !== businessWithoutStatusCount ||
+      summary.businessesWithUnknownVerification !== businessWithoutVerificationCount ||
+      summary.inventoryUnitCount !== inventoryUnitCount ||
+      inventoryKnownCount + inventoryMissingQuantityCount !== summary.productCount) {
+    throw new UniqueAiValidationError("Authorized AI inventory or data-quality summary is inconsistent.");
   }
 }
 
