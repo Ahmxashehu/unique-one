@@ -89,7 +89,10 @@ function validateAiOutput(value: unknown): string {
   if (!text) {
     throw new Error("Gemini returned an empty response.");
   }
-  return text.slice(0, MAX_OUTPUT_LENGTH);
+  if (text.length > MAX_OUTPUT_LENGTH) {
+    throw new Error(`Gemini response exceeds the maximum length of ${MAX_OUTPUT_LENGTH} characters.`);
+  }
+  return text;
 }
 
 export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<string> {
