@@ -162,10 +162,18 @@ function validateAuthorizedContext(
     }
   }
 
-  if (
-    summary.contextWarnings.length !==
-    Object.values(summary.contextTruncated).filter(Boolean).length
-  ) {
+  const expectedContextWarnings = [
+    ...(summary.contextTruncated.orders
+      ? [`Order context reached its limit of ${summary.contextLimits.orders} loaded records; additional records were not included.`]
+      : []),
+    ...(summary.contextTruncated.businesses
+      ? [`Business context reached its limit of ${summary.contextLimits.businesses} loaded records; additional records were not included.`]
+      : []),
+    ...(summary.contextTruncated.products
+      ? [`Product context reached its limit of ${summary.contextLimits.products} loaded records; additional records were not included.`]
+      : []),
+  ];
+  if (JSON.stringify(summary.contextWarnings) !== JSON.stringify(expectedContextWarnings)) {
     throw new UniqueAiValidationError("Authorized AI context warnings are inconsistent.");
   }
   if (context.orders.length > summary.contextLimits.orders ||
