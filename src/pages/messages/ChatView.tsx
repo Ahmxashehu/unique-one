@@ -422,6 +422,20 @@ export default function ChatView() {
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to update reaction.');
+      setMessages((current) => current.map((item) => {
+        if (item.id !== messageId) return item;
+        const nextReactions = { ...(item.reactions ?? {}) };
+        const previousReaction = item.myReaction;
+        if (previousReaction) {
+          nextReactions[previousReaction] = Math.max(0, (nextReactions[previousReaction] ?? 0) - 1);
+          if (nextReactions[previousReaction] === 0) delete nextReactions[previousReaction];
+        }
+        if (method === 'POST') {
+          nextReactions[reaction] = (nextReactions[reaction] ?? 0) + 1;
+          return { ...item, reactions: nextReactions, myReaction: reaction };
+        }
+        return { ...item, reactions: nextReactions, myReaction: undefined };
+      }));
       setReactionTarget(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update reaction.');
