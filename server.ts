@@ -1327,22 +1327,20 @@ async function startServer() {
       const storagePath = `messages/${conversationId}/${uid}/${fileId}.${extension}`;
       const bucket = getStorage().bucket();
       const file = bucket.file(storagePath);
+      const downloadToken = randomUUID();
       await file.save(body, {
         resumable: false,
         metadata: {
           contentType,
           metadata: {
+            firebaseStorageDownloadTokens: downloadToken,
             originalName,
             originalMimeType: contentType,
             originalBytes: String(body.length),
           },
         },
       });
-      const [downloadUrl] = await file.getSignedUrl({
-        version: 'v4',
-        action: 'read',
-        expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
-      });
+      const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucket.name)}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
       return res.status(201).json({ fileId, storagePath, downloadUrl, mimeType: contentType, sizeBytes: body.length });
     } catch (error) {
       console.error('Communication media upload failed:', error);
