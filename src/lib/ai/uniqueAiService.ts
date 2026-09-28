@@ -5,6 +5,7 @@ const DEFAULT_MODEL = "gemini-3.8-flash";
 const MAX_PROMPT_LENGTH = 4_000;
 const MAX_ORDER_CONTEXT = 20;
 const MAX_BUSINESS_CONTEXT = 5;
+const MAX_PRODUCT_CONTEXT = 30;
 
 const SYSTEM_INSTRUCTION = [
   "You are Unique AI, the assistant for the Unique One platform.",
@@ -49,6 +50,16 @@ type UniqueAiBusinessContext = {
   status?: string;
   verificationStatus?: string;
   createdAt?: string;
+};
+
+type UniqueAiProductContext = {
+  id: string;
+  name: string;
+  category?: string;
+  price?: number;
+  currency: string;
+  quantity?: number;
+  status?: string;
 };
 
 async function getAuthorizedUserContext(uid: string): Promise<UniqueAiUserContext> {
@@ -145,6 +156,27 @@ async function getAuthorizedBusinessContext(uid: string): Promise<UniqueAiBusine
   });
 }
 
+async function getAuthorizedProductContext(uid: string): Promise<UniqueAiProductContext[]> {
+  const snapshot = await getFirestore()
+    .collection("products")
+    .where("sellerId", "==", uid)
+    .limit(MAX_PRODUCT_CONTEXT)
+    .get();
+
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: typeof data.name === "string" ? data.name : "Unnamed product",
+      category: typeof data.category === "string" ? data.category : undefined,
+      price: typeof data.price === "number" && Number.isFinite(data.price) ? data.price : undefined,
+      currency: typeof data.currency === "string" ? data.currency : "NGN",
+      quantity: typeof data.quantity === "number" && Number.isFinite(data.quantity) ? data.quantity : undefined,
+      status: typeof data.status === "string" ? data.status : undefined,
+    };
+  });
+}
+
 function getPrompt(value: unknown): string {
   if (typeof value !== "string") {
     throw new UniqueAiValidationError("message must be a string.");
@@ -168,16 +200,18 @@ export async function generateUniqueAiResponse(input: {
   message: unknown;
 }): Promise<string> {
   const prompt = getPrompt(input.message);
-  const [userContext, orderContext, businessContext] = await Promise.all([
+  const [userContext, orderContext, businessContext, productContext] = await Promise.all([
     getAuthorizedUserContext(input.uid),
     getAuthorizedOrderContext(input.uid),
     getAuthorizedBusinessContext(input.uid),
+    getAuthorizedProductContext(input.uid),
   ]);
 
   const contextualPrompt = [
     `Authenticated user context (read-only, authoritative): ${JSON.stringify(userContext)}`,
     `Authorized order context (read-only, authoritative; only this user's customer/seller orders): ${JSON.stringify(orderContext)}`,
     `Authorized business context (read-only, authoritative; only businesses owned by this user): ${JSON.stringify(businessContext)}`,
+    `Authorized product context (read-only, authoritative; only products owned by this user as seller): ${JSON.stringify(productContext)}`,
     `User request: ${prompt}`,
   ].join("\n");
 
