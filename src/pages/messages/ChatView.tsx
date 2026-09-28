@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Conversation, Message, MessageAttachmentMetadata } from '../../lib/os/communication-types';
 import { optimizeImage } from '../../lib/media/image';
-import { subscribeToMessagesForConversation } from '../../lib/os/communication-db';
+import { getOlderMessagesForConversation, subscribeToMessagesForConversation } from '../../lib/os/communication-db';
 import { decryptFromUser, encryptForUser, ensureDeviceKeyPair, getUserPublicKey, registerPublicKey } from '../../lib/os/communication-crypto';
 
 const formatMessageDate = (value: string) => {
@@ -44,6 +44,8 @@ export default function ChatView() {
   const [attachmentStage, setAttachmentStage] = useState<'preparing' | 'uploading' | null>(null);
   const [attachmentProgress, setAttachmentProgress] = useState(0);
   const [encryptionReady, setEncryptionReady] = useState(false);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
+  const [hasMoreOlderMessages, setHasMoreOlderMessages] = useState(true);
   const [peerPublicKey, setPeerPublicKey] = useState<JsonWebKey | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -161,6 +163,8 @@ export default function ChatView() {
     let unsubscribe: (() => void) | null = null;
     setLoading(true);
     setError('');
+    setLoadingOlderMessages(false);
+    setHasMoreOlderMessages(true);
 
     if (id) {
       try {
@@ -221,8 +225,13 @@ export default function ChatView() {
                   console.warn('Could not cache conversation messages:', cacheError);
                 }
                 setMessages((current) => {
-                  if (current.length === hydrated.length && current.every((item, index) => {
-                    const next = hydrated[index];
+                  const merged = new Map(current.map((item) => [item.id, item]));
+                  hydrated.forEach((item) => merged.set(item.id, item));
+                  const nextMessages = Array.from(merged.values()).sort(
+                    (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+                  );
+                  if (current.length === nextMessages.length && current.every((item, index) => {
+                    const next = nextMessages[index];
                     return item.id === next.id
                       && item.updatedAt === next.updatedAt
                       && item.status === next.status
@@ -231,8 +240,9 @@ export default function ChatView() {
                       && JSON.stringify(item.reactions ?? {}) === JSON.stringify(next.reactions ?? {})
                       && JSON.stringify(item.attachments ?? []) === JSON.stringify(next.attachments ?? []);
                   })) return current;
-                  return hydrated;
+                  return nextMessages;
                 });
+                setHasMoreOlderMessages((current) => current || hydrated.length === 100);
                 setLoading(false);
               })();
             },
@@ -287,11 +297,48 @@ export default function ChatView() {
     setNewMessagesPending(0);
   }, []);
 
+  const loadOlderMessages = useCallback(async () => {
+    if (!id || loadingOlderMessages || !hasMoreOlderMessages || messages.length === 0) return;
+    const oldestMessage = messages[0];
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    setLoadingOlderMessages(true);
+    const previousScrollHeight = container.scrollHeight;
+    const previousScrollTop = container.scrollTop;
+    try {
+      const result = await getOlderMessagesForConversation(id, oldestMessage.createdAt, 100);
+      if (result.messages.length === 0) {
+        setHasMoreOlderMessages(false);
+        return;
+      }
+      setMessages((current) => {
+        const merged = new Map(current.map((item) => [item.id, item]));
+        result.messages.forEach((item) => merged.set(item.id, item));
+        return Array.from(merged.values()).sort(
+          (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+        );
+      });
+      setHasMoreOlderMessages(result.hasMore);
+      requestAnimationFrame(() => {
+        const nextContainer = messagesContainerRef.current;
+        if (!nextContainer) return;
+        nextContainer.scrollTop = previousScrollTop + (nextContainer.scrollHeight - previousScrollHeight);
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load older messages.');
+    } finally {
+      setLoadingOlderMessages(false);
+    }
+  }, [id, loadingOlderMessages, hasMoreOlderMessages, messages]);
+
   const handleMessagesScroll = () => {
     const container = messagesContainerRef.current;
     if (!container) return;
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     if (distanceFromBottom < 80) setNewMessagesPending(0);
+    if (container.scrollTop < 120 && !loadingOlderMessages && hasMoreOlderMessages) {
+      void loadOlderMessages();
+    }
   };
 
   useEffect(() => {
@@ -669,6 +716,13 @@ export default function ChatView() {
         </div>
       )}
       <div ref={messagesContainerRef} onScroll={handleMessagesScroll} className="unique-chat-motion flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 sm:px-4 sm:py-5 space-y-3 sm:space-y-4">
+        {loadingOlderMessages && (
+          <div className="sticky top-1 z-10 flex justify-center pointer-events-none">
+            <span className="rounded-full bg-white/95 border border-slate-200 px-3 py-1 text-[10px] text-slate-500 shadow-sm">
+              Loading older messages…
+            </span>
+          </div>
+        )}
         {loading && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center min-h-[220px] text-slate-400">
             <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center mb-3"><Loader2 className="w-5 h-5 animate-spin" /></div>
