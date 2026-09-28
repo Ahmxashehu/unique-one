@@ -54,7 +54,7 @@ class RequestValidationError extends Error {
     this.code = code;
   }
 }
-if (getApps().length === 0) initializeApp({ projectId: "unique-one-9731b" });
+if (getApps().length === 0) initializeApp({\n  projectId: "unique-one-9731b",\n  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "unique-one-9731b.firebasestorage.app",\n});
 const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || "(default)";
 const adminDb = getFirestore(FIRESTORE_DATABASE_ID);
 function errorResponse(res: Response, code: TransferErrorCode, message: string, statusOverride?: number) {
