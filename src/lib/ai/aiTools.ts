@@ -10,6 +10,14 @@ import type {
 const MAX_ORDER_CONTEXT = 20;
 const MAX_BUSINESS_CONTEXT = 5;
 const MAX_PRODUCT_CONTEXT = 30;
+const MAX_CONTEXT_STRING_LENGTH = 160;
+
+function safeString(value: unknown, fallback?: string): string | undefined {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (!trimmed) return fallback;
+  return trimmed.slice(0, MAX_CONTEXT_STRING_LENGTH);
+}
 
 function toIsoString(value: unknown): string | undefined {
   if (typeof value === "string") return value;
@@ -31,16 +39,14 @@ export async function getAuthorizedUserContext(uid: string): Promise<UniqueAiUse
 
   const data = snapshot.data() ?? {};
   return {
-    fullName: typeof data.fullName === "string" ? data.fullName : "Unique One user",
-    uniqueOneId: typeof data.uniqueOneId === "string" ? data.uniqueOneId : undefined,
-    preferredLanguage: typeof data.preferredLanguage === "string" ? data.preferredLanguage : undefined,
+    fullName: safeString(data.fullName, "Unique One user")!,
+    uniqueOneId: safeString(data.uniqueOneId),
+    preferredLanguage: safeString(data.preferredLanguage),
     roles: Array.isArray(data.roles)
       ? data.roles.filter((role): role is string => typeof role === "string").slice(0, 20)
       : [],
-    status: typeof data.status === "string" ? data.status : undefined,
-    verificationStatus: typeof data.verificationStatus === "string"
-      ? data.verificationStatus
-      : undefined,
+    status: safeString(data.status),
+    verificationStatus: safeString(data.verificationStatus),
   };
 }
 
@@ -61,11 +67,11 @@ export async function getAuthorizedOrderContext(uid: string): Promise<UniqueAiOr
     orders.set(snapshot.doc.id, {
       id: snapshot.doc.id,
       side: snapshot.side,
-      status: typeof data.status === "string" ? data.status : "unknown",
+      status: safeString(data.status, "unknown")!,
       totalAmount: typeof data.totalAmount === "number" && Number.isFinite(data.totalAmount)
         ? data.totalAmount
         : 0,
-      currency: typeof data.currency === "string" ? data.currency : "NGN",
+      currency: safeString(data.currency, "NGN")!,
       itemCount: items.length,
       createdAt: toIsoString(data.createdAt),
     });
@@ -84,16 +90,10 @@ export async function getAuthorizedBusinessContext(uid: string): Promise<UniqueA
     const data = doc.data();
     return {
       id: doc.id,
-      name: typeof data.name === "string"
-        ? data.name
-        : typeof data.businessName === "string"
-          ? data.businessName
-          : "Unnamed business",
-      category: typeof data.category === "string" ? data.category : undefined,
-      status: typeof data.status === "string" ? data.status : undefined,
-      verificationStatus: typeof data.verificationStatus === "string"
-        ? data.verificationStatus
-        : undefined,
+      name: safeString(data.name, safeString(data.businessName, "Unnamed business"))!,
+      category: safeString(data.category),
+      status: safeString(data.status),
+      verificationStatus: safeString(data.verificationStatus),
       createdAt: toIsoString(data.createdAt),
     };
   });
@@ -110,12 +110,12 @@ export async function getAuthorizedProductContext(uid: string): Promise<UniqueAi
     const data = doc.data();
     return {
       id: doc.id,
-      name: typeof data.name === "string" ? data.name : "Unnamed product",
-      category: typeof data.category === "string" ? data.category : undefined,
+      name: safeString(data.name, "Unnamed product")!,
+      category: safeString(data.category),
       price: typeof data.price === "number" && Number.isFinite(data.price) ? data.price : undefined,
-      currency: typeof data.currency === "string" ? data.currency : "NGN",
+      currency: safeString(data.currency, "NGN")!,
       quantity: typeof data.quantity === "number" && Number.isFinite(data.quantity) ? data.quantity : undefined,
-      status: typeof data.status === "string" ? data.status : undefined,
+      status: safeString(data.status),
     };
   });
 }
