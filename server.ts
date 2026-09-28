@@ -1348,6 +1348,39 @@ async function startServer() {
     }
   });
 
+  app.delete("/api/communication/media/upload", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = typeof req.body?.conversationId === 'string' ? req.body.conversationId.trim() : '';
+      const storagePath = typeof req.body?.storagePath === 'string' ? req.body.storagePath.trim() : '';
+      const fileId = typeof req.body?.fileId === 'string' ? req.body.fileId.trim() : '';
+      if (!isSafeConversationId(conversationId) || !/^[A-Za-z0-9_-]{1,128}$/.test(fileId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The attachment reference is invalid.');
+      }
+      const membershipSnapshot = await adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationId, uid)).get();
+      if (!membershipSnapshot.exists) return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      const expectedPrefix = `messages/${conversationId}/${uid}/`;
+      const allowedExtensions = ['jpg', 'png', 'webp', 'gif', 'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx'];
+      const ownsStoragePath = allowedExtensions.some((extension) => storagePath === `${expectedPrefix}${fileId}.${extension}`);
+      if (!ownsStoragePath) return errorResponse(res, 'INVALID_REQUEST', 'The attachment reference is invalid.');
+      const bucket = getStorage().bucket();
+      try {
+        await bucket.file(storagePath).delete();
+      } catch (error: any) {
+        if (error?.code !== 404) throw error;
+      }
+      return res.status(204).send();
+    } catch (error) {
+      console.error('Communication media cleanup failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to clean up the attachment.');
+    }
+  });
+
   app.post("/api/communication/media/upload-url", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 60,
