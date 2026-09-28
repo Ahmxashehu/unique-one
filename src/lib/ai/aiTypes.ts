@@ -45,9 +45,15 @@ export type UniqueAiPlatformSummary = {
   orderCount: number;
   customerOrderCount: number;
   sellerOrderCount: number;
+  orderStatusCounts: Record<string, number>;
+  activeOrderCount: number;
+  cancelledOrderCount: number;
   businessCount: number;
+  businessCategoryCounts: Record<string, number>;
   productCount: number;
+  productCategoryCounts: Record<string, number>;
   productsWithQuantity: number;
+  productsOutOfStock: number;
 };
 
 export type UniqueAiPlatformContext = {
