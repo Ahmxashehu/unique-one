@@ -1738,6 +1738,96 @@ async function startServer() {
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to send the message.');
     }
   });
+
+  app.post("/api/store/checkout", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('storeCheckoutRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many checkout attempts. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!isPlainObject(req.body) || !isSafeIdempotencyKey(req.body.idempotencyKey)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid checkout idempotency key is required.');
+      }
+      const idempotencyKey = req.body.idempotencyKey.trim();
+      const idempotencyRef = adminDb.collection('storeCheckoutIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const existing = await transaction.get(idempotencyRef);
+        if (existing.exists) {
+          const data = existing.data() || {};
+          if (data.uid !== uid || data.idempotencyKey !== idempotencyKey) {
+            throw new RequestValidationError('INVALID_REQUEST', 'Invalid checkout idempotency record.');
+          }
+          return { orderIds: Array.isArray(data.orderIds) ? data.orderIds : [], replayed: true };
+        }
+        const cartSnapshot = await transaction.get(adminDb.collection('carts').where('customerId', '==', uid));
+        if (cartSnapshot.empty) throw new RequestValidationError('INVALID_REQUEST', 'Your cart is empty.');
+        const carts = cartSnapshot.docs.map((snapshot) => ({ ref: snapshot.ref, id: snapshot.id, data: snapshot.data() as Record<string, unknown> }));
+        const productSnapshots = new Map<string, FirebaseFirestore.DocumentSnapshot>();
+        for (const cart of carts) {
+          if (cart.data.customerId !== uid || typeof cart.data.productId !== 'string' || !cart.data.productId.trim() ||
+              !Number.isSafeInteger(cart.data.quantity) || Number(cart.data.quantity) <= 0) {
+            throw new RequestValidationError('INVALID_REQUEST', 'Your cart contains invalid data.');
+          }
+          const productId = String(cart.data.productId).trim();
+          productSnapshots.set(productId, await transaction.get(adminDb.collection('products').doc(productId)));
+        }
+        const groups = new Map<string, { cart: typeof carts[number]; product: Record<string, unknown>; productId: string }[]>();
+        for (const cart of carts) {
+          const productId = String(cart.data.productId).trim();
+          const snapshot = productSnapshots.get(productId);
+          if (!snapshot?.exists) throw new RequestValidationError('INVALID_REQUEST', 'A product in your cart is no longer available.');
+          const product = snapshot.data() || {};
+          const quantity = Number(cart.data.quantity);
+          const sellerId = product.sellerId;
+          const price = product.price;
+          const available = product.quantity;
+          const minOrderQuantity = Number(product.minOrderQuantity || 1);
+          if (!isSafeFirebaseUid(sellerId) || product.status !== 'published' || typeof price !== 'number' || !Number.isFinite(price) || price < 0 ||
+              product.currency !== 'NGN' || !Number.isSafeInteger(available) || available < quantity ||
+              !Number.isSafeInteger(minOrderQuantity) || minOrderQuantity < 1 || quantity < minOrderQuantity) {
+            throw new RequestValidationError('INVALID_REQUEST', 'One or more products in your cart are no longer available in the requested quantity.');
+          }
+          const group = groups.get(sellerId) || [];
+          group.push({ cart, product, productId });
+          groups.set(sellerId, group);
+        }
+        const orderIds: string[] = [];
+        const now = Timestamp.now().toDate().toISOString();
+        for (const [sellerId, sellerItems] of groups) {
+          const orderRef = adminDb.collection('orders').doc();
+          const items = sellerItems.map(({ product, productId, cart }) => ({
+            productId,
+            name: typeof product.name === 'string' ? product.name : 'Product',
+            price: product.price,
+            quantity: Number(cart.data.quantity),
+          }));
+          const totalAmount = items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+          transaction.create(orderRef, {
+            id: orderRef.id, customerId: uid, sellerId, items, totalAmount, currency: 'NGN',
+            status: 'pending', createdAt: now, updatedAt: now,
+          });
+          orderIds.push(orderRef.id);
+        }
+        carts.forEach((cart) => transaction.delete(cart.ref));
+        transaction.create(idempotencyRef, { uid, idempotencyKey, orderIds, createdAt: now, updatedAt: now });
+        return { orderIds, replayed: false };
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Store checkout failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Checkout could not be completed. Your cart was not cleared.');
+    }
+  });
+
   app.get("/api/calendar/events", authenticate, async (req, res) => {
     try {
       const authHeader = req.headers.authorization; if (!authHeader) return res.status(401).json({ error: "No authorization header" });
