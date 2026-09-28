@@ -25,6 +25,7 @@ const QUICK_PROMPTS = [
   "Which of my products are missing category, status, or quantity data?",
   "Which of my businesses have missing category, status, or verification data?",
   "What order data is unknown or potentially incomplete?",
+  "Which summaries are guaranteed to be based on all loaded records?",
   "Why might my Unique AI counts be incomplete?",
   "Which loaded order totals are unavailable?",
   "What is my account verification status?",
