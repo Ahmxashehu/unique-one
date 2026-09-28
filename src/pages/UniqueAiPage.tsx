@@ -45,13 +45,15 @@ export default function UniqueAiPage() {
 
     try {
       const token = await currentUser.getIdToken();
+      const historySource = retryMessage ? messages.slice(0, -1) : messages;
+      const history = historySource.slice(-6).map(({ role, text }) => ({ role, text }));
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify({ message: trimmed, history }),
       });
 
       const payload = (await response.json().catch(() => null)) as
