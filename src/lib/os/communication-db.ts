@@ -8,6 +8,8 @@ import {
   onSnapshot,
   orderBy,
   query,
+  startAfter,
+  Timestamp,
   where,
   type DocumentData,
   type QueryDocumentSnapshot,
@@ -382,6 +384,34 @@ export async function getMessage(messageId: string): Promise<Message> {
     throw new CommunicationDbError('NOT_FOUND', `Message ${id} was not found.`);
   }
   return message;
+}
+
+/** Reads one older page of messages before the supplied oldest loaded message. */
+export async function getOlderMessagesForConversation(
+  conversationId: string,
+  beforeCreatedAt: string,
+  limit?: number,
+): Promise<{ messages: Message[]; hasMore: boolean }> {
+  const uid = requireAuthenticatedUid();
+  const id = requireId(conversationId, 'conversationId');
+  const beforeDate = new Date(beforeCreatedAt);
+  if (Number.isNaN(beforeDate.getTime())) {
+    throw new CommunicationDbError('INVALID_DOCUMENT_SHAPE', 'beforeCreatedAt is not a valid timestamp.');
+  }
+  const membershipSnapshot = await safeRead(() => getDoc(doc(db, CONVERSATION_MEMBERS_COLLECTION, `${id}_${uid}`)));
+  if (!membershipSnapshot.exists()) return { messages: [], hasMore: false };
+  const messageLimit = clampMessageLimit(limit);
+  const olderQuery = query(
+    collection(db, MESSAGES_COLLECTION),
+    where('conversationId', '==', id),
+    orderBy('createdAt', 'desc'),
+    startAfter(Timestamp.fromDate(beforeDate)),
+    fbLimit(messageLimit),
+  );
+  const snapshot = await safeRead(() => getDocs(olderQuery));
+  const mapped = snapshot.docs.map((item: QueryDocumentSnapshot<DocumentData>) => mapMessage(item.id, item.data()));
+  mapped.sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
+  return { messages: mapped, hasMore: mapped.length === messageLimit };
 }
 
 function mapMessageRequest(snapshotId: string, data: DocumentData | undefined): MessageRequest {
