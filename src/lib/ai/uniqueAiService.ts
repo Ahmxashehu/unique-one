@@ -95,6 +95,57 @@ function validateAuthorizedContext(
   context: Awaited<ReturnType<typeof getAuthorizedPlatformContext>>,
 ): void {
   const { summary } = context;
+
+  const nonNegativeSafeInteger = (value: number): boolean =>
+    Number.isSafeInteger(value) && value >= 0;
+  const countMaps = [
+    summary.orderStatusCounts,
+    summary.orderSideStatusCounts,
+    summary.businessCategoryCounts,
+    summary.businessStatusCounts,
+    summary.businessVerificationCounts,
+    summary.productCategoryCounts,
+    summary.productStatusCounts,
+  ];
+  if (
+    ![
+      summary.orderCount,
+      summary.customerOrderCount,
+      summary.sellerOrderCount,
+      summary.activeOrderCount,
+      summary.cancelledOrderCount,
+      summary.ordersWithUnknownStatus,
+      summary.businessCount,
+      summary.businessesWithoutCategory,
+      summary.businessesWithUnknownStatus,
+      summary.businessesWithUnknownVerification,
+      summary.productCount,
+      summary.productsWithoutCategory,
+      summary.productsWithUnknownStatus,
+      summary.productsWithoutQuantity,
+      summary.inventoryUnitCount,
+      summary.productsWithQuantity,
+      summary.productsOutOfStock,
+      summary.contextLimits.orders,
+      summary.contextLimits.businesses,
+      summary.contextLimits.products,
+    ].every(nonNegativeSafeInteger)
+  ) {
+    throw new UniqueAiValidationError("Authorized AI summary contains invalid numeric values.");
+  }
+  if (
+    countMaps.some((counts) =>
+      Object.values(counts).some((count) => !nonNegativeSafeInteger(count)),
+    )
+  ) {
+    throw new UniqueAiValidationError("Authorized AI summary contains invalid breakdown counts.");
+  }
+  if (
+    summary.contextWarnings.length !==
+    Object.values(summary.contextTruncated).filter(Boolean).length
+  ) {
+    throw new UniqueAiValidationError("Authorized AI context warnings are inconsistent.");
+  }
   if (context.orders.length > summary.contextLimits.orders ||
       context.businesses.length > summary.contextLimits.businesses ||
       context.products.length > summary.contextLimits.products) {
