@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Bot, Send, Sparkles, Trash2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -20,6 +20,12 @@ export default function UniqueAiPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, loading, error]);
 
   const sendMessage = async (event?: FormEvent) => {
     event?.preventDefault();
@@ -27,6 +33,7 @@ export default function UniqueAiPage() {
     if (!trimmed || loading || !currentUser) return;
 
     setError("");
+    setLastFailedMessage(null);
     setMessage("");
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -64,6 +71,7 @@ export default function UniqueAiPage() {
         { id: crypto.randomUUID(), role: "assistant", text: payload.message!.trim() },
       ]);
     } catch (err) {
+      setLastFailedMessage(trimmed);
       setError(err instanceof Error ? err.message : "Unable to contact Unique AI.");
     } finally {
       setLoading(false);
@@ -74,6 +82,7 @@ export default function UniqueAiPage() {
     if (loading) return;
     setMessages([]);
     setError("");
+    setLastFailedMessage(null);
   };
 
   return (
@@ -141,6 +150,7 @@ export default function UniqueAiPage() {
                   </div>
                 </div>
               ))}
+              <div ref={messagesEndRef} aria-hidden="true" />
               {loading && (
                 <div className="flex justify-start">
                   <div className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-500">
@@ -153,8 +163,20 @@ export default function UniqueAiPage() {
         </div>
 
         {error && (
-          <div className="border-t border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
+          <div className="flex items-center justify-between gap-3 border-t border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <span role="alert">{error}</span>
+            {lastFailedMessage && !loading && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMessage(lastFailedMessage);
+                  setError("");
+                }}
+                className="shrink-0 rounded-lg border border-red-200 bg-white px-3 py-1.5 font-medium text-red-700 hover:bg-red-100"
+              >
+                Retry
+              </button>
+            )}
           </div>
         )}
 
