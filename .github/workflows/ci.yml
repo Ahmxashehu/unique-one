@@ -34,3 +34,11 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Verify production PWA service worker
+        run: |
+          test -f dist/sw.js
+          grep -q 'NavigationRoute' dist/sw.js
+          grep -q 'index.html' dist/sw.js
+          grep -Eq 'allowlist: \[/\\\^\\\\/\\(\\\\\?!api' dist/sw.js
+          grep -Eq 'denylist: \[/\\\^\\\\/api' dist/sw.js
