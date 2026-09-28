@@ -17,6 +17,10 @@ const QUICK_PROMPTS = [
   "What order statuses do I currently have?",
   "How are my businesses grouped by category?",
   "How are my products grouped by category?",
+  "How are my orders split between customer and seller status?",
+  "How are my businesses split by status and verification?",
+  "How are my products split by status?",
+  "How many inventory units do my loaded products contain?",
   "What is my account verification status?",
   "Can you change a payment or order for me?",
 ];
@@ -126,7 +130,7 @@ export default function UniqueAiPage() {
               </div>
               <h2 className="text-lg font-semibold text-slate-900">How can I help?</h2>
               <p className="mt-2 text-sm text-slate-500">
-                Ask about your Unique One account, orders, businesses, or products. I will not invent records or claim actions I did not perform.
+                Ask about your Unique One account, orders, businesses, or products. I will not invent records or claim actions I did not perform. Summary counts use only authorized records loaded for the current request.
               </p>
               <div className="mt-6 grid w-full gap-2 sm:grid-cols-3">
                 {QUICK_PROMPTS.map((prompt) => (
@@ -215,7 +219,7 @@ export default function UniqueAiPage() {
             </button>
           </div>
           <p className="mt-2 px-1 text-xs text-slate-400">
-            Read-only assistant for now. It cannot change payments, orders, products, or other platform records.
+            Read-only assistant for now. It cannot change payments, orders, products, or other platform records. Some summaries are bounded by the records loaded for the request.
           </p>
         </form>
       </div>
