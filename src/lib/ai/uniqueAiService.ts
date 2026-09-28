@@ -106,8 +106,8 @@ function buildContextualPrompt(
       orders: context.orders,
       businesses: context.businesses,
       products: context.products,
-      contextLoadedAt: context.contextLoadedAt,
-      contextWarnings: context.contextWarnings,
+      contextLoadedAt: context.summary.contextLoadedAt,
+      contextWarnings: context.summary.contextWarnings,
     }),
     "</AUTHORIZED_PLATFORM_CONTEXT>",
     "<UNTRUSTED_CONVERSATION_HISTORY>",
@@ -138,7 +138,7 @@ async function writeAiAuditLog(input: {
         products: input.context.products.length,
       },
       contextTruncated: input.context.summary.contextTruncated,
-      contextWarningCount: input.context.contextWarnings.length,
+      contextWarningCount: input.context.summary.contextWarnings.length,
       createdAt: Timestamp.now(),
     });
   } catch (error) {
