@@ -322,6 +322,48 @@ async function startServer() {
   };
   app.get("/api/health", (req, res) => res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" }));
 
+  app.post("/api/business/staff/accept-invite", rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+    const uid = (req as any).user?.uid as string | undefined;
+    const email = typeof (req as any).user?.email === 'string' ? String((req as any).user.email).trim().toLowerCase() : '';
+    if (!uid || !email) return errorResponse(res, 'UNAUTHENTICATED', 'A verified account with an email address is required.');
+    try {
+      const inviteId = typeof req.body?.inviteId === 'string' ? req.body.inviteId.trim() : '';
+      if (!inviteId || !/^[A-Za-z0-9_-]{1,150}$/.test(inviteId)) return errorResponse(res, 'INVALID_REQUEST', 'A valid invitation is required.');
+      const inviteRef = adminDb.collection('staffInvites').doc(inviteId);
+      const memberRef = adminDb.collection('staffMembers').doc(uid + '_' + inviteId);
+      await adminDb.runTransaction(async transaction => {
+        const inviteSnap = await transaction.get(inviteRef);
+        if (!inviteSnap.exists) throw new Error('INVITE_NOT_FOUND');
+        const invite = inviteSnap.data() as Record<string, unknown>;
+        if (String(invite.inviteeEmail || '').trim().toLowerCase() !== email) throw new Error('INVITE_NOT_FOR_USER');
+        if (invite.status !== 'pending') throw new Error('INVITE_NOT_PENDING');
+        const role = typeof invite.role === 'string' ? invite.role : '';
+        const allowedRoles = new Set(['admin','manager','sales','cashier','accountant','inventory','support','delivery','branch_manager','viewer']);
+        if (!allowedRoles.has(role)) throw new Error('INVALID_ROLE');
+        const ownerUid = typeof invite.businessOwnerUid === 'string' ? invite.businessOwnerUid : '';
+        if (!ownerUid || ownerUid === uid) throw new Error('INVALID_OWNER');
+        const existingMember = await transaction.get(memberRef);
+        if (existingMember.exists) throw new Error('MEMBER_EXISTS');
+        transaction.set(memberRef, {
+          uid, businessOwnerUid: ownerUid, role,
+          branchName: typeof invite.branchName === 'string' ? invite.branchName : null,
+          inviteId, status: 'active', createdAt: Timestamp.now(), updatedAt: Timestamp.now()
+        });
+        transaction.update(inviteRef, { status: 'accepted', acceptedUid: uid, acceptedAt: Timestamp.now() });
+      });
+      return res.status(200).json({ status: 'accepted' });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'INVITE_NOT_FOUND') return errorResponse(res, 'NOT_FOUND', 'Invitation not found.', 404);
+      if (code === 'INVITE_NOT_FOR_USER') return errorResponse(res, 'FORBIDDEN', 'This invitation belongs to another email address.', 403);
+      if (code === 'INVITE_NOT_PENDING') return errorResponse(res, 'INVALID_REQUEST', 'This invitation is no longer pending.');
+      if (code === 'INVALID_ROLE' || code === 'INVALID_OWNER') return errorResponse(res, 'INVALID_REQUEST', 'This invitation is invalid.');
+      if (code === 'MEMBER_EXISTS') return errorResponse(res, 'INVALID_REQUEST', 'You are already a member for this invitation.');
+      console.error('Staff invite acceptance failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to accept the invitation right now.');
+    }
+  });
+
   app.post("/api/business/inventory/adjust", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = (req as any).user?.uid as string | undefined;
     if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
