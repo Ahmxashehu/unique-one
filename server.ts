@@ -343,7 +343,7 @@ async function startServer() {
         return errorResponse(res, 'INVALID_REQUEST', 'The AI request body must be a plain object.');
       }
       const payload = req.body as Record<string, unknown>;
-      const allowedKeys = new Set(['message']);
+      const allowedKeys = new Set(['message', 'history']);
       for (const key of Object.keys(payload)) {
         if (!allowedKeys.has(key)) {
           return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
@@ -354,7 +354,8 @@ async function startServer() {
         return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
       }
       const message = payload.message;
-      const responseText = await generateUniqueAiResponse({ uid, message });
+      const history = payload.history;
+      const responseText = await generateUniqueAiResponse({ uid, message, history });
       return res.status(200).json({ message: responseText, readOnly: true });
     } catch (error) {
       if (error instanceof UniqueAiValidationError) {
