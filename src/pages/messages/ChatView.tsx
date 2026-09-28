@@ -225,7 +225,7 @@ export default function ChatView() {
                   console.warn('Could not cache conversation messages:', cacheError);
                 }
                 setMessages((current) => {
-                  const merged = new Map(current.map((item) => [item.id, item]));
+                  const merged = new Map<string, Message>(current.map((item) => [item.id, item]));
                   hydrated.forEach((item) => merged.set(item.id, item));
                   const nextMessages = Array.from(merged.values()).sort(
                     (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
@@ -312,7 +312,7 @@ export default function ChatView() {
         return;
       }
       setMessages((current) => {
-        const merged = new Map(current.map((item) => [item.id, item]));
+        const merged = new Map<string, Message>(current.map((item) => [item.id, item]));
         result.messages.forEach((item) => merged.set(item.id, item));
         return Array.from(merged.values()).sort(
           (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
