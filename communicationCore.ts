@@ -228,6 +228,18 @@ function validateMessageAttachments(value: unknown, senderId: string, conversati
     throw new CommunicationValidationError('INVALID_ATTACHMENT', 'Up to 5 attachments are allowed.');
   }
   const result: ValidatedMessageAttachment[] = [];
+  const extensionByContentType: Record<string, string> = {
+    'image/jpeg': 'webp',
+    'image/png': 'webp',
+    'image/webp': 'webp',
+    'image/gif': 'webp',
+    'application/pdf': 'pdf',
+    'text/plain': 'txt',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.ms-excel': 'xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  };
   for (const item of value) {
     if (!item || typeof item !== 'object') throw new CommunicationValidationError('INVALID_ATTACHMENT', 'Invalid attachment metadata.');
     const attachment = item as Record<string, unknown>;
@@ -243,18 +255,31 @@ function validateMessageAttachments(value: unknown, senderId: string, conversati
       typeof contentType !== 'string' || contentType.length < 1 || contentType.length > 128 ||
       typeof sizeBytes !== 'number' || !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > 20 * 1024 * 1024 ||
       typeof url !== 'string' || url.length < 1 || url.length > 4096 ||
-      typeof storagePath !== 'string' || storagePath !== `messages/${conversationId}/${senderId}/${id}.webp` && !storagePath.startsWith(`messages/${conversationId}/${senderId}/`)
+      typeof storagePath !== 'string'
     ) {
       throw new CommunicationValidationError('INVALID_ATTACHMENT', 'Invalid attachment metadata.');
     }
-    if (!/^(image\/(jpeg|png|webp|gif)|application\/pdf|text\/plain|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document|application\/vnd\.ms-excel|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet)$/.test(contentType)) {
+    const expectedExtension = extensionByContentType[contentType];
+    if (!expectedExtension) {
       throw new CommunicationValidationError('INVALID_ATTACHMENT', 'Unsupported attachment type.');
+    }
+    const expectedStoragePath = `messages/${conversationId}/${senderId}/${id}.${expectedExtension}`;
+    if (storagePath !== expectedStoragePath) {
+      throw new CommunicationValidationError('INVALID_ATTACHMENT', 'Invalid attachment storage path.');
+    }
+    try {
+      const parsedUrl = new URL(url);
+      const encodedStoragePath = encodeURIComponent(storagePath);
+      if (parsedUrl.hostname !== 'firebasestorage.googleapis.com' || !parsedUrl.pathname.endsWith(`/o/${encodedStoragePath}`)) {
+        throw new Error('invalid attachment URL');
+      }
+    } catch {
+      throw new CommunicationValidationError('INVALID_ATTACHMENT', 'Invalid attachment download URL.');
     }
     result.push({ id, name: name.trim(), contentType, sizeBytes, url, storagePath });
   }
   return result;
 }
-
 function validateEncryptedPayload(value: unknown, senderId: string): NonNullable<ValidatedMessageDraft['encryptedPayload']> | undefined {
   if (value === undefined || value === null) return undefined;
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new CommunicationValidationError('INVALID_ENCRYPTED_MESSAGE', 'Invalid encrypted message payload.');
