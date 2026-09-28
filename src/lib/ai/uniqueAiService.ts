@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { getFirestore } from "firebase-admin/firestore";
 
 const DEFAULT_MODEL = "gemini-3.8-flash";
 const MAX_PROMPT_LENGTH = 4_000;
@@ -34,8 +35,8 @@ function getPrompt(value: unknown): string {
   return message;
 }
 
-export async function generateUniqueAiResponse(message: unknown): Promise<string> {
-  const prompt = getPrompt(message);
+export async function generateUniqueAiResponse(input: { uid: string; message: unknown }): Promise<string> {
+  const prompt = getPrompt(input.message);
   const apiKey = process.env.GEMINI_API_KEY?.trim();
 
   if (!apiKey) {
