@@ -10,6 +10,7 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import type { Conversation, ConversationMember, ConversationType, Message, MessageRequest } from "./src/lib/os/communication-types";
 import { validateMessageDraft, CommunicationValidationError } from "./communicationCore";
+import { generateUniqueAiResponse, UniqueAiValidationError } from "./src/lib/ai/uniqueAiService";
 
 interface WalletDocument {
   uid: string;
@@ -324,6 +325,45 @@ async function startServer() {
     catch (_) { return errorResponse(res, 'UNAUTHENTICATED', 'The supplied Firebase token is invalid or expired.'); }
   };
   app.get("/api/health", (req, res) => res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" }));
+
+  app.post("/api/ai/chat", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('aiChatRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many AI requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      if (!isPlainObject(req.body)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The AI request body must be a plain object.');
+      }
+      const payload = req.body as Record<string, unknown>;
+      const allowedKeys = new Set(['message']);
+      for (const key of Object.keys(payload)) {
+        if (!allowedKeys.has(key)) {
+          return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
+        }
+      }
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!uid) {
+        return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+      }
+      const message = payload.message;
+      const responseText = await generateUniqueAiResponse(message);
+      return res.status(200).json({ message: responseText, readOnly: true });
+    } catch (error) {
+      if (error instanceof UniqueAiValidationError) {
+        return errorResponse(res, 'INVALID_REQUEST', error.message);
+      }
+      console.error('Unique AI request failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unique AI is temporarily unavailable. Please try again shortly.');
+    }
+  });
 
   app.post("/api/business/staff/accept-invite", rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = (req as any).user?.uid as string | undefined;
