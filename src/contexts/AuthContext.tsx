@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { 
-  User as FirebaseUser, 
-  onAuthStateChanged, 
-  signOut as firebaseSignOut 
+import {
+  User as FirebaseUser,
+  onAuthStateChanged,
+  signOut as firebaseSignOut
 } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { UniqueUser, Role, Permission } from '../lib/os/types';
 
@@ -27,37 +27,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let unsubsribeSnapshot: (() => void) | null = null;
-    
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-      
-      if (user) {
-        try {
-          const userDocRef = doc(db, 'users', user.uid);
-          unsubsribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
-             if (docSnap.exists()) {
-               setUserData(docSnap.data() as UniqueUser);
-             } else {
-               console.warn("User document not found in Firestore.");
-             }
-          });
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-        }
-      } else {
-        if (unsubsribeSnapshot) {
-           unsubsribeSnapshot();
-        }
-        setUserData(null);
+    let unsubscribeSnapshot: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = null;
       }
-      
-      setLoading(false);
+
+      setCurrentUser(user);
+      setUserData(null);
+
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      const userDocRef = doc(db, 'users', user.uid);
+
+      unsubscribeSnapshot = onSnapshot(
+        userDocRef,
+        (docSnap) => {
+          if (docSnap.exists()) {
+            setUserData(docSnap.data() as UniqueUser);
+          } else {
+            console.warn('User document not found in Firestore.');
+          }
+          setLoading(false);
+        },
+        (error) => {
+          console.error('Error listening to user data:', error);
+          setUserData(null);
+          setLoading(false);
+        }
+      );
     });
 
     return () => {
-      unsubscribe();
-      if (unsubsribeSnapshot) unsubsribeSnapshot();
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
     };
   }, []);
 
