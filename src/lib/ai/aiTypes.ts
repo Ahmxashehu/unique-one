@@ -41,11 +41,21 @@ export type UniqueAiConversationTurn = {
   text: unknown;
 };
 
+export type UniqueAiPlatformSummary = {
+  orderCount: number;
+  customerOrderCount: number;
+  sellerOrderCount: number;
+  businessCount: number;
+  productCount: number;
+  productsWithQuantity: number;
+};
+
 export type UniqueAiPlatformContext = {
   user: UniqueAiUserContext;
   orders: UniqueAiOrderContext[];
   businesses: UniqueAiBusinessContext[];
   products: UniqueAiProductContext[];
+  summary: UniqueAiPlatformSummary;
 };
 
 export type UniqueAiRequest = {
