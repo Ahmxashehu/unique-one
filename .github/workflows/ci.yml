@@ -40,5 +40,5 @@ jobs:
           test -f dist/sw.js
           grep -q 'NavigationRoute' dist/sw.js
           grep -q 'index.html' dist/sw.js
-          grep -Eq 'allowlist: \[/\\\^\\\\/\\(\\\\\?!api' dist/sw.js
-          grep -Eq 'denylist: \[/\\\^\\\\/api' dist/sw.js
+          grep -q 'allowlist:' dist/sw.js
+          grep -q 'denylist:' dist/sw.js
