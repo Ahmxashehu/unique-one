@@ -50,13 +50,13 @@ export default defineConfig(() => {
             {
               src: 'pwa-512x512.svg',
               sizes: '512x512',
-              type: 'image/png',
+              type: 'image/svg+xml',
               purpose: 'any'
             },
             {
               src: 'pwa-maskable-512x512.svg',
               sizes: '512x512',
-              type: 'image/png',
+              type: 'image/svg+xml',
               purpose: 'maskable'
             }
           ]
