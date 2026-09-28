@@ -1573,7 +1573,7 @@ async function startServer() {
         else transaction.create(deliveryRef, delivery);
 
         if (message.senderId !== uid) {
-          const messageStatus = nextStatus === 'read' ? 'read' : 'delivered';
+          const messageStatus = nextStatus === 'read' || message.status === 'read' ? 'read' : 'delivered';
           transaction.update(messageRef, { status: messageStatus, updatedAt: nowIso });
           if (action === 'read') transaction.update(membershipRef, { lastReadAt: nowIso });
         }
