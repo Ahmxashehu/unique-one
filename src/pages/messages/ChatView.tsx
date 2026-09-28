@@ -51,6 +51,7 @@ export default function ChatView() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const previousMessageCountRef = useRef(0);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const pendingMessageIdempotencyKeyRef = useRef<string | null>(null);
 
   const updatePresence = useCallback(async (status: 'online' | 'offline') => {
     if (!currentUser) return;
@@ -637,9 +638,11 @@ export default function ChatView() {
         const encrypted = await encryptForUser(currentUser.uid, peerPublicKey, text);
         encryptedPayload = { version: 1, recipientId: otherUid, senderPublicKey, ...encrypted };
       }
+      const idempotencyKey = pendingMessageIdempotencyKeyRef.current ?? crypto.randomUUID();
+      pendingMessageIdempotencyKeyRef.current = idempotencyKey;
       const response = await fetch('/api/communication/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify({
           conversationId: id,
           type: attachments.length > 0 ? (attachments.every((item) => item.contentType.startsWith('image/')) ? 'image' : 'file') : 'text',
@@ -659,6 +662,7 @@ export default function ChatView() {
       }
       setAttachments([]);
       setReplyingTo(null);
+      pendingMessageIdempotencyKeyRef.current = null;
     } catch (err) {
       console.error(err);
       await Promise.all(attachments.map((attachment) => cleanupUploadedAttachment(attachment)));
