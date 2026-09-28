@@ -1141,6 +1141,22 @@ async function startServer() {
       return errorResponse(res, 'INVALID_REQUEST', 'The conversation request is invalid.');
     }
     try {
+      if (validatedRequest.type === 'direct' && validatedRequest.memberUids.length === 2) {
+        const otherUid = validatedRequest.memberUids.find((uid) => uid !== creatorUid);
+        if (!otherUid) {
+          return errorResponse(res, 'INVALID_REQUEST', 'A direct conversation requires another user.');
+        }
+        const blockIds = [
+          createHash('sha256').update(creatorUid + ':' + otherUid).digest('hex').slice(0, 40),
+          createHash('sha256').update(otherUid + ':' + creatorUid).digest('hex').slice(0, 40),
+        ];
+        const blockSnapshots = await Promise.all(
+          blockIds.map((blockId) => adminDb.collection('communicationBlocks').doc(blockId).get()),
+        );
+        if (blockSnapshots.some((snapshot) => snapshot.exists)) {
+          return errorResponse(res, 'FORBIDDEN', 'A direct conversation cannot be created while communication is blocked.', 403);
+        }
+      }
       const directConversationId = validatedRequest.type === 'direct' && validatedRequest.memberUids.length === 2
         ? createHash('sha256').update([...validatedRequest.memberUids].sort().join(':')).digest('hex').slice(0, 40)
         : null;
