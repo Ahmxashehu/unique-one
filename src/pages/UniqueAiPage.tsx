@@ -12,6 +12,9 @@ const QUICK_PROMPTS = [
   "What can you help me with in Unique One?",
   "Summarize my current orders.",
   "What businesses and products do I have?",
+  "How many orders, businesses, and products do I have?",
+  "What is my account verification status?",
+  "Can you change a payment or order for me?",
 ];
 
 export default function UniqueAiPage() {
