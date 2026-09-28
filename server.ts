@@ -1780,6 +1780,7 @@ async function startServer() {
           productSnapshots.set(productId, await transaction.get(adminDb.collection('products').doc(productId)));
         }
         const groups = new Map<string, { cart: typeof carts[number]; product: Record<string, unknown>; productId: string }[]>();
+        const requestedByProduct = new Map<string, number>();
         for (const cart of carts) {
           const productId = String(cart.data.productId).trim();
           const snapshot = productSnapshots.get(productId);
@@ -1791,16 +1792,32 @@ async function startServer() {
           const available = product.quantity;
           const minOrderQuantity = Number(product.minOrderQuantity || 1);
           if (!isSafeFirebaseUid(sellerId) || product.status !== 'published' || typeof price !== 'number' || !Number.isFinite(price) || price < 0 ||
-              product.currency !== 'NGN' || !Number.isSafeInteger(available) || available < quantity ||
+              product.currency !== 'NGN' || !Number.isSafeInteger(available) || available < 0 ||
               !Number.isSafeInteger(minOrderQuantity) || minOrderQuantity < 1 || quantity < minOrderQuantity) {
             throw new RequestValidationError('INVALID_REQUEST', 'One or more products in your cart are no longer available in the requested quantity.');
           }
+          const requested = (requestedByProduct.get(productId) || 0) + quantity;
+          if (!Number.isSafeInteger(requested) || requested > available) {
+            throw new RequestValidationError('INVALID_REQUEST', 'One or more products in your cart are no longer available in the requested quantity.');
+          }
+          requestedByProduct.set(productId, requested);
           const group = groups.get(sellerId) || [];
           group.push({ cart, product, productId });
           groups.set(sellerId, group);
         }
         const orderIds: string[] = [];
         const now = Timestamp.now().toDate().toISOString();
+        for (const [productId, requestedQuantity] of requestedByProduct) {
+          const snapshot = productSnapshots.get(productId);
+          if (!snapshot?.exists) throw new RequestValidationError('INVALID_REQUEST', 'A product in your cart is no longer available.');
+          const product = snapshot.data() || {};
+          const remainingQuantity = Number(product.quantity) - requestedQuantity;
+          transaction.update(snapshot.ref, {
+            quantity: remainingQuantity,
+            status: remainingQuantity === 0 ? 'out_of_stock' : product.status,
+            updatedAt: now,
+          });
+        }
         for (const [sellerId, sellerItems] of groups) {
           const orderRef = adminDb.collection('orders').doc();
           const items = sellerItems.map(({ product, productId, cart }) => ({
