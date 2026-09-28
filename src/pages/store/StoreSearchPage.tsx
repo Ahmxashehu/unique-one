@@ -22,6 +22,7 @@ export default function StoreSearchPage() {
   const [loading, setLoading] = useState(true);
   const [wishlistLoading, setWishlistLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -100,11 +101,28 @@ export default function StoreSearchPage() {
         <form onSubmit={handleSearch} className="flex items-center gap-2 w-full md:w-96">
           <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" placeholder="Search store..." value={searchInput} onChange={e => setSearchInput(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent" /></div>
           <button type="submit" className="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium">Search</button>
-          <button type="button" className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50" aria-label="Filter"><Filter className="w-5 h-5" /></button>
+          <button type="button" onClick={() => setShowMobileFilters(prev => !prev)} className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50" aria-label={showMobileFilters ? 'Hide filters' : 'Show filters'} aria-expanded={showMobileFilters}>
+            <Filter className="w-5 h-5" />
+          </button>
         </form>
       </div>
 
       <div className="flex flex-col md:flex-row gap-8">
+        {showMobileFilters && (
+          <div className="md:hidden bg-white border border-slate-200 rounded-2xl p-4 space-y-4">
+            <div><h3 className="font-semibold text-slate-900 mb-3">Categories</h3><div className="grid grid-cols-2 gap-2">
+              {['electronics', 'fashion', 'agriculture', 'building_materials', 'services', 'vehicles'].map(cat => (
+                <Link key={cat} to={`/store/search?cat=${cat}`} className={`text-sm p-2 rounded-lg border ${filterCat === cat ? 'text-blue-600 font-medium border-blue-200 bg-blue-50' : 'text-slate-600 border-slate-200'} capitalize`}>{cat.replace('_', ' ')}</Link>
+              ))}
+            </div></div>
+            <div><h3 className="font-semibold text-slate-900 mb-3">Price Range</h3><form onSubmit={handleSearch} className="flex gap-2">
+              <input type="number" min="0" placeholder="Min" value={minPriceInput} onChange={e => setMinPriceInput(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+              <input type="number" min="0" placeholder="Max" value={maxPriceInput} onChange={e => setMaxPriceInput(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+              <button type="submit" className="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium">Apply</button>
+            </form></div>
+          </div>
+        )}
+
         <div className="hidden md:block w-64 shrink-0 space-y-6">
           <div><h3 className="font-semibold text-slate-900 mb-3">Categories</h3><div className="space-y-2">
             {['electronics', 'fashion', 'agriculture', 'building_materials', 'services', 'vehicles'].map(cat => (
