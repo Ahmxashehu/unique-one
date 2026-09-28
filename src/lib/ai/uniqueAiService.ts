@@ -110,6 +110,20 @@ function validateAuthorizedContext(
     summary.productStatusCounts,
   ];
   if (
+    countMaps.some((counts) =>
+      Object.keys(counts).some((key) => !key.trim() || key.length > 160),
+    )
+  ) {
+    throw new UniqueAiValidationError("Authorized AI summary contains invalid breakdown labels.");
+  }
+  if (
+    summary.orderCount !== context.orders.length ||
+    summary.businessCount !== context.businesses.length ||
+    summary.productCount !== context.products.length
+  ) {
+    throw new UniqueAiValidationError("Authorized AI summary counts do not match loaded context.");
+  }
+  if (
     ![
       summary.orderCount,
       summary.customerOrderCount,
