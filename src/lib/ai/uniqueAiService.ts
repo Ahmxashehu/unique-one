@@ -92,6 +92,17 @@ function validateAiOutput(value: unknown): string {
   if (text.length > MAX_OUTPUT_LENGTH) {
     throw new Error(`Gemini response exceeds the maximum length of ${MAX_OUTPUT_LENGTH} characters.`);
   }
+
+  const forbiddenMarkers = [
+    "<AUTHORIZED_PLATFORM_CONTEXT>",
+    "</AUTHORIZED_PLATFORM_CONTEXT>",
+    "<UNTRUSTED_USER_REQUEST>",
+    "</UNTRUSTED_USER_REQUEST>",
+  ];
+  if (forbiddenMarkers.some((marker) => text.includes(marker))) {
+    throw new Error("Gemini returned an invalid response.");
+  }
+
   return text;
 }
 
