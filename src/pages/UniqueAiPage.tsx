@@ -1,0 +1,194 @@
+import { FormEvent, useState } from "react";
+import { Bot, Send, Sparkles, Trash2 } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+
+type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+};
+
+const QUICK_PROMPTS = [
+  "What can you help me with in Unique One?",
+  "Summarize my current orders.",
+  "What businesses and products do I have?",
+];
+
+export default function UniqueAiPage() {
+  const { currentUser } = useAuth();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const sendMessage = async (event?: FormEvent) => {
+    event?.preventDefault();
+    const trimmed = message.trim();
+    if (!trimmed || loading || !currentUser) return;
+
+    setError("");
+    setMessage("");
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      text: trimmed,
+    };
+    setMessages((current) => [...current, userMessage]);
+    setLoading(true);
+
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ message: trimmed }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { message?: string; error?: { message?: string } }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message || "Unique AI is temporarily unavailable.");
+      }
+
+      if (typeof payload?.message !== "string" || !payload.message.trim()) {
+        throw new Error("Unique AI returned an empty response.");
+      }
+
+      setMessages((current) => [
+        ...current,
+        { id: crypto.randomUUID(), role: "assistant", text: payload.message!.trim() },
+      ]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to contact Unique AI.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearConversation = () => {
+    if (loading) return;
+    setMessages([]);
+    setError("");
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-emerald-600" />
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Unique AI</h1>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            Your authenticated Unique One assistant. Platform information comes from authorized records.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={clearConversation}
+          disabled={messages.length === 0 || loading}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Trash2 className="h-4 w-4" />
+          Clear
+        </button>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {messages.length === 0 ? (
+            <div className="mx-auto flex max-w-2xl flex-col items-center py-10 text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
+                <Bot className="h-7 w-7 text-emerald-600" />
+              </div>
+              <h2 className="text-lg font-semibold text-slate-900">How can I help?</h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Ask about your Unique One account, orders, businesses, or products. I will not invent records or claim actions I did not perform.
+              </p>
+              <div className="mt-6 grid w-full gap-2 sm:grid-cols-3">
+                {QUICK_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => setMessage(prompt)}
+                    className="rounded-xl border border-slate-200 p-3 text-left text-sm text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mx-auto max-w-3xl space-y-4">
+              {messages.map((item) => (
+                <div
+                  key={item.id}
+                  className={`flex ${item.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${
+                      item.role === "user"
+                        ? "bg-slate-900 text-white"
+                        : "bg-slate-100 text-slate-800"
+                    }`}
+                  >
+                    {item.text}
+                  </div>
+                </div>
+              ))}
+              {loading && (
+                <div className="flex justify-start">
+                  <div className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-500">
+                    Unique AI is thinking…
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="border-t border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={sendMessage} className="border-t border-slate-200 p-3 sm:p-4">
+          <div className="flex items-end gap-2">
+            <textarea
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void sendMessage();
+                }
+              }}
+              rows={2}
+              maxLength={4000}
+              disabled={loading || !currentUser}
+              placeholder="Ask Unique AI…"
+              className="min-h-[48px] flex-1 resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50"
+            />
+            <button
+              type="submit"
+              disabled={!message.trim() || loading || !currentUser}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Send className="h-4 w-4" />
+              Send
+            </button>
+          </div>
+          <p className="mt-2 px-1 text-xs text-slate-400">
+            Read-only assistant for now. It cannot change payments, orders, products, or other platform records.
+          </p>
+        </form>
+      </div>
+    </div>
+  );
+}
