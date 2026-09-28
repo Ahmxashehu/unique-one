@@ -1,6 +1,20 @@
 const fs = require('fs');
-const { execSync } = require('child_process');
 
-// The icon is in public/icon.svg. We can just use a simple placeholder if it doesn't exist.
-// Since we don't have sharp installed globally, we can just make dummy PNG files, but that won't pass strict PWA checks.
-// Let's create a minimal script to create valid PNGs using a canvas.
+// PWA icons are maintained as SVG assets in public/.
+// Do not generate placeholder PNGs: the manifest intentionally uses the
+// checked-in SVG icons so their dimensions and artwork remain authoritative.
+const required = [
+  'public/unique-icon.svg',
+  'public/pwa-192x192.svg',
+  'public/pwa-512x512.svg',
+  'public/pwa-maskable-512x512.svg',
+  'public/apple-touch-icon.svg',
+];
+
+const missing = required.filter((file) => !fs.existsSync(file));
+if (missing.length) {
+  console.error('Missing PWA icon assets:', missing.join(', '));
+  process.exit(1);
+}
+
+console.log('PWA icon assets verified:', required.join(', '));
