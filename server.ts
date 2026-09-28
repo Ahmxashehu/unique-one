@@ -968,6 +968,17 @@ async function startServer() {
         return errorResponse(res, 'INVALID_REQUEST', 'This user already has a pending message request to you.');
       }
 
+      const blockIds = [
+        createHash('sha256').update(fromUid + ':' + toUid).digest('hex').slice(0, 40),
+        createHash('sha256').update(toUid + ':' + fromUid).digest('hex').slice(0, 40),
+      ];
+      const blockSnapshots = await Promise.all(
+        blockIds.map((blockId) => adminDb.collection('communicationBlocks').doc(blockId).get()),
+      );
+      if (blockSnapshots.some((snapshot) => snapshot.exists)) {
+        return errorResponse(res, 'FORBIDDEN', 'Message requests are not available between these users.', 403);
+      }
+
       const requestRef = adminDb.collection('messageRequests').doc();
       const now = Timestamp.now();
       const nowIso = now.toDate().toISOString();
