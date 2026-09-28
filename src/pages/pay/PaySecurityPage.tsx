@@ -21,7 +21,7 @@ export default function PaySecurityPage() {
              <button className="mt-4 px-4 py-2 border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50">
                Set up PIN
              </button>
-             <p className="text-xs text-slate-400 mt-3">Note: We never store your PIN in plain text. It is cryptographically hashed.</p>
+             <p className="text-xs text-slate-400 mt-3">Your PIN is handled by the secure authentication flow and is not displayed here.</p>
            </div>
         </div>
 
@@ -33,16 +33,9 @@ export default function PaySecurityPage() {
            </div>
            <div className="flex-1">
              <h3 className="font-semibold text-slate-900">Transaction Limits</h3>
-             <p className="text-sm text-slate-500 mt-1">Control your daily and single-transaction spending limits.</p>
-             <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
-               <div className="flex justify-between items-center">
-                 <span className="text-sm font-medium text-slate-700">Daily Limit</span>
-                 <span className="text-sm font-semibold text-slate-900">₦0.00 <span className="text-slate-400 font-normal">(Demo)</span></span>
-               </div>
-               <div className="flex justify-between items-center">
-                 <span className="text-sm font-medium text-slate-700">Single Transaction Limit</span>
-                 <span className="text-sm font-semibold text-slate-900">₦0.00 <span className="text-slate-400 font-normal">(Demo)</span></span>
-               </div>
+             <p className="text-sm text-slate-500 mt-1">Transfer limits will appear here when production limits are configured for your account.</p>
+             <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+               <p className="text-sm text-slate-600">No numeric transfer limits are currently configured. Limits will not be invented or displayed until an authoritative production policy is connected.</p>
              </div>
            </div>
         </div>
