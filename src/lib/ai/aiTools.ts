@@ -72,7 +72,7 @@ export async function getAuthorizedOrderContext(uid: string): Promise<UniqueAiOr
         typeof data.totalAmount === "number" && Number.isFinite(data.totalAmount)
           ? data.totalAmount
           : undefined,
-      currency: safeString(data.currency, "NGN")!,
+      currency: safeString(data.currency, "unknown")!,
       itemCount: items.length,
       createdAt: toIsoString(data.createdAt),
     });
@@ -115,7 +115,7 @@ export async function getAuthorizedProductContext(uid: string): Promise<UniqueAi
       category: safeString(data.category),
       price:
         typeof data.price === "number" && Number.isFinite(data.price) ? data.price : undefined,
-      currency: safeString(data.currency, "NGN")!,
+      currency: safeString(data.currency, "unknown")!,
       quantity:
         typeof data.quantity === "number" && Number.isFinite(data.quantity)
           ? data.quantity
