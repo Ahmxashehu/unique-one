@@ -25,6 +25,8 @@ const QUICK_PROMPTS = [
   "Which of my products are missing category, status, or quantity data?",
   "Which of my businesses have missing category, status, or verification data?",
   "What order data is unknown or potentially incomplete?",
+  "Why might my Unique AI counts be incomplete?",
+  "Which loaded order totals are unavailable?",
   "What is my account verification status?",
   "Can you change a payment or order for me?",
 ];
@@ -36,6 +38,7 @@ export default function UniqueAiPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
+  const [requestStartedAt, setRequestStartedAt] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -57,6 +60,7 @@ export default function UniqueAiPage() {
     };
     setMessages((current) => [...current, userMessage]);
     setLoading(true);
+    setRequestStartedAt(Date.now());
 
     try {
       const token = await currentUser.getIdToken();
@@ -92,6 +96,7 @@ export default function UniqueAiPage() {
       setError(err instanceof Error ? err.message : "Unable to contact Unique AI.");
     } finally {
       setLoading(false);
+      setRequestStartedAt(null);
     }
   };
 
@@ -171,7 +176,7 @@ export default function UniqueAiPage() {
               {loading && (
                 <div className="flex justify-start">
                   <div className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-500">
-                    Unique AI is thinking…
+                    Unique AI is thinking… {requestStartedAt ? `${Math.max(0, Math.floor((Date.now() - requestStartedAt) / 1000))}s` : ""}
                   </div>
                 </div>
               )}
