@@ -19,7 +19,37 @@ export class UniqueAiValidationError extends Error {
   }
 }
 
-type UniqueAiUserContext = {\n  fullName: string;\n  uniqueOneId?: string;\n  preferredLanguage?: string;\n  roles: string[];\n  status?: string;\n  verificationStatus?: string;\n};\n\nasync function getAuthorizedUserContext(uid: string): Promise<UniqueAiUserContext> {\n  const snapshot = await getFirestore().collection("users").doc(uid).get();\n  if (!snapshot.exists) {\n    return { fullName: "Unique One user", roles: [] };\n  }\n  const data = snapshot.data() ?? {};\n  return {\n    fullName: typeof data.fullName === "string" ? data.fullName : "Unique One user",\n    uniqueOneId: typeof data.uniqueOneId === "string" ? data.uniqueOneId : undefined,\n    preferredLanguage: typeof data.preferredLanguage === "string" ? data.preferredLanguage : undefined,\n    roles: Array.isArray(data.roles) ? data.roles.filter((role): role is string => typeof role === "string").slice(0, 20) : [],\n    status: typeof data.status === "string" ? data.status : undefined,\n    verificationStatus: typeof data.verificationStatus === "string" ? data.verificationStatus : undefined,\n  };\n}\n\nfunction getPrompt(value: unknown): string {
+type UniqueAiUserContext = {
+  fullName: string;
+  uniqueOneId?: string;
+  preferredLanguage?: string;
+  roles: string[];
+  status?: string;
+  verificationStatus?: string;
+};
+
+async function getAuthorizedUserContext(uid: string): Promise<UniqueAiUserContext> {
+  const snapshot = await getFirestore().collection("users").doc(uid).get();
+  if (!snapshot.exists) {
+    return { fullName: "Unique One user", roles: [] };
+  }
+
+  const data = snapshot.data() ?? {};
+  return {
+    fullName: typeof data.fullName === "string" ? data.fullName : "Unique One user",
+    uniqueOneId: typeof data.uniqueOneId === "string" ? data.uniqueOneId : undefined,
+    preferredLanguage: typeof data.preferredLanguage === "string" ? data.preferredLanguage : undefined,
+    roles: Array.isArray(data.roles)
+      ? data.roles
+          .filter((role): role is string => typeof role === "string")
+          .slice(0, 20)
+      : [],
+    status: typeof data.status === "string" ? data.status : undefined,
+    verificationStatus: typeof data.verificationStatus === "string" ? data.verificationStatus : undefined,
+  };
+}
+
+function getPrompt(value: unknown): string {
   if (typeof value !== "string") {
     throw new UniqueAiValidationError("message must be a string.");
   }
@@ -29,14 +59,25 @@ type UniqueAiUserContext = {\n  fullName: string;\n  uniqueOneId?: string;\n  pr
     throw new UniqueAiValidationError("message must not be empty.");
   }
   if (message.length > MAX_PROMPT_LENGTH) {
-    throw new UniqueAiValidationError(`message exceeds the maximum length of ${MAX_PROMPT_LENGTH} characters.`);
+    throw new UniqueAiValidationError(
+      `message exceeds the maximum length of ${MAX_PROMPT_LENGTH} characters.`,
+    );
   }
 
   return message;
 }
 
-export async function generateUniqueAiResponse(input: { uid: string; message: unknown }): Promise<string> {
-  const prompt = getPrompt(input.message);\n  const userContext = await getAuthorizedUserContext(input.uid);\n  const contextualPrompt = [\n    `Authenticated user context (read-only, authoritative): ${JSON.stringify(userContext)}`,\n    `User request: ${prompt}`,\n  ].join("\\n");
+export async function generateUniqueAiResponse(input: {
+  uid: string;
+  message: unknown;
+}): Promise<string> {
+  const prompt = getPrompt(input.message);
+  const userContext = await getAuthorizedUserContext(input.uid);
+  const contextualPrompt = [
+    `Authenticated user context (read-only, authoritative): ${JSON.stringify(userContext)}`,
+    `User request: ${prompt}`,
+  ].join("\n");
+
   const apiKey = process.env.GEMINI_API_KEY?.trim();
 
   if (!apiKey) {
