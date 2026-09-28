@@ -49,7 +49,7 @@ service cloud.firestore {
     }
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.sellerId == request.auth.uid) || isAdmin();
-      allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
+            allow create: if false;
       allow update: if isAuthenticated()
         && request.resource.data.customerId == resource.data.customerId
         && request.resource.data.sellerId == resource.data.sellerId
