@@ -49,18 +49,25 @@ export type UniqueAiPlatformSummary = {
   orderSideStatusCounts: Record<string, number>;
   activeOrderCount: number;
   cancelledOrderCount: number;
+  ordersWithUnknownStatus: number;
   businessCount: number;
   businessCategoryCounts: Record<string, number>;
   businessStatusCounts: Record<string, number>;
   businessVerificationCounts: Record<string, number>;
+  businessesWithoutCategory: number;
+  businessesWithUnknownStatus: number;
+  businessesWithUnknownVerification: number;
   productCount: number;
   productCategoryCounts: Record<string, number>;
   productStatusCounts: Record<string, number>;
   productsWithoutCategory: number;
+  productsWithUnknownStatus: number;
+  productsWithoutQuantity: number;
   inventoryUnitCount: number;
   productsWithQuantity: number;
   productsOutOfStock: number;
   contextLimits: { orders: number; businesses: number; products: number };
+  contextTruncated: { orders: boolean; businesses: boolean; products: boolean };
 };
 
 export type UniqueAiPlatformContext = {
