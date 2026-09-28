@@ -24,6 +24,7 @@ export default defineConfig(() => {
         devOptions: {
           enabled: true,
           type: 'module',
+          navigateFallbackAllowlist: [/^\/(?!api(?:\/|$)).*/],
         },
         manifest: {
           id: '/',
