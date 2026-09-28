@@ -38,7 +38,7 @@ export type UniqueAiProductContext = {
 
 export type UniqueAiConversationTurn = {
   role: "user" | "assistant";
-  text: unknown;
+  text: string;
 };
 
 export type UniqueAiPlatformSummary = {
