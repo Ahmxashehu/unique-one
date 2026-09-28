@@ -53,8 +53,8 @@ export async function getAuthorizedUserContext(uid: string): Promise<UniqueAiUse
 export async function getAuthorizedOrderContext(uid: string): Promise<UniqueAiOrderContext[]> {
   const db = getFirestore();
   const [customerSnapshot, sellerSnapshot] = await Promise.all([
-    db.collection("orders").where("customerId", "==", uid).limit(MAX_ORDER_CONTEXT).get(),
-    db.collection("orders").where("sellerId", "==", uid).limit(MAX_ORDER_CONTEXT).get(),
+    db.collection("orders").where("customerId", "==", uid).limit(MAX_ORDER_CONTEXT + 1).get(),
+    db.collection("orders").where("sellerId", "==", uid).limit(MAX_ORDER_CONTEXT + 1).get(),
   ]);
 
   const orders = new Map<string, UniqueAiOrderContext>();
@@ -84,7 +84,7 @@ export async function getAuthorizedBusinessContext(uid: string): Promise<UniqueA
   const snapshot = await getFirestore()
     .collection("businesses")
     .where("ownerUid", "==", uid)
-    .limit(MAX_BUSINESS_CONTEXT)
+    .limit(MAX_BUSINESS_CONTEXT + 1)
     .get();
 
   return snapshot.docs.map((doc) => {
@@ -104,7 +104,7 @@ export async function getAuthorizedProductContext(uid: string): Promise<UniqueAi
   const snapshot = await getFirestore()
     .collection("products")
     .where("sellerId", "==", uid)
-    .limit(MAX_PRODUCT_CONTEXT)
+    .limit(MAX_PRODUCT_CONTEXT + 1)
     .get();
 
   return snapshot.docs.map((doc) => {
@@ -237,19 +237,19 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
         products: MAX_PRODUCT_CONTEXT,
       },
       contextTruncated: {
-        orders: orders.length >= MAX_ORDER_CONTEXT,
-        businesses: businesses.length >= MAX_BUSINESS_CONTEXT,
-        products: products.length >= MAX_PRODUCT_CONTEXT,
+        orders: orders.length > MAX_ORDER_CONTEXT,
+        businesses: businesses.length > MAX_BUSINESS_CONTEXT,
+        products: products.length > MAX_PRODUCT_CONTEXT,
       },
       contextLoadedAt: new Date().toISOString(),
       contextWarnings: [
-        ...(orders.length >= MAX_ORDER_CONTEXT
+        ...(orders.length > MAX_ORDER_CONTEXT
           ? [`Order context reached its limit of ${MAX_ORDER_CONTEXT} loaded records.`]
           : []),
-        ...(businesses.length >= MAX_BUSINESS_CONTEXT
+        ...(businesses.length > MAX_BUSINESS_CONTEXT
           ? [`Business context reached its limit of ${MAX_BUSINESS_CONTEXT}.`]
           : []),
-        ...(products.length >= MAX_PRODUCT_CONTEXT
+        ...(products.length > MAX_PRODUCT_CONTEXT
           ? [`Product context reached its limit of ${MAX_PRODUCT_CONTEXT}.`]
           : []),
       ],
