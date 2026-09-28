@@ -322,6 +322,56 @@ async function startServer() {
   };
   app.get("/api/health", (req, res) => res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" }));
 
+  app.post("/api/business/register", rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+    const uid = (req as any).user?.uid as string | undefined;
+    if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+    try {
+      const body = req.body as Record<string, unknown>;
+      const name = typeof body?.name === 'string' ? body.name.trim() : '';
+      const registrationNumber = typeof body?.registrationNumber === 'string' ? body.registrationNumber.trim() : '';
+      const description = typeof body?.description === 'string' ? body.description.trim() : '';
+      const contactEmail = typeof body?.contactEmail === 'string' ? body.contactEmail.trim() : '';
+      const contactPhone = typeof body?.contactPhone === 'string' ? body.contactPhone.trim() : '';
+      const category = typeof body?.category === 'string' ? body.category.trim() : '';
+
+      if (!name || name.length > 200 || description.length > 5000 || contactEmail.length > 320 || contactPhone.length > 50 || category.length > 100 || registrationNumber.length > 100) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Business registration data is invalid.');
+      }
+      if (!contactEmail || !contactPhone || !category || !description) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Business name, description, email, phone, and category are required.');
+      }
+
+      const existing = await adminDb.collection('businesses').where('ownerUid', '==', uid).limit(1).get();
+      if (!existing.empty) return errorResponse(res, 'BLOCKED', 'This account already has a business registration.', 409);
+
+      const now = Timestamp.now();
+      const businessRef = adminDb.collection('businesses').doc();
+      const userRef = adminDb.collection('users').doc(uid);
+
+      await adminDb.runTransaction(async transaction => {
+        transaction.set(businessRef, {
+          ownerUid: uid,
+          name,
+          registrationNumber,
+          description,
+          contactEmail,
+          contactPhone,
+          categories: [category],
+          status: 'pending',
+          verificationStatus: 'unverified',
+          createdAt: now,
+          updatedAt: now,
+        });
+        transaction.update(userRef, { roles: Array.from(new Set([...(Array.isArray((await transaction.get(userRef)).data()?.roles) ? (await transaction.get(userRef)).data()?.roles as string[] : []), 'business_owner'])) });
+      });
+
+      return res.status(201).json({ businessId: businessRef.id, status: 'pending' });
+    } catch (error) {
+      console.error('Business registration failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to submit business registration right now.');
+    }
+  });
+
   app.patch("/api/admin/users/verification", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const adminUid = (req as any).user?.uid as string | undefined;
     if (!adminUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
