@@ -36,6 +36,11 @@ export type UniqueAiProductContext = {
   status?: string;
 };
 
+export type UniqueAiConversationTurn = {
+  role: "user" | "assistant";
+  text: unknown;
+};
+
 export type UniqueAiPlatformContext = {
   user: UniqueAiUserContext;
   orders: UniqueAiOrderContext[];
@@ -46,4 +51,5 @@ export type UniqueAiPlatformContext = {
 export type UniqueAiRequest = {
   uid: string;
   message: unknown;
+  history?: unknown;
 };
