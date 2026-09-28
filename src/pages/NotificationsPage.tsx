@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, CheckCircle2 } from 'lucide-react';
-import { collection, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
