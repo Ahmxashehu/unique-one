@@ -4,6 +4,7 @@ import { getFirestore } from "firebase-admin/firestore";
 const DEFAULT_MODEL = "gemini-3.8-flash";
 const MAX_PROMPT_LENGTH = 4_000;
 const MAX_ORDER_CONTEXT = 20;
+const MAX_BUSINESS_CONTEXT = 5;
 
 const SYSTEM_INSTRUCTION = [
   "You are Unique AI, the assistant for the Unique One platform.",
@@ -38,6 +39,15 @@ type UniqueAiOrderContext = {
   totalAmount: number;
   currency: string;
   itemCount: number;
+  createdAt?: string;
+};
+
+type UniqueAiBusinessContext = {
+  id: string;
+  name: string;
+  category?: string;
+  status?: string;
+  verificationStatus?: string;
   createdAt?: string;
 };
 
@@ -109,6 +119,32 @@ async function getAuthorizedOrderContext(uid: string): Promise<UniqueAiOrderCont
   return Array.from(orders.values()).slice(0, MAX_ORDER_CONTEXT);
 }
 
+async function getAuthorizedBusinessContext(uid: string): Promise<UniqueAiBusinessContext[]> {
+  const snapshot = await getFirestore()
+    .collection("businesses")
+    .where("ownerUid", "==", uid)
+    .limit(MAX_BUSINESS_CONTEXT)
+    .get();
+
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: typeof data.name === "string"
+        ? data.name
+        : typeof data.businessName === "string"
+          ? data.businessName
+          : "Unnamed business",
+      category: typeof data.category === "string" ? data.category : undefined,
+      status: typeof data.status === "string" ? data.status : undefined,
+      verificationStatus: typeof data.verificationStatus === "string"
+        ? data.verificationStatus
+        : undefined,
+      createdAt: toIsoString(data.createdAt),
+    };
+  });
+}
+
 function getPrompt(value: unknown): string {
   if (typeof value !== "string") {
     throw new UniqueAiValidationError("message must be a string.");
@@ -132,14 +168,16 @@ export async function generateUniqueAiResponse(input: {
   message: unknown;
 }): Promise<string> {
   const prompt = getPrompt(input.message);
-  const [userContext, orderContext] = await Promise.all([
+  const [userContext, orderContext, businessContext] = await Promise.all([
     getAuthorizedUserContext(input.uid),
     getAuthorizedOrderContext(input.uid),
+    getAuthorizedBusinessContext(input.uid),
   ]);
 
   const contextualPrompt = [
     `Authenticated user context (read-only, authoritative): ${JSON.stringify(userContext)}`,
     `Authorized order context (read-only, authoritative; only this user's customer/seller orders): ${JSON.stringify(orderContext)}`,
+    `Authorized business context (read-only, authoritative; only businesses owned by this user): ${JSON.stringify(businessContext)}`,
     `User request: ${prompt}`,
   ].join("\n");
 
