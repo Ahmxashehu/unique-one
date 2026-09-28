@@ -118,10 +118,27 @@ function validateAuthorizedContext(
     throw new UniqueAiValidationError("Authorized AI business summary is inconsistent.");
   }
 
+  const orderSideStatusTotal = Object.values(summary.orderSideStatusCounts).reduce((total, count) => total + count, 0);
+  if (orderSideStatusTotal !== summary.orderCount) {
+    throw new UniqueAiValidationError("Authorized AI order side/status summary is inconsistent.");
+  }
+
   const productCategoryTotal = Object.values(summary.productCategoryCounts).reduce((total, count) => total + count, 0);
   const productStatusTotal = Object.values(summary.productStatusCounts).reduce((total, count) => total + count, 0);
   if (productCategoryTotal !== summary.productCount || productStatusTotal !== summary.productCount) {
     throw new UniqueAiValidationError("Authorized AI product summary is inconsistent.");
+  }
+
+  const productQuantityCount = context.products.filter(
+    (product) => typeof product.quantity === "number" && product.quantity > 0,
+  ).length;
+  const productOutOfStockCount = context.products.filter(
+    (product) => typeof product.quantity === "number" && product.quantity <= 0,
+  ).length;
+  if (summary.productsWithQuantity !== productQuantityCount ||
+      summary.productsOutOfStock !== productOutOfStockCount ||
+      summary.productsWithoutQuantity !== context.products.filter((product) => product.quantity === undefined).length) {
+    throw new UniqueAiValidationError("Authorized AI inventory summary is inconsistent.");
   }
 }
 
