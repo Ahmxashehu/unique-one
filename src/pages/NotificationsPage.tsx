@@ -56,7 +56,7 @@ export default function NotificationsPage() {
     setMarkingRead(true);
     try {
       await Promise.all(unread.map(notification =>
-        updateDoc(notificationRef(notification.id), { read: true }),
+        updateDoc(doc(db, 'notifications', notification.id), { read: true }),
       ));
       setNotifications(current => current.map(notification => ({ ...notification, read: true })));
     } catch (error) {
@@ -64,10 +64,6 @@ export default function NotificationsPage() {
     } finally {
       setMarkingRead(false);
     }
-  };
-
-  const notificationRef = (id: string) => {
-    return requireNotificationDocument(id);
   };
 
   return (
@@ -118,8 +114,4 @@ export default function NotificationsPage() {
       </div>
     </div>
   );
-}
-
-function requireNotificationDocument(id: string) {
-  return { id };
 }
