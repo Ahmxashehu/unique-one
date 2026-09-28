@@ -1653,19 +1653,48 @@ async function startServer() {
       const messageId = req.params.messageId;
       if (!/^[A-Za-z0-9_-]{1,128}$/.test(messageId)) return errorResponse(res, 'INVALID_REQUEST', 'The message ID is invalid.');
       const messageRef = adminDb.collection('messages').doc(messageId);
+      let attachmentStoragePaths: string[] = [];
       await adminDb.runTransaction(async (transaction) => {
         const snapshot = await transaction.get(messageRef);
         if (!snapshot.exists) throw new RequestValidationError('INVALID_REQUEST', 'The message was not found.');
         const message = snapshot.data() as Partial<Message>;
-        if (message.senderId !== uid) throw new RequestValidationError('INVALID_REQUEST', 'You can only delete your own messages.',);
+        if (message.senderId !== uid) throw new RequestValidationError('INVALID_REQUEST', 'You can only delete your own messages.');
+        if (Array.isArray(message.attachments)) {
+          const conversationId = typeof message.conversationId === 'string' ? message.conversationId : '';
+          const ownedPrefix = conversationId && isSafeConversationId(conversationId)
+            ? `messages/${conversationId}/${uid}/`
+            : '';
+          attachmentStoragePaths = message.attachments
+            .map((attachment) => attachment && typeof attachment === 'object' && 'storagePath' in attachment
+              ? (attachment as { storagePath?: unknown }).storagePath
+              : undefined)
+            .filter((storagePath): storagePath is string =>
+              Boolean(ownedPrefix) && typeof storagePath === 'string' && storagePath.startsWith(ownedPrefix) && storagePath.length <= 512);
+        }
+        const nowIso = Timestamp.now().toDate().toISOString();
         transaction.update(messageRef, {
           text: 'This message was deleted',
           deleted: true,
-          deletedAt: Timestamp.now().toDate().toISOString(),
-          updatedAt: Timestamp.now().toDate().toISOString(),
+          deletedAt: nowIso,
+          updatedAt: nowIso,
           attachments: [],
         });
       });
+      if (attachmentStoragePaths.length > 0) {
+        const bucket = getStorage().bucket();
+        await Promise.all(attachmentStoragePaths.map(async (storagePath) => {
+          try {
+            await bucket.file(storagePath).delete();
+          } catch (error) {
+            const code = typeof error === 'object' && error !== null && 'code' in error
+              ? String((error as { code?: unknown }).code)
+              : '';
+            if (code !== '404') {
+              console.error('Failed to delete message attachment from Storage:', { storagePath, error });
+            }
+          }
+        }));
+      }
       return res.status(200).json({ deleted: true });
     } catch (error) {
       if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
