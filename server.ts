@@ -1048,6 +1048,13 @@ async function startServer() {
         }
 
         const memberUids = [requestData.fromUid, responderUid].sort();
+        const blockIds = [
+          createHash('sha256').update(requestData.fromUid + ':' + responderUid).digest('hex').slice(0, 40),
+          createHash('sha256').update(responderUid + ':' + requestData.fromUid).digest('hex').slice(0, 40),
+        ];
+        const blockRefs = blockIds.map((blockId) => adminDb.collection('communicationBlocks').doc(blockId));
+        const blockSnapshots = await Promise.all(blockRefs.map((ref) => transaction.get(ref)));
+        if (blockSnapshots.some((snapshot) => snapshot.exists)) throw new Error('BLOCKED');
         const conversationId = createHash('sha256').update(memberUids.join(':')).digest('hex').slice(0, 40);
         const conversationRef = adminDb.collection('conversations').doc(conversationId);
         const memberRefs = memberUids.map((uid) =>
@@ -1102,6 +1109,7 @@ async function startServer() {
       if (code === 'REQUEST_NOT_FOUND') return errorResponse(res, 'INVALID_REQUEST', 'The message request was not found.', 404);
       if (code === 'FORBIDDEN') return errorResponse(res, 'INVALID_REQUEST', 'Only the request recipient can respond to this request.', 403);
       if (code === 'INVALID_REQUEST') return errorResponse(res, 'INVALID_REQUEST', 'The message request data is invalid.');
+      if (code === 'BLOCKED') return errorResponse(res, 'FORBIDDEN', 'This message request cannot be accepted because communication is blocked.', 403);
       console.error('Message request response failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to respond to the message request.');
     }
