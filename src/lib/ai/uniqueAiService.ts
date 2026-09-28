@@ -19,7 +19,7 @@ export class UniqueAiValidationError extends Error {
   }
 }
 
-function getPrompt(value: unknown): string {
+type UniqueAiUserContext = {\n  fullName: string;\n  uniqueOneId?: string;\n  preferredLanguage?: string;\n  roles: string[];\n  status?: string;\n  verificationStatus?: string;\n};\n\nasync function getAuthorizedUserContext(uid: string): Promise<UniqueAiUserContext> {\n  const snapshot = await getFirestore().collection("users").doc(uid).get();\n  if (!snapshot.exists) {\n    return { fullName: "Unique One user", roles: [] };\n  }\n  const data = snapshot.data() ?? {};\n  return {\n    fullName: typeof data.fullName === "string" ? data.fullName : "Unique One user",\n    uniqueOneId: typeof data.uniqueOneId === "string" ? data.uniqueOneId : undefined,\n    preferredLanguage: typeof data.preferredLanguage === "string" ? data.preferredLanguage : undefined,\n    roles: Array.isArray(data.roles) ? data.roles.filter((role): role is string => typeof role === "string").slice(0, 20) : [],\n    status: typeof data.status === "string" ? data.status : undefined,\n    verificationStatus: typeof data.verificationStatus === "string" ? data.verificationStatus : undefined,\n  };\n}\n\nfunction getPrompt(value: unknown): string {
   if (typeof value !== "string") {
     throw new UniqueAiValidationError("message must be a string.");
   }
@@ -36,7 +36,7 @@ function getPrompt(value: unknown): string {
 }
 
 export async function generateUniqueAiResponse(input: { uid: string; message: unknown }): Promise<string> {
-  const prompt = getPrompt(input.message);
+  const prompt = getPrompt(input.message);\n  const userContext = await getAuthorizedUserContext(input.uid);\n  const contextualPrompt = [\n    `Authenticated user context (read-only, authoritative): ${JSON.stringify(userContext)}`,\n    `User request: ${prompt}`,\n  ].join("\\n");
   const apiKey = process.env.GEMINI_API_KEY?.trim();
 
   if (!apiKey) {
@@ -46,7 +46,7 @@ export async function generateUniqueAiResponse(input: { uid: string; message: un
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL,
-    contents: prompt,
+    contents: contextualPrompt,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
       temperature: 0.2,
