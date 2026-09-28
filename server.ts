@@ -1839,6 +1839,11 @@ async function startServer() {
         ]);
         if (forwardBlock.exists || reverseBlock.exists) return errorResponse(res, 'BLOCKED', 'Messaging is unavailable because one of the users has blocked the other.');
       }
+      const idempotencyKey = typeof req.headers['idempotency-key'] === 'string' ? req.headers['idempotency-key'].trim() : '';
+      if (!isSafeIdempotencyKey(idempotencyKey)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid idempotency key is required.');
+      }
+      const idempotencyRef = adminDb.collection('communicationMessageIdempotency').doc(idempotencyDocumentId(senderUid, idempotencyKey));
       const messageRef = adminDb.collection('messages').doc();
       const replyMessageRef = draft.replyToMessageId ? adminDb.collection('messages').doc(draft.replyToMessageId) : null;
       const now = Timestamp.now();
@@ -1856,7 +1861,19 @@ async function startServer() {
         status: 'sent',
         ...(draft.replyToMessageId ? { replyToMessageId: draft.replyToMessageId } : {}),
       };
-      await adminDb.runTransaction(async (transaction) => {
+      const transactionResult = await adminDb.runTransaction(async (transaction) => {
+        const existingIdempotency = await transaction.get(idempotencyRef);
+        if (existingIdempotency.exists) {
+          const data = existingIdempotency.data() || {};
+          if (data.uid !== senderUid || data.idempotencyKey !== idempotencyKey || typeof data.messageId !== 'string') {
+            throw new RequestValidationError('INVALID_REQUEST', 'Invalid message idempotency record.');
+          }
+          const existingMessageSnapshot = await transaction.get(adminDb.collection('messages').doc(data.messageId));
+          if (!existingMessageSnapshot.exists) {
+            throw new RequestValidationError('INVALID_REQUEST', 'The previous message attempt is incomplete. Please try again.');
+          }
+          return { message: existingMessageSnapshot.data() as Message, replayed: true };
+        }
         const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(draft.conversationId, senderUid));
         const results = await Promise.all([
           transaction.get(conversationRef),
@@ -1875,13 +1892,20 @@ async function startServer() {
           if (!replyData || replyData.conversationId !== draft.conversationId) throw new RequestValidationError('INVALID_REQUEST', 'You can only reply to a message in this conversation.');
         }
         transaction.create(messageRef, message);
+        transaction.set(idempotencyRef, {
+          uid: senderUid,
+          idempotencyKey,
+          messageId: messageRef.id,
+          createdAt: nowIso,
+        });
         transaction.update(conversationRef, {
           lastMessageId: messageRef.id,
           lastMessageAt: nowIso,
           updatedAt: nowIso,
         });
+        return { message, replayed: false };
       });
-      return res.status(201).json({ message });
+      return res.status(transactionResult.replayed ? 200 : 201).json({ message: transactionResult.message });
     } catch (error) {
       if (error instanceof RequestValidationError) {
         return errorResponse(res, error.code, error.message);
