@@ -15,7 +15,7 @@ const categories = [
   "Other",
 ] as const;
 
-type ContributionRequest = {
+type ContributionOffer = {\n  id: string;\n  requestId: string;\n  contributorUid: string;\n  status: "pending" | "accepted" | "rejected" | "withdrawn";\n};\n\ntype ContributionRequest = {
   id: string;
   requesterUid: string;
   title: string;
@@ -34,7 +34,7 @@ function toIso(value: unknown): string | undefined {
 
 export default function ContributionNetworkPage() {
   const { currentUser } = useAuth();
-  const [requests, setRequests] = useState<ContributionRequest[]>([]);
+  const [requests, setRequests] = useState<ContributionRequest[]>([]);\n  const [offers, setOffers] = useState<ContributionOffer[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<(typeof categories)[number]>(categories[0]);
@@ -48,7 +48,7 @@ export default function ContributionNetworkPage() {
     setLoading(true);
     setNotice("");
     try {
-      const [publishedSnap, ownedSnap] = await Promise.all([
+      const [publishedSnap, ownedSnap, offerSnap] = await Promise.all([
         getDocs(query(collection(db, "contributionRequests"), where("status", "==", "published"), limit(50))),
         getDocs(query(collection(db, "contributionRequests"), where("requesterUid", "==", currentUser.uid), limit(50))),
       ]);
@@ -73,7 +73,7 @@ export default function ContributionNetworkPage() {
           });
         }
       });
-      setRequests(Array.from(map.values()).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")));
+      setRequests(Array.from(map.values()).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")));\n      setOffers(offerSnap.docs.flatMap((item) => {\n        const data = item.data();\n        if (typeof data.requestId !== "string" || typeof data.contributorUid !== "string" || !["pending","accepted","rejected","withdrawn"].includes(data.status)) return [];\n        return [{ id: item.id, requestId: data.requestId, contributorUid: data.contributorUid, status: data.status as ContributionOffer["status"] }];\n      }));
     } catch (error) {
       console.error("Contribution request load failed:", error);
       setNotice("Contribution requests could not be loaded. Please try again.");
@@ -111,6 +111,22 @@ export default function ContributionNetworkPage() {
     } catch (error) {
       console.error("Contribution offer failed:", error);
       setNotice("Could not submit your offer. You may already have an offer for this request.");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const updateOffer = async (offer: ContributionOffer, status: "accepted" | "rejected") => {
+    if (!currentUser || !requests.some((request) => request.id === offer.requestId && request.requesterUid === currentUser.uid)) return;
+    setActionId(offer.id);
+    setNotice("");
+    try {
+      await updateDoc(doc(db, "contributionOffers", offer.id), { status, updatedAt: serverTimestamp() });
+      setOffers((items) => items.map((item) => item.id === offer.id ? { ...item, status } : item));
+      setNotice(status === "accepted" ? "The help offer was accepted." : "The help offer was rejected.");
+    } catch (error) {
+      console.error("Contribution offer update failed:", error);
+      setNotice("Could not update the help offer.");
     } finally {
       setActionId(null);
     }
@@ -264,6 +280,22 @@ export default function ContributionNetworkPage() {
                   <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">{request.status}</span>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-600">{request.description}</p>
+                {request.requesterUid === currentUser?.uid && (
+                  <div className="mt-4 rounded-lg bg-slate-50 p-3">
+                    <p className="text-xs font-semibold text-slate-700">Help offers: {offers.filter((offer) => offer.requestId === request.id).length}</p>
+                    {offers.filter((offer) => offer.requestId === request.id).map((offer) => (
+                      <div key={offer.id} className="mt-2 flex items-center justify-between gap-2 text-xs">
+                        <span className="text-slate-500">{offer.contributorUid.slice(0, 8)}… · {offer.status}</span>
+                        {offer.status === "pending" && (
+                          <span className="flex gap-1">
+                            <button type="button" onClick={() => void updateOffer(offer, "accepted")} disabled={actionId === offer.id} className="rounded bg-emerald-600 px-2 py-1 font-semibold text-white disabled:opacity-50">Accept</button>
+                            <button type="button" onClick={() => void updateOffer(offer, "rejected")} disabled={actionId === offer.id} className="rounded border border-slate-200 px-2 py-1 font-semibold text-slate-700 disabled:opacity-50">Reject</button>
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="mt-4 flex flex-wrap gap-2">
                   {request.requesterUid !== currentUser?.uid && request.status === "published" && (
                     <button type="button" onClick={() => void offerToHelp(request)} disabled={actionId === request.id}
