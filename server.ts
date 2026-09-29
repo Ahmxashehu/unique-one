@@ -369,12 +369,29 @@ const app = express();
       const phone = normalizeAuthPhone(req.body?.phone);
       if (decoded.phone_number !== phone) return errorResponse(res, 'FORBIDDEN', 'The verified phone number does not match the registration phone number.');
       const password = validateLoginPassword(req.body?.password);
+      const confirmPassword = validateLoginPassword(req.body?.confirmPassword);
+      if (password !== confirmPassword) return errorResponse(res, 'INVALID_REQUEST', 'The 6-digit login passwords do not match.');
+      const transactionPin = typeof req.body?.transactionPin === 'string' ? req.body.transactionPin : '';
+      const confirmTransactionPin = typeof req.body?.confirmTransactionPin === 'string' ? req.body.confirmTransactionPin : '';
+      if (!/^\\d{4}$/.test(transactionPin) || !/^\\d{4}$/.test(confirmTransactionPin)) return errorResponse(res, 'INVALID_REQUEST', 'Your Transaction PIN must be exactly 4 digits.');
+      if (transactionPin !== confirmTransactionPin) return errorResponse(res, 'INVALID_REQUEST', 'The Transaction PINs do not match.');
       const fullName = typeof req.body?.fullName === 'string' ? req.body.fullName.trim().slice(0, 120) : '';
-      const salt = randomUUID().replace(/-/g, '');
-      await adminDb.collection('authCredentials').doc(decoded.uid).set({uid: decoded.uid,phone,loginPasswordSalt: salt,loginPasswordHash: passwordDigest(password, salt),createdAt: Timestamp.now(),updatedAt: Timestamp.now()}, { merge: true });
+      const now = Timestamp.now();
+      const loginSalt = randomUUID().replace(/-/g, '');
+      const pinSalt = randomUUID().replace(/-/g, '');
+      await adminDb.collection('authCredentials').doc(decoded.uid).set({
+        uid: decoded.uid, phone, loginPasswordSalt: loginSalt, loginPasswordHash: passwordDigest(password, loginSalt),
+        transactionPinSalt: pinSalt, transactionPinHash: passwordDigest(transactionPin, pinSalt),
+        createdAt: now, updatedAt: now
+      }, { merge: true });
       const uniqueOneId = `U1-${decoded.uid.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toUpperCase() || 'ACCOUNT'}`;
-      await adminDb.collection('users').doc(decoded.uid).set({uid: decoded.uid,email: decoded.email || '',phone,fullName: fullName || 'Unique One User',uniqueOneId,roles: ['customer'],permissions: [],status: 'active',preferredLanguage: 'en',createdAt: new Date().toISOString(),lastLogin: new Date().toISOString(),verificationStatus: 'phone_verified',hasSecurePin: false,twoFactorEnabled: false},{merge:true});
-      return res.json({ok:true,uid:decoded.uid,uniqueOneId});
+      await adminDb.collection('users').doc(decoded.uid).set({
+        uid: decoded.uid,email: decoded.email || '',phone,fullName: fullName || 'Unique One User',uniqueOneId,
+        roles: ['customer'],permissions: [],status: 'active',preferredLanguage: 'en',
+        createdAt: now.toDate().toISOString(),lastLogin: now.toDate().toISOString(),
+        verificationStatus: 'phone_verified',hasSecurePin: true,twoFactorEnabled: false
+      },{merge:true});
+      return res.json({ok:true,uid:decoded.uid,uniqueOneId,hasSecurePin:true});
     } catch (error: any) {
       const code = error?.code === 'auth/id-token-expired' || error?.code === 'auth/argument-error' ? 'UNAUTHENTICATED' : error instanceof RequestValidationError ? error.code : 'INVALID_REQUEST';
       return errorResponse(res, code as TransferErrorCode, error?.message || 'Registration could not be completed.');
