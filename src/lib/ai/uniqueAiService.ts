@@ -290,6 +290,15 @@ function validateAuthorizedContext(
   }
 
   const expectedContextWarnings = [
+    ...(summary.dataQuality.ordersMissingTotals > 0
+      ? [`Loaded order context has ${summary.dataQuality.ordersMissingTotals} record(s) without a supplied total amount.`]
+      : []),
+    ...(summary.dataQuality.businessesMissingNames > 0
+      ? [`Loaded business context has ${summary.dataQuality.businessesMissingNames} record(s) using the fallback unnamed label.`]
+      : []),
+    ...(summary.dataQuality.productsMissingNames > 0
+      ? [`Loaded product context has ${summary.dataQuality.productsMissingNames} record(s) using the fallback unnamed label.`]
+      : []),
     ...(summary.contextTruncated.orders
       ? [`Order context reached its limit of ${summary.contextLimits.orders} loaded records; additional records were not included.`]
       : []),
