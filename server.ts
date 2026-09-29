@@ -350,11 +350,6 @@ async function startServer() {
         }
       }
       const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
-      const requestIdHeader = req.headers['x-request-id'];
-      const requestId = typeof requestIdHeader === 'string' ? requestIdHeader : undefined;
-      if (requestId && /^[A-Za-z0-9._:-]{1,64}$/.test(requestId)) {
-        res.setHeader('X-Request-ID', requestId);
-      }
       if (!uid) {
         return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
       }
@@ -370,7 +365,11 @@ async function startServer() {
         res.setHeader("X-Request-ID", requestId.trim());
       }
       res.setHeader("Cache-Control", "no-store");
-      return res.status(200).json({ message: responseText, readOnly: true });
+      return res.status(200).json({
+        message: responseText,
+        readOnly: true,
+        ...(typeof requestId === "string" && requestId.trim() ? { requestId: requestId.trim() } : {}),
+      });
     } catch (error) {
       if (error instanceof UniqueAiValidationError) {
         return errorResponse(res, 'INVALID_REQUEST', error.message);
