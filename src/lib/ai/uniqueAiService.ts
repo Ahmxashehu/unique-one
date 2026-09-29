@@ -198,6 +198,9 @@ function validateAuthorizedContext(
   ) {
     throw new UniqueAiValidationError("Authorized AI summary contains invalid breakdown labels.");
   }
+  if (summary.schemaVersion !== AI_CONTEXT_SCHEMA_VERSION) {
+    throw new UniqueAiValidationError("Authorized AI context schema version is unsupported.");
+  }
   if (
     summary.orderCount !== context.orders.length ||
     summary.businessCount !== context.businesses.length ||
@@ -286,16 +289,25 @@ function validateAuthorizedContext(
     summary.coverage.ordersLoaded !== context.orders.length ||
     summary.coverage.businessesLoaded !== context.businesses.length ||
     summary.coverage.productsLoaded !== context.products.length ||
-    (summary.contextTruncated.orders ? summary.coverage.ordersOmitted < 1 : summary.coverage.ordersOmitted !== 0) ||
-    (summary.contextTruncated.businesses ? summary.coverage.businessesOmitted < 1 : summary.coverage.businessesOmitted !== 0) ||
-    (summary.contextTruncated.products ? summary.coverage.productsOmitted < 1 : summary.coverage.productsOmitted !== 0)
+    (summary.contextTruncated.orders
+      ? summary.coverage.ordersOmitted < 1
+      : summary.coverage.ordersOmitted !== 0) ||
+    (summary.contextTruncated.businesses
+      ? summary.coverage.businessesOmitted < 1
+      : summary.coverage.businessesOmitted !== 0) ||
+    (summary.contextTruncated.products
+      ? summary.coverage.productsOmitted < 1
+      : summary.coverage.productsOmitted !== 0)
   ) {
     throw new UniqueAiValidationError("Authorized AI coverage metadata is inconsistent.");
   }
   if (
     summary.dataQuality.ordersMissingTotals > summary.orderCount ||
     summary.dataQuality.businessesMissingNames > summary.businessCount ||
-    summary.dataQuality.productsMissingNames > summary.productCount
+    summary.dataQuality.productsMissingNames > summary.productCount ||
+    summary.contextWarnings.some(
+      (warning) => typeof warning !== "string" || warning.trim().length === 0 || warning.length > MAX_CONTEXT_WARNING_LENGTH,
+    )
   ) {
     throw new UniqueAiValidationError("Authorized AI data-quality metadata exceeds loaded record counts.");
   }
