@@ -508,8 +508,8 @@ function validateAiOutput(value: unknown, requestMessage?: string): string {
   }
 
   const unsupportedActionClaimPatterns = [
-    /\\bI (?:have|just|successfully) (?:changed|updated|created|deleted|sent|cancelled|approved|refunded|booked|transferred|paid)\\b/i,
-    /\\b(?:payment|order|product|business|booking|account)\\b.{0,50}\\b(?:has been|was|is now)\\s+(?:changed|updated|created|deleted|sent|cancelled|approved|refunded|booked|transferred|paid)\\b/i,
+    /\bI (?:have|just|successfully) (?:changed|updated|created|deleted|sent|cancelled|approved|refunded|booked|transferred|paid)\b/i,
+    /\b(?:payment|order|product|business|booking|account)\\b.{0,50}\\b(?:has been|was|is now)\\s+(?:changed|updated|created|deleted|sent|cancelled|approved|refunded|booked|transferred|paid)\b/i,
   ];
   if (unsupportedActionClaimPatterns.some((pattern) => pattern.test(text))) {
     throw new Error("Gemini returned an unsupported action claim.");
