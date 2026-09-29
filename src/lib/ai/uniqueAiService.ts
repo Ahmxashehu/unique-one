@@ -468,17 +468,31 @@ async function generateModelResponse(
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => reject(new Error("Unique AI model request timed out.")), MODEL_REQUEST_TIMEOUT_MS);
     });
-    const responsePromise = ai.models.generateContent({
-      model,
-      contents: contextualPrompt,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        safetySettings: MODEL_SAFETY_SETTINGS,
-        temperature: 0.2,
-        maxOutputTokens: MAX_MODEL_OUTPUT_TOKENS,
-      },
-    });
-    const response = await Promise.race([responsePromise, timeoutPromise]);
+    let response: Awaited<ReturnType<typeof ai.models.generateContent>> | undefined;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const responsePromise = ai.models.generateContent({
+          model,
+          contents: contextualPrompt,
+          config: {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            safetySettings: MODEL_SAFETY_SETTINGS,
+            temperature: 0.2,
+            maxOutputTokens: MAX_MODEL_OUTPUT_TOKENS,
+          },
+        });
+        response = await Promise.race([responsePromise, timeoutPromise]);
+        break;
+      } catch (error) {
+        lastError = error;
+        if (attempt === 1 || !isLikelyTransientModelError(error)) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    }
+    if (!response) {
+      throw lastError instanceof Error ? lastError : new Error("Unique AI model request failed.");
+    }
     if (!response || typeof response.text !== "string") {
       throw new Error("Gemini returned an invalid response.");
     }
