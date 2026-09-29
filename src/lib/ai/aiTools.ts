@@ -14,13 +14,19 @@ const MAX_CONTEXT_STRING_LENGTH = 160;
 
 function safeString(value: unknown, fallback?: string): string | undefined {
   if (typeof value !== "string") return fallback;
-  const trimmed = value.trim();
-  if (!trimmed) return fallback;
-  return trimmed.slice(0, MAX_CONTEXT_STRING_LENGTH);
+  const normalized = value
+    .replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]/g, " ")
+    .replace(/\\s+/g, " ")
+    .trim();
+  if (!normalized) return fallback;
+  return normalized.slice(0, MAX_CONTEXT_STRING_LENGTH);
 }
 
 function toIsoString(value: unknown): string | undefined {
-  if (typeof value === "string") return value;
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? undefined : new Date(parsed).toISOString();
+  }
   if (
     value &&
     typeof value === "object" &&
