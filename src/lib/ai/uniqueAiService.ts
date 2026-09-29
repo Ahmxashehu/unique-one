@@ -20,6 +20,7 @@ const MODEL_REQUEST_TIMEOUT_MS = 30_000;
 const MAX_MODEL_OUTPUT_TOKENS = 1_000;
 const MAX_MODEL_ATTEMPTS = 2;
 const MODEL_RETRY_DELAY_MS = 250;
+const MAX_RETRY_DELAY_MS = 2_000;
 const MAX_CONTEXT_WARNING_LENGTH = 240;
 const AI_CONTEXT_SCHEMA_VERSION = 1;
 const MODEL_SAFETY_SETTINGS: SafetySetting[] = [
@@ -382,6 +383,7 @@ async function writeAiAuditLog(input: {
   success: boolean;
   durationMs: number;
   outputLength: number;
+  modelAttempts: number;
   errorType?: string;
   context: Awaited<ReturnType<typeof getAuthorizedPlatformContext>>;
 }): Promise<void> {
@@ -402,6 +404,7 @@ async function writeAiAuditLog(input: {
       contextSchemaVersion: input.context.summary.schemaVersion,
       contextLoadedAt: input.context.summary.contextLoadedAt,
       outputLength: input.outputLength,
+      modelAttempts: input.modelAttempts,
       ...(input.errorType ? { errorType: input.errorType } : {}),
       createdAt: Timestamp.now(),
     });
@@ -469,11 +472,13 @@ async function generateModelResponse(
   ai: GoogleGenAI,
   model: string,
   contextualPrompt: string,
-): Promise<string> {
+): Promise<{ text: string; attempts: number }> {
   try {
     let response: Awaited<ReturnType<typeof ai.models.generateContent>> | undefined;
     let lastError: unknown;
+    let attempts = 0;
     for (let attempt = 0; attempt < MAX_MODEL_ATTEMPTS; attempt += 1) {
+      attempts += 1;
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
       try {
         const timeoutPromise = new Promise<never>((_, reject) => {
@@ -494,7 +499,9 @@ async function generateModelResponse(
       } catch (error) {
         lastError = error;
         if (attempt === MAX_MODEL_ATTEMPTS - 1 || !isLikelyTransientModelError(error)) throw error;
-        await new Promise((resolve) => setTimeout(resolve, MODEL_RETRY_DELAY_MS));
+        const retryDelay = Math.min(MAX_RETRY_DELAY_MS, MODEL_RETRY_DELAY_MS * 2 ** attempt);
+        const jitter = Math.floor(Math.random() * Math.max(1, Math.floor(retryDelay * 0.25)));
+        await new Promise((resolve) => setTimeout(resolve, retryDelay + jitter));
       } finally {
         if (timeoutId) clearTimeout(timeoutId);
       }
@@ -515,7 +522,7 @@ async function generateModelResponse(
     if (finishReason === "MAX_TOKENS") {
       throw new Error("Gemini response was truncated by the output limit.");
     }
-    return response.text;
+    return { text: response.text, attempts };
   } finally {
     // Retry-specific timeout handles are cleared inside each attempt.
   }
@@ -583,8 +590,8 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
   const startedAt = Date.now();
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const responseText = await generateModelResponse(ai, model, contextualPrompt);
-    const output = validateAiOutput(responseText, prompt);
+    const modelResult = await generateModelResponse(ai, model, contextualPrompt);
+    const output = validateAiOutput(modelResult.text, prompt);
     await writeAiAuditLog({
       uid: input.uid,
       requestId,
@@ -592,6 +599,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
       success: true,
       durationMs: sanitizeAuditDuration(Date.now() - startedAt),
       outputLength: output.length,
+      modelAttempts: modelResult.attempts,
       context,
     });
     return output;
@@ -603,6 +611,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
       success: false,
       durationMs: sanitizeAuditDuration(Date.now() - startedAt),
       outputLength: 0,
+      modelAttempts: 0,
       errorType: sanitizeAuditErrorType(classifyAiError(error)),
       context,
     });
