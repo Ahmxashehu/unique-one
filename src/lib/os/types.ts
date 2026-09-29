@@ -608,6 +608,8 @@ export interface IdentityVerificationRecord {
   type: IdentityVerificationType;
   status: IdentityVerificationStatus;
   provider: string;
+  providerValidated?: boolean;
+  matchStatus?: 'not_requested' | 'matched' | 'not_matched';
   providerReference?: string;
   matchFields?: string[];
   failureCode?: string;
