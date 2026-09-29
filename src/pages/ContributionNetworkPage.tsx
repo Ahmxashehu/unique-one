@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { addDoc, collection, getDocs, limit , orderBy, query, serverTimestamp, where } from "firebase/firestore";
+import { addDoc, collection, doc, getDocs, limit, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import { HeartHandshake, Plus, ClipboardList, Users, Clock3, CheckCircle2, Loader2 } from "lucide-react";
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
@@ -15,7 +15,14 @@ const categories = [
   "Other",
 ] as const;
 
-type ContributionOffer = {\n  id: string;\n  requestId: string;\n  contributorUid: string;\n  status: "pending" | "accepted" | "rejected" | "withdrawn";\n};\n\ntype ContributionRequest = {
+type ContributionOffer = {
+  id: string;
+  requestId: string;
+  contributorUid: string;
+  status: "pending" | "accepted" | "rejected" | "withdrawn";
+};
+
+type ContributionRequest = {
   id: string;
   requesterUid: string;
   title: string;
@@ -34,14 +41,16 @@ function toIso(value: unknown): string | undefined {
 
 export default function ContributionNetworkPage() {
   const { currentUser } = useAuth();
-  const [requests, setRequests] = useState<ContributionRequest[]>([]);\n  const [offers, setOffers] = useState<ContributionOffer[]>([]);
+  const [requests, setRequests] = useState<ContributionRequest[]>([]);
+  const [offers, setOffers] = useState<ContributionOffer[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<(typeof categories)[number]>(categories[0]);
   const [description, setDescription] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);\n  const [actionId, setActionId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [actionId, setActionId] = useState<string | null>(null);
 
   const loadRequests = async () => {
     if (!currentUser) return;
@@ -51,6 +60,7 @@ export default function ContributionNetworkPage() {
       const [publishedSnap, ownedSnap, offerSnap] = await Promise.all([
         getDocs(query(collection(db, "contributionRequests"), where("status", "==", "published"), limit(50))),
         getDocs(query(collection(db, "contributionRequests"), where("requesterUid", "==", currentUser.uid), limit(50))),
+        getDocs(query(collection(db, "contributionOffers"), where("requesterUid", "==", currentUser.uid), limit(100))),
       ]);
       const map = new Map<string, ContributionRequest>();
       [...publishedSnap.docs, ...ownedSnap.docs].forEach((item) => {
@@ -73,7 +83,12 @@ export default function ContributionNetworkPage() {
           });
         }
       });
-      setRequests(Array.from(map.values()).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")));\n      setOffers(offerSnap.docs.flatMap((item) => {\n        const data = item.data();\n        if (typeof data.requestId !== "string" || typeof data.contributorUid !== "string" || !["pending","accepted","rejected","withdrawn"].includes(data.status)) return [];\n        return [{ id: item.id, requestId: data.requestId, contributorUid: data.contributorUid, status: data.status as ContributionOffer["status"] }];\n      }));
+      setRequests(Array.from(map.values()).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")));
+      setOffers(offerSnap.docs.flatMap((item) => {
+        const data = item.data();
+        if (typeof data.requestId !== "string" || typeof data.contributorUid !== "string" || !["pending","accepted","rejected","withdrawn"].includes(data.status)) return [];
+        return [{ id: item.id, requestId: data.requestId, contributorUid: data.contributorUid, status: data.status as ContributionOffer["status"] }];
+      }));
     } catch (error) {
       console.error("Contribution request load failed:", error);
       setNotice("Contribution requests could not be loaded. Please try again.");
