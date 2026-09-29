@@ -39,6 +39,8 @@ export default function StorePage() {
   const [wishlistCount, setWishlistCount] = useState(0);
   const [cartCount, setCartCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+  const [savingWishlist, setSavingWishlist] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -89,6 +91,7 @@ export default function StorePage() {
         if (active) {
           setWishlistCount(wishlist.size);
           setCartCount(cart.size);
+          setWishlistIds(new Set(wishlist.docs.map(d => String(d.data().productId || ''))));
         }
       } catch (err) {
         console.error('Could not load Store account data:', err);
@@ -97,6 +100,30 @@ export default function StorePage() {
     loadPersonalStoreData();
     return () => { active = false; };
   }, [currentUser]);
+
+  const toggleWishlist = async (product: Product, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!currentUser || savingWishlist) return;
+    const wishlistId = `${product.id}_${currentUser.uid}`;
+    setSavingWishlist(product.id);
+    try {
+      const { doc, setDoc, deleteDoc, serverTimestamp } = await import('firebase/firestore');
+      if (wishlistIds.has(product.id)) {
+        await deleteDoc(doc(db, 'wishlists', wishlistId));
+        setWishlistIds(prev => { const next = new Set(prev); next.delete(product.id); return next; });
+        setWishlistCount(prev => Math.max(0, prev - 1));
+      } else {
+        await setDoc(doc(db, 'wishlists', wishlistId), { id: wishlistId, customerId: currentUser.uid, productId: product.id, updatedAt: serverTimestamp() });
+        setWishlistIds(prev => new Set(prev).add(product.id));
+        setWishlistCount(prev => prev + 1);
+      }
+    } catch (err) {
+      console.error('Could not update Store wishlist:', err);
+    } finally {
+      setSavingWishlist(null);
+    }
+  };
 
   const submitSearch = (event: React.FormEvent) => {
     event.preventDefault();
@@ -153,6 +180,16 @@ export default function StorePage() {
       </section>
 
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <Link to={currentUser ? '/store/saved' : '/login'} className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
+          <Heart className="w-5 h-5 text-rose-500" />
+          <p className="font-semibold text-slate-900 mt-3">Saved</p>
+          <p className="text-xs text-slate-500 mt-1">{currentUser ? `${wishlistCount} saved item${wishlistCount === 1 ? '' : 's'}` : 'Sign in to save items'}</p>
+        </Link>
+        <Link to={currentUser ? '/store/cart' : '/login'} className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
+          <ShoppingBag className="w-5 h-5 text-emerald-600" />
+          <p className="font-semibold text-slate-900 mt-3">Cart</p>
+          <p className="text-xs text-slate-500 mt-1">{currentUser ? `${cartCount} item${cartCount === 1 ? '' : 's'} in cart` : 'Sign in to view cart'}</p>
+        </Link>
         <Link to="/store/search" className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
           <Zap className="w-5 h-5 text-amber-500" />
           <p className="font-semibold text-slate-900 mt-3">Fresh listings</p>
@@ -163,6 +200,9 @@ export default function StorePage() {
           <p className="font-semibold text-slate-900 mt-3">Hire & Book</p>
           <p className="text-xs text-slate-500 mt-1">Find available services</p>
         </Link>
+      </section>
+
+      <section className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
         <Link to="/store/search" className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
           <MapPin className="w-5 h-5 text-blue-600" />
           <p className="font-semibold text-slate-900 mt-3">Find nearby</p>
@@ -220,7 +260,12 @@ export default function StorePage() {
                   )}
                 </div>
                 <div className="p-3.5">
-                  <p className="text-sm font-medium text-slate-900 line-clamp-2 min-h-10">{product.name}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-medium text-slate-900 line-clamp-2 min-h-10">{product.name}</p>
+                    <button type="button" onClick={(event) => toggleWishlist(product, event)} disabled={savingWishlist === product.id} aria-label={wishlistIds.has(product.id) ? 'Remove from saved' : 'Save item'} className="shrink-0 rounded-full p-2 bg-slate-50 hover:bg-rose-50 transition-colors">
+                      <Heart className={`w-4 h-4 ${wishlistIds.has(product.id) ? 'fill-rose-500 text-rose-500' : 'text-slate-500'}`} />
+                    </button>
+                  </div>
                   <p className="text-lg font-bold text-slate-900 mt-2">
                     {product.currency === 'NGN' ? '₦' : product.currency + ' '}{Number(product.price).toLocaleString()}
                   </p>
