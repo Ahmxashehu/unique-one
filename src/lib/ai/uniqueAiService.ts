@@ -579,7 +579,14 @@ async function generateModelResponse(
     if (!response || typeof response.text !== "string") {
       throw new Error("Gemini returned an invalid response.");
     }
-    const finishReason = response.candidates?.[0]?.finishReason;
+    const blockReason = response.promptFeedback?.blockReason;
+    if (blockReason) {
+      throw new Error(`Gemini prompt was blocked: ${String(blockReason)}.`);
+    }
+    if (!Array.isArray(response.candidates) || response.candidates.length === 0) {
+      throw new Error("Gemini returned no response candidate.");
+    }
+    const finishReason = response.candidates[0]?.finishReason;
     if (finishReason === "SAFETY") {
       throw new Error("Gemini response was blocked by safety filters.");
     }
