@@ -440,6 +440,9 @@ async function generateModelResponse(
       },
     });
     const response = await Promise.race([responsePromise, timeoutPromise]);
+    if (!response || typeof response.text !== "string") {
+      throw new Error("Gemini returned an invalid response.");
+    }
     return response.text;
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
