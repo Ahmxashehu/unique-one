@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Store, ShieldCheck, Heart, ShoppingBag, MessageSquare, Handshake, MapPin, Loader2, AlertCircle } from 'lucide-react';
+import { Store, Heart, ShoppingBag, MessageSquare, Handshake, MapPin, Loader2, AlertCircle, ChevronLeft } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Product } from '../../lib/os/types';
@@ -131,10 +131,10 @@ export default function StoreProductPage() {
   const maxQuantity = Math.max(minQuantity, product.quantity);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 pb-20">
-      <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6 sm:space-y-8 pb-28">
+      <Link to="/store/search" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700"><ChevronLeft className="w-4 h-4" /> Back to Store</Link>\n      <div className="grid md:grid-cols-2 gap-6 lg:gap-12">
         <div className="space-y-4">
-          <div className="aspect-square bg-slate-100 rounded-3xl border border-slate-200 flex items-center justify-center overflow-hidden relative">
+          <div className="aspect-square bg-slate-100 rounded-2xl sm:rounded-3xl border border-slate-200 flex items-center justify-center overflow-hidden relative">
             {product.images?.length > 0 ? <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" /> : <Store className="w-16 h-16 text-slate-300" />}
             <div className="absolute top-4 left-4 flex gap-2">
               <span className="px-3 py-1 bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider rounded shadow-sm text-slate-700">{product.condition}</span>
@@ -149,7 +149,7 @@ export default function StoreProductPage() {
             <p className="text-sm font-medium text-slate-500 mb-2 uppercase tracking-wide">{product.category.replace('_', ' ')}</p>
             <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight leading-tight">{product.name}</h1>
             <div className="mt-4 flex items-end gap-4">
-              <span className="text-3xl font-bold text-slate-900">{product.currency === 'NGN' ? '₦' : '$'}{product.price.toLocaleString()}</span>
+              <span className="text-3xl font-bold text-slate-900">{product.currency === 'NGN' ? '₦' : `${product.currency} `}{product.price.toLocaleString()}</span>
               {product.quantity > 0 ? <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full mb-1">In Stock ({product.quantity})</span> : <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full mb-1">Out of Stock</span>}
             </div>
             {product.wholesalePrice && <p className="text-sm font-medium text-blue-600 mt-2">Wholesale: {product.currency === 'NGN' ? '₦' : '$'}{product.wholesalePrice.toLocaleString()} (Min qty: {product.minOrderQuantity})</p>}
@@ -166,7 +166,7 @@ export default function StoreProductPage() {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <button onClick={handleAddToCart} disabled={addingToCart || product.quantity === 0} className="flex-1 bg-slate-900 text-white px-8 py-4 rounded-xl font-medium hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50">{addingToCart ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShoppingBag className="w-5 h-5" />} Add to Cart</button>
+              <button onClick={handleAddToCart} disabled={addingToCart || product.quantity === 0} className="flex-1 bg-emerald-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50">{addingToCart ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShoppingBag className="w-5 h-5" />} Add to Cart</button>
               <button onClick={handleSaveWishlist} disabled={savingWishlist} className={`px-6 py-4 rounded-xl border font-medium transition-colors flex items-center justify-center gap-2 ${isWishlisted ? 'border-red-200 bg-red-50 text-red-600' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>{savingWishlist ? <Loader2 className="w-5 h-5 animate-spin" /> : <Heart className={`w-5 h-5 ${isWishlisted ? 'fill-current' : ''}`} />} {isWishlisted ? 'Saved' : 'Save'}</button>
             </div>
             <div className="flex gap-3">
@@ -176,7 +176,7 @@ export default function StoreProductPage() {
           </div>
           <Link to={`/store/seller/${product.sellerId}`} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-200 hover:bg-slate-50 transition-colors">
             <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center"><Store className="w-6 h-6 text-slate-400" /></div>
-            <div className="flex-1"><h3 className="font-semibold text-slate-900 flex items-center gap-1">Seller Identity <ShieldCheck className="w-4 h-4 text-blue-500" /></h3><p className="text-sm text-slate-500">View profile and other items</p></div>
+            <div className="flex-1"><h3 className="font-semibold text-slate-900 flex items-center gap-1">Seller profile</h3><p className="text-sm text-slate-500">View profile and other items</p></div>
           </Link>
         </div>
       </div>
