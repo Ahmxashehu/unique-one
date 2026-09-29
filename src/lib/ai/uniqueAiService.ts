@@ -426,6 +426,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
   const context = await getAuthorizedPlatformContext(input.uid);
   validateAuthorizedContext(context);
   const contextualPrompt = buildContextualPrompt(prompt, history, context);
+  validateMutationBoundary(prompt);
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
 
@@ -463,7 +464,9 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
       success: false,
       durationMs: Date.now() - startedAt,
       outputLength: 0,
-      errorType: error instanceof UniqueAiValidationError ? "validation" : "generation",
+      errorType: error instanceof UniqueAiValidationError
+        ? (error.message === READ_ONLY_MUTATION_RESPONSE ? "mutation_blocked" : "validation")
+        : "generation",
       context,
     });
     throw error;
