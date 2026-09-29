@@ -39,8 +39,9 @@ export default function EducationPage() {
       setLoading(true);
       setError('');
       try {
-        const [institutionSnap, enrollmentSnap, courseSnap] = await Promise.all([
+        const [publishedInstitutionSnap, ownedInstitutionSnap, enrollmentSnap, courseSnap] = await Promise.all([
           getDocs(query(collection(db, 'educationInstitutions'), where('status', '==', 'published'), orderBy('name'), limit(50))),
+          getDocs(query(collection(db, 'educationInstitutions'), where('ownerUid', '==', currentUser.uid), orderBy('createdAt', 'desc'), limit(50))),
           getDocs(query(collection(db, 'educationEnrollments'), where('studentUid', '==', currentUser.uid), orderBy('createdAt', 'desc'), limit(50))),
           getDocs(query(collection(db, 'educationCourses'), where('ownerUid', '==', currentUser.uid), orderBy('createdAt', 'desc'), limit(50))),
         ]);
