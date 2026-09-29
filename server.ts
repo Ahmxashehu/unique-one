@@ -338,7 +338,14 @@ async function startServer() {
     },
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many AI requests. Please try again shortly.'),
   }), async (req, res) => {
-    let resolvedRequestId: string | undefined;
+    const requestIdHeader = req.headers["x-request-id"];
+    const suppliedRequestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
+    const resolvedRequestId =
+      typeof suppliedRequestId === "string" && /^[A-Za-z0-9._:-]{1,64}$/.test(suppliedRequestId.trim())
+        ? suppliedRequestId.trim()
+        : `ai_${randomUUID().replace(/-/g, "")}`.slice(0, 64);
+    res.setHeader("X-Request-ID", resolvedRequestId);
+    res.setHeader("Cache-Control", "no-store");
     try {
       if (!isPlainObject(req.body)) {
         return errorResponse(res, 'INVALID_REQUEST', 'The AI request body must be a plain object.');
@@ -356,30 +363,28 @@ async function startServer() {
       }
       const message = payload.message;
       const history = payload.history;
-      const requestIdHeader = req.headers["x-request-id"];
-      const requestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
-      if (requestId !== undefined && (typeof requestId !== "string" || !/^[A-Za-z0-9._:-]{1,64}$/.test(requestId.trim()))) {
-        res.setHeader("Cache-Control", "no-store");
-        return errorResponse(res, 'INVALID_REQUEST', 'x-request-id is invalid.');
+      if (suppliedRequestId !== undefined && (
+        typeof suppliedRequestId !== "string" ||
+        !/^[A-Za-z0-9._:-]{1,64}$/.test(suppliedRequestId.trim())
+      )) {
+        return res.status(400).json({
+          error: { code: "INVALID_REQUEST", message: "x-request-id is invalid." },
+          requestId: resolvedRequestId,
+        });
       }
-      resolvedRequestId = typeof requestId === "string" && requestId.trim()
-        ? requestId.trim()
-        : `ai_${randomUUID().replace(/-/g, "")}`.slice(0, 64);
       const responseText = await generateUniqueAiResponse({ uid, message, history, requestId: resolvedRequestId });
-      res.setHeader("X-Request-ID", resolvedRequestId);
-      res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({
         message: responseText,
         readOnly: true,
         requestId: resolvedRequestId,
       });
     } catch (error) {
-      res.setHeader("Cache-Control", "no-store");
-      const requestIdHeader = req.headers["x-request-id"];
-      const requestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
-      const errorRequestId = resolvedRequestId || (typeof requestId === "string" && /^[A-Za-z0-9._:-]{1,64}$/.test(requestId.trim()) ? requestId.trim() : undefined);
-      if (errorRequestId) {
-        res.setHeader("X-Request-ID", errorRequestId);
+      if (error instanceof UniqueAiValidationError) {
+        return res.status(400).json({ error: { code: "INVALID_REQUEST", message: error.message }, requestId: resolvedRequestId });
+      }
+      console.error('Unique AI request failed:', { requestId: resolvedRequestId, error });
+      return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Unique AI is temporarily unavailable. Please try again shortly." }, requestId: resolvedRequestId });
+    }
         if (error instanceof UniqueAiValidationError) {
           return res.status(400).json({ error: { code: "INVALID_REQUEST", message: error.message }, requestId: errorRequestId });
         }
