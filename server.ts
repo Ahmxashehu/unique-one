@@ -355,7 +355,15 @@ async function startServer() {
       }
       const message = payload.message;
       const history = payload.history;
-      const responseText = await generateUniqueAiResponse({ uid, message, history });
+      const requestIdHeader = req.headers["x-request-id"];
+      const requestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
+      if (requestId !== undefined && (typeof requestId !== "string" || !/^[A-Za-z0-9._:-]{1,64}$/.test(requestId.trim()))) {
+        return errorResponse(res, 'INVALID_REQUEST', 'x-request-id is invalid.');
+      }
+      const responseText = await generateUniqueAiResponse({ uid, message, history, requestId });
+      if (typeof requestId === "string" && requestId.trim()) {
+        res.setHeader("X-Request-ID", requestId.trim());
+      }
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ message: responseText, readOnly: true });
     } catch (error) {
