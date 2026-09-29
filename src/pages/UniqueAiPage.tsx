@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { Bot, Send, Sparkles, Trash2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
-type ChatMessage = {
+type UniqueAiCapabilities = {\n  version: 1;\n  readOnly: true;\n  contexts: string[];\n  mutations: string[];\n};\n\ntype ChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
@@ -103,7 +103,7 @@ export default function UniqueAiPage() {
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { message?: string; readOnly?: boolean; requestId?: string; error?: { message?: string } }
+        | { message?: string; readOnly?: boolean; requestId?: string; capabilities?: UniqueAiCapabilities; error?: { message?: string } }
         | null;
 
       const responseRequestId = response.headers.get("X-Request-ID")?.trim();
@@ -120,6 +120,16 @@ export default function UniqueAiPage() {
 
       if (payload?.readOnly !== true) {
         throw new Error("Unique AI returned an invalid response contract.");
+      }
+      if (
+        !payload.capabilities ||
+        payload.capabilities.version !== 1 ||
+        payload.capabilities.readOnly !== true ||
+        !Array.isArray(payload.capabilities.contexts) ||
+        !Array.isArray(payload.capabilities.mutations) ||
+        payload.capabilities.mutations.length !== 0
+      ) {
+        throw new Error("Unique AI returned an invalid capability contract.");
       }
 
       if (payload.requestId !== undefined && payload.requestId !== requestId) {
@@ -284,7 +294,7 @@ export default function UniqueAiPage() {
             </button>
           </div>
           <div className="mt-2 flex items-center justify-between gap-3 px-1 text-xs text-slate-400">
-            <span>Read-only assistant for now. Each request has a temporary support request ID; it cannot change payments, orders, products, or other platform records. Answers use only authorized records loaded for the current request and may be incomplete when a context limit is reached.</span>
+            <span>Read-only assistant for now. It can read authorized account, order, business, and product context only; no platform mutations are exposed. Each request has a temporary support request ID. Answers use only authorized records loaded for the current request and may be incomplete when a context limit is reached.</span>
             <span className="text-right" aria-live="polite">
               {lastRequestId ? `Request: ${lastRequestId}` : "Support request ID will appear after a response"} · {message.length}/4000
             </span>
