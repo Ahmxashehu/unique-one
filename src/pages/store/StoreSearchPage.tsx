@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Filter, Store as StoreIcon, Heart, Loader2 } from 'lucide-react';
+import { Search, Filter, Store as StoreIcon, Heart, Loader2, Smartphone, Shirt, Gem, Home, Hammer, Layers3, Sprout, Wheat, Tractor, Utensils, Factory, Car, Building2, Briefcase, Globe2, PackageOpen, Package } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
@@ -23,6 +23,12 @@ export default function StoreSearchPage() {
   const [wishlistLoading, setWishlistLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const categoryOptions: Array<{ key: string; label: string }> = [
+    ['electronics','Electronics'], ['phones_accessories','Phones & Accessories'], ['fashion','Fashion'], ['shoes','Shoes'], ['beauty','Beauty'],
+    ['home_furniture','Home & Furniture'], ['building_materials','Building Materials'], ['cement','Cement'], ['agriculture','Agriculture'],
+    ['fertilizer','Fertilizer'], ['seeds','Seeds'], ['farm_equipment','Farm Equipment'], ['food_groceries','Food & Groceries'],
+    ['machinery','Machinery'], ['vehicles','Vehicles'], ['property','Property'], ['services','Services'], ['digital_products','Digital Products'], ['other','Other']
+  ];
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -111,8 +117,8 @@ export default function StoreSearchPage() {
         {showMobileFilters && (
           <div className="md:hidden bg-white border border-slate-200 rounded-2xl p-4 space-y-4">
             <div><h3 className="font-semibold text-slate-900 mb-3">Categories</h3><div className="grid grid-cols-2 gap-2">
-              {['electronics', 'fashion', 'agriculture', 'building_materials', 'services', 'vehicles'].map(cat => (
-                <Link key={cat} to={`/store/search?cat=${cat}`} className={`text-sm p-2 rounded-lg border ${filterCat === cat ? 'text-blue-600 font-medium border-blue-200 bg-blue-50' : 'text-slate-600 border-slate-200'} capitalize`}>{cat.replace('_', ' ')}</Link>
+              {categoryOptions.map(([cat, label]) => (
+                <Link key={cat} to={`/store/search?cat=${cat}`} className={`text-sm p-2 rounded-lg border ${filterCat === cat ? 'text-emerald-700 font-medium border-emerald-200 bg-emerald-50' : 'text-slate-600 border-slate-200'}`}>{label}</Link>
               ))}
             </div></div>
             <div><h3 className="font-semibold text-slate-900 mb-3">Price Range</h3><form onSubmit={handleSearch} className="flex gap-2">
