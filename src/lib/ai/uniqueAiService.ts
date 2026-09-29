@@ -12,6 +12,9 @@ const MAX_HISTORY_TOTAL_LENGTH = 6_000;
 const MAX_CONTEXT_STRING_LENGTH = 160;
 const MAX_CONTEXT_JSON_LENGTH = 60_000;
 const MAX_MODEL_NAME_LENGTH = 100;
+const MAX_AUDIT_ERROR_TYPE_LENGTH = 64;
+const MAX_AUDIT_DURATION_MS = 120_000;
+const MODEL_REQUEST_TIMEOUT_MS = 30_000;
 
 const SYSTEM_INSTRUCTION = [
   "You are Unique AI, the assistant for the Unique One platform.",
@@ -398,12 +401,57 @@ function validateMutationBoundary(message: string): void {
   }
 }
 
+function classifyAiError(error: unknown): string {
+  if (error instanceof UniqueAiValidationError) {
+    return error.message === READ_ONLY_MUTATION_RESPONSE ? "mutation_blocked" : "validation";
+  }
+  if (error instanceof Error && /timed out/i.test(error.message)) return "timeout";
+  return "generation";
+}
+
+function sanitizeAuditErrorType(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const normalized = value.trim().slice(0, MAX_AUDIT_ERROR_TYPE_LENGTH);
+  return normalized || undefined;
+}
+
+function sanitizeAuditDuration(value: number): number {
+  if (!Number.isFinite(value) || value < 0) return MAX_AUDIT_DURATION_MS;
+  return Math.min(Math.round(value), MAX_AUDIT_DURATION_MS);
+}
+
+async function generateModelResponse(
+  ai: GoogleGenAI,
+  model: string,
+  contextualPrompt: string,
+): Promise<string> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error("Unique AI model request timed out.")), MODEL_REQUEST_TIMEOUT_MS);
+    });
+    const responsePromise = ai.models.generateContent({
+      model,
+      contents: contextualPrompt,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        temperature: 0.2,
+        maxOutputTokens: 1_000,
+      },
+    });
+    const response = await Promise.race([responsePromise, timeoutPromise]);
+    return response.text;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 function validateAiOutput(value: unknown, requestMessage?: string): string {
   if (typeof value !== "string") {
     throw new Error("Gemini returned an invalid response.");
   }
 
-  const text = value.trim();
+  const text = value.replace(/\s+/g, " ").trim();
   if (!text) {
     throw new Error("Gemini returned an empty response.");
   }
@@ -419,7 +467,10 @@ function validateAiOutput(value: unknown, requestMessage?: string): string {
     "<UNTRUSTED_CURRENT_USER_REQUEST>",
     "</UNTRUSTED_CURRENT_USER_REQUEST>",
   ];
-  if (forbiddenMarkers.some((marker) => text.includes(marker))) {
+  if (forbiddenMarkers.some((marker) => text.includes(marker)) ||
+      text.includes("firebase-admin") ||
+      text.includes("GEMINI_API_KEY") ||
+      text.includes("aiAuditLogs")) {
     throw new Error("Gemini returned an invalid response.");
   }
   if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(text)) {
@@ -432,10 +483,10 @@ function validateAiOutput(value: unknown, requestMessage?: string): string {
 export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<string> {
   const prompt = getPrompt(input.message);
   const history = getHistory(input.history);
+  validateMutationBoundary(prompt);
   const context = await getAuthorizedPlatformContext(input.uid);
   validateAuthorizedContext(context);
   const contextualPrompt = buildContextualPrompt(prompt, history, context);
-  validateMutationBoundary(prompt);
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
 
@@ -447,21 +498,13 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
   const startedAt = Date.now();
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model,
-      contents: contextualPrompt,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.2,
-        maxOutputTokens: 1_000,
-      },
-    });
-    const output = validateAiOutput(response.text, prompt);
+    const responseText = await generateModelResponse(ai, model, contextualPrompt);
+    const output = validateAiOutput(responseText, prompt);
     await writeAiAuditLog({
       uid: input.uid,
       model,
       success: true,
-      durationMs: Date.now() - startedAt,
+      durationMs: sanitizeAuditDuration(Date.now() - startedAt),
       outputLength: output.length,
       context,
     });
@@ -473,9 +516,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
       success: false,
       durationMs: Date.now() - startedAt,
       outputLength: 0,
-      errorType: error instanceof UniqueAiValidationError
-        ? (error.message === READ_ONLY_MUTATION_RESPONSE ? "mutation_blocked" : "validation")
-        : "generation",
+      errorType: sanitizeAuditErrorType(classifyAiError(error)),
       context,
     });
     throw error;
