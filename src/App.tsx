@@ -133,7 +133,7 @@ export default function App() {
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 
                 {/* Unique Store Public Routes */}
-                <Route path="/store" element={<StoreDiscoverPage />} />
+                <Route path="/store" element={<StorePage />} />
                 <Route path="/store/categories" element={<StoreCategoriesPage />} />
                 <Route path="/store/product/:id" element={<StoreProductPage />} />
                 <Route path="/store/seller/:id" element={<StoreSellerProfilePage />} />
