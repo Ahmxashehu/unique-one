@@ -1,4 +1,4 @@
-import type { Express, RequestHandler } from "express";
+import type { Express, Request, RequestHandler } from "express";
 import { createHash } from "crypto";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 
