@@ -192,6 +192,10 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
     (business) => !business.verificationStatus,
   ).length;
   const ordersWithUnknownStatus = orders.filter((order) => order.status === "unknown").length;
+  const ordersMissingTotals = orders.filter((order) => order.totalAmount === undefined).length;
+  const businessesMissingNames = businesses.filter((business) => !business.name.trim() || business.name === "Unnamed business").length;
+  const productsMissingNames = products.filter((product) => !product.name.trim() || product.name === "Unnamed product").length;
+  const productsWithInvalidQuantities = products.filter((product) => product.quantity !== undefined && (!Number.isFinite(product.quantity) || product.quantity < 0)).length;
 
   const inventoryUnitCount = products.reduce(
     (total, product) =>
@@ -252,6 +256,20 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
         products: contextTruncated.products,
       },
       contextLoadedAt: new Date().toISOString(),
+      coverage: {
+        ordersLoaded: orders.length,
+        businessesLoaded: businesses.length,
+        productsLoaded: products.length,
+        ordersOmitted: contextTruncated.orders ? Math.max(0, loadedOrders.length - orders.length) : 0,
+        businessesOmitted: contextTruncated.businesses ? Math.max(0, loadedBusinesses.length - businesses.length) : 0,
+        productsOmitted: contextTruncated.products ? Math.max(0, loadedProducts.length - products.length) : 0,
+      },
+      dataQuality: {
+        ordersMissingTotals,
+        businessesMissingNames,
+        productsMissingNames,
+        productsWithInvalidQuantities,
+      },
       contextWarnings: [
         ...(contextTruncated.orders
           ? [`Order context reached its limit of ${MAX_ORDER_CONTEXT} loaded records; additional records were not included.`]
