@@ -12,6 +12,7 @@ import type { Conversation, ConversationMember, ConversationType, Message, Messa
 import { validateMessageDraft, CommunicationValidationError } from "./communicationCore";
 import { generateUniqueAiResponse, UniqueAiValidationError } from "./src/lib/ai/uniqueAiService";
 import { registerIdentityVerificationRoutes } from "./src/server/identityVerificationRoutes";
+import { registerAjoRoutes } from "./src/server/ajoRoutes";
 
 interface WalletDocument {
   uid: string;
