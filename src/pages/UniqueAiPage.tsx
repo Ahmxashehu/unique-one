@@ -9,6 +9,10 @@ type ChatMessage = {
 };
 
 const QUICK_PROMPTS = [
+  "How does Unique AI protect my platform data?",
+  "What happens if the AI service times out?",
+  "Can Unique AI make changes to my account?",
+  "Are AI answers based on all my records or only loaded records?",
   "What can you help me with in Unique One?",
   "Summarize my current orders.",
   "What businesses and products do I have?",
@@ -239,7 +243,7 @@ export default function UniqueAiPage() {
             </button>
           </div>
           <div className="mt-2 flex items-center justify-between gap-3 px-1 text-xs text-slate-400">
-            <span>Read-only assistant for now. It cannot change payments, orders, products, or other platform records.  Some summaries are bounded by the records loaded for the request and may be incomplete when a context limit is reached.</span>
+            <span>Read-only assistant for now. It cannot change payments, orders, products, or other platform records. Answers use only authorized records loaded for the current request and may be incomplete when a context limit is reached.  Some summaries are bounded by the records loaded for the request and may be incomplete when a context limit is reached.</span>
             <span aria-live="polite">{message.length}/4000</span>
           </div>
         </form>
