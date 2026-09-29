@@ -352,6 +352,9 @@ async function startServer() {
       const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
       const requestIdHeader = req.headers['x-request-id'];
       const requestId = typeof requestIdHeader === 'string' ? requestIdHeader : undefined;
+      if (requestId && /^[A-Za-z0-9._:-]{1,64}$/.test(requestId)) {
+        res.setHeader('X-Request-ID', requestId);
+      }
       if (!uid) {
         return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
       }
