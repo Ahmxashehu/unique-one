@@ -107,7 +107,10 @@ export default function UniqueAiPage() {
         throw new Error("Unique AI returned an invalid response request ID.");
       }
       if (!response.ok) {
-        if (responseRequestId) setLastRequestId(responseRequestId);
+        const errorRequestId =
+          responseRequestId ||
+          (typeof payload?.requestId === "string" ? payload.requestId : undefined);
+        if (errorRequestId) setLastRequestId(errorRequestId);
         throw new Error(payload?.error?.message || "Unique AI is temporarily unavailable.");
       }
 
