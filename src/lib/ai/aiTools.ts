@@ -150,6 +150,7 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
   const orderedOrders = sortNewestFirst(loadedOrders);
   const orderedBusinesses = sortNewestFirst(loadedBusinesses);
   const orderedProducts = sortNewestFirst(loadedProducts);
+  // The +1 sentinel makes truncation explicit without exposing an unbounded query.
   const contextTruncated = {
     orders: orderedOrders.length > MAX_ORDER_CONTEXT,
     businesses: orderedBusinesses.length > MAX_BUSINESS_CONTEXT,
