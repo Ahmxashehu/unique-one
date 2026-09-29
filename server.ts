@@ -385,17 +385,6 @@ async function startServer() {
       console.error('Unique AI request failed:', { requestId: resolvedRequestId, error });
       return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Unique AI is temporarily unavailable. Please try again shortly." }, requestId: resolvedRequestId });
     }
-        if (error instanceof UniqueAiValidationError) {
-          return res.status(400).json({ error: { code: "INVALID_REQUEST", message: error.message }, requestId: errorRequestId });
-        }
-        console.error('Unique AI request failed:', { requestId: errorRequestId, error });
-        return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Unique AI is temporarily unavailable. Please try again shortly." }, requestId: errorRequestId });
-      }
-      if (error instanceof UniqueAiValidationError) {
-        return errorResponse(res, 'INVALID_REQUEST', error.message);
-      }
-      console.error('Unique AI request failed:', error);
-      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unique AI is temporarily unavailable. Please try again shortly.');
     }
   });
 
