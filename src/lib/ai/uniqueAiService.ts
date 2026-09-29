@@ -387,6 +387,8 @@ async function writeAiAuditLog(input: {
       },
       contextTruncated: input.context.summary.contextTruncated,
       contextWarningCount: input.context.summary.contextWarnings.length,
+      contextSchemaVersion: input.context.summary.schemaVersion,
+      contextLoadedAt: input.context.summary.contextLoadedAt,
       outputLength: input.outputLength,
       ...(input.errorType ? { errorType: input.errorType } : {}),
       createdAt: Timestamp.now(),
@@ -509,9 +511,6 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
     throw new UniqueAiValidationError("GEMINI_MODEL is invalid.");
   }
   const model = configuredModel || DEFAULT_MODEL;
-  if (model.length > MAX_MODEL_NAME_LENGTH || !/^[A-Za-z0-9._:-]+$/.test(model)) {
-    throw new UniqueAiValidationError("GEMINI_MODEL is invalid.");
-  }
   const startedAt = Date.now();
   try {
     const ai = new GoogleGenAI({ apiKey });
