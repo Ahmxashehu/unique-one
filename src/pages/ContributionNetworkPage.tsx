@@ -25,7 +25,7 @@ export default function ContributionNetworkPage() {
       setNotice("Please provide a title and describe what contribution is needed.");
       return;
     }
-    setNotice("Contribution request captured locally for this first feature stage. Network matching and publishing will be connected in the next implementation stage.");
+    setNotice("Draft prepared locally for this first feature stage. Network publishing and matching will be connected in the next implementation stage.");
   };
 
   return (
@@ -119,7 +119,7 @@ export default function ContributionNetworkPage() {
             </div>
             <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white">
               <CheckCircle2 className="h-4 w-4" />
-              Save request draft
+              Prepare request
             </button>
           </form>
         )}
