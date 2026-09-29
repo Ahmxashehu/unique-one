@@ -29,6 +29,8 @@ export default function AppLayout() {
     { name: 'Wishlist', path: '/os/wishlist', icon: Heart },
     { name: 'My Requests', path: '/os/requests', icon: ClipboardList },
     { name: 'UniquePay', path: '/os/pay', icon: Wallet },
+    { name: 'Cycle Ajo', path: '/os/pay/ajo', icon: HeartHandshake },
+    { name: 'Verification Center', path: '/os/pay/verification', icon: Shield },
     { name: 'Unique AI', path: '/os/ai', icon: Sparkles },
     { name: 'Jobs', path: '/os/jobs', icon: Briefcase },
     { name: 'Contributions', path: '/os/contributions', icon: HeartHandshake },
