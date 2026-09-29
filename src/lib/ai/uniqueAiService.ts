@@ -14,6 +14,7 @@ const MAX_CONTEXT_JSON_LENGTH = 60_000;
 const MAX_MODEL_NAME_LENGTH = 100;
 const MAX_AUDIT_ERROR_TYPE_LENGTH = 64;
 const MAX_AUDIT_DURATION_MS = 120_000;
+const MAX_REQUEST_ID_LENGTH = 64;
 const MODEL_REQUEST_TIMEOUT_MS = 30_000;
 const MAX_MODEL_OUTPUT_TOKENS = 1_000;
 const MAX_CONTEXT_WARNING_LENGTH = 240;
@@ -373,6 +374,7 @@ function buildContextualPrompt(
 
 async function writeAiAuditLog(input: {
   uid: string;
+  requestId: string;
   model: string;
   success: boolean;
   durationMs: number;
@@ -383,6 +385,7 @@ async function writeAiAuditLog(input: {
   try {
     await getFirestore().collection("aiAuditLogs").add({
       uid: input.uid,
+      requestId: input.requestId,
       model: input.model,
       success: input.success,
       durationMs: input.durationMs,
@@ -437,6 +440,15 @@ function sanitizeAuditErrorType(value: string | undefined): string | undefined {
 function sanitizeAuditDuration(value: number): number {
   if (!Number.isFinite(value) || value < 0) return MAX_AUDIT_DURATION_MS;
   return Math.min(Math.round(value), MAX_AUDIT_DURATION_MS);
+}
+
+function createAiRequestId(): string {
+  return `ai_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`.slice(0, MAX_REQUEST_ID_LENGTH);
+}
+
+function isLikelyTransientModelError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /timed out|temporar|unavailable|rate limit|429|503/i.test(error.message);
 }
 
 async function generateModelResponse(
@@ -509,7 +521,8 @@ function validateAiOutput(value: unknown, requestMessage?: string): string {
 
   const unsupportedActionClaimPatterns = [
     /\bI (?:have|just|successfully) (?:changed|updated|created|deleted|sent|cancelled|approved|refunded|booked|transferred|paid)\b/i,
-    /\b(?:payment|order|product|business|booking|account)\b.{0,50}\b(?:has been|was|is now)\s+(?:changed|updated|created|deleted|sent|cancelled|approved|refunded|booked|transferred|paid)\b/i,
+    /\b(?:payment|order|product|business|booking|account|message|transfer)\b.{0,80}\b(?:has been|was|is now|got)\s+(?:changed|updated|created|deleted|sent|cancelled|approved|refunded|booked|transferred|paid|completed)\b/i,
+    /\b(?:done|completed|successfully)\b.{0,40}\b(?:sent|paid|booked|created|updated|deleted|cancelled|refunded|transferred)\b/i,
   ];
   if (unsupportedActionClaimPatterns.some((pattern) => pattern.test(text))) {
     throw new Error("Gemini returned an unsupported action claim.");
@@ -533,6 +546,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
     throw new UniqueAiValidationError("GEMINI_MODEL is invalid.");
   }
   const model = configuredModel || DEFAULT_MODEL;
+  const requestId = createAiRequestId();
   const startedAt = Date.now();
   try {
     const ai = new GoogleGenAI({ apiKey });
@@ -540,6 +554,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
     const output = validateAiOutput(responseText, prompt);
     await writeAiAuditLog({
       uid: input.uid,
+      requestId,
       model,
       success: true,
       durationMs: sanitizeAuditDuration(Date.now() - startedAt),
@@ -550,6 +565,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
   } catch (error) {
     await writeAiAuditLog({
       uid: input.uid,
+      requestId,
       model,
       success: false,
       durationMs: Date.now() - startedAt,
