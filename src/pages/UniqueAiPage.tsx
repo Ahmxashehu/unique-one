@@ -79,11 +79,15 @@ export default function UniqueAiPage() {
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { message?: string; error?: { message?: string } }
+        | { message?: string; readOnly?: boolean; error?: { message?: string } }
         | null;
 
       if (!response.ok) {
         throw new Error(payload?.error?.message || "Unique AI is temporarily unavailable.");
+      }
+
+      if (payload?.readOnly !== true) {
+        throw new Error("Unique AI returned an invalid response contract.");
       }
 
       if (typeof payload?.message !== "string" || !payload.message.trim()) {
