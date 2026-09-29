@@ -102,6 +102,8 @@ import JobsPage from "./pages/JobsPage";
 import ContributionNetworkPage from "./pages/ContributionNetworkPage";
 import EducationPage from "./pages/EducationPage";
 import TravelPage from "./pages/TravelPage";
+import CycleAjoPage from "./pages/pay/CycleAjoPage";
+import VerificationCenterPage from "./pages/pay/VerificationCenterPage";
 
 
 
@@ -194,6 +196,8 @@ export default function App() {
               <Route path="pay/history" element={<TransactionHistoryPage />} />
               <Route path="pay/send" element={<SendMoneyPage />} />
               <Route path="pay/receive" element={<ReceiveMoneyPage />} />
+              <Route path="pay/ajo" element={<CycleAjoPage />} />
+              <Route path="pay/verification" element={<VerificationCenterPage />} />
               <Route path="pay/beneficiaries" element={<BeneficiariesPage />} />
               <Route path="pay/settings" element={<PaySettingsPage />} />
               <Route path="pay/security" element={<PaySecurityPage />} />
