@@ -507,7 +507,10 @@ async function generateModelResponse(
       }
     }
     if (!response) {
-      throw lastError instanceof Error ? lastError : new Error("Unique AI model request failed.");
+      const finalError =
+        lastError instanceof Error ? lastError : new Error("Unique AI model request failed.");
+      Object.assign(finalError, { modelAttempts: attempts });
+      throw finalError;
     }
     if (!response || typeof response.text !== "string") {
       throw new Error("Gemini returned an invalid response.");
@@ -604,6 +607,13 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
     });
     return output;
   } catch (error) {
+    const modelAttempts =
+      typeof error === "object" &&
+      error !== null &&
+      "modelAttempts" in error &&
+      Number.isSafeInteger((error as { modelAttempts?: unknown }).modelAttempts)
+        ? Number((error as { modelAttempts: number }).modelAttempts)
+        : 0;
     await writeAiAuditLog({
       uid: input.uid,
       requestId,
@@ -611,7 +621,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
       success: false,
       durationMs: sanitizeAuditDuration(Date.now() - startedAt),
       outputLength: 0,
-      modelAttempts: 0,
+      modelAttempts,
       errorType: sanitizeAuditErrorType(classifyAiError(error)),
       context,
     });
