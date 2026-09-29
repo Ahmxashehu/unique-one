@@ -354,6 +354,8 @@ async function startServer() {
     },
   }), async (req, res) => {
     const resolvedRequestId = resolveAiRequestId(req);
+    const rawRequestIdHeader = req.headers["x-request-id"];
+    const suppliedRequestId = Array.isArray(rawRequestIdHeader) ? rawRequestIdHeader[0] : rawRequestIdHeader;
     res.setHeader("X-Request-ID", resolvedRequestId);
     res.setHeader("Cache-Control", "no-store");
     try {
