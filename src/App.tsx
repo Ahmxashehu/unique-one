@@ -98,6 +98,7 @@ import BeneficiariesPage from "./pages/pay/BeneficiariesPage";
 import PaySettingsPage from "./pages/pay/PaySettingsPage";
 import PaySecurityPage from "./pages/pay/PaySecurityPage";
 import UniqueAiPage from "./pages/UniqueAiPage";
+import JobsPage from "./pages/JobsPage";
 import ContributionNetworkPage from "./pages/ContributionNetworkPage";
 
 
@@ -153,6 +154,7 @@ export default function App() {
               <Route path="pay" element={<PayPage />} />
               <Route path="store" element={<StorePage />} />
               <Route path="ai" element={<UniqueAiPage />} />
+              <Route path="jobs" element={<JobsPage />} />
               <Route path="contributions" element={<ContributionNetworkPage />} />
 
               {/* Business Tools */}
