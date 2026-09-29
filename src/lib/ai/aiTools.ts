@@ -133,14 +133,25 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
     getAuthorizedProductContext(uid),
   ]);
 
+  const sortNewestFirst = <T extends { id: string; createdAt?: string }>(items: T[]): T[] =>
+    [...items].sort((a, b) => {
+      const aTime = a.createdAt ? Date.parse(a.createdAt) : Number.NEGATIVE_INFINITY;
+      const bTime = b.createdAt ? Date.parse(b.createdAt) : Number.NEGATIVE_INFINITY;
+      if (bTime !== aTime) return bTime - aTime;
+      return a.id.localeCompare(b.id);
+    });
+
+  const orderedOrders = sortNewestFirst(loadedOrders);
+  const orderedBusinesses = sortNewestFirst(loadedBusinesses);
+  const orderedProducts = sortNewestFirst(loadedProducts);
   const contextTruncated = {
-    orders: loadedOrders.length > MAX_ORDER_CONTEXT,
-    businesses: loadedBusinesses.length > MAX_BUSINESS_CONTEXT,
-    products: loadedProducts.length > MAX_PRODUCT_CONTEXT,
+    orders: orderedOrders.length > MAX_ORDER_CONTEXT,
+    businesses: orderedBusinesses.length > MAX_BUSINESS_CONTEXT,
+    products: orderedProducts.length > MAX_PRODUCT_CONTEXT,
   };
-  const orders = loadedOrders.slice(0, MAX_ORDER_CONTEXT);
-  const businesses = loadedBusinesses.slice(0, MAX_BUSINESS_CONTEXT);
-  const products = loadedProducts.slice(0, MAX_PRODUCT_CONTEXT);
+  const orders = orderedOrders.slice(0, MAX_ORDER_CONTEXT);
+  const businesses = orderedBusinesses.slice(0, MAX_BUSINESS_CONTEXT);
+  const products = orderedProducts.slice(0, MAX_PRODUCT_CONTEXT);
 
   const orderStatusCounts = orders.reduce<Record<string, number>>((counts, order) => {
     counts[order.status] = (counts[order.status] ?? 0) + 1;
