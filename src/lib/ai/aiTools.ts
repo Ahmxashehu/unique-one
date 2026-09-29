@@ -216,6 +216,7 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
     businesses,
     products,
     summary: {
+      schemaVersion: 1,
       orderCount: orders.length,
       customerOrderCount: orders.filter((order) => order.side === "customer").length,
       sellerOrderCount: orders.filter((order) => order.side === "seller").length,
