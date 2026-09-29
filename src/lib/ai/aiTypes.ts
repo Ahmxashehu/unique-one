@@ -42,6 +42,7 @@ export type UniqueAiConversationTurn = {
 };
 
 export type UniqueAiPlatformSummary = {
+  schemaVersion: 1;
   orderCount: number;
   customerOrderCount: number;
   sellerOrderCount: number;
