@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Store, Wallet, Calendar, Bell, Settings,
   Briefcase, ShoppingCart, Users, FileText, HeartHandshake,
   User, MessageSquare, Heart, ClipboardList, Globe, Shield,
-  Building2, Activity, PlusCircle, Menu, X, LogOut, Sparkles, GraduationCap, Plane
+  Building2, Activity, PlusCircle, Menu, X, LogOut, Sparkles, GraduationCap, Plane, Landmark
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -32,6 +32,7 @@ export default function AppLayout() {
     { name: 'Cycle Ajo', path: '/os/pay/ajo', icon: HeartHandshake },
     { name: 'Verification Center', path: '/os/pay/verification', icon: Shield },
     { name: 'Unique AI', path: '/os/ai', icon: Sparkles },
+    { name: 'Master Vision', path: '/os/master-vision', icon: Landmark },
     { name: 'Jobs', path: '/os/jobs', icon: Briefcase },
     { name: 'Contributions', path: '/os/contributions', icon: HeartHandshake },
     { name: 'Education', path: '/os/education', icon: GraduationCap },
