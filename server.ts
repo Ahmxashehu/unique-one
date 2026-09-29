@@ -356,6 +356,7 @@ async function startServer() {
       const message = payload.message;
       const history = payload.history;
       const responseText = await generateUniqueAiResponse({ uid, message, history });
+      res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ message: responseText, readOnly: true });
     } catch (error) {
       if (error instanceof UniqueAiValidationError) {
