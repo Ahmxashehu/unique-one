@@ -343,13 +343,15 @@ async function startServer() {
         return errorResponse(res, 'INVALID_REQUEST', 'The AI request body must be a plain object.');
       }
       const payload = req.body as Record<string, unknown>;
-      const allowedKeys = new Set(['message', 'history']);
+      const allowedKeys = new Set(['message', 'history', 'requestId']);
       for (const key of Object.keys(payload)) {
         if (!allowedKeys.has(key)) {
           return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
         }
       }
       const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const requestIdHeader = req.headers['x-request-id'];
+      const requestId = typeof requestIdHeader === 'string' ? requestIdHeader : undefined;
       if (!uid) {
         return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
       }
