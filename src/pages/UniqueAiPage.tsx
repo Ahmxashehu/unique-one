@@ -71,12 +71,14 @@ export default function UniqueAiPage() {
 
     try {
       const token = await currentUser.getIdToken();
+      const requestId = crypto.randomUUID();
       const history = messages.slice(-6).map(({ role, text }) => ({ role, text }));
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          "X-Request-ID": requestId,
         },
         body: JSON.stringify({ message: trimmed, history }),
         signal: controller.signal,
