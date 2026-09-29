@@ -104,6 +104,7 @@ import EducationPage from "./pages/EducationPage";
 import TravelPage from "./pages/TravelPage";
 import CycleAjoPage from "./pages/pay/CycleAjoPage";
 import VerificationCenterPage from "./pages/pay/VerificationCenterPage";
+import MasterVisionPage from "./pages/MasterVisionPage";
 
 
 
@@ -158,6 +159,7 @@ export default function App() {
               <Route path="pay" element={<PayPage />} />
               <Route path="store" element={<StorePage />} />
               <Route path="ai" element={<UniqueAiPage />} />
+              <Route path="master-vision" element={<MasterVisionPage />} />
               <Route path="jobs" element={<JobsPage />} />
               <Route path="contributions" element={<ContributionNetworkPage />} />
               <Route path="education" element={<EducationPage />} />
