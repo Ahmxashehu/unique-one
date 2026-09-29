@@ -43,6 +43,7 @@ export type UniqueAiConversationTurn = {
 
 export type UniqueAiPlatformSummary = {
   schemaVersion: 1;
+  summaryVersion: "ai-40";
   orderCount: number;
   customerOrderCount: number;
   sellerOrderCount: number;
@@ -69,8 +70,10 @@ export type UniqueAiPlatformSummary = {
   productsOutOfStock: number;
   contextLimits: { orders: number; businesses: number; products: number };
   contextTruncated: { orders: boolean; businesses: boolean; products: boolean };
+  contextComplete: boolean;
   contextLoadedAt: string;
   contextWarnings: string[];
+  requestScope: "authorized-user-context";
   coverage: {
     ordersLoaded: number;
     businessesLoaded: number;
