@@ -16,6 +16,7 @@ const QUICK_PROMPTS = [
   "Can Unique AI make changes to my account?",
   "Are AI answers based on all my records or only loaded records?",
   "What can you help me with in Unique One?",
+  "What can Unique AI access right now?",
   "Summarize my current orders.",
   "What businesses and products do I have?",
   "How many orders, businesses, and products do I have?",
@@ -205,6 +206,9 @@ export default function UniqueAiPage() {
               <p className="mt-2 text-sm text-slate-500">
                 Ask about your Unique One account, orders, businesses, or products. I will not invent records or claim actions I did not perform. Summary counts use only authorized records loaded for the current request. If a collection reaches its context limit, the summary may be incomplete.
               </p>
+              <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-left text-xs leading-5 text-emerald-800">
+                <strong>Current capability:</strong> read-only access to your authorized account, order, business, and product context. No payment, order, product, business, booking, transfer, or other platform mutation is exposed to Unique AI.
+              </div>
               <div className="mt-6 grid w-full gap-2 sm:grid-cols-3">
                 {QUICK_PROMPTS.map((prompt) => (
                   <button
