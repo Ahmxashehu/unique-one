@@ -9,6 +9,7 @@ const MAX_OUTPUT_LENGTH = 8_000;
 const MAX_HISTORY_TURNS = 6;
 const MAX_HISTORY_TEXT_LENGTH = 1_000;
 const MAX_HISTORY_TOTAL_LENGTH = 6_000;
+const MAX_CONTEXT_STRING_LENGTH = 160;
 const MAX_CONTEXT_JSON_LENGTH = 60_000;
 const MAX_MODEL_NAME_LENGTH = 100;
 
@@ -385,8 +386,16 @@ async function writeAiAuditLog(input: {
   }
 }
 
+const READ_ONLY_MUTATION_RESPONSE = "Unique AI is read-only right now and cannot change, send, cancel, approve, create, delete, refund, edit, transfer, pay, or book platform records.";
+
 function isMutationRequest(message: string): boolean {
   return /\b(change|send|cancel|approve|create|delete|refund|edit|update|modify|remove|transfer|pay|book)\b/i.test(message);
+}
+
+function validateMutationBoundary(message: string): void {
+  if (isMutationRequest(message)) {
+    throw new UniqueAiValidationError(READ_ONLY_MUTATION_RESPONSE);
+  }
 }
 
 function validateAiOutput(value: unknown, requestMessage?: string): string {
