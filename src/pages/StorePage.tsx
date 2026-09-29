@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Search, ShoppingBag, Heart, Package, ArrowRight, Sparkles,
+  Search, ShoppingBag, Heart, Package, ArrowRight, Sparkles, MapPin, Clock3, Zap, Tag, ChevronRight,
   Smartphone, Shirt, Home, Hammer, Sprout, Utensils, Car, Briefcase, Loader2
 } from 'lucide-react';
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
@@ -94,6 +94,8 @@ export default function StorePage() {
   };
 
   const visibleProducts = useMemo(() => products.filter(product => product.status === 'published'), [products]);
+  const lowStockProducts = useMemo(() => visibleProducts.filter(product => Number(product.quantity) > 0 && Number(product.quantity) <= 5), [visibleProducts]);
+  const serviceListings = useMemo(() => visibleProducts.filter(product => product.category === 'services'), [visibleProducts]);
 
   return (
     <div className="min-h-full space-y-6 pb-8">
@@ -124,6 +126,27 @@ export default function StorePage() {
       </section>
 
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <Link to="/store/search" className="group bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
+          <Zap className="w-5 h-5 text-amber-500" />
+          <p className="font-semibold text-slate-900 mt-3">Fresh listings</p>
+          <p className="text-xs text-slate-500 mt-1">See the newest live items</p>
+        </Link>
+        <Link to="/store/search?cat=services" className="group bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
+          <Clock3 className="w-5 h-5 text-emerald-600" />
+          <p className="font-semibold text-slate-900 mt-3">Hire & Book</p>
+          <p className="text-xs text-slate-500 mt-1">Find available services</p>
+        </Link>
+        <Link to="/store/search" className="group bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
+          <MapPin className="w-5 h-5 text-blue-600" />
+          <p className="font-semibold text-slate-900 mt-3">Find nearby</p>
+          <p className="text-xs text-slate-500 mt-1">Use filters to narrow listings</p>
+        </Link>
+        <Link to="/store/product-request" className="group bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
+          <Tag className="w-5 h-5 text-violet-600" />
+          <p className="font-semibold text-slate-900 mt-3">Request an item</p>
+          <p className="text-xs text-slate-500 mt-1">Tell sellers what you need</p>
+        </Link>
+      </section>
         <Link to="/store/search" className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 transition-colors">
           <Package className="w-5 h-5 text-emerald-700" />
           <p className="font-semibold text-slate-900 mt-3">All Products</p>
@@ -179,6 +202,13 @@ export default function StorePage() {
           </Link>
         </div>
 
+        {!loading && lowStockProducts.length > 0 && (
+          <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center justify-between gap-3 mb-3"><div><h3 className="font-bold text-slate-900">Low stock</h3><p className="text-xs text-slate-600">Real listings with five or fewer units currently available.</p></div><Zap className="w-5 h-5 text-amber-500" /></div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{lowStockProducts.slice(0, 4).map(product => (<Link key={product.id} to={`/store/product/${product.id}`} className="bg-white rounded-xl border border-amber-100 p-3 hover:shadow-sm"><p className="text-sm font-semibold text-slate-900 line-clamp-2">{product.name}</p><p className="text-xs font-semibold text-amber-700 mt-2">{product.quantity} left</p></Link>))}</div>
+          </div>
+        )}
+
         {loading ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-12 flex justify-center">
             <Loader2 className="w-7 h-7 animate-spin text-slate-400" />
@@ -217,6 +247,12 @@ export default function StorePage() {
           </div>
         )}
       </section>
+      {!loading && serviceListings.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-3"><div><h2 className="text-xl font-bold text-slate-900">Services to hire or book</h2><p className="text-sm text-slate-500">Real service listings currently published in Store.</p></div><Link to="/store/search?cat=services" className="text-sm font-semibold text-emerald-700 flex items-center gap-1">See services <ChevronRight className="w-4 h-4" /></Link></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{serviceListings.slice(0, 4).map(product => (<Link key={product.id} to={`/store/product/${product.id}`} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-emerald-300 hover:shadow-sm transition-all"><div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mb-3"><Clock3 className="w-5 h-5 text-emerald-700" /></div><p className="font-semibold text-slate-900 line-clamp-2">{product.name}</p><p className="text-sm font-bold text-slate-900 mt-2">{product.currency === 'NGN' ? '₦' : product.currency + ' '}{Number(product.price).toLocaleString()}</p></Link>))}</div>
+        </section>
+      )}
     </div>
   );
 }
