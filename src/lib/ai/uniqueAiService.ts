@@ -17,6 +17,7 @@ const MAX_AUDIT_DURATION_MS = 120_000;
 const MODEL_REQUEST_TIMEOUT_MS = 30_000;
 const MAX_MODEL_OUTPUT_TOKENS = 1_000;
 const MAX_CONTEXT_WARNING_LENGTH = 240;
+const AI_CONTEXT_SCHEMA_VERSION = 1;
 
 const SYSTEM_INSTRUCTION = [
   "You are Unique AI, the assistant for the Unique One platform.",
@@ -107,6 +108,10 @@ function validateAuthorizedContext(
   context: Awaited<ReturnType<typeof getAuthorizedPlatformContext>>,
 ): void {
   const { summary } = context;
+
+  if (summary.schemaVersion !== AI_CONTEXT_SCHEMA_VERSION) {
+    throw new UniqueAiValidationError("Authorized AI context schema version is unsupported.");
+  }
 
   const validateBoundedText = (value: unknown, field: string): void => {
     if (typeof value !== "string" || !value.trim() || value.length > MAX_CONTEXT_STRING_LENGTH) {
@@ -504,6 +509,9 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
     throw new UniqueAiValidationError("GEMINI_MODEL is invalid.");
   }
   const model = configuredModel || DEFAULT_MODEL;
+  if (model.length > MAX_MODEL_NAME_LENGTH || !/^[A-Za-z0-9._:-]+$/.test(model)) {
+    throw new UniqueAiValidationError("GEMINI_MODEL is invalid.");
+  }
   const startedAt = Date.now();
   try {
     const ai = new GoogleGenAI({ apiKey });
