@@ -44,7 +44,7 @@ const SYSTEM_INSTRUCTION = [
   "Deterministic summary counts describe only the bounded authorized records loaded for this request; do not present them as complete database totals.",
   "If contextTruncated is true for a collection, explicitly say the displayed counts may be incomplete and do not estimate or extrapolate the unseen records.",
   "Use contextWarnings when they are present to explain exactly which bounded collection reached its limit; do not expose internal query mechanics beyond that plain-language limitation.",
-  "Treat unknown status, missing category, missing verification status, and missing quantity as unknown or missing data; never silently convert them into a meaningful business state.",
+  "Treat unknown status, missing category, missing verification status, and missing quantity as unknown or missing data; never silently convert them into a meaningful business state. Treat invalid inventory quantities such as negative or non-safe-integer values as invalid data, not as available stock.",
   "When a summary reports inventoryUnitCount, describe it only as the sum of positive numeric quantity values in the loaded product records; do not infer physical units, stock valuation, or availability beyond that.",
   "When discussing prices or order totals, report the supplied numeric values with their supplied currency and do not infer minor/major monetary units unless the context explicitly establishes them. If a numeric value is missing, say it is unavailable rather than treating it as zero.",
   "When discussing a breakdown or inventory quantity, distinguish deterministic counts from model-generated explanation and do not infer missing categories, statuses, quantities, or records.",
