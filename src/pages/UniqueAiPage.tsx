@@ -89,7 +89,7 @@ export default function UniqueAiPage() {
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { message?: string; readOnly?: boolean; error?: { message?: string } }
+        | { message?: string; readOnly?: boolean; requestId?: string; error?: { message?: string } }
         | null;
 
       if (!response.ok) {
@@ -98,6 +98,10 @@ export default function UniqueAiPage() {
 
       if (payload?.readOnly !== true) {
         throw new Error("Unique AI returned an invalid response contract.");
+      }
+
+      if (payload.requestId !== undefined && payload.requestId !== requestId) {
+        throw new Error("Unique AI returned a mismatched request ID.");
       }
 
       if (typeof payload?.message !== "string" || !payload.message.trim()) {
@@ -252,7 +256,7 @@ export default function UniqueAiPage() {
             </button>
           </div>
           <div className="mt-2 flex items-center justify-between gap-3 px-1 text-xs text-slate-400">
-            <span>Read-only assistant for now. It cannot change payments, orders, products, or other platform records. Answers use only authorized records loaded for the current request and may be incomplete when a context limit is reached.</span>
+            <span>Read-only assistant for now. Each request is traceable with a temporary request ID; it cannot change payments, orders, products, or other platform records. Answers use only authorized records loaded for the current request and may be incomplete when a context limit is reached.</span>
             <span aria-live="polite">{message.length}/4000</span>
           </div>
         </form>
