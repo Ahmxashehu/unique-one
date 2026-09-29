@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { randomUUID } from "node:crypto";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import type { HarmBlockThreshold, HarmCategory, SafetySetting } from "@google/genai";
+import { ThinkingLevel, type HarmBlockThreshold, type HarmCategory, type SafetySetting } from "@google/genai";
 import { getAuthorizedPlatformContext } from "./aiTools";
 import type { UniqueAiConversationTurn, UniqueAiRequest } from "./aiTypes";
 
@@ -19,7 +19,7 @@ const MAX_AUDIT_DURATION_MS = 120_000;
 const MAX_REQUEST_ID_LENGTH = 64;
 const MODEL_REQUEST_TIMEOUT_MS = 30_000;
 const MAX_MODEL_OUTPUT_TOKENS = 1_000;
-const MODEL_THINKING_LEVEL = "low" as const;
+const MODEL_THINKING_LEVEL = ThinkingLevel.LOW;
 const MAX_MODEL_ATTEMPTS = 2;
 const MODEL_RETRY_DELAY_MS = 250;
 const MAX_RETRY_DELAY_MS = 2_000;
