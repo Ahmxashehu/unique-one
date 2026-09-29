@@ -502,14 +502,28 @@ const READ_ONLY_MUTATION_RESPONSE = "Unique AI is read-only right now and cannot
 
 function isMutationRequest(message: string): boolean {
   const action = "change|send|cancel|approve|create|delete|refund|edit|update|modify|remove|transfer|pay|book";
-  const actionPattern = new RegExp(`\\b(?:${action})\\b`, "i");
-  const directRequestPattern = new RegExp(`^\\s*(?:please\\s+)?(?:${action})\\b`, "i");
+  const directRequestPattern = new RegExp(
+    `^\\s*(?:please\\s+)?(?:${action})\\b`,
+    "i",
+  );
   const directAssistantRequestPattern = new RegExp(
-    `\\b(?:can|could|would|will|please|help)\\s+you\\s+(?:${action})\\b`,
+    `\\b(?:can|could|would|will|please|help)\\s+you\\s+(?:to\\s+)?(?:${action})\\b`,
+    "i",
+  );
+  const directGerundRequestPattern = new RegExp(
+    `\\b(?:can|could|would|will|please|help)\\s+you\\s+(?:${action})(?:ing|ed)?\\b`,
     "i",
   );
   const userIntentPattern = new RegExp(
     `\\b(?:i\\s+(?:want|need)|let\\s+me)\\s+(?:to\\s+)?(?:${action})\\b`,
+    "i",
+  );
+  const userGerundIntentPattern = new RegExp(
+    `\\b(?:i\\s+(?:want|need)|let\\s+me)\\s+(?:help\\s+me\\s+)?(?:${action})ing\\b`,
+    "i",
+  );
+  const imperativeObjectPattern = new RegExp(
+    `^\\s*(?:please\\s+)?(?:send|cancel|approve|create|delete|refund|edit|update|modify|remove|transfer|pay|book)\\s+.+`,
     "i",
   );
   const explanatoryQuestionPattern = /^\\s*(?:can|could|would|will|please|help)\\s+you\\s+(?:tell|explain|show|describe)\\b/i;
@@ -517,7 +531,10 @@ function isMutationRequest(message: string): boolean {
   return (
     directRequestPattern.test(message) ||
     directAssistantRequestPattern.test(message) ||
-    userIntentPattern.test(message)
+    directGerundRequestPattern.test(message) ||
+    userIntentPattern.test(message) ||
+    userGerundIntentPattern.test(message) ||
+    imperativeObjectPattern.test(message)
   );
 }
 
