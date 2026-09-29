@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingBag, Trash2, ArrowRight, Loader2, Minus, Plus } from 'lucide-react';
+import { ShoppingBag, Trash2, ArrowRight, Loader2, Minus, Plus, ChevronLeft, ShieldCheck } from 'lucide-react';
 import { collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Product, CartItem } from '../../lib/os/types';
@@ -91,11 +91,11 @@ export default function StoreCartPage() {
   const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      <div><h1 className="text-2xl font-bold tracking-tight text-slate-900">Your Cart</h1><p className="text-sm text-slate-500 mt-1">Review your items before checkout.</p></div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6 pb-28">
+      <div className="flex items-center justify-between gap-3"><div><Link to="/store/search" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 mb-2"><ChevronLeft className="w-4 h-4" /> Continue shopping</Link><h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">Your Cart</h1><p className="text-sm text-slate-500 mt-1">Review your real Store items before checkout.</p></div></div>
       {error && <div className="p-4 rounded-xl bg-red-50 text-red-700 text-sm">{error}</div>}
       {!currentUser ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center"><h3 className="text-xl font-semibold text-slate-900">Sign in to view your cart</h3><Link to="/login" className="inline-block mt-6 bg-slate-900 text-white px-6 py-3 rounded-xl text-sm font-medium">Sign In</Link></div>
+        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center"><h3 className="text-xl font-semibold text-slate-900">Sign in to view your cart</h3><Link to="/login" className="inline-block mt-6 bg-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-bold">Sign In</Link></div>
       ) : items.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
           <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4"><ShoppingBag className="w-10 h-10 text-blue-600" /></div>
@@ -107,8 +107,8 @@ export default function StoreCartPage() {
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-4">
             {items.map(item => (
-              <div key={item.id} className="bg-white border border-slate-200 rounded-2xl p-4 flex gap-4">
-                <Link to={`/store/product/${item.product.id}`} className="w-24 h-24 rounded-xl bg-slate-100 overflow-hidden shrink-0">
+              <div key={item.id} className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex gap-3 sm:gap-4">
+                <Link to={`/store/product/${item.product.id}`} className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-slate-100 overflow-hidden shrink-0">
                   {item.product.images?.[0] ? <img src={item.product.images[0]} alt={item.product.name} className="w-full h-full object-cover" /> : <ShoppingBag className="w-8 h-8 m-8 text-slate-300" />}
                 </Link>
                 <div className="flex-1 min-w-0">
@@ -127,19 +127,19 @@ export default function StoreCartPage() {
               </div>
             ))}
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 h-fit">
-            <h2 className="font-semibold text-slate-900">Order Summary</h2>
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 h-fit lg:sticky lg:top-24">
+            <div className="flex items-center justify-between"><h2 className="font-bold text-slate-900">Order Summary</h2><ShieldCheck className="w-5 h-5 text-emerald-600" /></div>
             <div className="flex justify-between mt-4 text-sm text-slate-600"><span>Subtotal</span><span>{items[0]?.product.currency === 'NGN' ? '₦' : '$'}{total.toLocaleString()}</span></div>
             <div className="flex justify-between mt-3 pt-3 border-t font-bold text-slate-900"><span>Total</span><span>{items[0]?.product.currency === 'NGN' ? '₦' : '$'}{total.toLocaleString()}</span></div>
             <button
               onClick={handleCheckout}
               disabled={checkingOut}
-              className="w-full mt-6 bg-slate-900 text-white py-3 rounded-xl font-medium hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full mt-6 bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {checkingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
               {checkingOut ? 'Creating order…' : 'Place Order'}
             </button>
-            <p className="text-xs text-slate-500 mt-3">Your order is created first. Payment will be connected through UniquePay in the payment step.</p>
+            <p className="text-xs text-slate-500 mt-3">Your order is created first. Payment is handled through the UniquePay payment step after the order is created.</p>
           </div>
         </div>
       )}
