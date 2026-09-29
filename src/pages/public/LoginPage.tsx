@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Loader2, Mail, Lock } from 'lucide-react';
-import { getRedirectResult, signInWithRedirect, GoogleAuthProvider, signInWithEmailAndPassword } from 'firebase/auth';
+import { getRedirectResult, onAuthStateChanged, signInWithRedirect, GoogleAuthProvider, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
 import { UniqueUser } from '../../lib/os/types';
@@ -17,24 +17,47 @@ export default function LoginPage() {
 
   const from = location.state?.from?.pathname || "/os/dashboard";
 
-  React.useEffect(() => {
+  const postLoginHandled = useRef(false);
+
+  useEffect(() => {
     let active = true;
-    setLoading(true);
-    getRedirectResult(auth)
-      .then(async (result) => {
-        if (active && result?.user) {
-          await handlePostLogin(result.user);
+
+    const completeLogin = async (user: any) => {
+      if (!active || !user || postLoginHandled.current) return;
+      postLoginHandled.current = true;
+      setLoading(true);
+      try {
+        await handlePostLogin(user);
+      } catch (err: any) {
+        postLoginHandled.current = false;
+        if (active) {
+          console.error("Post-login setup error", err);
+          setError(err.message || 'Signed in, but we could not finish opening your dashboard.');
         }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (user) void completeLogin(user);
+    });
+
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) void completeLogin(result.user);
       })
       .catch((err: any) => {
         if (!active) return;
         console.error("Google redirect login error", err);
         setError(err.message || 'Failed to authenticate with Google. Please try again.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+        setLoading(false);
       });
-    return () => { active = false; };
+
+    return () => {
+      active = false;
+      unsubscribeAuth();
+    };
   }, []);
 
   const handlePostLogin = async (user: any) => {
