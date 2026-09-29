@@ -66,6 +66,23 @@ const adminDb = getFirestore(FIRESTORE_DATABASE_ID);
 function errorResponse(res: Response, code: TransferErrorCode, message: string, statusOverride?: number) {
   return res.status(statusOverride ?? transferErrorStatus[code] ?? 500).json({ error: { code, message } });
 }
+
+function normalizeAuthPhone(value: unknown): string {
+  if (typeof value !== 'string') throw new RequestValidationError('INVALID_REQUEST', 'Phone number is required.');
+  const trimmed = value.trim().replace(/[\s()-]/g, '');
+  const normalized = trimmed.startsWith('+') ? trimmed : /^0\d{10}$/.test(trimmed) ? `+234${trimmed.slice(1)}` : trimmed;
+  if (!/^\+\d{8,15}$/.test(normalized)) throw new RequestValidationError('INVALID_REQUEST', 'Enter a valid phone number.');
+  return normalized;
+}
+const WEAK_LOGIN_PASSWORDS = new Set(['000000','111111','123456','654321','121212','112233','123123']);
+function validateLoginPassword(value: unknown): string {
+  if (typeof value !== 'string' || !/^\d{6}$/.test(value) || WEAK_LOGIN_PASSWORDS.has(value)) throw new RequestValidationError('INVALID_REQUEST', 'Your login password must be exactly 6 digits and cannot be an obvious weak pattern.');
+  return value;
+}
+function passwordDigest(password: string, salt: string): string {
+  return require('crypto').scryptSync(password, salt, 64).toString('hex');
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -343,6 +360,44 @@ const app = express();
     try { (req as any).user = await getAuth().verifyIdToken(authHeader.split('Bearer ')[1]); next(); }
     catch (_) { return errorResponse(res, 'UNAUTHENTICATED', 'The supplied Firebase token is invalid or expired.'); }
   };
+
+  app.post('/api/auth/phone/register-password', async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) return errorResponse(res, 'UNAUTHENTICATED', 'Phone verification is required.');
+      const decoded = await getAuth().verifyIdToken(authHeader.slice(7));
+      const phone = normalizeAuthPhone(req.body?.phone);
+      if (decoded.phone_number !== phone) return errorResponse(res, 'FORBIDDEN', 'The verified phone number does not match the registration phone number.');
+      const password = validateLoginPassword(req.body?.password);
+      const fullName = typeof req.body?.fullName === 'string' ? req.body.fullName.trim().slice(0, 120) : '';
+      const salt = randomUUID().replace(/-/g, '');
+      await adminDb.collection('authCredentials').doc(decoded.uid).set({uid: decoded.uid,phone,loginPasswordSalt: salt,loginPasswordHash: passwordDigest(password, salt),createdAt: Timestamp.now(),updatedAt: Timestamp.now()}, { merge: true });
+      const uniqueOneId = `U1-${decoded.uid.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toUpperCase() || 'ACCOUNT'}`;
+      await adminDb.collection('users').doc(decoded.uid).set({uid: decoded.uid,email: decoded.email || '',phone,fullName: fullName || 'Unique One User',uniqueOneId,roles: ['customer'],permissions: [],status: 'active',preferredLanguage: 'en',createdAt: new Date().toISOString(),lastLogin: new Date().toISOString(),verificationStatus: 'phone_verified',hasSecurePin: false,twoFactorEnabled: false},{merge:true});
+      return res.json({ok:true,uid:decoded.uid,uniqueOneId});
+    } catch (error: any) {
+      const code = error?.code === 'auth/id-token-expired' || error?.code === 'auth/argument-error' ? 'UNAUTHENTICATED' : error instanceof RequestValidationError ? error.code : 'INVALID_REQUEST';
+      return errorResponse(res, code as TransferErrorCode, error?.message || 'Registration could not be completed.');
+    }
+  });
+  app.post('/api/auth/phone/login', async (req, res) => {
+    try {
+      const phone = normalizeAuthPhone(req.body?.phone);
+      const password = validateLoginPassword(req.body?.password);
+      const user = await getAuth().getUserByPhoneNumber(phone);
+      const snap = await adminDb.collection('authCredentials').doc(user.uid).get();
+      const credential = snap.data() as {loginPasswordSalt?:string;loginPasswordHash?:string}|undefined;
+      if (!credential?.loginPasswordSalt || !credential.loginPasswordHash || passwordDigest(password,credential.loginPasswordSalt)!==credential.loginPasswordHash) return errorResponse(res,'UNAUTHENTICATED','Invalid phone number or 6-digit login password.');
+      const customToken=await getAuth().createCustomToken(user.uid);
+      await adminDb.collection('users').doc(user.uid).set({lastLogin:new Date().toISOString()},{merge:true});
+      return res.json({customToken});
+    } catch(error:any) {
+      if(error?.code==='auth/user-not-found') return errorResponse(res,'UNAUTHENTICATED','Invalid phone number or 6-digit login password.');
+      const code=error instanceof RequestValidationError?error.code:'UNAUTHENTICATED';
+      return errorResponse(res,code as TransferErrorCode,error?.message||'Unable to sign in.');
+    }
+  });
+
   app.get("/api/health", (req, res) => res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" }));
   registerIdentityVerificationRoutes(app, authenticate);
   registerAjoRoutes(app, authenticate);

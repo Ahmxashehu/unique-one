@@ -72,6 +72,7 @@ service cloud.firestore {
       allow update: if isAuthenticated() && resource.data.studentUid == request.auth.uid && request.resource.data.studentUid == resource.data.studentUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['programme','level','status','updatedAt']) && request.resource.data.status in ['active','completed','withdrawn'] || isAdmin();
       allow delete: if isAdmin();
     }
+    match /authCredentials/{userId} { allow read, write: if false; }
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && (!('roles' in request.resource.data) || !('administrator' in request.resource.data.roles));
