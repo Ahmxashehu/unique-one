@@ -242,6 +242,38 @@ function validateAuthorizedContext(
   if (!Number.isFinite(Date.parse(summary.contextLoadedAt))) {
     throw new UniqueAiValidationError("Authorized AI context timestamp is invalid.");
   }
+  const coverageValues = [
+    summary.coverage.ordersLoaded,
+    summary.coverage.businessesLoaded,
+    summary.coverage.productsLoaded,
+    summary.coverage.ordersOmitted,
+    summary.coverage.businessesOmitted,
+    summary.coverage.productsOmitted,
+    summary.dataQuality.ordersMissingTotals,
+    summary.dataQuality.businessesMissingNames,
+    summary.dataQuality.productsMissingNames,
+  ];
+  if (!coverageValues.every(nonNegativeSafeInteger)) {
+    throw new UniqueAiValidationError("Authorized AI coverage or data-quality metadata is invalid.");
+  }
+  if (
+    summary.coverage.ordersLoaded !== context.orders.length ||
+    summary.coverage.businessesLoaded !== context.businesses.length ||
+    summary.coverage.productsLoaded !== context.products.length ||
+    summary.coverage.ordersOmitted !== (summary.contextTruncated.orders ? Math.max(0, summary.coverage.ordersLoaded) : 0) ||
+    summary.coverage.businessesOmitted !== (summary.contextTruncated.businesses ? Math.max(0, summary.coverage.businessesLoaded) : 0) ||
+    summary.coverage.productsOmitted !== (summary.contextTruncated.products ? Math.max(0, summary.coverage.productsLoaded) : 0)
+  ) {
+    throw new UniqueAiValidationError("Authorized AI coverage metadata is inconsistent.");
+  }
+  if (
+    summary.dataQuality.ordersMissingTotals > summary.orderCount ||
+    summary.dataQuality.businessesMissingNames > summary.businessCount ||
+    summary.dataQuality.productsMissingNames > summary.productCount
+  ) {
+    throw new UniqueAiValidationError("Authorized AI data-quality metadata exceeds loaded record counts.");
+  }
+
   if (summary.contextWarnings.some((warning) => typeof warning !== "string" || warning.length > MAX_CONTEXT_WARNING_LENGTH || !warning.trim())) {
     throw new UniqueAiValidationError("Authorized AI context warnings are invalid.");
   }
