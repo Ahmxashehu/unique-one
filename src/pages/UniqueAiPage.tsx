@@ -52,6 +52,8 @@ const QUICK_PROMPTS = [
   "How does Unique AI handle an invalid model response?",
   "How does Unique AI trace a failed request?",
   "How can I give support the request ID safely?",
+  "Does Unique AI verify that its authorized context is internally consistent?",
+  "What does the Unique AI context completeness status mean?",
   "What does it mean when AI context is incomplete?",
   "What data is never exposed to Unique AI?",
   "Which loaded order totals are unavailable?",
@@ -134,6 +136,7 @@ export default function UniqueAiPage() {
         payload.capabilities.version !== 1 ||
         payload.capabilities.readOnly !== true ||
         !Array.isArray(payload.capabilities.contexts) ||
+        JSON.stringify([...payload.capabilities.contexts].sort()) !== JSON.stringify(["account", "businesses", "orders", "products"]) ||
         !Array.isArray(payload.capabilities.mutations) ||
         payload.capabilities.mutations.length !== 0
       ) {
