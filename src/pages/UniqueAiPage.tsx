@@ -2,7 +2,14 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { Bot, Send, Sparkles, Trash2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
-type UniqueAiCapabilities = {\n  version: 1;\n  readOnly: true;\n  contexts: string[];\n  mutations: string[];\n};\n\ntype ChatMessage = {
+type UniqueAiCapabilities = {
+  version: 1;
+  readOnly: true;
+  contexts: string[];
+  mutations: string[];
+};
+
+type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
