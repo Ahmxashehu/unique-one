@@ -467,12 +467,20 @@ function isMutationRequest(message: string): boolean {
   const action = "change|send|cancel|approve|create|delete|refund|edit|update|modify|remove|transfer|pay|book";
   const actionPattern = new RegExp(`\\b(?:${action})\\b`, "i");
   const directRequestPattern = new RegExp(`^\\s*(?:please\\s+)?(?:${action})\\b`, "i");
-  const assistantRequestPattern = new RegExp(`\\b(?:can|could|would|will|please|help)\\s+you\\b`, "i");
-  const userIntentPattern = /\\b(?:i\\s+(?:want|need)|let\\s+me)\\b/i;
+  const directAssistantRequestPattern = new RegExp(
+    `\\b(?:can|could|would|will|please|help)\\s+you\\s+(?:${action})\\b`,
+    "i",
+  );
+  const userIntentPattern = new RegExp(
+    `\\b(?:i\\s+(?:want|need)|let\\s+me)\\s+(?:to\\s+)?(?:${action})\\b`,
+    "i",
+  );
+  const explanatoryQuestionPattern = /^\\s*(?:can|could|would|will|please|help)\\s+you\\s+(?:tell|explain|show|describe)\\b/i;
+  if (explanatoryQuestionPattern.test(message)) return false;
   return (
     directRequestPattern.test(message) ||
-    (assistantRequestPattern.test(message) && actionPattern.test(message)) ||
-    (userIntentPattern.test(message) && actionPattern.test(message))
+    directAssistantRequestPattern.test(message) ||
+    userIntentPattern.test(message)
   );
 }
 
