@@ -150,3 +150,2025 @@ function sanitizeOptionalConversationText(value: unknown, fieldName: 'title' | '
   }
   return trimmed;
 }
+function conversationMemberDocumentId(conversationId: string, uid: string) {
+  return `${conversationId}_${uid}`;
+}
+function validateConversationMemberCount(type: ConversationType, memberUids: string[]) {
+  switch (type) {
+    case 'direct':
+      if (memberUids.length !== 2) {
+        throw new RequestValidationError('INVALID_REQUEST', 'direct conversations must include exactly two unique members.');
+      }
+      return;
+    case 'group':
+      if (memberUids.length < 2 || memberUids.length > MAX_CONVERSATION_MEMBER_COUNT) {
+        throw new RequestValidationError('INVALID_REQUEST', 'group conversations must include between 2 and 50 unique members.');
+      }
+      return;
+    case 'business':
+      if (memberUids.length < 2 || memberUids.length > MAX_CONVERSATION_MEMBER_COUNT) {
+        throw new RequestValidationError('INVALID_REQUEST', 'business conversations must include between 2 and 50 unique members.');
+      }
+      return;
+  }
+}
+function validateCreateConversationRequest(body: unknown, creatorUid: string): CreateConversationRequestInput {
+  if (!isPlainObject(body)) {
+    throw new RequestValidationError('INVALID_REQUEST', 'The conversation request body must be a plain object.');
+  }
+  const payload = body as Record<string, unknown>;
+  const forbiddenKeys = new Set(['creatorId', 'ownerId', 'createdBy', 'createdAt', 'updatedAt', 'status', 'role', 'roles', 'membershipRole', 'membershipRoles', 'conversationId']);
+  for (const key of Object.keys(payload)) {
+    if (forbiddenKeys.has(key)) {
+      throw new RequestValidationError('INVALID_REQUEST', `${key} must not be provided by the client.`);
+    }
+  }
+  const allowedKeys = new Set(['type', 'title', 'avatarUrl', 'memberUids']);
+  for (const key of Object.keys(payload)) {
+    if (!allowedKeys.has(key)) {
+      throw new RequestValidationError('INVALID_REQUEST', `Unsupported field: ${key}.`);
+    }
+  }
+  if (typeof payload.type !== 'string' || !COMMUNICATION_CONVERSATION_TYPES.has(payload.type as ConversationType)) {
+    throw new RequestValidationError('INVALID_REQUEST', 'type must be one of: direct, group, business.');
+  }
+  const title = sanitizeOptionalConversationText(payload.title, 'title', MAX_CONVERSATION_TITLE_LENGTH);
+  const avatarUrl = sanitizeOptionalConversationText(payload.avatarUrl, 'avatarUrl', MAX_CONVERSATION_AVATAR_URL_LENGTH);
+  if (payload.memberUids !== undefined && !Array.isArray(payload.memberUids)) {
+    throw new RequestValidationError('INVALID_REQUEST', 'memberUids must be an array of Firebase UIDs when provided.');
+  }
+  const memberUidSet = new Set<string>([creatorUid]);
+  if (Array.isArray(payload.memberUids)) {
+    for (const rawUid of payload.memberUids) {
+      if (typeof rawUid !== 'string') {
+        throw new RequestValidationError('INVALID_REQUEST', 'memberUids must contain only string Firebase UIDs.');
+      }
+      const candidateUid = rawUid.trim();
+      if (!isSafeFirebaseUid(candidateUid)) {
+        throw new RequestValidationError('INVALID_REQUEST', 'memberUids contains an invalid Firebase UID.');
+      }
+      memberUidSet.add(candidateUid);
+    }
+  }
+  if (memberUidSet.size > MAX_CONVERSATION_MEMBER_COUNT) {
+    throw new RequestValidationError('INVALID_REQUEST', `A conversation may have at most ${MAX_CONVERSATION_MEMBER_COUNT} unique members.`);
+  }
+  const memberUids = Array.from(memberUidSet);
+  validateConversationMemberCount(payload.type as ConversationType, memberUids);
+  return {
+    type: payload.type as ConversationType,
+    memberUids,
+    title,
+    avatarUrl,
+  };
+}
+function buildConversationMembers(conversationId: string, memberUids: string[], creatorUid: string, joinedAt: string): ConversationMember[] {
+  return memberUids.map((uid) => ({
+    conversationId,
+    uid,
+    role: uid === creatorUid ? 'owner' : 'member',
+    joinedAt,
+  }));
+}
+function createFirestoreRateLimitStore(collectionName: string, windowMs: number): Store {
+  return {
+    localKeys: false,
+    prefix: `${collectionName}:`,
+    async get(key) {
+      const snapshot = await adminDb.collection(collectionName).doc(key).get();
+      if (!snapshot.exists) return undefined;
+      const data = snapshot.data() as Record<string, unknown> | undefined;
+      const totalHits = Number.isSafeInteger(data?.totalHits) ? Number(data?.totalHits) : 0;
+      const resetTime = typeof data?.resetTime === 'string' ? new Date(data.resetTime) : undefined;
+      if (!resetTime || Number.isNaN(resetTime.getTime()) || resetTime.getTime() <= Date.now()) {
+        await snapshot.ref.delete().catch(() => undefined);
+        return undefined;
+      }
+      return { totalHits, resetTime };
+    },
+    async increment(key) {
+      const docRef = adminDb.collection(collectionName).doc(key);
+      const now = Timestamp.now();
+      const nowIso = now.toDate().toISOString();
+      const defaultResetTime = new Date(now.toMillis() + windowMs);
+      return adminDb.runTransaction(async transaction => {
+        const snapshot = await transaction.get(docRef);
+        const data = snapshot.data() as Record<string, unknown> | undefined;
+        const existingResetTime = typeof data?.resetTime === 'string' ? new Date(data.resetTime) : undefined;
+        const resetTime = existingResetTime && !Number.isNaN(existingResetTime.getTime()) && existingResetTime.getTime() > now.toMillis()
+          ? existingResetTime
+          : defaultResetTime;
+        const previousHits = existingResetTime && existingResetTime.getTime() > now.toMillis() && Number.isSafeInteger(data?.totalHits)
+          ? Number(data?.totalHits)
+          : 0;
+        const totalHits = previousHits + 1;
+        transaction.set(docRef, {
+          key,
+          totalHits,
+          resetTime: resetTime.toISOString(),
+          createdAt: typeof data?.createdAt === 'string' ? data.createdAt : nowIso,
+          updatedAt: nowIso,
+        });
+        return { totalHits, resetTime };
+      });
+    },
+    async decrement() {
+      return;
+    },
+    async resetKey(key) {
+      await adminDb.collection(collectionName).doc(key).delete();
+    },
+  };
+}
+function transferResultPayload(transactionId: string, reference: string, senderUid: string, recipientId: string, amountMinor: number, currency: string, description: string | undefined, status: 'completed' | 'failed') {
+  const payload: Record<string, unknown> = { id: transactionId, reference, senderId: senderUid, recipientId, amount: amountMinor, currency, type: 'transfer', sourceModule: 'unique_pay.wallet_transfer', provider: 'unique_pay_internal_wallet', status, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' };
+  if (description !== undefined) payload.description = description;
+  return payload;
+}
+async function readUserExists(uid: string): Promise<boolean> {
+  try {
+    await getAuth().getUser(uid);
+    return true;
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: unknown }).code === 'auth/user-not-found') {
+      return false;
+    }
+    throw error;
+  }
+}
+function idempotencyDocumentId(senderUid: string, idempotencyKey: string) {
+  // Hash the composite identity so UID/key combinations cannot collide because
+  // of separator characters, while keeping the Firestore document ID bounded.
+  return createHash('sha256').update(senderUid + '\0' + idempotencyKey).digest('hex');
+}
+
+function resolveAiRequestId(req: Request): string {
+  const requestIdHeader = req.headers["x-request-id"];
+  const suppliedRequestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
+  if (typeof suppliedRequestId === "string") {
+    const trimmed = suppliedRequestId.trim();
+    if (/^[A-Za-z0-9._:-]{1,64}$/.test(trimmed)) return trimmed;
+  }
+  return `ai_${randomUUID().replace(/-/g, "")}`.slice(0, 64);
+}
+async function startServer() {
+  const UNIQUE_AI_CAPABILITIES = {
+  version: 1,
+  readOnly: true,
+  contexts: ["account", "orders", "businesses", "products"],
+  mutations: [],
+} as const;
+
+const app = express();
+  const PORT = Number(process.env.PORT) || 3000;
+  const httpServer = http.createServer(app);
+  // Codespaces forwards requests through a trusted proxy and supplies X-Forwarded-For.
+  app.set('trust proxy', 1);
+  app.disable('x-powered-by');
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    if (process.env.NODE_ENV === 'production') {
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+  });
+  app.use(express.json({ limit: "1mb" }));
+  app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
+  const authenticate = async (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to access this resource.');
+    try { (req as any).user = await getAuth().verifyIdToken(authHeader.split('Bearer ')[1]); next(); }
+    catch (_) { return errorResponse(res, 'UNAUTHENTICATED', 'The supplied Firebase token is invalid or expired.'); }
+  };
+  app.get("/api/health", (req, res) => res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" }));
+  registerIdentityVerificationRoutes(app, authenticate);
+  registerAjoRoutes(app, authenticate);
+
+  app.post("/api/ai/chat", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('aiChatRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (req, res) => {
+      const requestId = resolveAiRequestId(req);
+      res.setHeader("X-Request-ID", requestId);
+      res.setHeader("Cache-Control", "no-store");
+      return errorResponse(res, 'RATE_LIMITED', 'Too many AI requests. Please try again shortly.');
+    },
+  }), async (req, res) => {
+    const resolvedRequestId = resolveAiRequestId(req);
+    const rawRequestIdHeader = req.headers["x-request-id"];
+    const suppliedRequestId = Array.isArray(rawRequestIdHeader) ? rawRequestIdHeader[0] : rawRequestIdHeader;
+    res.setHeader("X-Request-ID", resolvedRequestId);
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      if (!isPlainObject(req.body)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The AI request body must be a plain object.');
+      }
+      const payload = req.body as Record<string, unknown>;
+      const allowedKeys = new Set(['message', 'history']);
+      for (const key of Object.keys(payload)) {
+        if (!allowedKeys.has(key)) {
+          return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
+        }
+      }
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!uid) {
+        return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+      }
+      const message = payload.message;
+      const history = payload.history;
+      if (suppliedRequestId !== undefined && (
+        typeof suppliedRequestId !== "string" ||
+        !/^[A-Za-z0-9._:-]{1,64}$/.test(suppliedRequestId.trim())
+      )) {
+        return res.status(400).json({
+          error: { code: "INVALID_REQUEST", message: "x-request-id is invalid." },
+          requestId: resolvedRequestId,
+          capabilities: UNIQUE_AI_CAPABILITIES,
+        });
+      }
+      const responseText = await generateUniqueAiResponse({ uid, message, history, requestId: resolvedRequestId });
+      return res.status(200).json({
+        message: responseText,
+        readOnly: true,
+        requestId: resolvedRequestId,
+        capabilities: UNIQUE_AI_CAPABILITIES,
+      });
+    } catch (error) {
+      if (error instanceof UniqueAiValidationError) {
+        return res.status(400).json({ error: { code: "INVALID_REQUEST", message: error.message }, requestId: resolvedRequestId, capabilities: UNIQUE_AI_CAPABILITIES });
+      }
+      console.error('Unique AI request failed:', { requestId: resolvedRequestId, error });
+      return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Unique AI is temporarily unavailable. Please try again shortly." }, requestId: resolvedRequestId, capabilities: UNIQUE_AI_CAPABILITIES });
+    }
+  });
+
+  app.post("/api/business/staff/accept-invite", rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+    const uid = (req as any).user?.uid as string | undefined;
+    const email = typeof (req as any).user?.email === 'string' ? String((req as any).user.email).trim().toLowerCase() : '';
+    if (!uid || !email) return errorResponse(res, 'UNAUTHENTICATED', 'A verified account with an email address is required.');
+    try {
+      const inviteId = typeof req.body?.inviteId === 'string' ? req.body.inviteId.trim() : '';
+      if (!inviteId || !/^[A-Za-z0-9_-]{1,150}$/.test(inviteId)) return errorResponse(res, 'INVALID_REQUEST', 'A valid invitation is required.');
+      const inviteRef = adminDb.collection('staffInvites').doc(inviteId);
+      const memberRef = adminDb.collection('staffMembers').doc(uid + '_' + inviteId);
+      await adminDb.runTransaction(async transaction => {
+        const inviteSnap = await transaction.get(inviteRef);
+        if (!inviteSnap.exists) throw new Error('INVITE_NOT_FOUND');
+        const invite = inviteSnap.data() as Record<string, unknown>;
+        if (String(invite.inviteeEmail || '').trim().toLowerCase() !== email) throw new Error('INVITE_NOT_FOR_USER');
+        if (invite.status !== 'pending') throw new Error('INVITE_NOT_PENDING');
+        const role = typeof invite.role === 'string' ? invite.role : '';
+        const allowedRoles = new Set(['admin','manager','sales','cashier','accountant','inventory','support','delivery','branch_manager','viewer']);
+        if (!allowedRoles.has(role)) throw new Error('INVALID_ROLE');
+        const ownerUid = typeof invite.businessOwnerUid === 'string' ? invite.businessOwnerUid : '';
+        if (!ownerUid || ownerUid === uid) throw new Error('INVALID_OWNER');
+        const existingMember = await transaction.get(memberRef);
+        if (existingMember.exists) throw new Error('MEMBER_EXISTS');
+        transaction.set(memberRef, {
+          uid, businessOwnerUid: ownerUid, role,
+          branchName: typeof invite.branchName === 'string' ? invite.branchName : null,
+          inviteId, status: 'active', createdAt: Timestamp.now(), updatedAt: Timestamp.now()
+        });
+        transaction.update(inviteRef, { status: 'accepted', acceptedUid: uid, acceptedAt: Timestamp.now() });
+      });
+      return res.status(200).json({ status: 'accepted' });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'INVITE_NOT_FOUND') return errorResponse(res, 'NOT_FOUND', 'Invitation not found.', 404);
+      if (code === 'INVITE_NOT_FOR_USER') return errorResponse(res, 'FORBIDDEN', 'This invitation belongs to another email address.', 403);
+      if (code === 'INVITE_NOT_PENDING') return errorResponse(res, 'INVALID_REQUEST', 'This invitation is no longer pending.');
+      if (code === 'INVALID_ROLE' || code === 'INVALID_OWNER') return errorResponse(res, 'INVALID_REQUEST', 'This invitation is invalid.');
+      if (code === 'MEMBER_EXISTS') return errorResponse(res, 'INVALID_REQUEST', 'You are already a member for this invitation.');
+      console.error('Staff invite acceptance failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to accept the invitation right now.');
+    }
+  });
+
+  app.post("/api/business/inventory/adjust", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+    const uid = (req as any).user?.uid as string | undefined;
+    if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+    try {
+      const body = req.body as Record<string, unknown>;
+      const productId = typeof body?.productId === 'string' ? body.productId.trim() : '';
+      const direction = body?.direction === 'in' ? 'in' : body?.direction === 'out' ? 'out' : '';
+      const quantity = body?.quantity;
+      const note = typeof body?.note === 'string' ? body.note.trim().slice(0, 300) : '';
+      if (!productId || !direction || !Number.isInteger(quantity) || (quantity as number) < 1 || (quantity as number) > 100000000) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid product, direction, and positive whole quantity are required.');
+      }
+
+      const productRef = adminDb.collection('products').doc(productId);
+      const movementRef = adminDb.collection('inventory_movements').doc();
+      let remaining = 0;
+      await adminDb.runTransaction(async transaction => {
+        const snapshot = await transaction.get(productRef);
+        if (!snapshot.exists) throw new Error('PRODUCT_NOT_FOUND');
+        const product = snapshot.data() as Record<string, unknown>;
+        if (product.sellerId !== uid) throw new Error('NOT_OWNER');
+        const currentQuantity = Number.isInteger(product.quantity) && (product.quantity as number) >= 0 ? product.quantity as number : 0;
+        const nextQuantity = direction === 'in' ? currentQuantity + (quantity as number) : currentQuantity - (quantity as number);
+        if (nextQuantity < 0) throw new Error('INSUFFICIENT_STOCK');
+        remaining = nextQuantity;
+        const status = nextQuantity === 0 ? 'out_of_stock' : product.status === 'out_of_stock' ? 'published' : product.status;
+        transaction.update(productRef, { quantity: nextQuantity, status, updatedAt: Timestamp.now() });
+        transaction.set(movementRef, {
+          productId, sellerId: uid, direction, quantity, previousQuantity: currentQuantity,
+          remainingQuantity: nextQuantity, note, createdAt: Timestamp.now(),
+        });
+      });
+
+      return res.status(200).json({ productId, direction, quantity, remainingQuantity: remaining });
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === 'PRODUCT_NOT_FOUND') return errorResponse(res, 'NOT_FOUND', 'Product not found.', 404);
+        if (error.message === 'NOT_OWNER') return errorResponse(res, 'FORBIDDEN', 'You can only adjust inventory for your own product.', 403);
+        if (error.message === 'INSUFFICIENT_STOCK') return errorResponse(res, 'INSUFFICIENT_STOCK', 'Stock out quantity cannot exceed available inventory.', 409);
+      }
+      console.error('Inventory adjustment failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to adjust inventory right now.');
+    }
+  });
+
+  app.post("/api/business/register", rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+    const uid = (req as any).user?.uid as string | undefined;
+    if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+    try {
+      const body = req.body as Record<string, unknown>;
+      const name = typeof body?.name === 'string' ? body.name.trim() : '';
+      const registrationNumber = typeof body?.registrationNumber === 'string' ? body.registrationNumber.trim() : '';
+      const description = typeof body?.description === 'string' ? body.description.trim() : '';
+      const contactEmail = typeof body?.contactEmail === 'string' ? body.contactEmail.trim() : '';
+      const contactPhone = typeof body?.contactPhone === 'string' ? body.contactPhone.trim() : '';
+      const category = typeof body?.category === 'string' ? body.category.trim() : '';
+
+      if (!name || name.length > 200 || description.length > 5000 || contactEmail.length > 320 || contactPhone.length > 50 || category.length > 100 || registrationNumber.length > 100) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Business registration data is invalid.');
+      }
+      if (!contactEmail || !contactPhone || !category || !description) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Business name, description, email, phone, and category are required.');
+      }
+
+      const existing = await adminDb.collection('businesses').where('ownerUid', '==', uid).limit(1).get();
+      if (!existing.empty) return errorResponse(res, 'BLOCKED', 'This account already has a business registration.', 409);
+
+      const now = Timestamp.now();
+      const businessRef = adminDb.collection('businesses').doc();
+      const userRef = adminDb.collection('users').doc(uid);
+
+      await adminDb.runTransaction(async transaction => {
+        const userSnapshot = await transaction.get(userRef);
+        const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+        const existingRoles = Array.isArray(userData?.roles)
+          ? userData.roles.filter((role): role is string => typeof role === 'string')
+          : [];
+
+        transaction.set(businessRef, {
+          ownerUid: uid,
+          name,
+          registrationNumber,
+          description,
+          contactEmail,
+          contactPhone,
+          categories: [category],
+          status: 'pending',
+          verificationStatus: 'unverified',
+          createdAt: now,
+          updatedAt: now,
+        });
+        transaction.update(userRef, { roles: Array.from(new Set([...existingRoles, 'business_owner'])) });
+      });
+
+      return res.status(201).json({ businessId: businessRef.id, status: 'pending' });
+    } catch (error) {
+      console.error('Business registration failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to submit business registration right now.');
+    }
+  });
+
+  app.patch("/api/admin/users/verification", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+    const adminUid = (req as any).user?.uid as string | undefined;
+    if (!adminUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+    try {
+      const adminSnapshot = await adminDb.collection('users').doc(adminUid).get();
+      const adminData = adminSnapshot.data() as Record<string, unknown> | undefined;
+      const roles = Array.isArray(adminData?.roles) ? adminData.roles : [];
+      if (!roles.includes('administrator')) return errorResponse(res, 'BLOCKED', 'Administrator access is required.', 403);
+
+      const body = req.body as Record<string, unknown>;
+      const uid = typeof body?.uid === 'string' ? body.uid.trim() : '';
+      const allowedStatuses = new Set(['unverified', 'email_verified', 'phone_verified', 'fully_verified']);
+      const verificationStatus = typeof body?.verificationStatus === 'string' ? body.verificationStatus : '';
+      if (!isSafeFirebaseUid(uid) || !allowedStatuses.has(verificationStatus)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid user ID and verification status are required.');
+      }
+      if (uid === adminUid) return errorResponse(res, 'INVALID_REQUEST', 'Administrator self-verification changes are not allowed through this endpoint.');
+
+      const userRef = adminDb.collection('users').doc(uid);
+      const userSnapshot = await userRef.get();
+      if (!userSnapshot.exists) return errorResponse(res, 'NOT_FOUND', 'The requested user does not exist.');
+
+      const now = Timestamp.now();
+      await adminDb.runTransaction(async transaction => {
+        transaction.update(userRef, { verificationStatus, verificationUpdatedAt: now, verificationUpdatedBy: adminUid });
+        const auditRef = adminDb.collection('audit_logs').doc();
+        transaction.set(auditRef, {
+          action: 'user_verification_status_changed',
+          actorUid: adminUid,
+          targetUid: uid,
+          verificationStatus,
+          createdAt: now,
+        });
+      });
+      return res.status(200).json({ uid, verificationStatus });
+    } catch (error) {
+      console.error('Admin verification update failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to update verification status right now.');
+    }
+  });
+  app.get("/api/users/resolve", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+    try {
+      const identifier = typeof req.query.identifier === 'string' ? req.query.identifier.trim() : '';
+      if (!identifier || identifier.length > 320) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A recipient identifier is required.');
+      }
+
+      const normalizedEmail = identifier.toLowerCase();
+      const [emailSnapshot, phoneSnapshot, uniqueOneIdSnapshot] = await Promise.all([
+        adminDb.collection('users').where('email', '==', identifier).limit(1).get(),
+        adminDb.collection('users').where('phone', '==', identifier).limit(1).get(),
+        adminDb.collection('users').where('uniqueOneId', '==', identifier).limit(1).get(),
+      ]);
+
+      const normalizedEmailSnapshot = normalizedEmail !== identifier
+        ? await adminDb.collection('users').where('email', '==', normalizedEmail).limit(1).get()
+        : null;
+
+      const match = [emailSnapshot, normalizedEmailSnapshot, phoneSnapshot, uniqueOneIdSnapshot]
+        .find((snapshot) => snapshot && !snapshot.empty);
+
+      if (!match || match.empty) {
+        return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'No Unique One user matches that recipient identifier.');
+      }
+
+      const userDoc = match.docs[0];
+      const data = userDoc.data() as Record<string, unknown>;
+      return res.status(200).json({
+        uid: userDoc.id,
+        fullName: typeof data.fullName === 'string' ? data.fullName : 'Unique One user',
+        uniqueOneId: typeof data.uniqueOneId === 'string' ? data.uniqueOneId : undefined,
+        profilePhotoUrl: typeof data.profilePhotoUrl === 'string' ? data.profilePhotoUrl : undefined,
+      });
+    } catch (error) {
+      console.error('Recipient lookup failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'We could not verify that recipient right now.');
+    }
+  });
+  app.post("/api/payment-requests", authenticate, rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), async (req, res) => {
+    const senderId = (req as any).user?.uid as string | undefined;
+    if (!senderId) return errorResponse(res, 'UNAUTHENTICATED', 'Missing authenticated user.');
+    try {
+      const body = req.body as Record<string, unknown>;
+      const recipientIdentifier = typeof body?.recipientIdentifier === 'string' ? body.recipientIdentifier.trim() : '';
+      const description = typeof body?.description === 'string' ? body.description.trim() : '';
+      const amount = body?.amount;
+      const dueDate = typeof body?.dueDate === 'string' ? body.dueDate : undefined;
+      const status = body?.status === 'draft' ? 'draft' : body?.status === 'sent' ? 'sent' : '';
+      if (!recipientIdentifier || recipientIdentifier.length > 320 || !description || description.length > 500) return errorResponse(res, 'INVALID_REQUEST', 'Recipient and description are required and must be valid.');
+      if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 1000000000000) return errorResponse(res, 'INVALID_AMOUNT', 'The payment request amount is invalid.');
+      if (!status) return errorResponse(res, 'INVALID_REQUEST', 'A valid payment request status is required.');
+      const normalizedEmail = recipientIdentifier.toLowerCase();
+      const [emailSnapshot, phoneSnapshot, uniqueOneIdSnapshot] = await Promise.all([
+        adminDb.collection('users').where('email', '==', recipientIdentifier).limit(1).get(),
+        adminDb.collection('users').where('phone', '==', recipientIdentifier).limit(1).get(),
+        adminDb.collection('users').where('uniqueOneId', '==', recipientIdentifier).limit(1).get(),
+      ]);
+      const normalizedEmailSnapshot = normalizedEmail !== recipientIdentifier ? await adminDb.collection('users').where('email', '==', normalizedEmail).limit(1).get() : null;
+      const match = [emailSnapshot, normalizedEmailSnapshot, phoneSnapshot, uniqueOneIdSnapshot].find((snapshot) => snapshot && !snapshot.empty);
+      if (!match || match.empty) return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'No Unique One user matches that recipient identifier.');
+      const recipientDoc = match.docs[0];
+      if (recipientDoc.id === senderId) return errorResponse(res, 'SELF_TRANSFER_NOT_ALLOWED', 'You cannot create a payment request to yourself.');
+      const recipientData = recipientDoc.data() as Record<string, unknown>;
+      const now = Timestamp.now().toDate().toISOString();
+      const ref = adminDb.collection('payment_requests').doc();
+      await ref.create({
+        senderId, recipientId: recipientDoc.id,
+        recipientIdentifier,
+        recipientName: typeof recipientData.fullName === 'string' ? recipientData.fullName : 'Unique One user',
+        amount: Math.round(amount * 100) / 100, currency: 'NGN', description,
+        ...(dueDate ? { dueDate } : {}), status, createdAt: now, updatedAt: now,
+      });
+      return res.status(201).json({ id: ref.id, recipientId: recipientDoc.id, status });
+    } catch (error) {
+      console.error('Payment request creation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'We could not create the payment request right now.');
+    }
+  });
+
+  app.get("/api/wallet", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+    const uid = (req as any).user?.uid as string | undefined;
+    if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Missing authenticated user.');
+    try {
+      const snapshot = await adminDb.collection('wallets').doc(uid).get();
+      if (!snapshot.exists) return errorResponse(res, 'WALLET_NOT_FOUND', 'No wallet exists for this user.', 404);
+      return res.status(200).json(validateWalletDocument(snapshot.data(), uid));
+    } catch (error) { console.error('Error fetching wallet:', error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to fetch wallet.'); }
+  });
+  app.post("/api/wallet", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+    const uid = (req as any).user?.uid as string | undefined;
+    if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Missing authenticated user.');
+    try {
+      const wallet = await ensureWalletForUser(uid);
+      return res.status(200).json({ uid: wallet.uid, currency: wallet.currency, availableBalanceMinor: wallet.availableBalanceMinor, status: wallet.status, createdAt: wallet.createdAt.toDate().toISOString(), updatedAt: wallet.updatedAt.toDate().toISOString() });
+    } catch (error) { console.error("Error initializing wallet:", error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to initialize wallet.'); }
+  });
+  app.post("/api/wallet/transfer", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false, handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many transfer requests were made. Please try again shortly.') }), authenticate, async (req, res) => {
+    const senderUid = (req as any).user?.uid as string | undefined;
+    if (!senderUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to initiate a transfer.');
+    let validatedRequest: TransferRequestInput;
+    try { validatedRequest = validateTransferRequest(req.body, senderUid); }
+    catch (error) {
+      const code = (error as Error).message as TransferErrorCode;
+      const messages: Record<TransferErrorCode, string> = {
+        UNAUTHENTICATED: 'Authentication is required to initiate a transfer.', INVALID_REQUEST: 'The transfer request body is malformed or contains unsupported fields.', INVALID_RECIPIENT: 'A valid recipient UID is required.', RECIPIENT_NOT_FOUND: 'The recipient does not exist.', SELF_TRANSFER_NOT_ALLOWED: 'A wallet transfer to yourself is not allowed.', INVALID_AMOUNT: 'Transfer amount must be a positive integer minor-unit amount.', INVALID_CURRENCY: 'Only NGN transfers are supported.', INVALID_IDEMPOTENCY_KEY: 'The idempotency key is invalid or exceeds the allowed length.', IDEMPOTENCY_KEY_CONFLICT: 'This idempotency key was already used with different transfer parameters.', TRANSFER_ALREADY_COMPLETED: 'This transfer has already been completed.', TRANSFER_IN_PROGRESS: 'A transfer with this idempotency key is already in progress.', WALLET_NOT_FOUND: 'A wallet record is missing for this transfer.', WALLET_UNAVAILABLE: 'The wallet status or currency configuration is not valid for transfer.', INSUFFICIENT_FUNDS: 'The sender wallet does not have enough funds.', TRANSACTION_FAILED: 'The transfer failed while processing the transaction.', SERVICE_UNAVAILABLE: 'The transfer service is temporarily unavailable.',
+        RATE_LIMITED: 'Too many requests were made. Please try again shortly.', NOT_FOUND: 'The requested resource was not found.', BLOCKED: 'Messaging is unavailable because one of the users has blocked the other.', FORBIDDEN: 'You are not permitted to perform this operation.', INSUFFICIENT_STOCK: 'The requested quantity exceeds available stock.',
+      };
+      return errorResponse(res, code, messages[code] ?? 'Invalid transfer request.');
+    }
+    const { recipientId, amountMinor, currency, idempotencyKey, description } = validatedRequest;
+    try {
+      if (!(await readUserExists(recipientId))) return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'The recipient user does not exist.');
+    } catch (error) {
+      console.error('Recipient lookup failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to validate the recipient at this time.');
+    }
+    const fingerprint = buildRequestFingerprint(senderUid, recipientId, amountMinor, currency, description);
+    const idempotencyRef = adminDb.collection('walletIdempotency').doc(idempotencyDocumentId(senderUid, idempotencyKey));
+    try {
+      const transactionResult = await adminDb.runTransaction(async transaction => {
+        const idempotencySnapshot = await transaction.get(idempotencyRef);
+        if (idempotencySnapshot.exists) {
+          const existing = idempotencySnapshot.data() as Record<string, unknown>;
+          if (String(existing.requestFingerprint ?? '') !== fingerprint) return { error: { code: 'IDEMPOTENCY_KEY_CONFLICT' as TransferErrorCode, message: 'This idempotency key was already used with different transfer parameters.' } } as TransferErrorResponse;
+          if (existing.status === 'completed') return existing.result as Record<string, unknown>;
+          if (existing.status === 'failed') return existing.errorResult as Record<string, unknown>;
+          if (existing.status === 'in_progress') return { error: { code: 'TRANSFER_IN_PROGRESS' as TransferErrorCode, message: 'A transfer with this idempotency key is already in progress.' } } as TransferErrorResponse;
+        }
+        const senderWalletRef = adminDb.collection('wallets').doc(senderUid);
+        const recipientWalletRef = adminDb.collection('wallets').doc(recipientId);
+        const [senderWalletSnapshot, recipientWalletSnapshot] = await Promise.all([transaction.get(senderWalletRef), transaction.get(recipientWalletRef)]);
+        const writeFailure = (failure: TransferErrorResponse) => { transaction.set(idempotencyRef, { senderUid, recipientId, amountMinor, currency, description: description ?? '', requestFingerprint: fingerprint, status: 'failed', errorResult: failure, createdAt: Timestamp.now(), updatedAt: Timestamp.now() }); return failure; };
+        if (!senderWalletSnapshot.exists || !recipientWalletSnapshot.exists) return writeFailure({ error: { code: 'WALLET_NOT_FOUND', message: 'Both sender and recipient wallets must already exist before transfer.' } });
+        let senderWallet: WalletDocument; let recipientWallet: WalletDocument;
+        try { senderWallet = validateWalletDocument(senderWalletSnapshot.data(), senderUid); recipientWallet = validateWalletDocument(recipientWalletSnapshot.data(), recipientId); }
+        catch (_) { return writeFailure({ error: { code: 'WALLET_UNAVAILABLE', message: 'The wallet status or currency configuration is not valid for transfer.' } }); }
+        if (senderWallet.status !== 'active' || recipientWallet.status !== 'active') return writeFailure({ error: { code: 'WALLET_UNAVAILABLE', message: 'One or both wallets are unavailable for transfer.' } });
+        const senderBalance = senderWallet.availableBalanceMinor; const recipientBalance = recipientWallet.availableBalanceMinor;
+        if (senderBalance < amountMinor) return writeFailure({ error: { code: 'INSUFFICIENT_FUNDS', message: 'Insufficient wallet balance.' } });
+        const newSenderBalance = senderBalance - amountMinor; const newRecipientBalance = recipientBalance + amountMinor;
+        if (!Number.isSafeInteger(newSenderBalance) || !Number.isSafeInteger(newRecipientBalance)) return writeFailure({ error: { code: 'TRANSACTION_FAILED', message: 'The transfer amount would exceed the safe integer range for wallet accounting.' } });
+        const now = Timestamp.now(); const transactionId = adminDb.collection('transactions').doc().id; const reference = `UP-WT-${transactionId}`;
+        const transactionRecord = { id: transactionId, reference, senderId: senderUid, recipientId, amount: amountMinor, currency, type: 'transfer', sourceModule: 'unique_pay.wallet_transfer', provider: 'unique_pay_internal_wallet', status: 'completed', ...(description !== undefined ? { description } : {}), createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' };
+        const completedResult = { transaction: transferResultPayload(transactionId, reference, senderUid, recipientId, amountMinor, currency, description, 'completed'), idempotencyKey, status: 'completed' };
+        transaction.set(adminDb.collection('transactions').doc(transactionId), transactionRecord);
+        transaction.update(senderWalletRef, { availableBalanceMinor: newSenderBalance, updatedAt: now });
+        transaction.update(recipientWalletRef, { availableBalanceMinor: newRecipientBalance, updatedAt: now });
+        // Double-entry ledger: two server-generated ledgerEntries documents are
+        // written atomically with the wallet mutations and financial transaction:
+        // one debit for the sender and one credit for the recipient. Both share the
+        // transactionId, reference, amountMinor, currency, status, and idempotencyKey.
+        const senderLedgerRef = adminDb.collection('ledgerEntries').doc();
+        const recipientLedgerRef = adminDb.collection('ledgerEntries').doc();
+        const senderLedgerEntry = {
+          id: senderLedgerRef.id,
+          transactionId,
+          reference,
+          uid: senderUid,
+          direction: 'debit' as const,
+          amountMinor,
+          currency,
+          status: 'completed' as const,
+          idempotencyKey,
+          createdAt: now,
+        };
+        const recipientLedgerEntry = {
+          id: recipientLedgerRef.id,
+          transactionId,
+          reference,
+          uid: recipientId,
+          direction: 'credit' as const,
+          amountMinor,
+          currency,
+          status: 'completed' as const,
+          idempotencyKey,
+          createdAt: now,
+        };
+        transaction.set(senderLedgerRef, senderLedgerEntry);
+        transaction.set(recipientLedgerRef, recipientLedgerEntry);
+        transaction.set(idempotencyRef, { senderUid, recipientId, amountMinor, currency, description: description ?? '', requestFingerprint: fingerprint, status: 'completed', result: completedResult, createdAt: now, updatedAt: now });
+        return completedResult;
+      });
+      if ((transactionResult as TransferErrorResponse | undefined)?.error) { const { code, message } = (transactionResult as TransferErrorResponse).error; return errorResponse(res, code, message, transferErrorStatus[code] ?? 500); }
+      return res.status(200).json(transactionResult);
+    } catch (error) { console.error('Transfer execution failed:', error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The transfer service is temporarily unavailable.'); }
+  });
+  app.post("/api/communication/presence", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationPresenceRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many presence updates. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!isPlainObject(req.body) || (req.body.status !== 'online' && req.body.status !== 'offline')) {
+        return errorResponse(res, 'INVALID_REQUEST', 'status must be online or offline.');
+      }
+      const status = req.body.status as 'online' | 'offline';
+      const nowIso = Timestamp.now().toDate().toISOString();
+      const ref = adminDb.collection('userPresence').doc(uid);
+      await ref.set({ uid, status, lastSeenAt: nowIso }, { merge: true });
+      return res.status(200).json({ presence: { uid, status, lastSeenAt: nowIso } });
+    } catch (error) {
+      console.error('Presence update failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to update presence.');
+    }
+  });
+
+  app.get("/api/communication/conversations/:conversationId", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationConversationReadRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conversation reads. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = req.params.conversationId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(conversationId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The conversation ID is invalid.');
+      }
+      const membershipSnapshot = await adminDb.collection('conversationMembers')
+        .doc(conversationMemberDocumentId(conversationId, uid)).get();
+      if (!membershipSnapshot.exists) {
+        return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      }
+      const conversationSnapshot = await adminDb.collection('conversations').doc(conversationId).get();
+      if (!conversationSnapshot.exists) {
+        return errorResponse(res, 'NOT_FOUND', 'The conversation was not found.', 404);
+      }
+      const membersSnapshot = await adminDb.collection('conversationMembers')
+        .where('conversationId', '==', conversationId).get();
+      const conversationData = conversationSnapshot.data() as Record<string, unknown>;
+      let enrichedConversation = conversationData;
+      const otherUid = membersSnapshot.docs
+        .map((member) => member.data().uid)
+        .find((memberUid) => typeof memberUid === 'string' && memberUid !== uid);
+      if (conversationData.type === 'direct' && typeof otherUid === 'string' && isSafeFirebaseUid(otherUid)) {
+        const userSnapshot = await adminDb.collection('users').doc(otherUid).get();
+        if (userSnapshot.exists) {
+          const user = userSnapshot.data() as Record<string, unknown>;
+          const fullName = typeof user.fullName === 'string' && user.fullName.trim()
+            ? user.fullName.trim()
+            : 'Unique One User';
+          const avatarUrl = typeof user.profilePhotoUrl === 'string' && user.profilePhotoUrl.trim()
+            ? user.profilePhotoUrl.trim()
+            : undefined;
+          enrichedConversation = {
+            ...conversationData,
+            title: fullName,
+            ...(avatarUrl ? { avatarUrl } : {}),
+            otherUid,
+          };
+        }
+      }
+      return res.status(200).json({
+        conversation: enrichedConversation,
+        members: membersSnapshot.docs.map((member) => member.data()),
+      });
+    } catch (error) {
+      console.error('Conversation read failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to load the conversation.');
+    }
+  });
+
+  app.get("/api/communication/conversations/:conversationId/presence", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationPresenceReadRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many presence requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const requesterUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = req.params.conversationId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(conversationId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The conversation ID is invalid.');
+      }
+      const requesterMembership = await adminDb.collection('conversationMembers')
+        .doc(conversationMemberDocumentId(conversationId, requesterUid)).get();
+      if (!requesterMembership.exists) {
+        return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);      }
+      const membersSnapshot = await adminDb.collection('conversationMembers')
+        .where('conversationId', '==', conversationId).get();
+      const presences = await Promise.all(membersSnapshot.docs.map(async (memberDoc) => {
+        const member = memberDoc.data() as Partial<ConversationMember>;
+        if (!isSafeFirebaseUid(member.uid)) return null;
+        const presenceSnapshot = await adminDb.collection('userPresence').doc(member.uid).get();
+        if (!presenceSnapshot.exists) return { uid: member.uid, status: 'offline' as const, lastSeenAt: null };
+        const data = presenceSnapshot.data() as Record<string, unknown>;
+        return {
+          uid: member.uid,
+          status: data.status === 'online' ? 'online' as const : 'offline' as const,
+          lastSeenAt: typeof data.lastSeenAt === 'string' ? data.lastSeenAt : null,
+        };
+      }));
+      return res.status(200).json({ presences: presences.filter(Boolean) });
+    } catch (error) {
+      console.error('Presence read failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to fetch conversation presence.');
+    }
+  });
+
+
+  app.get("/api/communication/users/search", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationUserSearchRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many user searches. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const requesterUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const rawQuery = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+      if (rawQuery.length < 2 || rawQuery.length > 128) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Search must contain between 2 and 128 characters.');
+      }
+
+      const usersRef = adminDb.collection('users');
+      const candidates = new Map<string, FirebaseFirestore.DocumentData>();
+      const normalized = rawQuery.toLowerCase();
+      const addCandidate = (uid: string, data: FirebaseFirestore.DocumentData | undefined) => {
+        if (uid !== requesterUid) candidates.set(uid, data ?? {});
+      };
+
+      // Support exact and prefix matching for the identifiers users actually see.
+      // Prefix queries let "Ham", "@hamza", or "US-ABJ" find a user without
+      // requiring a separate search index, while keeping the query bounded.
+      const prefixEnd = (value: string) => value + "\uf8ff";
+      const queries = [
+        usersRef.where('email', '==', rawQuery).limit(10),
+        usersRef.where('email', '==', normalized).limit(10),
+        usersRef.where('username', '==', rawQuery).limit(10),
+        usersRef.where('username', '==', normalized).limit(10),
+        usersRef.where('uniqueOneId', '==', rawQuery).limit(10),
+        usersRef.where('uniqueOneId', '==', normalized).limit(10),
+        usersRef.where('phone', '==', rawQuery).limit(10),
+        usersRef.where('fullName', '==', rawQuery).limit(10),
+        usersRef.where('fullName', '==', normalized).limit(10),
+        usersRef.where('fullName', '>=', rawQuery).where('fullName', '<=', prefixEnd(rawQuery)).limit(10),
+        usersRef.where('fullName', '>=', normalized).where('fullName', '<=', prefixEnd(normalized)).limit(10),
+        usersRef.where('username', '>=', rawQuery).where('username', '<=', prefixEnd(rawQuery)).limit(10),
+        usersRef.where('username', '>=', normalized).where('username', '<=', prefixEnd(normalized)).limit(10),
+        usersRef.where('uniqueOneId', '>=', rawQuery).where('uniqueOneId', '<=', prefixEnd(rawQuery)).limit(10),
+        usersRef.where('uniqueOneId', '>=', normalized).where('uniqueOneId', '<=', prefixEnd(normalized)).limit(10),
+      ];
+
+      const snapshots = await Promise.all(queries.map((query) => query.get()));
+      for (const snapshot of snapshots) {
+        for (const doc of snapshot.docs) addCandidate(doc.id, doc.data());
+      }
+
+      // Firebase Auth fallback covers accounts whose profile document has not
+      // copied email/phone yet. Auth does not provide general name search here,
+      // so Firestore profile search remains the source for names/usernames/IDs.
+      try {
+        const auth = getAuth();
+        if (rawQuery.includes('@')) {
+          const authUser = await auth.getUserByEmail(rawQuery).catch(() => null);
+          if (authUser) addCandidate(authUser.uid, {
+            fullName: authUser.displayName,
+            email: authUser.email,
+            profilePhotoUrl: authUser.photoURL,
+          });
+        }
+        if (/^\+?[0-9][0-9\s().-]{6,20}$/.test(rawQuery)) {
+          const phone = rawQuery.replace(/[\s().-]/g, '');
+          const authUser = await auth.getUserByPhoneNumber(phone).catch(() => null);
+          if (authUser) addCandidate(authUser.uid, {
+            fullName: authUser.displayName,
+            phone: authUser.phoneNumber,
+            profilePhotoUrl: authUser.photoURL,
+          });
+        }
+      } catch (error) {
+        console.warn('Firebase Auth user lookup skipped:', error);
+      }
+
+      const results = Array.from(candidates.entries()).slice(0, 10).map(([uid, data]) => ({
+        uid,
+        fullName: typeof data.fullName === 'string' && data.fullName.trim() ? data.fullName : 'Unique One User',
+        username: typeof data.username === 'string' && data.username.trim() ? data.username : undefined,
+        uniqueOneId: typeof data.uniqueOneId === 'string' && data.uniqueOneId.trim() ? data.uniqueOneId : undefined,
+        profilePhotoUrl: typeof data.profilePhotoUrl === 'string' ? data.profilePhotoUrl : undefined,
+        verificationStatus: typeof data.verificationStatus === 'string' ? data.verificationStatus : 'unverified',
+      }));
+      return res.status(200).json({ users: results });
+    } catch (error) {
+      console.error('Communication user search failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to search for users.');
+    }
+  });
+  app.post("/api/communication/message-requests", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMessageRequestRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      if (isSafeFirebaseUid(uid)) return uid;
+      return ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many message request attempts. Please try again shortly.'),
+  }), async (req, res) => {
+    let fromUid: string;
+    try {
+      fromUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!isPlainObject(req.body)) return errorResponse(res, 'INVALID_REQUEST', 'The message request body must be a plain object.');
+      const payload = req.body as Record<string, unknown>;
+      const allowedKeys = new Set(['toUid']);
+      for (const key of Object.keys(payload)) {
+        if (!allowedKeys.has(key)) return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
+      }
+      if (typeof payload.toUid !== 'string' || !isSafeFirebaseUid(payload.toUid.trim())) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid recipient UID is required.');
+      }
+      const toUid = payload.toUid.trim();
+      if (toUid === fromUid) return errorResponse(res, 'INVALID_REQUEST', 'You cannot send a message request to yourself.');
+      if (!(await readUserExists(toUid))) return errorResponse(res, 'INVALID_RECIPIENT', 'The recipient user does not exist.');
+
+      const requestQuery = await adminDb.collection('messageRequests')
+        .where('fromUid', '==', fromUid)
+        .where('toUid', '==', toUid)
+        .where('status', '==', 'pending')
+        .limit(1)
+        .get();
+      if (!requestQuery.empty) return res.status(200).json({ request: requestQuery.docs[0].data(), alreadyPending: true });
+
+      const reverseQuery = await adminDb.collection('messageRequests')
+        .where('fromUid', '==', toUid)
+        .where('toUid', '==', fromUid)
+        .where('status', '==', 'pending')
+        .limit(1)
+        .get();
+      if (!reverseQuery.empty) {
+        return errorResponse(res, 'INVALID_REQUEST', 'This user already has a pending message request to you.');
+      }
+
+      const blockIds = [
+        createHash('sha256').update(fromUid + ':' + toUid).digest('hex').slice(0, 40),
+        createHash('sha256').update(toUid + ':' + fromUid).digest('hex').slice(0, 40),
+      ];
+      const blockSnapshots = await Promise.all(
+        blockIds.map((blockId) => adminDb.collection('communicationBlocks').doc(blockId).get()),
+      );
+      if (blockSnapshots.some((snapshot) => snapshot.exists)) {
+        return errorResponse(res, 'FORBIDDEN', 'Message requests are not available between these users.', 403);
+      }
+
+      const requestRef = adminDb.collection('messageRequests').doc();
+      const now = Timestamp.now();
+      const nowIso = now.toDate().toISOString();
+      const request: MessageRequest = {
+        id: requestRef.id,
+        fromUid,
+        toUid,
+        status: 'pending',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      await requestRef.create(request);
+      return res.status(201).json({ request });
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Message request creation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to create the message request.');
+    }
+  });
+
+  app.post("/api/communication/message-requests/:requestId/respond", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMessageRequestResponseRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many message request responses. Please try again shortly.'),
+  }), async (req, res) => {
+    let responderUid: string;
+    try {
+      responderUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const requestId = req.params.requestId;
+      if (!isSafeFirebaseUid(requestId) && !/^[A-Za-z0-9_-]{1,128}$/.test(requestId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The message request ID is invalid.');
+      }
+      if (!isPlainObject(req.body)) return errorResponse(res, 'INVALID_REQUEST', 'The response body must be a plain object.');
+      const payload = req.body as Record<string, unknown>;
+      if (Object.keys(payload).some((key) => key !== 'action')) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Only action is supported.');
+      }
+      if (payload.action !== 'accept' && payload.action !== 'decline') {
+        return errorResponse(res, 'INVALID_REQUEST', 'action must be accept or decline.');
+      }
+      const action = payload.action as 'accept' | 'decline';
+      const requestRef = adminDb.collection('messageRequests').doc(requestId);
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const requestSnapshot = await transaction.get(requestRef);
+        if (!requestSnapshot.exists) throw new Error('REQUEST_NOT_FOUND');
+        const requestData = requestSnapshot.data() as Partial<MessageRequest>;
+        if (requestData.toUid !== responderUid) throw new Error('FORBIDDEN');
+        if (requestData.status !== 'pending') {
+          return { request: requestData, conversation: undefined, alreadyHandled: true };
+        }
+        if (!requestData.fromUid || !isSafeFirebaseUid(requestData.fromUid)) throw new Error('INVALID_REQUEST');
+        if (action === 'decline') {
+          const now = Timestamp.now().toDate().toISOString();
+          transaction.update(requestRef, { status: 'declined', updatedAt: now });
+          return {
+            request: { ...requestData, id: requestId, status: 'declined', updatedAt: now },
+            conversation: undefined,
+            alreadyHandled: false,
+          };
+        }
+
+        const memberUids = [requestData.fromUid, responderUid].sort();
+        const blockIds = [
+          createHash('sha256').update(requestData.fromUid + ':' + responderUid).digest('hex').slice(0, 40),
+          createHash('sha256').update(responderUid + ':' + requestData.fromUid).digest('hex').slice(0, 40),
+        ];
+        const blockRefs = blockIds.map((blockId) => adminDb.collection('communicationBlocks').doc(blockId));
+        const blockSnapshots = await Promise.all(blockRefs.map((ref) => transaction.get(ref)));
+        if (blockSnapshots.some((snapshot) => snapshot.exists)) throw new Error('BLOCKED');
+        const conversationId = createHash('sha256').update(memberUids.join(':')).digest('hex').slice(0, 40);
+        const conversationRef = adminDb.collection('conversations').doc(conversationId);
+        const memberRefs = memberUids.map((uid) =>
+          adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationId, uid))
+        );
+        const conversationSnapshot = await transaction.get(conversationRef);
+        const memberSnapshots = await Promise.all(memberRefs.map((ref) => transaction.get(ref)));
+        const now = Timestamp.now();
+        const nowIso = now.toDate().toISOString();
+
+        const conversation: Conversation = conversationSnapshot.exists
+          ? (conversationSnapshot.data() as Conversation)
+          : {
+              id: conversationId,
+              type: 'direct',
+              createdBy: requestData.fromUid,
+              createdAt: nowIso,
+              updatedAt: nowIso,
+              status: 'active',
+            };
+
+        if (!conversationSnapshot.exists) {
+          transaction.create(conversationRef, conversation);
+          const members = buildConversationMembers(conversationId, memberUids, requestData.fromUid, nowIso);
+          memberRefs.forEach((ref, index) => transaction.create(ref, members[index]));
+        } else {
+          transaction.update(conversationRef, { status: 'active', updatedAt: nowIso });
+          memberRefs.forEach((ref, index) => {
+            if (!memberSnapshots[index].exists) {
+              const member: ConversationMember = {
+                conversationId,
+                uid: memberUids[index],
+                role: memberUids[index] === requestData.fromUid ? 'owner' : 'member',
+                joinedAt: nowIso,
+              };
+              transaction.create(ref, member);
+            }
+          });
+        }
+
+        transaction.update(requestRef, { status: 'accepted', conversationId, updatedAt: nowIso });
+        return {
+          request: { ...requestData, id: requestId, status: 'accepted', conversationId, updatedAt: nowIso },
+          conversation,
+          alreadyHandled: false,
+        };
+      });
+
+      return res.status(200).json(result);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'REQUEST_NOT_FOUND') return errorResponse(res, 'INVALID_REQUEST', 'The message request was not found.', 404);
+      if (code === 'FORBIDDEN') return errorResponse(res, 'INVALID_REQUEST', 'Only the request recipient can respond to this request.', 403);
+      if (code === 'INVALID_REQUEST') return errorResponse(res, 'INVALID_REQUEST', 'The message request data is invalid.');
+      if (code === 'BLOCKED') return errorResponse(res, 'FORBIDDEN', 'This message request cannot be accepted because communication is blocked.', 403);
+      console.error('Message request response failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to respond to the message request.');
+    }
+  });
+
+  app.post("/api/communication/conversations", authenticate, rateLimit({
+    windowMs: CONVERSATION_CREATE_WINDOW_MS,
+    limit: MAX_CONVERSATION_CREATES_PER_WINDOW,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationConversationRateLimits', CONVERSATION_CREATE_WINDOW_MS),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      if (isSafeFirebaseUid(uid)) return uid;
+      return ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conversation creation requests. Please try again shortly.'),
+  }), async (req, res) => {
+    let creatorUid: string;
+    let validatedRequest: CreateConversationRequestInput;
+    try {
+      creatorUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      validatedRequest = validateCreateConversationRequest(req.body, creatorUid);
+    } catch (error) {
+      if (error instanceof RequestValidationError) {
+        return errorResponse(res, error.code, error.message);
+      }
+      console.error('Conversation request validation failed:', error);
+      return errorResponse(res, 'INVALID_REQUEST', 'The conversation request is invalid.');
+    }
+    try {
+      if (validatedRequest.type === 'direct' && validatedRequest.memberUids.length === 2) {
+        const otherUid = validatedRequest.memberUids.find((uid) => uid !== creatorUid);
+        if (!otherUid) {
+          return errorResponse(res, 'INVALID_REQUEST', 'A direct conversation requires another user.');
+        }
+        const blockIds = [
+          createHash('sha256').update(creatorUid + ':' + otherUid).digest('hex').slice(0, 40),
+          createHash('sha256').update(otherUid + ':' + creatorUid).digest('hex').slice(0, 40),
+        ];
+        const blockSnapshots = await Promise.all(
+          blockIds.map((blockId) => adminDb.collection('communicationBlocks').doc(blockId).get()),
+        );
+        if (blockSnapshots.some((snapshot) => snapshot.exists)) {
+          return errorResponse(res, 'FORBIDDEN', 'A direct conversation cannot be created while communication is blocked.', 403);
+        }
+      }
+      const directConversationId = validatedRequest.type === 'direct' && validatedRequest.memberUids.length === 2
+        ? createHash('sha256').update([...validatedRequest.memberUids].sort().join(':')).digest('hex').slice(0, 40)
+        : null;
+      const conversationRef = directConversationId
+        ? adminDb.collection('conversations').doc(directConversationId)
+        : adminDb.collection('conversations').doc();
+      const existingConversation = await conversationRef.get();
+      if (existingConversation.exists) {
+        // Repair any missing membership records for an existing direct conversation.
+        // This is safe for conversations created before the current membership flow.
+        const existingData = existingConversation.data() as Conversation;
+        const expectedMembers = buildConversationMembers(
+          conversationRef.id,
+          validatedRequest.memberUids,
+          creatorUid,
+          typeof existingData.createdAt === 'string' ? existingData.createdAt : Timestamp.now().toDate().toISOString(),
+        );
+        const membershipRefs = expectedMembers.map((member) =>
+          adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationRef.id, member.uid)),
+        );
+        const membershipSnapshots = await adminDb.getAll(...membershipRefs);
+        const repairBatch = adminDb.batch();
+        let repaired = false;
+        membershipSnapshots.forEach((snapshot, index) => {
+          if (!snapshot.exists) {
+            repairBatch.create(membershipRefs[index], expectedMembers[index]);
+            repaired = true;
+          }
+        });
+        if (repaired) await repairBatch.commit();
+        return res.status(200).json({ conversation: existingData, members: expectedMembers });
+      }
+      const now = Timestamp.now();
+      const nowIso = now.toDate().toISOString();
+      const conversation: Conversation = {
+        id: conversationRef.id,
+        type: validatedRequest.type,
+        createdBy: creatorUid,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        status: 'active',
+      };
+      if (validatedRequest.title !== undefined) conversation.title = validatedRequest.title;
+      if (validatedRequest.avatarUrl !== undefined) conversation.avatarUrl = validatedRequest.avatarUrl;
+      const members = buildConversationMembers(conversation.id, validatedRequest.memberUids, creatorUid, nowIso);
+      const batch = adminDb.batch();
+      batch.create(conversationRef, conversation);
+      for (const member of members) {
+        batch.create(
+          adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversation.id, member.uid)),
+          member,
+        );
+      }
+      await batch.commit();
+      return res.status(201).json({ conversation, members });
+    } catch (error) {
+      console.error('Conversation creation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to create the conversation.');
+    }
+  });
+  app.get("/api/communication/conversations", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationConversationListRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conversation list requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const membershipSnapshot = await adminDb.collection('conversationMembers').where('uid', '==', uid).get();
+      const conversationIdSet = new Set<string>(
+        membershipSnapshot.docs
+          .map((doc) => doc.data().conversationId)
+          .filter((id): id is string => typeof id === 'string' && isSafeConversationId(id)),
+      );
+
+      // Recover older conversations whose membership record may be missing for
+      // this user. Sent messages still identify the conversation, so use them
+      // as a safe legacy discovery path and repair the missing membership.
+      const sentMessagesSnapshot = await adminDb.collection('messages')
+        .where('senderId', '==', uid)
+        .limit(100)
+        .get();
+      for (const messageDoc of sentMessagesSnapshot.docs) {
+        const conversationId = messageDoc.data().conversationId;
+        if (typeof conversationId === 'string' && isSafeConversationId(conversationId)) {
+          conversationIdSet.add(conversationId);
+        }
+      }
+
+      const conversationIds = Array.from(conversationIdSet);
+      if (conversationIds.length === 0) return res.status(200).json({ conversations: [] });
+      const conversations = [];
+      for (const conversationId of conversationIds.slice(0, 100)) {
+        const snapshot = await adminDb.collection('conversations').doc(conversationId).get();
+        if (!snapshot.exists) continue;
+        const conversation = snapshot.data() as Record<string, unknown>;
+
+        const ownMembershipRef = adminDb.collection('conversationMembers')
+          .doc(conversationMemberDocumentId(conversationId, uid));
+        const ownMembership = await ownMembershipRef.get();
+        if (!ownMembership.exists) {
+          const memberSnapshot = await adminDb.collection('conversationMembers')
+            .where('conversationId', '==', conversationId).get();
+          const existingMembers = memberSnapshot.docs.map((doc) => doc.data().uid).filter((memberUid) => typeof memberUid === 'string');
+          if (existingMembers.includes(uid)) {
+            // No-op: a differently keyed legacy membership already exists.
+          } else if (conversation.type === 'direct' && existingMembers.length > 0) {
+            const createdAt = typeof conversation.createdAt === 'string' ? conversation.createdAt : Timestamp.now().toDate().toISOString();
+            await ownMembershipRef.set({
+              conversationId,
+              uid,
+              role: 'member',
+              joinedAt: createdAt,
+            }, { merge: true });
+          }
+        }
+
+        if (conversation.type === 'direct') {
+          const memberSnapshot = await adminDb.collection('conversationMembers')
+            .where('conversationId', '==', conversationId).get();
+          const otherUid = memberSnapshot.docs
+            .map((doc) => doc.data().uid)
+            .find((memberUid) => typeof memberUid === 'string' && memberUid !== uid);
+          if (typeof otherUid === 'string' && isSafeFirebaseUid(otherUid)) {
+            const userSnapshot = await adminDb.collection('users').doc(otherUid).get();
+            if (userSnapshot.exists) {
+              const user = userSnapshot.data() as Record<string, unknown>;
+              const fullName = typeof user.fullName === 'string' && user.fullName.trim()
+                ? user.fullName.trim()
+                : 'Unique One User';
+              const avatarUrl = typeof user.profilePhotoUrl === 'string' && user.profilePhotoUrl.trim()
+                ? user.profilePhotoUrl.trim()
+                : undefined;
+              const memberData = ownMembership.exists ? ownMembership.data() as Record<string, unknown> : {};
+              const lastReadAt = typeof memberData.lastReadAt === 'string' ? memberData.lastReadAt : null;
+              const unreadSnapshot = await adminDb.collection('messages')
+                .where('conversationId', '==', conversationId)
+                .get();
+              const unreadCount = unreadSnapshot.docs.filter((doc) => {
+                const createdAt = doc.data().createdAt;
+                return !lastReadAt || (typeof createdAt === 'string' && createdAt > lastReadAt);
+              }).length;
+              conversations.push({
+                ...conversation,
+                title: fullName,
+                ...(avatarUrl ? { avatarUrl } : {}),
+                otherUid,
+                muted: memberData.muted === true,
+                unreadCount,
+              });
+              continue;
+            }
+          }
+        }
+        conversations.push(conversation);
+      }
+      conversations.sort((a: any, b: any) =>
+        new Date(String(b?.lastMessageAt ?? b?.updatedAt ?? b?.createdAt ?? 0)).getTime()
+        - new Date(String(a?.lastMessageAt ?? a?.updatedAt ?? a?.createdAt ?? 0)).getTime()
+      );
+      return res.status(200).json({ conversations });
+    } catch (error) {
+      console.error('Conversation list read failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to load messages.');
+    }
+  });
+
+  app.post("/api/communication/media/upload", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }), express.raw({ type: 'application/octet-stream', limit: '20mb' }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = typeof req.headers['x-conversation-id'] === 'string' ? req.headers['x-conversation-id'].trim() : '';
+      const contentType = typeof req.headers['x-content-type'] === 'string' ? req.headers['x-content-type'].trim().toLowerCase() : '';
+      const originalName = typeof req.headers['x-original-name'] === 'string' ? req.headers['x-original-name'].trim() : '';
+      const body = req.body;
+      if (!isSafeConversationId(conversationId)) return errorResponse(res, 'INVALID_REQUEST', 'The conversation ID is invalid.');
+      if (!Buffer.isBuffer(body) || body.length <= 0) return errorResponse(res, 'INVALID_REQUEST', 'The attachment body is empty.');
+      const allowedTypes = new Set([
+        'image/webp', 'image/jpeg', 'image/png', 'image/gif',
+        'application/pdf', 'text/plain', 'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ]);
+      if (!allowedTypes.has(contentType)) return errorResponse(res, 'INVALID_REQUEST', 'This attachment type is not supported.');
+      const maxBytes = contentType.startsWith('image/') ? 5 * 1024 * 1024 : 20 * 1024 * 1024;
+      if (body.length > maxBytes) return errorResponse(res, 'INVALID_REQUEST', 'The attachment exceeds the allowed size.');
+      if (originalName.length < 1 || originalName.length > 255) return errorResponse(res, 'INVALID_REQUEST', 'The attachment filename is invalid.');
+      const membershipSnapshot = await adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationId, uid)).get();
+      if (!membershipSnapshot.exists) return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      const extension = contentType === 'image/webp' ? 'webp' : (originalName.includes('.') ? originalName.split('.').pop()?.toLowerCase() : 'bin');
+      const fileId = randomUUID();
+      const storagePath = `messages/${conversationId}/${uid}/${fileId}.${extension}`;
+      const bucket = getStorage().bucket();
+      const file = bucket.file(storagePath);
+      const downloadToken = randomUUID();
+      await file.save(body, {
+        resumable: false,
+        metadata: {
+          contentType,
+          metadata: {
+            firebaseStorageDownloadTokens: downloadToken,
+            originalName,
+            originalMimeType: contentType,
+            originalBytes: String(body.length),
+          },
+        },
+      });
+      const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucket.name)}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
+      return res.status(201).json({ fileId, storagePath, downloadUrl, mimeType: contentType, sizeBytes: body.length });
+    } catch (error) {
+      console.error('Communication media upload failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to upload the attachment.');
+    }
+  });
+
+  app.delete("/api/communication/media/upload", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = typeof req.body?.conversationId === 'string' ? req.body.conversationId.trim() : '';
+      const storagePath = typeof req.body?.storagePath === 'string' ? req.body.storagePath.trim() : '';
+      const fileId = typeof req.body?.fileId === 'string' ? req.body.fileId.trim() : '';
+      if (!isSafeConversationId(conversationId) || !/^[A-Za-z0-9_-]{1,128}$/.test(fileId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The attachment reference is invalid.');
+      }
+      const membershipSnapshot = await adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationId, uid)).get();
+      if (!membershipSnapshot.exists) return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      const expectedPrefix = `messages/${conversationId}/${uid}/`;
+      const allowedExtensions = ['jpg', 'png', 'webp', 'gif', 'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx'];
+      const ownsStoragePath = allowedExtensions.some((extension) => storagePath === `${expectedPrefix}${fileId}.${extension}`);
+      if (!ownsStoragePath) return errorResponse(res, 'INVALID_REQUEST', 'The attachment reference is invalid.');
+      const bucket = getStorage().bucket();
+      try {
+        await bucket.file(storagePath).delete();
+      } catch (error: any) {
+        if (error?.code !== 404) throw error;
+      }
+      return res.status(204).send();
+    } catch (error) {
+      console.error('Communication media cleanup failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to clean up the attachment.');
+    }
+  });
+
+  app.post("/api/communication/media/upload-url", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = typeof req.body?.conversationId === 'string' ? req.body.conversationId.trim() : '';
+      const contentType = typeof req.body?.contentType === 'string' ? req.body.contentType.trim().toLowerCase() : '';
+      const originalName = typeof req.body?.originalName === 'string' ? req.body.originalName.trim() : '';
+      const sizeBytes = req.body?.sizeBytes;
+      if (!isSafeConversationId(conversationId)) return errorResponse(res, 'INVALID_REQUEST', 'The conversation ID is invalid.');
+      if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > 100 * 1024 * 1024) return errorResponse(res, 'INVALID_REQUEST', 'The attachment size is invalid or too large.');
+      const allowedTypes = new Set([
+        'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+        'application/pdf', 'text/plain', 'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ]);
+      if (!allowedTypes.has(contentType)) return errorResponse(res, 'INVALID_REQUEST', 'This attachment type is not supported.');
+      if (originalName.length < 1 || originalName.length > 255) return errorResponse(res, 'INVALID_REQUEST', 'The attachment filename is invalid.');
+      const membershipSnapshot = await adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationId, uid)).get();
+      if (!membershipSnapshot.exists) return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      const isImage = contentType.startsWith('image/');
+      const maxBytes = isImage ? 5 * 1024 * 1024 : 20 * 1024 * 1024;
+      if (sizeBytes > maxBytes) return errorResponse(res, 'INVALID_REQUEST', 'The attachment exceeds the allowed size.');
+      const extension = isImage ? 'webp' : (originalName.includes('.') ? originalName.split('.').pop()?.toLowerCase() : 'bin');
+      const fileId = randomUUID();
+      const storagePath = `messages/${conversationId}/${uid}/${fileId}.${extension}`;
+      const bucket = getStorage().bucket();
+      const file = bucket.file(storagePath);
+      const token = randomUUID();
+      await file.setMetadata({
+        contentType: isImage ? 'image/webp' : contentType,
+        metadata: {
+          firebaseStorageDownloadTokens: token,
+          originalName,
+          originalMimeType: contentType,
+          originalBytes: String(sizeBytes),
+        },
+      });
+      const [uploadUrl] = await file.getSignedUrl({
+        version: 'v4',
+        action: 'write',
+        expires: Date.now() + 15 * 60 * 1000,
+        contentType: isImage ? 'image/webp' : contentType,
+      });
+      const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucket.name)}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`;
+      return res.status(200).json({ fileId, storagePath, uploadUrl, downloadUrl });
+    } catch (error) {
+      console.error('Communication media upload URL failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to prepare the attachment upload.');
+    }
+  });
+
+  app.post("/api/communication/keys", authenticate, rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const key = req.body?.publicKey;
+      if (!key || typeof key !== 'object' || Array.isArray(key) || key.kty !== 'EC' || key.crv !== 'P-256' || typeof key.x !== 'string' || typeof key.y !== 'string' || key.x.length > 256 || key.y.length > 256) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid P-256 public encryption key is required.');
+      }
+      await adminDb.collection('communicationKeys').doc(uid).set({ uid, publicKey: key, version: 1, updatedAt: Timestamp.now().toDate().toISOString() }, { merge: true });
+      return res.status(200).json({ registered: true, version: 1 });
+    } catch (error) {
+      console.error('Communication encryption key registration failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to register the encryption key.');
+    }
+  });
+
+  app.get("/api/communication/keys/:uid", authenticate, rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), async (req, res) => {
+    try {
+      sanitizeRequiredAuthUid((req as any).user?.uid);
+      const uid = req.params.uid;
+      if (!isSafeFirebaseUid(uid)) return errorResponse(res, 'INVALID_REQUEST', 'The user ID is invalid.');
+      const snapshot = await adminDb.collection('communicationKeys').doc(uid).get();
+      if (!snapshot.exists) return errorResponse(res, 'NOT_FOUND', 'The user has not registered an encryption key on this device.', 404);
+      const data = snapshot.data() as Record<string, unknown>;
+      return res.status(200).json({ uid, publicKey: data.publicKey, version: data.version ?? 1 });
+    } catch (error) {
+      console.error('Communication encryption key read failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to read the encryption key.');
+    }
+  });
+
+  app.get("/api/communication/conversations/:conversationId/messages", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMessageReadRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many message reads. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = req.params.conversationId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(conversationId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The conversation ID is invalid.');
+      }
+      const membershipSnapshot = await adminDb.collection('conversationMembers')
+        .doc(conversationMemberDocumentId(conversationId, uid)).get();
+      if (!membershipSnapshot.exists) {
+        return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      }
+      const rawLimit = Number(req.query.limit ?? 50);
+      const messageLimit = Number.isSafeInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
+      const messagesSnapshot = await adminDb.collection('messages')
+        .where('conversationId', '==', conversationId)
+        .orderBy('createdAt', 'asc')
+        .limit(messageLimit)
+        .get();
+      const messages = messagesSnapshot.docs.map((message) => message.data() as Record<string, unknown>);
+      const reactionSnapshot = await adminDb.collection('messageReactions')
+        .where('conversationId', '==', conversationId)
+        .get();
+      const reactionMap = new Map<string, Array<{ uid: string; reaction: string }>>();
+      reactionSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        if (typeof data.messageId === 'string' && typeof data.uid === 'string' && typeof data.reaction === 'string') {
+          const list = reactionMap.get(data.messageId) ?? [];
+          list.push({ uid: data.uid, reaction: data.reaction });
+          reactionMap.set(data.messageId, list);
+        }
+      });
+      const enrichedMessages = messages.map((message) => {
+        const reactions = reactionMap.get(String(message.id)) ?? [];
+        const counts: Record<string, number> = {};
+        reactions.forEach((item) => { counts[item.reaction] = (counts[item.reaction] ?? 0) + 1; });
+        const mine = reactions.find((item) => item.uid === uid)?.reaction;
+        return { ...message, reactions: counts, ...(mine ? { myReaction: mine } : {}) };
+      });
+      return res.status(200).json({ messages: enrichedMessages });
+    } catch (error) {
+      console.error('Conversation message read failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to load conversation messages.');
+    }
+  });
+
+  app.post("/api/communication/messages/:messageId/delivery", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMessageDeliveryRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many delivery updates. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const messageId = req.params.messageId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(messageId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The message ID is invalid.');
+      }
+      if (!isPlainObject(req.body) || (req.body.action !== 'delivered' && req.body.action !== 'read')) {
+        return errorResponse(res, 'INVALID_REQUEST', 'action must be delivered or read.');
+      }
+      const action = req.body.action as 'delivered' | 'read';
+      const messageRef = adminDb.collection('messages').doc(messageId);
+      const deliveryRef = adminDb.collection('messageDeliveries').doc(messageId + '_' + uid);
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const messageSnapshot = await transaction.get(messageRef);
+        if (!messageSnapshot.exists) throw new Error('MESSAGE_NOT_FOUND');
+        const message = messageSnapshot.data() as Message;
+        const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(message.conversationId, uid));
+        const membershipSnapshot = await transaction.get(membershipRef);
+        if (!membershipSnapshot.exists) throw new Error('FORBIDDEN');
+        if (message.senderId === uid) throw new Error('SENDER_CANNOT_UPDATE_DELIVERY');
+
+        const deliverySnapshot = await transaction.get(deliveryRef);
+        const nowIso = Timestamp.now().toDate().toISOString();
+        const current = deliverySnapshot.exists ? deliverySnapshot.data() as Record<string, unknown> : {};
+        const currentStatus = current.status === 'read' ? 'read' : current.status === 'delivered' ? 'delivered' : 'sent';
+        const nextStatus = action === 'read' ? 'read' : (currentStatus === 'read' ? 'read' : 'delivered');
+        const delivery = {
+          messageId,
+          uid,
+          status: nextStatus,
+          deliveredAt: typeof current.deliveredAt === 'string' ? current.deliveredAt : nowIso,
+          ...(nextStatus === 'read' ? { readAt: typeof current.readAt === 'string' ? current.readAt : nowIso } : {}),
+        };
+        if (deliverySnapshot.exists) transaction.update(deliveryRef, delivery);
+        else transaction.create(deliveryRef, delivery);
+
+        if (message.senderId !== uid) {
+          const messageStatus = nextStatus === 'read' || message.status === 'read' ? 'read' : 'delivered';
+          transaction.update(messageRef, { status: messageStatus, updatedAt: nowIso });
+          if (action === 'read') transaction.update(membershipRef, { lastReadAt: nowIso });
+        }
+        return { delivery, messageStatus: message.senderId === uid ? message.status : (nextStatus === 'read' ? 'read' : 'delivered') };
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'MESSAGE_NOT_FOUND') return errorResponse(res, 'INVALID_REQUEST', 'The message was not found.', 404);
+      if (code === 'FORBIDDEN') return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      if (code === 'SENDER_CANNOT_UPDATE_DELIVERY') return errorResponse(res, 'INVALID_REQUEST', 'Only a message recipient can update delivery status.', 403);
+      console.error('Message delivery update failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to update message delivery status.');
+    }
+  });
+
+  app.post("/api/communication/messages/:messageId/reactions", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationReactionRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many reaction requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const messageId = req.params.messageId;
+      const reaction = typeof req.body?.reaction === 'string' ? req.body.reaction.trim() : '';
+      const allowed = new Set(['👍', '❤️', '😂', '😮', '😢', '🙏']);
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(messageId) || !allowed.has(reaction)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid reaction is required.');
+      }
+      const messageRef = adminDb.collection('messages').doc(messageId);
+      const reactionRef = adminDb.collection('messageReactions').doc(messageId + '_' + uid);
+      await adminDb.runTransaction(async (transaction) => {
+        const messageSnapshot = await transaction.get(messageRef);
+        if (!messageSnapshot.exists) throw new RequestValidationError('INVALID_REQUEST', 'The message was not found.');
+        const message = messageSnapshot.data() as Partial<Message>;
+        const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(String(message.conversationId), uid));
+        const membershipSnapshot = await transaction.get(membershipRef);
+        if (!membershipSnapshot.exists) throw new RequestValidationError('INVALID_REQUEST', 'You are not a member of this conversation.');
+        transaction.set(reactionRef, {
+          messageId,
+          conversationId: message.conversationId,
+          uid,
+          reaction,
+          updatedAt: Timestamp.now().toDate().toISOString(),
+        }, { merge: true });
+      });
+      return res.status(200).json({ reaction });
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Message reaction failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to update the reaction.');
+    }
+  });
+
+  app.delete("/api/communication/messages/:messageId/reactions", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationReactionRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many reaction requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const messageId = req.params.messageId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(messageId)) return errorResponse(res, 'INVALID_REQUEST', 'The message ID is invalid.');
+      const messageRef = adminDb.collection('messages').doc(messageId);
+      const reactionRef = adminDb.collection('messageReactions').doc(messageId + '_' + uid);
+      await adminDb.runTransaction(async (transaction) => {
+        const messageSnapshot = await transaction.get(messageRef);
+        if (!messageSnapshot.exists) throw new RequestValidationError('INVALID_REQUEST', 'The message was not found.');
+        const message = messageSnapshot.data() as Partial<Message>;
+        const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(String(message.conversationId), uid));
+        const membershipSnapshot = await transaction.get(membershipRef);
+        if (!membershipSnapshot.exists) throw new RequestValidationError('INVALID_REQUEST', 'You are not a member of this conversation.');
+        transaction.delete(reactionRef);
+      });
+      return res.status(200).json({ reaction: null });
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Message reaction removal failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to remove the reaction.');
+    }
+  });
+
+  app.delete("/api/communication/messages/:messageId", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMessageDeleteRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many delete requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const messageId = req.params.messageId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(messageId)) return errorResponse(res, 'INVALID_REQUEST', 'The message ID is invalid.');
+      const messageRef = adminDb.collection('messages').doc(messageId);
+      let attachmentStoragePaths: string[] = [];
+      await adminDb.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(messageRef);
+        if (!snapshot.exists) throw new RequestValidationError('INVALID_REQUEST', 'The message was not found.');
+        const message = snapshot.data() as Partial<Message>;
+        if (message.senderId !== uid) throw new RequestValidationError('INVALID_REQUEST', 'You can only delete your own messages.');
+        if (Array.isArray(message.attachments)) {
+          const conversationId = typeof message.conversationId === 'string' ? message.conversationId : '';
+          const ownedPrefix = conversationId && isSafeConversationId(conversationId)
+            ? `messages/${conversationId}/${uid}/`
+            : '';
+          attachmentStoragePaths = message.attachments
+            .map((attachment) => attachment && typeof attachment === 'object' && 'storagePath' in attachment
+              ? (attachment as { storagePath?: unknown }).storagePath
+              : undefined)
+            .filter((storagePath): storagePath is string =>
+              Boolean(ownedPrefix) && typeof storagePath === 'string' && storagePath.startsWith(ownedPrefix) && storagePath.length <= 512);
+        }
+        const nowIso = Timestamp.now().toDate().toISOString();
+        transaction.update(messageRef, {
+          text: 'This message was deleted',
+          deleted: true,
+          deletedAt: nowIso,
+          updatedAt: nowIso,
+          attachments: [],
+          encryptedPayload: null,
+        });
+      });
+      if (attachmentStoragePaths.length > 0) {
+        const bucket = getStorage().bucket();
+        await Promise.all(attachmentStoragePaths.map(async (storagePath) => {
+          try {
+            await bucket.file(storagePath).delete();
+          } catch (error) {
+            const code = typeof error === 'object' && error !== null && 'code' in error
+              ? String((error as { code?: unknown }).code)
+              : '';
+            if (code !== '404') {
+              console.error('Failed to delete message attachment from Storage:', { storagePath, error });
+            }
+          }
+        }));
+      }
+      return res.status(200).json({ deleted: true });
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Message deletion failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to delete the message.');
+    }
+  });
+
+  app.post("/api/communication/conversations/:conversationId/mute", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMuteRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many mute requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const conversationId = req.params.conversationId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(conversationId) || typeof req.body?.muted !== 'boolean') {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid conversation and muted value are required.');
+      }
+      const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(conversationId, uid));
+      const membershipSnapshot = await membershipRef.get();
+      if (!membershipSnapshot.exists) return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403);
+      await membershipRef.update({ muted: req.body.muted });
+      return res.status(200).json({ muted: req.body.muted });
+    } catch (error) {
+      console.error('Conversation mute failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to update mute state.');
+    }
+  });
+
+  app.post("/api/communication/blocks", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationBlockRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many block attempts. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const blockerUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!isPlainObject(req.body) || typeof req.body.blockedUid !== 'string' || !isSafeFirebaseUid(req.body.blockedUid.trim())) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid blocked user UID is required.');
+      }
+      const blockedUid = req.body.blockedUid.trim();
+      if (blockerUid === blockedUid) return errorResponse(res, 'INVALID_REQUEST', 'You cannot block yourself.');
+      if (!(await readUserExists(blockedUid))) return errorResponse(res, 'INVALID_RECIPIENT', 'The user does not exist.');
+      const blockId = createHash('sha256').update(blockerUid + ':' + blockedUid).digest('hex').slice(0, 40);
+      await adminDb.collection('communicationBlocks').doc(blockId).set({ id: blockId, blockerUid, blockedUid, createdAt: Timestamp.now().toDate().toISOString() }, { merge: true });      return res.status(200).json({ blocked: true });
+    } catch (error) {
+      console.error('Communication block failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to block this user.');
+    }
+  });
+
+  app.post("/api/communication/messages", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationMessageRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      if (isSafeFirebaseUid(uid)) return uid;
+      return ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many message requests. Please try again shortly.'),
+  }), async (req, res) => {
+    let senderUid: string;
+    let draft: ReturnType<typeof validateMessageDraft>;
+    try {
+      senderUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      draft = validateMessageDraft(req.body, { uid: senderUid });
+    } catch (error) {
+      if (error instanceof CommunicationValidationError) {
+        return errorResponse(res, 'INVALID_REQUEST', error.message);
+      }
+      if (error instanceof RequestValidationError) {
+        return errorResponse(res, error.code, error.message);
+      }
+      console.error('Message request validation failed:', error);
+      return errorResponse(res, 'INVALID_REQUEST', 'The message request is invalid.');
+    }
+    try {
+      const conversationRef = adminDb.collection('conversations').doc(draft.conversationId);
+      const membershipQuery = await adminDb.collection('conversationMembers').where('conversationId', '==', draft.conversationId).get();
+      const otherUids = membershipQuery.docs.map((doc) => (doc.data() as Partial<ConversationMember>).uid).filter((uid): uid is string => Boolean(uid) && uid !== senderUid);
+      if (draft.encryptedPayload && !otherUids.includes(draft.encryptedPayload.recipientId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The encrypted recipient is not a member of this conversation.');
+      }
+      for (const otherUid of otherUids) {
+        const forwardId = createHash('sha256').update(senderUid + ':' + otherUid).digest('hex').slice(0, 40);
+        const reverseId = createHash('sha256').update(otherUid + ':' + senderUid).digest('hex').slice(0, 40);
+        const [forwardBlock, reverseBlock] = await Promise.all([
+          adminDb.collection('communicationBlocks').doc(forwardId).get(),
+          adminDb.collection('communicationBlocks').doc(reverseId).get(),
+        ]);
+        if (forwardBlock.exists || reverseBlock.exists) return errorResponse(res, 'BLOCKED', 'Messaging is unavailable because one of the users has blocked the other.');
+      }
+      const idempotencyKey = typeof req.headers['idempotency-key'] === 'string' ? req.headers['idempotency-key'].trim() : '';
+      if (!isSafeIdempotencyKey(idempotencyKey)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid idempotency key is required.');
+      }
+      const idempotencyRef = adminDb.collection('communicationMessageIdempotency').doc(idempotencyDocumentId(senderUid, idempotencyKey));
+      if (draft.attachments?.length) {
+        const bucket = getStorage().bucket();
+        for (const attachment of draft.attachments) {
+          try {
+            const [metadata] = await bucket.file(attachment.storagePath).getMetadata();
+            const actualSize = Number(metadata.size);
+            const actualContentType = typeof metadata.contentType === 'string' ? metadata.contentType : '';
+            if (!Number.isSafeInteger(actualSize) || actualSize <= 0 || actualSize !== attachment.sizeBytes || actualContentType !== attachment.contentType) {
+              return errorResponse(res, 'INVALID_REQUEST', 'One or more message attachments are invalid or incomplete.');
+            }
+          } catch {
+            return errorResponse(res, 'INVALID_REQUEST', 'One or more message attachments could not be verified.');
+          }
+        }
+      }
+      const messageRef = adminDb.collection('messages').doc();
+      const replyMessageRef = draft.replyToMessageId ? adminDb.collection('messages').doc(draft.replyToMessageId) : null;
+      const now = Timestamp.now();
+      const nowIso = now.toDate().toISOString();
+      const message: Message = {
+        id: messageRef.id,
+        conversationId: draft.conversationId,
+        senderId: senderUid,
+        type: draft.type,
+        ...(draft.text ? { text: draft.text } : {}),
+        ...(draft.encryptedPayload ? { encryptedPayload: draft.encryptedPayload } : {}),
+        ...(draft.attachments ? { attachments: draft.attachments } : {}),
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        status: 'sent',
+        ...(draft.replyToMessageId ? { replyToMessageId: draft.replyToMessageId } : {}),
+      };
+      const transactionResult = await adminDb.runTransaction(async (transaction) => {
+        const existingIdempotency = await transaction.get(idempotencyRef);
+        if (existingIdempotency.exists) {
+          const data = existingIdempotency.data() || {};
+          if (data.uid !== senderUid || data.idempotencyKey !== idempotencyKey || typeof data.messageId !== 'string') {
+            throw new RequestValidationError('INVALID_REQUEST', 'Invalid message idempotency record.');
+          }
+          const existingMessageSnapshot = await transaction.get(adminDb.collection('messages').doc(data.messageId));
+          if (!existingMessageSnapshot.exists) {
+            throw new RequestValidationError('INVALID_REQUEST', 'The previous message attempt is incomplete. Please try again.');
+          }
+          return { message: existingMessageSnapshot.data() as Message, replayed: true };
+        }
+        const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(draft.conversationId, senderUid));
+        const results = await Promise.all([
+          transaction.get(conversationRef),
+          transaction.get(membershipRef),
+          ...(replyMessageRef ? [transaction.get(replyMessageRef)] : []),
+        ]);
+        const conversationSnapshot = results[0];
+        const membershipSnapshot = results[1];
+        const replySnapshot = results[2];
+        if (!conversationSnapshot.exists || !membershipSnapshot.exists) {
+          throw new RequestValidationError('INVALID_REQUEST', 'You are not a member of this conversation.');
+        }
+        if (replyMessageRef) {
+          if (!replySnapshot || !replySnapshot.exists) throw new RequestValidationError('INVALID_REQUEST', 'The message you are replying to was not found.');
+          const replyData = replySnapshot.data() as Partial<Message> | undefined;
+          if (!replyData || replyData.conversationId !== draft.conversationId) throw new RequestValidationError('INVALID_REQUEST', 'You can only reply to a message in this conversation.');
+        }
+        transaction.create(messageRef, message);
+        transaction.set(idempotencyRef, {
+          uid: senderUid,
+          idempotencyKey,
+          messageId: messageRef.id,
+          createdAt: nowIso,
+        });
+        transaction.update(conversationRef, {
+          lastMessageId: messageRef.id,
+          lastMessageAt: nowIso,
+          updatedAt: nowIso,
+        });
+        return { message, replayed: false };
+      });
+      return res.status(transactionResult.replayed ? 200 : 201).json({ message: transactionResult.message });
+    } catch (error) {
+      if (error instanceof RequestValidationError) {
+        return errorResponse(res, error.code, error.message);
+      }
+      console.error('Message creation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to send the message.');
+    }
+  });
+
+  app.post("/api/store/checkout", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('storeCheckoutRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many checkout attempts. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!isPlainObject(req.body) || !isSafeIdempotencyKey(req.body.idempotencyKey)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid checkout idempotency key is required.');
+      }
+      const idempotencyKey = req.body.idempotencyKey.trim();
+      const idempotencyRef = adminDb.collection('storeCheckoutIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const existing = await transaction.get(idempotencyRef);
+        if (existing.exists) {
+          const data = existing.data() || {};
+          if (data.uid !== uid || data.idempotencyKey !== idempotencyKey) {
+            throw new RequestValidationError('INVALID_REQUEST', 'Invalid checkout idempotency record.');
+          }
+          return { orderIds: Array.isArray(data.orderIds) ? data.orderIds : [], replayed: true };
+        }
+        const cartSnapshot = await transaction.get(adminDb.collection('carts').where('customerId', '==', uid));
+        if (cartSnapshot.empty) throw new RequestValidationError('INVALID_REQUEST', 'Your cart is empty.');
+        const carts = cartSnapshot.docs.map((snapshot) => ({ ref: snapshot.ref, id: snapshot.id, data: snapshot.data() as Record<string, unknown> }));
+        const productSnapshots = new Map<string, FirebaseFirestore.DocumentSnapshot>();
+        for (const cart of carts) {
+          if (cart.data.customerId !== uid || typeof cart.data.productId !== 'string' || !cart.data.productId.trim() ||
+              !Number.isSafeInteger(cart.data.quantity) || Number(cart.data.quantity) <= 0) {
+            throw new RequestValidationError('INVALID_REQUEST', 'Your cart contains invalid data.');
+          }
+          const productId = String(cart.data.productId).trim();
+          productSnapshots.set(productId, await transaction.get(adminDb.collection('products').doc(productId)));
+        }
+        const groups = new Map<string, { cart: typeof carts[number]; product: Record<string, unknown>; productId: string }[]>();
+        const requestedByProduct = new Map<string, number>();
+        for (const cart of carts) {
+          const productId = String(cart.data.productId).trim();
+          const snapshot = productSnapshots.get(productId);
+          if (!snapshot?.exists) throw new RequestValidationError('INVALID_REQUEST', 'A product in your cart is no longer available.');
+          const product = snapshot.data() || {};
+          const quantity = Number(cart.data.quantity);
+          const sellerId = product.sellerId;
+          const price = product.price;
+          const available = product.quantity;
+          const minOrderQuantity = Number(product.minOrderQuantity || 1);
+          if (!isSafeFirebaseUid(sellerId) || product.status !== 'published' || typeof price !== 'number' || !Number.isFinite(price) || price < 0 ||
+              product.currency !== 'NGN' || !Number.isSafeInteger(available) || available < 0 ||
+              !Number.isSafeInteger(minOrderQuantity) || minOrderQuantity < 1 || quantity < minOrderQuantity) {
+            throw new RequestValidationError('INVALID_REQUEST', 'One or more products in your cart are no longer available in the requested quantity.');
+          }
+          const requested = (requestedByProduct.get(productId) || 0) + quantity;
+          if (!Number.isSafeInteger(requested) || requested > available) {
+            throw new RequestValidationError('INVALID_REQUEST', 'One or more products in your cart are no longer available in the requested quantity.');
+          }
+          requestedByProduct.set(productId, requested);
+          const group = groups.get(sellerId) || [];
+          group.push({ cart, product, productId });
+          groups.set(sellerId, group);
+        }
+        const orderIds: string[] = [];
+        const now = Timestamp.now().toDate().toISOString();
+        for (const [productId, requestedQuantity] of requestedByProduct) {
+          const snapshot = productSnapshots.get(productId);
+          if (!snapshot?.exists) throw new RequestValidationError('INVALID_REQUEST', 'A product in your cart is no longer available.');
+          const product = snapshot.data() || {};
+          const remainingQuantity = Number(product.quantity) - requestedQuantity;
+          transaction.update(snapshot.ref, {
+            quantity: remainingQuantity,
+            status: remainingQuantity === 0 ? 'out_of_stock' : product.status,
+            updatedAt: now,
+          });
+        }
+        for (const [sellerId, sellerItems] of groups) {
+          const orderRef = adminDb.collection('orders').doc();
+          const items = sellerItems.map(({ product, productId, cart }) => ({
+            productId,
+            name: typeof product.name === 'string' ? product.name : 'Product',
+            price: product.price,
+            quantity: Number(cart.data.quantity),
+          }));
+          const totalAmount = items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+          transaction.create(orderRef, {
+            id: orderRef.id, customerId: uid, sellerId, items, totalAmount, currency: 'NGN',
+            status: 'pending', createdAt: now, updatedAt: now,
+          });
+          orderIds.push(orderRef.id);
+        }
+        carts.forEach((cart) => transaction.delete(cart.ref));
+        transaction.create(idempotencyRef, { uid, idempotencyKey, orderIds, createdAt: now, updatedAt: now });
+        return { orderIds, replayed: false };
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Store checkout failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Checkout could not be completed. Your cart was not cleared.');
+    }
+  });
+
+  app.get("/api/calendar/events", authenticate, async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization; if (!authHeader) return res.status(401).json({ error: "No authorization header" });
+      const response = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=" + new Date().toISOString() + "&maxResults=10&singleEvents=true&orderBy=startTime", { headers: { Authorization: authHeader, Accept: "application/json" } });
+      if (!response.ok) return res.status(response.status).json(await response.json());
+      return res.json(await response.json());
+    } catch (error) { console.error("Calendar API Error:", error); return res.status(500).json({ error: "Failed to fetch calendar events" }); }
+  });
+  if (process.env.NODE_ENV !== "production") { const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" }); app.use(vite.middlewares); }
+  else { const distPath = path.join(process.cwd(), "dist"); app.use(express.static(distPath)); app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html"))); }
+  httpServer.listen(PORT, "0.0.0.0", () => console.log(`UniqueOS Server running on http://localhost:${PORT}`));
+}
+startServer();
