@@ -148,7 +148,7 @@ export default function StorePage() {
         </Link>
       </section>
 
-      <section>      <section>
+      <section>
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Latest listings</h2>
