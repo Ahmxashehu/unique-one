@@ -310,7 +310,14 @@ function resolveAiRequestId(req: Request): string {
   return `ai_${randomUUID().replace(/-/g, "")}`.slice(0, 64);
 }
 async function startServer() {
-  const app = express();
+  const UNIQUE_AI_CAPABILITIES = {
+  version: 1,
+  readOnly: true,
+  contexts: ["account", "orders", "businesses", "products"],
+  mutations: [],
+} as const;
+
+const app = express();
   const PORT = Number(process.env.PORT) || 3000;
   const httpServer = http.createServer(app);
   // Codespaces forwards requests through a trusted proxy and supplies X-Forwarded-For.
@@ -389,6 +396,7 @@ async function startServer() {
         message: responseText,
         readOnly: true,
         requestId: resolvedRequestId,
+        capabilities: UNIQUE_AI_CAPABILITIES,
       });
     } catch (error) {
       if (error instanceof UniqueAiValidationError) {
