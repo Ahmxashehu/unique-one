@@ -127,6 +127,12 @@ function validateAuthorizedContext(
   if (summary.schemaVersion !== AI_CONTEXT_SCHEMA_VERSION) {
     throw new UniqueAiValidationError("Authorized AI context schema version is unsupported.");
   }
+  if (summary.summaryVersion !== "ai-40") {
+    throw new UniqueAiValidationError("Authorized AI summary version is unsupported.");
+  }
+  if (summary.requestScope !== "authorized-user-context") {
+    throw new UniqueAiValidationError("Authorized AI request scope is unsupported.");
+  }
 
   const validateBoundedText = (value: unknown, field: string): void => {
     if (typeof value !== "string" || !value.trim() || value.length > MAX_CONTEXT_STRING_LENGTH) {
@@ -290,6 +296,14 @@ function validateAuthorizedContext(
   if (!Number.isFinite(Date.parse(summary.contextLoadedAt))) {
     throw new UniqueAiValidationError("Authorized AI context timestamp is invalid.");
   }
+  if (
+    summary.contextComplete !==
+    (!summary.contextTruncated.orders &&
+      !summary.contextTruncated.businesses &&
+      !summary.contextTruncated.products)
+  ) {
+    throw new UniqueAiValidationError("Authorized AI context completeness metadata is inconsistent.");
+  }
   const coverageValues = [
     summary.coverage.ordersLoaded,
     summary.coverage.businessesLoaded,
@@ -335,6 +349,14 @@ function validateAuthorizedContext(
     throw new UniqueAiValidationError("Authorized AI context warnings are invalid.");
   }
 
+  if (
+    summary.coverage.ordersOmitted < 0 ||
+    summary.coverage.businessesOmitted < 0 ||
+    summary.coverage.productsOmitted < 0
+  ) {
+    throw new UniqueAiValidationError("Authorized AI omitted-record coverage is invalid.");
+  }
+
   const contextCollections = [
     ["orders", context.orders.length, summary.contextLimits.orders, summary.contextTruncated.orders],
     ["businesses", context.businesses.length, summary.contextLimits.businesses, summary.contextTruncated.businesses],
@@ -378,6 +400,15 @@ function validateAuthorizedContext(
       context.businesses.length > summary.contextLimits.businesses ||
       context.products.length > summary.contextLimits.products) {
     throw new UniqueAiValidationError("Authorized AI context exceeded its configured bounds.");
+  }
+
+  if (
+    summary.customerOrderCount > summary.orderCount ||
+    summary.sellerOrderCount > summary.orderCount ||
+    summary.productsWithoutCategory > summary.productCount ||
+    summary.businessesWithoutCategory > summary.businessCount
+  ) {
+    throw new UniqueAiValidationError("Authorized AI summary subset counts exceed their loaded totals.");
   }
 
   const orderSideTotal = summary.customerOrderCount + summary.sellerOrderCount;
