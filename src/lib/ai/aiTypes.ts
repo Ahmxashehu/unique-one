@@ -71,6 +71,20 @@ export type UniqueAiPlatformSummary = {
   contextTruncated: { orders: boolean; businesses: boolean; products: boolean };
   contextLoadedAt: string;
   contextWarnings: string[];
+  coverage: {
+    ordersLoaded: number;
+    businessesLoaded: number;
+    productsLoaded: number;
+    ordersOmitted: number;
+    businessesOmitted: number;
+    productsOmitted: number;
+  };
+  dataQuality: {
+    ordersMissingTotals: number;
+    businessesMissingNames: number;
+    productsMissingNames: number;
+    productsWithInvalidQuantities: number;
+  };
 };
 
 export type UniqueAiPlatformContext = {
