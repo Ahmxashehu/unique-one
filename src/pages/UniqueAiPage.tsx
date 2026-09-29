@@ -29,6 +29,7 @@ const QUICK_PROMPTS = [
   "How many inventory units do my loaded products contain?",
   "Which of my AI summaries may be incomplete because of context limits?",
   "Which of my products are missing category, status, or quantity data?",
+  "Which of my products have invalid inventory quantities?",
   "Which of my businesses have missing category, status, or verification data?",
   "What order data is unknown or potentially incomplete?",
   "Which summaries are guaranteed to be based on all loaded records?",
