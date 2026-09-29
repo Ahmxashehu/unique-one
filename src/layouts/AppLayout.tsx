@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Store, Wallet, Calendar, Bell, Settings,
   Briefcase, ShoppingCart, Users, FileText, HeartHandshake,
   User, MessageSquare, Heart, ClipboardList, Globe, Shield,
-  Building2, Activity, PlusCircle, Menu, X, LogOut, Sparkles, GraduationCap
+  Building2, Activity, PlusCircle, Menu, X, LogOut, Sparkles, GraduationCap, Plane
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +33,7 @@ export default function AppLayout() {
     { name: 'Jobs', path: '/os/jobs', icon: Briefcase },
     { name: 'Contributions', path: '/os/contributions', icon: HeartHandshake },
     { name: 'Education', path: '/os/education', icon: GraduationCap },
+    { name: 'Travel', path: '/os/travel', icon: Plane },
   ];
 
   const businessNav = [
