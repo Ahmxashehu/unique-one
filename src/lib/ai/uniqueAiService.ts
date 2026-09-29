@@ -285,8 +285,13 @@ function validateAuthorizedContext(
     ["products", context.products.length, summary.contextLimits.products, summary.contextTruncated.products],
   ] as const;
   for (const [name, loadedCount, limit, truncated] of contextCollections) {
-    if (loadedCount > limit || (truncated && loadedCount !== limit) || (!truncated && loadedCount === limit)) {
+    if (loadedCount > limit || (truncated && loadedCount !== limit)) {
       throw new UniqueAiValidationError(`Authorized AI ${name} context truncation metadata is inconsistent.`);
+    }
+    // A non-truncated collection may legitimately contain exactly its configured limit.
+    // Truncation is only true when the loader fetched at least one extra record.
+    if (!truncated && loadedCount > limit) {
+      throw new UniqueAiValidationError(`Authorized AI ${name} context exceeds its configured limit.`);
     }
   }
 
