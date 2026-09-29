@@ -18,6 +18,12 @@ const MODEL_REQUEST_TIMEOUT_MS = 30_000;
 const MAX_MODEL_OUTPUT_TOKENS = 1_000;
 const MAX_CONTEXT_WARNING_LENGTH = 240;
 const AI_CONTEXT_SCHEMA_VERSION = 1;
+const MODEL_SAFETY_SETTINGS = [
+  { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+  { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+  { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+  { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+];
 
 const SYSTEM_INSTRUCTION = [
   "You are Unique AI, the assistant for the Unique One platform.",
@@ -448,6 +454,7 @@ async function generateModelResponse(
       contents: contextualPrompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
+        safetySettings: MODEL_SAFETY_SETTINGS,
         temperature: 0.2,
         maxOutputTokens: MAX_MODEL_OUTPUT_TOKENS,
       },
@@ -455,6 +462,13 @@ async function generateModelResponse(
     const response = await Promise.race([responsePromise, timeoutPromise]);
     if (!response || typeof response.text !== "string") {
       throw new Error("Gemini returned an invalid response.");
+    }
+    const finishReason = response.candidates?.[0]?.finishReason;
+    if (finishReason === "SAFETY") {
+      throw new Error("Gemini response was blocked by safety filters.");
+    }
+    if (finishReason === "RECITATION") {
+      throw new Error("Gemini response was blocked by recitation controls.");
     }
     return response.text;
   } finally {
