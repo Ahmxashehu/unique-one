@@ -33,6 +33,15 @@ const QUICK_PROMPTS = [
   "What order data is unknown or potentially incomplete?",
   "Which summaries are guaranteed to be based on all loaded records?",
   "Why might my Unique AI counts be incomplete?",
+  "What request ID should I give support if Unique AI fails?",
+  "What does a blocked AI response mean?",
+  "What happens when Unique AI has no usable model response?",
+  "Does Unique AI cache my platform response?",
+  "Can Unique AI expose another user’s private data?",
+  "What happens when one of my data fields is missing?",
+  "What happens when the AI context reaches its size limit?",
+  "How does Unique AI handle an invalid model response?",
+  "How does Unique AI trace a failed request?",
   "Which loaded order totals are unavailable?",
   "What is my account verification status?",
   "Can you change a payment or order for me?",
@@ -93,7 +102,12 @@ export default function UniqueAiPage() {
         | { message?: string; readOnly?: boolean; requestId?: string; error?: { message?: string } }
         | null;
 
+      const responseRequestId = response.headers.get("X-Request-ID")?.trim();
+      if (responseRequestId && !/^[A-Za-z0-9._:-]{1,64}$/.test(responseRequestId)) {
+        throw new Error("Unique AI returned an invalid response request ID.");
+      }
       if (!response.ok) {
+        if (responseRequestId) setLastRequestId(responseRequestId);
         throw new Error(payload?.error?.message || "Unique AI is temporarily unavailable.");
       }
 
@@ -113,7 +127,7 @@ export default function UniqueAiPage() {
         throw new Error("Unique AI returned an empty response.");
       }
 
-      setLastRequestId(payload.requestId);
+      setLastRequestId(responseRequestId || payload.requestId);
       setMessages((current) => [
         ...current,
         { id: crypto.randomUUID(), role: "assistant", text: payload.message!.trim() },
