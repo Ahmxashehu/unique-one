@@ -411,7 +411,8 @@ async function writeAiAuditLog(input: {
 const READ_ONLY_MUTATION_RESPONSE = "Unique AI is read-only right now and cannot change, send, cancel, approve, create, delete, refund, edit, transfer, pay, or book platform records.";
 
 function isMutationRequest(message: string): boolean {
-  return /\b(change|send|cancel|approve|create|delete|refund|edit|update|modify|remove|transfer|pay|book)\b/i.test(message);
+  const action = "change|send|cancel|approve|create|delete|refund|edit|update|modify|remove|transfer|pay|book";
+  return new RegExp("^\\s*(?:please\\s+)?(?:"+action+")\\b|\\b(?:can|could|would|will)\\s+you\\s+(?:please\\s+)?(?:"+action+")\\b", "i").test(message);
 }
 
 function validateMutationBoundary(message: string): void {
@@ -463,15 +464,15 @@ async function generateModelResponse(
   model: string,
   contextualPrompt: string,
 ): Promise<string> {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error("Unique AI model request timed out.")), MODEL_REQUEST_TIMEOUT_MS);
-    });
     let response: Awaited<ReturnType<typeof ai.models.generateContent>> | undefined;
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       try {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("Unique AI model request timed out.")), MODEL_REQUEST_TIMEOUT_MS);
+        });
         const responsePromise = ai.models.generateContent({
           model,
           contents: contextualPrompt,
@@ -488,6 +489,8 @@ async function generateModelResponse(
         lastError = error;
         if (attempt === 1 || !isLikelyTransientModelError(error)) throw error;
         await new Promise((resolve) => setTimeout(resolve, 250));
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
       }
     }
     if (!response) {
@@ -505,7 +508,7 @@ async function generateModelResponse(
     }
     return response.text;
   } finally {
-    if (timeoutId) clearTimeout(timeoutId);
+    // Retry-specific timeout handles are cleared inside each attempt.
   }
 }
 
