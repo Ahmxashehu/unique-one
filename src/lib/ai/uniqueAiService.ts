@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { randomUUID } from "node:crypto";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import type { HarmBlockThreshold, HarmCategory, SafetySetting } from "@google/genai";
 import { getAuthorizedPlatformContext } from "./aiTools";
@@ -417,7 +418,12 @@ const READ_ONLY_MUTATION_RESPONSE = "Unique AI is read-only right now and cannot
 
 function isMutationRequest(message: string): boolean {
   const action = "change|send|cancel|approve|create|delete|refund|edit|update|modify|remove|transfer|pay|book";
-  return new RegExp("^\\s*(?:please\\s+)?(?:"+action+")\\b|\\b(?:can|could|would|will)\\s+you\\s+(?:please\\s+)?(?:"+action+")\\b", "i").test(message);
+  const actionPattern = new RegExp(`\\b(?:${action})\\b`, "i");
+  return (
+    /^\\s*(?:please\\s+)?(?:${action})\\b/i.test(message) ||
+    /\\b(?:can|could|would|will|please|help)\\s+you\\b/i.test(message) && actionPattern.test(message) ||
+    /\\b(?:i\\s+(?:want|need)|let\\s+me)\\b.{0,40}${actionPattern.source}/i.test(message)
+  );
 }
 
 function validateMutationBoundary(message: string): void {
@@ -460,7 +466,7 @@ function sanitizeRequestId(value: unknown): string | undefined {
 }
 
 function createAiRequestId(): string {
-  return `ai_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`.slice(0, MAX_REQUEST_ID_LENGTH);
+  return `ai_${randomUUID().replace(/-/g, "")}`.slice(0, MAX_REQUEST_ID_LENGTH);
 }
 
 function isLikelyTransientModelError(error: unknown): boolean {
