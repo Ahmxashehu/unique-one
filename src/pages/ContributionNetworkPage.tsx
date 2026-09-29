@@ -41,7 +41,7 @@ export default function ContributionNetworkPage() {
   const [description, setDescription] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);\n  const [actionId, setActionId] = useState<string | null>(null);
 
   const loadRequests = async () => {
     if (!currentUser) return;
@@ -85,6 +85,55 @@ export default function ContributionNetworkPage() {
   useEffect(() => {
     void loadRequests();
   }, [currentUser]);
+
+  const offerToHelp = async (request: ContributionRequest) => {
+    if (!currentUser) {
+      setNotice("Please sign in before offering to help.");
+      return;
+    }
+    if (request.requesterUid === currentUser.uid) {
+      setNotice("You cannot offer to help on your own request.");
+      return;
+    }
+    setActionId(request.id);
+    setNotice("");
+    try {
+      const offerId = request.id + "_" + currentUser.uid;
+      await setDoc(doc(db, "contributionOffers", offerId), {
+        requestId: request.id,
+        requesterUid: request.requesterUid,
+        contributorUid: currentUser.uid,
+        status: "pending",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: false });
+      setNotice("Your offer to help was submitted.");
+    } catch (error) {
+      console.error("Contribution offer failed:", error);
+      setNotice("Could not submit your offer. You may already have an offer for this request.");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const cancelRequest = async (request: ContributionRequest) => {
+    if (!currentUser || request.requesterUid !== currentUser.uid || request.status !== "published") return;
+    setActionId(request.id);
+    setNotice("");
+    try {
+      await updateDoc(doc(db, "contributionRequests", request.id), {
+        status: "cancelled",
+        updatedAt: serverTimestamp(),
+      });
+      setRequests((items) => items.map((item) => item.id === request.id ? { ...item, status: "cancelled" } : item));
+      setNotice("Your contribution request has been cancelled.");
+    } catch (error) {
+      console.error("Contribution request cancellation failed:", error);
+      setNotice("Could not cancel the contribution request.");
+    } finally {
+      setActionId(null);
+    }
+  };
 
   const submitRequest = async (event: FormEvent) => {
     event.preventDefault();
@@ -215,6 +264,20 @@ export default function ContributionNetworkPage() {
                   <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">{request.status}</span>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-600">{request.description}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {request.requesterUid !== currentUser?.uid && request.status === "published" && (
+                    <button type="button" onClick={() => void offerToHelp(request)} disabled={actionId === request.id}
+                      className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
+                      {actionId === request.id ? "Submitting…" : "Offer to help"}
+                    </button>
+                  )}
+                  {request.requesterUid === currentUser?.uid && request.status === "published" && (
+                    <button type="button" onClick={() => void cancelRequest(request)} disabled={actionId === request.id}
+                      className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50">
+                      {actionId === request.id ? "Cancelling…" : "Cancel request"}
+                    </button>
+                  )}
+                </div>
               </article>
             ))}
           </div>}
