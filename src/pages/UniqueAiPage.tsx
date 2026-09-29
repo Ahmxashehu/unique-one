@@ -42,6 +42,9 @@ const QUICK_PROMPTS = [
   "What happens when the AI context reaches its size limit?",
   "How does Unique AI handle an invalid model response?",
   "How does Unique AI trace a failed request?",
+  "How can I give support the request ID safely?",
+  "What does it mean when AI context is incomplete?",
+  "What data is never exposed to Unique AI?",
   "Which loaded order totals are unavailable?",
   "What is my account verification status?",
   "Can you change a payment or order for me?",
@@ -280,9 +283,9 @@ export default function UniqueAiPage() {
             </button>
           </div>
           <div className="mt-2 flex items-center justify-between gap-3 px-1 text-xs text-slate-400">
-            <span>Read-only assistant for now. Each request is traceable with a temporary request ID; it cannot change payments, orders, products, or other platform records. Answers use only authorized records loaded for the current request and may be incomplete when a context limit is reached.</span>
+            <span>Read-only assistant for now. Each request has a temporary support request ID; it cannot change payments, orders, products, or other platform records. Answers use only authorized records loaded for the current request and may be incomplete when a context limit is reached.</span>
             <span className="text-right" aria-live="polite">
-              {lastRequestId ? `Request: ${lastRequestId}` : "Request ID will appear after a response"} · {message.length}/4000
+              {lastRequestId ? `Request: ${lastRequestId}` : "Support request ID will appear after a response"} · {message.length}/4000
             </span>
           </div>
         </form>
