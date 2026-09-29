@@ -15,8 +15,8 @@ const MAX_CONTEXT_STRING_LENGTH = 160;
 function safeString(value: unknown, fallback?: string): string | undefined {
   if (typeof value !== "string") return fallback;
   const normalized = value
-    .replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]/g, " ")
-    .replace(/\\s+/g, " ")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
   if (!normalized) return fallback;
   return normalized.slice(0, MAX_CONTEXT_STRING_LENGTH);
