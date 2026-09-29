@@ -592,3 +592,58 @@ export interface SupportConversation {
   createdAt: string;
   updatedAt: string;
 }
+
+
+/**
+ * UniquePay identity and Cycle Ajo contracts.
+ * Provider responses are authoritative; the client must not fabricate verification
+ * results or financial balances.
+ */
+export type IdentityVerificationType = 'nin' | 'vNIN' | 'bvn' | 'bank_account' | 'phone' | 'business';
+export type IdentityVerificationStatus = 'not_started' | 'pending' | 'verified' | 'failed' | 'needs_review' | 'expired';
+
+export interface IdentityVerificationRecord {
+  id: string;
+  uid: string;
+  type: IdentityVerificationType;
+  status: IdentityVerificationStatus;
+  provider: string;
+  providerReference?: string;
+  matchFields?: string[];
+  failureCode?: string;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt?: string;
+}
+
+export type AjoFrequency = 'weekly' | 'monthly' | 'custom';
+export type AjoCycleStatus = 'draft' | 'pending_activation' | 'active' | 'paused' | 'completed' | 'cancelled' | 'disputed';
+
+export interface AjoCycle {
+  id: string;
+  ownerUid: string;
+  name: string;
+  contributionAmountMinor: number;
+  currency: WalletCurrency;
+  frequency: AjoFrequency;
+  memberCount: number;
+  payoutOrder: string[];
+  status: AjoCycleStatus;
+  nextContributionAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AjoContribution {
+  id: string;
+  cycleId: string;
+  memberUid: string;
+  amountMinor: number;
+  currency: WalletCurrency;
+  dueAt: string;
+  paidAt?: string;
+  status: 'pending' | 'paid' | 'late' | 'failed' | 'reversed' | 'disputed';
+  transactionId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
