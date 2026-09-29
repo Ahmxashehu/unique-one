@@ -68,6 +68,7 @@ export type UniqueAiPlatformSummary = {
   inventoryUnitCount: number;
   productsWithQuantity: number;
   productsOutOfStock: number;
+  productsWithInvalidQuantity: number;
   contextLimits: { orders: number; businesses: number; products: number };
   contextTruncated: { orders: boolean; businesses: boolean; products: boolean };
   contextComplete: boolean;
