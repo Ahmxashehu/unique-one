@@ -180,7 +180,7 @@ export default function StorePage() {
       </section>
 
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-        <Link to={currentUser ? '/store/saved' : '/login'} className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
+        <Link to={currentUser ? '/store/wishlist' : '/login'} className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
           <Heart className="w-5 h-5 text-rose-500" />
           <p className="font-semibold text-slate-900 mt-3">Saved</p>
           <p className="text-xs text-slate-500 mt-1">{currentUser ? `${wishlistCount} saved item${wishlistCount === 1 ? '' : 's'}` : 'Sign in to save items'}</p>
