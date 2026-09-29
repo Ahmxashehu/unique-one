@@ -45,7 +45,9 @@ export default function EducationPage() {
           getDocs(query(collection(db, 'educationCourses'), where('ownerUid', '==', currentUser.uid), orderBy('createdAt', 'desc'), limit(50))),
         ]);
         if (cancelled) return;
-        const institutionMap = new Map<string, EducationInstitution>();\n        [...publishedInstitutionSnap.docs, ...ownedInstitutionSnap.docs].forEach(d => institutionMap.set(d.id, { id: d.id, ...d.data(), createdAt: toIso(d.data().createdAt), updatedAt: toIso(d.data().updatedAt) } as EducationInstitution));\n        setInstitutions(Array.from(institutionMap.values()));
+        const institutionMap = new Map<string, EducationInstitution>();
+        [...publishedInstitutionSnap.docs, ...ownedInstitutionSnap.docs].forEach(d => institutionMap.set(d.id, { id: d.id, ...d.data(), createdAt: toIso(d.data().createdAt), updatedAt: toIso(d.data().updatedAt) } as EducationInstitution));
+        setInstitutions(Array.from(institutionMap.values()));
         setEnrollments(enrollmentSnap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: toIso(d.data().createdAt), updatedAt: toIso(d.data().updatedAt) } as EducationEnrollment)));
         setCourses(courseSnap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: toIso(d.data().createdAt), updatedAt: toIso(d.data().updatedAt) } as EducationCourse)));
       } catch (e) {
@@ -71,7 +73,26 @@ export default function EducationPage() {
     } catch (e) { console.error(e); setError('Could not create the institution profile.'); }
   };
 
-  const createEnrollment = async () => {\n    if (!currentUser || !enrollmentInstitutionId) return;\n    try {\n      const now = new Date().toISOString();\n      await addDoc(collection(db, 'educationEnrollments'), { studentUid: currentUser.uid, institutionId: enrollmentInstitutionId, programme: enrollmentProgramme.trim(), level: enrollmentLevel.trim(), status: 'active', createdAt: now, updatedAt: now });\n      setEnrollmentInstitutionId(''); setEnrollmentProgramme(''); setEnrollmentLevel(''); setShowEnrollmentForm(false);\n    } catch (e) { console.error(e); setError('Could not create the education enrollment.'); }\n  };\n\n  const publishInstitution = async (institution: EducationInstitution) => {\n    if (!currentUser || institution.ownerUid !== currentUser.uid) return;\n    try { await updateDoc(doc(db, 'educationInstitutions', institution.id), { status: 'published', updatedAt: new Date().toISOString() }); setInstitutions(items => items.map(i => i.id === institution.id ? { ...i, status: 'published' } : i)); } catch (e) { console.error(e); setError('Could not publish the institution.'); }\n  };\n\n  const publishCourse = async (course: EducationCourse) => {\n    if (!currentUser || course.ownerUid !== currentUser.uid) return;\n    try { await updateDoc(doc(db, 'educationCourses', course.id), { status: 'published', updatedAt: new Date().toISOString() }); setCourses(items => items.map(c => c.id === course.id ? { ...c, status: 'published' } : c)); } catch (e) { console.error(e); setError('Could not publish the course.'); }\n  };\n\n  const createCourse = async () => {
+  const createEnrollment = async () => {
+    if (!currentUser || !enrollmentInstitutionId) return;
+    try {
+      const now = new Date().toISOString();
+      await addDoc(collection(db, 'educationEnrollments'), { studentUid: currentUser.uid, institutionId: enrollmentInstitutionId, programme: enrollmentProgramme.trim(), level: enrollmentLevel.trim(), status: 'active', createdAt: now, updatedAt: now });
+      setEnrollmentInstitutionId(''); setEnrollmentProgramme(''); setEnrollmentLevel(''); setShowEnrollmentForm(false);
+    } catch (e) { console.error(e); setError('Could not create the education enrollment.'); }
+  };
+
+  const publishInstitution = async (institution: EducationInstitution) => {
+    if (!currentUser || institution.ownerUid !== currentUser.uid) return;
+    try { await updateDoc(doc(db, 'educationInstitutions', institution.id), { status: 'published', updatedAt: new Date().toISOString() }); setInstitutions(items => items.map(i => i.id === institution.id ? { ...i, status: 'published' } : i)); } catch (e) { console.error(e); setError('Could not publish the institution.'); }
+  };
+
+  const publishCourse = async (course: EducationCourse) => {
+    if (!currentUser || course.ownerUid !== currentUser.uid) return;
+    try { await updateDoc(doc(db, 'educationCourses', course.id), { status: 'published', updatedAt: new Date().toISOString() }); setCourses(items => items.map(c => c.id === course.id ? { ...c, status: 'published' } : c)); } catch (e) { console.error(e); setError('Could not publish the course.'); }
+  };
+
+  const createCourse = async () => {
     if (!currentUser || !selectedInstitutionId || !courseTitle.trim()) return;
     const ownsInstitution = institutions.some(i => i.id === selectedInstitutionId && i.ownerUid === currentUser.uid);
     if (!ownsInstitution) { setError('Select an institution you own.'); return; }
@@ -95,7 +116,8 @@ export default function EducationPage() {
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowInstitutionForm(v => !v)} className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-medium flex items-center gap-2"><Plus className="w-4 h-4" /> Institution</button>
-          <button onClick={() => setShowCourseForm(v => !v)} disabled={!institutions.some(i => i.ownerUid === currentUser?.uid)} className="px-4 py-2.5 rounded-xl bg-emerald-600 disabled:opacity-40 text-white text-sm font-medium flex items-center gap-2"><Plus className="w-4 h-4" /> Course</button>\n          <button onClick={() => setShowEnrollmentForm(v => !v)} className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium flex items-center gap-2"><Plus className="w-4 h-4" /> Enroll</button>
+          <button onClick={() => setShowCourseForm(v => !v)} disabled={!institutions.some(i => i.ownerUid === currentUser?.uid)} className="px-4 py-2.5 rounded-xl bg-emerald-600 disabled:opacity-40 text-white text-sm font-medium flex items-center gap-2"><Plus className="w-4 h-4" /> Course</button>
+          <button onClick={() => setShowEnrollmentForm(v => !v)} className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium flex items-center gap-2"><Plus className="w-4 h-4" /> Enroll</button>
         </div>
       </header>
 
