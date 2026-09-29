@@ -97,7 +97,7 @@ export default function StorePage() {
 
   return (
     <div className="min-h-full space-y-6 pb-8">
-      <section className="rounded-3xl bg-slate-900 text-white p-6 sm:p-8 overflow-hidden relative">
+      <section className="rounded-3xl bg-emerald-600 text-white p-4 sm:p-6 lg:p-8 overflow-hidden relative">
         <div className="relative z-10 max-w-3xl">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold">
             <Sparkles className="w-4 h-4" /> Unique Store
@@ -113,19 +113,19 @@ export default function StorePage() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search products and services..."
-                className="w-full rounded-xl bg-white text-slate-900 pl-10 pr-4 py-3.5 text-sm outline-none focus:ring-2 focus:ring-white/60"
+                className="w-full rounded-xl bg-white text-slate-900 pl-10 pr-4 py-4 text-sm outline-none focus:ring-2 focus:ring-white/60"
               />
             </div>
-            <button type="submit" className="rounded-xl bg-white text-slate-900 px-5 py-3 font-semibold text-sm hover:bg-slate-100">
+            <button type="submit" className="rounded-xl bg-slate-950 text-white px-5 py-3 font-bold text-sm hover:bg-slate-100">
               Search
             </button>
           </form>
         </div>
       </section>
 
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Link to="/store/search" className="bg-white border border-slate-200 rounded-2xl p-4 hover:border-slate-300 transition-colors">
-          <Package className="w-5 h-5 text-slate-700" />
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <Link to="/store/search" className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 transition-colors">
+          <Package className="w-5 h-5 text-emerald-700" />
           <p className="font-semibold text-slate-900 mt-3">All Products</p>
           <p className="text-xs text-slate-500 mt-1">Browse live listings</p>
         </Link>
@@ -152,14 +152,14 @@ export default function StorePage() {
             <h2 className="text-xl font-bold text-slate-900">Categories</h2>
             <p className="text-sm text-slate-500">Explore by what you need.</p>
           </div>
-          <Link to="/store/search" className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+          <Link to="/store/search" className="text-sm font-semibold text-emerald-700 flex items-center gap-1">
             See all <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           {categories.map(({ key, label, icon: Icon }) => (
-            <Link key={key} to={`/store/search?cat=${key}`} className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-3 hover:border-slate-300 hover:shadow-sm transition-all">
-              <span className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+            <Link key={key} to={`/store/search?cat=${key}`} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3 hover:border-emerald-300 hover:shadow-sm transition-all">
+              <span className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
                 <Icon className="w-5 h-5 text-slate-700" />
               </span>
               <span className="text-sm font-semibold text-slate-800">{label}</span>
@@ -171,8 +171,8 @@ export default function StorePage() {
       <section>
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Latest available</h2>
-            <p className="text-sm text-slate-500">Only published Store listings are shown.</p>
+            <h2 className="text-xl font-bold text-slate-900">Latest listings</h2>
+            <p className="text-sm text-slate-500">Fresh listings from the live Unique Store marketplace.</p>
           </div>
           <Link to="/store/search" className="text-sm font-semibold text-slate-700 flex items-center gap-1">
             View all <ArrowRight className="w-4 h-4" />
@@ -195,9 +195,9 @@ export default function StorePage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {visibleProducts.map(product => (
-              <Link key={product.id} to={`/store/product/${product.id}`} className="group bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-md transition-all">
+              <Link key={product.id} to={`/store/product/${product.id}`} className="group bg-white border border-slate-200 rounded-xl sm:rounded-2xl overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <div className="aspect-square bg-slate-100 overflow-hidden flex items-center justify-center">
                   {product.images?.[0] ? (
                     <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
