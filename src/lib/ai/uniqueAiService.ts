@@ -102,6 +102,58 @@ function validateAuthorizedContext(
 ): void {
   const { summary } = context;
 
+  const validateBoundedText = (value: unknown, field: string): void => {
+    if (typeof value !== "string" || !value.trim() || value.length > MAX_CONTEXT_STRING_LENGTH) {
+      throw new UniqueAiValidationError(`Authorized AI ${field} is invalid.`);
+    }
+  };
+  const validateOptionalBoundedText = (value: unknown, field: string): void => {
+    if (value !== undefined && (typeof value !== "string" || value.length > MAX_CONTEXT_STRING_LENGTH)) {
+      throw new UniqueAiValidationError(`Authorized AI ${field} is invalid.`);
+    }
+  };
+  const validateFiniteNumber = (value: unknown, field: string): void => {
+    if (value !== undefined && (typeof value !== "number" || !Number.isFinite(value))) {
+      throw new UniqueAiValidationError(`Authorized AI ${field} is invalid.`);
+    }
+  };
+
+  validateBoundedText(context.user.fullName, "user name");
+  if (context.user.uniqueOneId !== undefined) validateBoundedText(context.user.uniqueOneId, "user unique ID");
+  if (context.user.preferredLanguage !== undefined) validateBoundedText(context.user.preferredLanguage, "preferred language");
+  if (context.user.status !== undefined) validateBoundedText(context.user.status, "user status");
+  if (context.user.verificationStatus !== undefined) validateBoundedText(context.user.verificationStatus, "user verification status");
+  for (const role of context.user.roles) validateBoundedText(role, "user role");
+
+  for (const order of context.orders) {
+    validateBoundedText(order.id, "order ID");
+    validateBoundedText(order.side, "order side");
+    validateBoundedText(order.status, "order status");
+    validateBoundedText(order.currency, "order currency");
+    validateOptionalBoundedText(order.createdAt, "order timestamp");
+    validateFiniteNumber(order.totalAmount, "order total");
+    if (!Number.isSafeInteger(order.itemCount) || order.itemCount < 0) {
+      throw new UniqueAiValidationError("Authorized AI order item count is invalid.");
+    }
+  }
+  for (const business of context.businesses) {
+    validateBoundedText(business.id, "business ID");
+    validateBoundedText(business.name, "business name");
+    validateOptionalBoundedText(business.category, "business category");
+    validateOptionalBoundedText(business.status, "business status");
+    validateOptionalBoundedText(business.verificationStatus, "business verification status");
+    validateOptionalBoundedText(business.createdAt, "business timestamp");
+  }
+  for (const product of context.products) {
+    validateBoundedText(product.id, "product ID");
+    validateBoundedText(product.name, "product name");
+    validateOptionalBoundedText(product.category, "product category");
+    validateBoundedText(product.currency, "product currency");
+    validateOptionalBoundedText(product.status, "product status");
+    validateFiniteNumber(product.price, "product price");
+    validateFiniteNumber(product.quantity, "product quantity");
+  }
+
   const nonNegativeSafeInteger = (value: number): boolean =>
     Number.isSafeInteger(value) && value >= 0;
   const nonNegativeFiniteNumber = (value: number): boolean =>
