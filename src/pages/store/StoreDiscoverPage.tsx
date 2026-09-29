@@ -17,12 +17,12 @@ export default function StoreDiscoverPage() {
   const [error, setError] = useState('');
 
   const categories = [
-    { name: 'Electronics', icon: '💻', path: '/store/categories?cat=electronics' },
-    { name: 'Fashion', icon: '👕', path: '/store/categories?cat=fashion' },
-    { name: 'Agriculture', icon: '🌾', path: '/store/categories?cat=agriculture' },
-    { name: 'Building', icon: '🏗️', path: '/store/categories?cat=building_materials' },
-    { name: 'Vehicles', icon: '🚗', path: '/store/categories?cat=vehicles' },
-    { name: 'Services', icon: '🔧', path: '/store/categories?cat=services' },
+    { name: 'Electronics', icon: '💻', path: '/store/search?cat=electronics' },
+    { name: 'Fashion', icon: '👕', path: '/store/search?cat=fashion' },
+    { name: 'Agriculture', icon: '🌾', path: '/store/search?cat=agriculture' },
+    { name: 'Building', icon: '🏗️', path: '/store/search?cat=building_materials' },
+    { name: 'Vehicles', icon: '🚗', path: '/store/search?cat=vehicles' },
+    { name: 'Services', icon: '🔧', path: '/store/search?cat=services' },
   ];
 
   useEffect(() => {
@@ -108,7 +108,7 @@ export default function StoreDiscoverPage() {
       <div className="bg-slate-900 rounded-3xl p-8 md:p-12 text-center relative overflow-hidden">
         <div className="relative z-10 max-w-2xl mx-auto space-y-6">
           <h1 className="text-3xl md:text-5xl font-bold text-white tracking-tight">The Unique Marketplace</h1>
-          <p className="text-slate-300 text-lg">Find products, services, and wholesale deals directly from verified sellers.</p>
+          <p className="text-slate-300 text-lg">Find products, services, and bulk listings from sellers on Unique Store.</p>
           <form onSubmit={handleSearch} className="relative flex items-center">
             <Search className="absolute left-4 w-5 h-5 text-slate-400" />
             <input type="text" placeholder="Search products, sellers, or services..." value={searchText} onChange={e => setSearchText(e.target.value)} className="w-full pl-12 pr-32 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -140,14 +140,14 @@ export default function StoreDiscoverPage() {
         <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 flex flex-col items-start justify-center">
           <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-4"><Building2 className="w-6 h-6" /></div>
           <h2 className="text-2xl font-bold text-slate-900 mb-2">Verified Businesses</h2>
-          <p className="text-slate-500 mb-6">Shop from verified local businesses, agents, and service providers.</p>
-          <Link to="/store/search?filter=verified_sellers" className="text-emerald-600 font-medium hover:underline">Find Local Businesses →</Link>
+          <p className="text-slate-500 mb-6">Discover products and services from businesses and providers listed on Unique Store.</p>
+          <Link to="/store/search?filter=verified_sellers" className="text-emerald-600 font-medium hover:underline">Discover Local Listings →</Link>
         </div>
       </div>
 
       <div>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-slate-900">Featured Products</h2>
+          <h2 className="text-xl font-bold text-slate-900">Latest Listings</h2>
           <Link to="/store/search" className="text-sm font-medium text-blue-600 hover:underline">View all</Link>
         </div>
         {loading ? <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div> :
@@ -166,7 +166,7 @@ export default function StoreDiscoverPage() {
               <div className="p-4 flex flex-col flex-1">
                 <h3 className="text-sm font-medium text-slate-900 line-clamp-2 mb-1">{product.name}</h3>
                 <p className="text-lg font-bold text-slate-900 mt-auto">{product.currency === 'NGN' ? '₦' : '$'}{Number(product.price).toLocaleString()}</p>
-                <div className="flex items-center gap-1 text-xs text-slate-500 mt-2"><StoreIcon className="w-3 h-3" /><span className="truncate">Seller ID: {product.sellerId || 'Unavailable'}</span></div>
+                <div className="flex items-center gap-1 text-xs text-slate-500 mt-2"><StoreIcon className="w-3 h-3" /><span className="truncate">Seller: {product.sellerId || 'Unavailable'}</span></div>
               </div>
             </Link>
           ))}
