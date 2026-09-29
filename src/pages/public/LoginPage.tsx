@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Loader2, Mail, Lock } from 'lucide-react';
-import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword } from 'firebase/auth';
+import { getRedirectResult, signInWithRedirect, GoogleAuthProvider, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
 import { UniqueUser } from '../../lib/os/types';
@@ -16,6 +16,26 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
 
   const from = location.state?.from?.pathname || "/os/dashboard";
+
+  React.useEffect(() => {
+    let active = true;
+    setLoading(true);
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (active && result?.user) {
+          await handlePostLogin(result.user);
+        }
+      })
+      .catch((err: any) => {
+        if (!active) return;
+        console.error("Google redirect login error", err);
+        setError(err.message || 'Failed to authenticate with Google. Please try again.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   const handlePostLogin = async (user: any) => {
     const userDocRef = doc(db, 'users', user.uid);
@@ -79,7 +99,7 @@ export default function LoginPage() {
     
     try {
       const provider = new GoogleAuthProvider();
-      const userCredential = await signInWithPopup(auth, provider);
+      await signInWithRedirect(auth, provider);
       await handlePostLogin(userCredential.user);
     } catch (err: any) {
       console.error("Login error", err);
