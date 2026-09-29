@@ -442,6 +442,12 @@ function sanitizeAuditDuration(value: number): number {
   return Math.min(Math.round(value), MAX_AUDIT_DURATION_MS);
 }
 
+function sanitizeRequestId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return /^[A-Za-z0-9._:-]{1,64}$/.test(trimmed) ? trimmed : undefined;
+}
+
 function createAiRequestId(): string {
   return `ai_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`.slice(0, MAX_REQUEST_ID_LENGTH);
 }
@@ -546,7 +552,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
     throw new UniqueAiValidationError("GEMINI_MODEL is invalid.");
   }
   const model = configuredModel || DEFAULT_MODEL;
-  const requestId = createAiRequestId();
+  const requestId = sanitizeRequestId(input.requestId) || createAiRequestId();
   const startedAt = Date.now();
   try {
     const ai = new GoogleGenAI({ apiKey });
