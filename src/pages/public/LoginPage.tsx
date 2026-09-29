@@ -38,7 +38,6 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [phoneCode, setPhoneCode] = useState('');
   const [phoneStep, setPhoneStep] = useState<'phone' | 'code'>('phone');
-  const [phoneVerificationId, setPhoneVerificationId] = useState('');
   const [phoneConfirmation, setPhoneConfirmation] = useState<Awaited<ReturnType<typeof signInWithPhoneNumber>> | null>(null);
 
   const [email, setEmail] = useState('');
@@ -291,7 +290,7 @@ export default function LoginPage() {
     try {
       const provider = new PhoneAuthProvider(auth);
       const verificationId = await provider.verifyPhoneNumber(
-        { phoneNumber: normalized, session: undefined as never },
+        { phoneNumber: normalized },
         getRecaptchaVerifier()
       );
       setGateVerificationId(verificationId);
