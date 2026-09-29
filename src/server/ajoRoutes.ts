@@ -6,8 +6,12 @@ type Frequency = "weekly" | "monthly" | "custom";
 const frequencies = new Set<Frequency>(["weekly", "monthly", "custom"]);
 
 function uidFrom(req: Request) {
-  const uid = (req as Request & { user?: { uid?: string } }).user?.uid;
-  return typeof uid === "string" && uid.length > 0 ? uid : null;
+  const uid = (req as Request & { user?: { uid?: unknown } }).user?.uid;
+  return typeof uid === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(uid) ? uid : null;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function validAmount(value: unknown): value is number {
@@ -25,18 +29,28 @@ export function registerAjoRoutes(app: Express, authenticate: RequestHandler) {
 
     const snapshot = await getFirestore().collection("ajoCycles")
       .where("ownerUid", "==", uid)
-      .orderBy("updatedAt", "desc")
       .limit(50)
       .get();
 
-    return res.json({ cycles: snapshot.docs.map(doc => doc.data()) });
+    const cycles = snapshot.docs
+      .map(doc => doc.data())
+      .sort((a, b) => {
+        const aTime = a.updatedAt instanceof Timestamp ? a.updatedAt.toMillis() : 0;
+        const bTime = b.updatedAt instanceof Timestamp ? b.updatedAt.toMillis() : 0;
+        return bTime - aTime;
+      });
+
+    return res.json({ cycles });
   });
 
   app.post("/api/ajo/cycles", authenticate, async (req, res) => {
     const uid = uidFrom(req);
     if (!uid) return res.status(401).json({ error: { code: "UNAUTHENTICATED", message: "Authentication is required." } });
 
-    const body = req.body as Record<string, unknown>;
+    if (!isPlainObject(req.body)) {
+      return res.status(400).json({ error: { code: "INVALID_REQUEST", message: "The Cycle Ajo request body must be a plain object." } });
+    }
+    const body = req.body;
     const allowed = new Set(["name", "contributionAmountMinor", "memberCount", "frequency"]);
     if (!body || Object.keys(body).some(key => !allowed.has(key))) {
       return res.status(400).json({ error: { code: "INVALID_REQUEST", message: "Invalid Cycle Ajo fields." } });
