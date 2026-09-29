@@ -385,7 +385,11 @@ async function writeAiAuditLog(input: {
   }
 }
 
-function validateAiOutput(value: unknown): string {
+function isMutationRequest(message: string): boolean {
+  return /\b(change|send|cancel|approve|create|delete|refund|edit|update|modify|remove|transfer|pay|book)\b/i.test(message);
+}
+
+function validateAiOutput(value: unknown, requestMessage?: string): string {
   if (typeof value !== "string") {
     throw new Error("Gemini returned an invalid response.");
   }
@@ -442,7 +446,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
         maxOutputTokens: 1_000,
       },
     });
-    const output = validateAiOutput(response.text);
+    const output = validateAiOutput(response.text, prompt);
     await writeAiAuditLog({
       uid: input.uid,
       model,
