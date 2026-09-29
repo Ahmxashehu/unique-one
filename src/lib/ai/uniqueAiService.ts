@@ -419,10 +419,13 @@ const READ_ONLY_MUTATION_RESPONSE = "Unique AI is read-only right now and cannot
 function isMutationRequest(message: string): boolean {
   const action = "change|send|cancel|approve|create|delete|refund|edit|update|modify|remove|transfer|pay|book";
   const actionPattern = new RegExp(`\\b(?:${action})\\b`, "i");
+  const directRequestPattern = new RegExp(`^\\s*(?:please\\s+)?(?:${action})\\b`, "i");
+  const assistantRequestPattern = new RegExp(`\\b(?:can|could|would|will|please|help)\\s+you\\b`, "i");
+  const userIntentPattern = /\\b(?:i\\s+(?:want|need)|let\\s+me)\\b/i;
   return (
-    /^\\s*(?:please\\s+)?(?:${action})\\b/i.test(message) ||
-    /\\b(?:can|could|would|will|please|help)\\s+you\\b/i.test(message) && actionPattern.test(message) ||
-    /\\b(?:i\\s+(?:want|need)|let\\s+me)\\b.{0,40}${actionPattern.source}/i.test(message)
+    directRequestPattern.test(message) ||
+    (assistantRequestPattern.test(message) && actionPattern.test(message)) ||
+    (userIntentPattern.test(message) && actionPattern.test(message))
   );
 }
 
