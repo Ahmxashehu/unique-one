@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Search, ShoppingBag, Heart, Package, ArrowRight, Sparkles, MapPin, Clock3, Zap, Tag, ChevronRight,
-  Smartphone, Shirt, Home, Hammer, Sprout, Utensils, Car, Briefcase, Loader2
+  Smartphone, Shirt, Home, Hammer, Sprout, Utensils, Car, Briefcase, Loader2, Gem, PackageOpen, Layers3, Wheat, Tractor, Factory, Building2, Globe2
 } from 'lucide-react';
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -11,13 +11,24 @@ import { Product, ProductCategory } from '../lib/os/types';
 
 const categories: Array<{ key: ProductCategory; label: string; icon: React.ElementType }> = [
   { key: 'electronics', label: 'Electronics', icon: Smartphone },
+  { key: 'phones_accessories', label: 'Phones & Accessories', icon: Smartphone },
   { key: 'fashion', label: 'Fashion', icon: Shirt },
+  { key: 'shoes', label: 'Shoes', icon: PackageOpen },
+  { key: 'beauty', label: 'Beauty', icon: Gem },
   { key: 'home_furniture', label: 'Home & Furniture', icon: Home },
   { key: 'building_materials', label: 'Building Materials', icon: Hammer },
+  { key: 'cement', label: 'Cement', icon: Layers3 },
   { key: 'agriculture', label: 'Agriculture', icon: Sprout },
+  { key: 'fertilizer', label: 'Fertilizer', icon: Wheat },
+  { key: 'seeds', label: 'Seeds', icon: Sprout },
+  { key: 'farm_equipment', label: 'Farm Equipment', icon: Tractor },
   { key: 'food_groceries', label: 'Food & Groceries', icon: Utensils },
+  { key: 'machinery', label: 'Machinery', icon: Factory },
   { key: 'vehicles', label: 'Vehicles', icon: Car },
+  { key: 'property', label: 'Property', icon: Building2 },
   { key: 'services', label: 'Services', icon: Briefcase },
+  { key: 'digital_products', label: 'Digital Products', icon: Globe2 },
+  { key: 'other', label: 'Other', icon: Package },
 ];
 
 export default function StorePage() {
@@ -122,6 +133,22 @@ export default function StorePage() {
               Search
             </button>
           </form>
+        </div>
+      </section>
+
+      <section className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div><h2 className="text-lg font-bold text-slate-900">Shop by category</h2><p className="text-xs sm:text-sm text-slate-500">Explore every marketplace department already supported by Unique Store.</p></div>
+          <Link to="/store/search" className="hidden sm:inline-flex items-center gap-1 text-sm font-semibold text-emerald-700">All items <ChevronRight className="w-4 h-4" /></Link>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1 snap-x">
+          {categories.map(category => {
+            const Icon = category.icon;
+            return <Link key={category.key} to={`/store/search?cat=${category.key}`} className="min-w-[108px] sm:min-w-[124px] snap-start rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 hover:border-emerald-300 hover:bg-emerald-50 transition-colors">
+              <Icon className="w-5 h-5 text-emerald-700" />
+              <p className="text-xs sm:text-sm font-semibold text-slate-800 mt-2 line-clamp-2">{category.label}</p>
+            </Link>;
+          })}
         </div>
       </section>
 
