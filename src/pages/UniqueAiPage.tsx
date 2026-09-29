@@ -161,6 +161,7 @@ export default function UniqueAiPage() {
                   <button
                     key={prompt}
                     type="button"
+                    disabled={loading}
                     onClick={() => setMessage(prompt)}
                     className="rounded-xl border border-slate-200 p-3 text-left text-sm text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
                   >
@@ -230,6 +231,7 @@ export default function UniqueAiPage() {
               rows={2}
               maxLength={4000}
               disabled={loading || !currentUser}
+              aria-label="Message Unique AI"
               placeholder="Ask Unique AI…"
               className="min-h-[48px] flex-1 resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50"
             />
