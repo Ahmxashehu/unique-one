@@ -15,6 +15,8 @@ const MAX_MODEL_NAME_LENGTH = 100;
 const MAX_AUDIT_ERROR_TYPE_LENGTH = 64;
 const MAX_AUDIT_DURATION_MS = 120_000;
 const MODEL_REQUEST_TIMEOUT_MS = 30_000;
+const MAX_MODEL_OUTPUT_TOKENS = 1_000;
+const MAX_CONTEXT_WARNING_LENGTH = 240;
 
 const SYSTEM_INSTRUCTION = [
   "You are Unique AI, the assistant for the Unique One platform.",
@@ -223,7 +225,7 @@ function validateAuthorizedContext(
   if (!Number.isFinite(Date.parse(summary.contextLoadedAt))) {
     throw new UniqueAiValidationError("Authorized AI context timestamp is invalid.");
   }
-  if (summary.contextWarnings.some((warning) => typeof warning !== "string" || warning.length > 240)) {
+  if (summary.contextWarnings.some((warning) => typeof warning !== "string" || warning.length > MAX_CONTEXT_WARNING_LENGTH)) {
     throw new UniqueAiValidationError("Authorized AI context warnings are invalid.");
   }
 
@@ -405,7 +407,11 @@ function classifyAiError(error: unknown): string {
   if (error instanceof UniqueAiValidationError) {
     return error.message === READ_ONLY_MUTATION_RESPONSE ? "mutation_blocked" : "validation";
   }
-  if (error instanceof Error && /timed out/i.test(error.message)) return "timeout";
+  if (error instanceof Error) {
+    if (/timed out/i.test(error.message)) return "timeout";
+    if (/invalid response/i.test(error.message)) return "invalid_output";
+    if (/GEMINI_API_KEY/i.test(error.message)) return "configuration";
+  }
   return "generation";
 }
 
@@ -436,7 +442,7 @@ async function generateModelResponse(
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         temperature: 0.2,
-        maxOutputTokens: 1_000,
+        maxOutputTokens: MAX_MODEL_OUTPUT_TOKENS,
       },
     });
     const response = await Promise.race([responsePromise, timeoutPromise]);
