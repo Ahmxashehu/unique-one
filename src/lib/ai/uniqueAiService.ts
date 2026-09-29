@@ -34,6 +34,7 @@ const MODEL_SAFETY_SETTINGS: SafetySetting[] = [
 const SYSTEM_INSTRUCTION = [
   "You are Unique AI, the assistant for the Unique One platform.",
   "Be accurate, practical, and concise.",
+  "When the authorized user context includes a preferred language, answer in that language when practical; otherwise answer in clear English.",
   "Do not invent Unique One platform data, balances, orders, businesses, listings, bookings, users, or other records.",
   "This service is read-only: do not claim that you completed an action or changed platform data.",
   "For requests to change, send, cancel, approve, create, delete, refund, edit, or otherwise mutate platform records, clearly state that this read-only assistant cannot perform that action.",
@@ -645,6 +646,9 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
     const ai = new GoogleGenAI({ apiKey });
     const modelResult = await generateModelResponse(ai, model, contextualPrompt);
     const output = validateAiOutput(modelResult.text, prompt);
+    if (output.length > MAX_OUTPUT_LENGTH) {
+      throw new UniqueAiValidationError("The AI response is too long.");
+    }
     await writeAiAuditLog({
       uid: input.uid,
       requestId,
