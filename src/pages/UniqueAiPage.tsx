@@ -11,6 +11,8 @@ type ChatMessage = {
 const QUICK_PROMPTS = [
   "How does Unique AI protect my platform data?",
   "What happens if the AI service times out?",
+  "How does Unique AI handle temporary model failures?",
+  "Why might an AI answer be blocked or rejected?",
   "Can Unique AI make changes to my account?",
   "Are AI answers based on all my records or only loaded records?",
   "What can you help me with in Unique One?",
@@ -43,6 +45,7 @@ export default function UniqueAiPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
+  const [requestState, setRequestState] = useState<"idle" | "sending" | "retrying">("idle");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -66,6 +69,7 @@ export default function UniqueAiPage() {
       setMessages((current) => [...current, userMessage]);
     }
     setLoading(true);
+    setRequestState(retryMessage ? "retrying" : "sending");
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
 
@@ -114,6 +118,7 @@ export default function UniqueAiPage() {
     } finally {
       window.clearTimeout(timeoutId);
       setLoading(false);
+      setRequestState("idle");
     }
   };
 
@@ -194,7 +199,7 @@ export default function UniqueAiPage() {
               {loading && (
                 <div className="flex justify-start">
                   <div className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-500">
-                    Unique AI is thinking…
+                    {requestState === "retrying" ? "Retrying Unique AI…" : "Unique AI is thinking…"}
                   </div>
                 </div>
               )}
