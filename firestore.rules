@@ -128,12 +128,14 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/contributionRequests/$(request.resource.data.requestId)).data.status == 'published';
       allow update: if isAdmin()
         || (isAuthenticated()
-          && resource.data.contributorUid == request.auth.uid
           && request.resource.data.contributorUid == resource.data.contributorUid
           && request.resource.data.requesterUid == resource.data.requesterUid
           && request.resource.data.requestId == resource.data.requestId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt'])
-          && request.resource.data.status in ['pending','withdrawn']);
+          && (
+            (resource.data.contributorUid == request.auth.uid && request.resource.data.status in ['pending','withdrawn'])
+            || (resource.data.requesterUid == request.auth.uid && request.resource.data.status in ['accepted','rejected'])
+          ));
       allow delete: if isAdmin();
     }
     match /businesses/{businessId} {
