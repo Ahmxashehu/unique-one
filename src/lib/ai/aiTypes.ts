@@ -83,7 +83,6 @@ export type UniqueAiPlatformSummary = {
     ordersMissingTotals: number;
     businessesMissingNames: number;
     productsMissingNames: number;
-    productsWithInvalidQuantities: number;
   };
 };
 
