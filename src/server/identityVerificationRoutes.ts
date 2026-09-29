@@ -5,7 +5,6 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 type VerificationType = "nin" | "vNIN" | "bvn" | "bank_account" | "phone";
 type MatchInput = { firstName?: string; lastName?: string; dateOfBirth?: string; phone?: string };
 
-const db = getFirestore();
 const allowedTypes = new Set<VerificationType>(["nin", "vNIN", "bvn", "bank_account", "phone"]);
 
 function normalize(value: string) {
@@ -92,7 +91,7 @@ export function registerIdentityVerificationRoutes(app: Express, authenticate: R
     const uid = (req as Request & { user?: { uid?: string } }).user?.uid;
     if (!uid) return res.status(401).json({ error: { code: "UNAUTHENTICATED", message: "Authentication is required." } });
 
-    const snapshot = await db.collection("identityVerifications")
+    const snapshot = await getFirestore().collection("identityVerifications")
       .where("uid", "==", uid)
       .orderBy("updatedAt", "desc")
       .limit(20)
@@ -151,7 +150,7 @@ export function registerIdentityVerificationRoutes(app: Express, authenticate: R
       .update(uid + ":" + type + ":" + Date.now() + ":" + Math.random())
       .digest("hex");
 
-    await db.collection("identityVerifications").doc(verificationId).set({
+    await getFirestore().collection("identityVerifications").doc(verificationId).set({
       id: verificationId,
       uid,
       type,
