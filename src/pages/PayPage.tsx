@@ -1,7 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Wallet, ArrowUpRight, ArrowDownRight, FileText, Receipt, ShieldCheck, HelpCircle, Settings } from 'lucide-react';
+import {
+  ArrowDownRight, ArrowUpRight, Banknote, CalendarClock, CircleDollarSign,
+  FileText, Fingerprint, Landmark, Receipt, ShieldCheck, Smartphone,
+  Wallet, WalletCards, Users, Settings
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+
+const money = (minor: number) => '₦' + (minor / 100).toLocaleString('en-NG', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 export default function PayPage() {
   const { currentUser, loading: authLoading } = useAuth();
@@ -12,26 +21,15 @@ export default function PayPage() {
   useEffect(() => {
     if (authLoading) return;
     let cancelled = false;
-
     const loadWallet = async () => {
-      if (!currentUser) {
-        setWalletLoading(false);
-        return;
-      }
-
+      if (!currentUser) { setWalletLoading(false); return; }
       setWalletLoading(true);
       setWalletError('');
       try {
         const token = await currentUser.getIdToken();
-        const response = await fetch('/api/wallet', {
-          headers: { Authorization: 'Bearer ' + token },
-        });
-
+        const response = await fetch('/api/wallet', { headers: { Authorization: 'Bearer ' + token } });
         if (response.status === 404) {
-          const initializeResponse = await fetch('/api/wallet', {
-            method: 'POST',
-            headers: { Authorization: 'Bearer ' + token },
-          });
+          const initializeResponse = await fetch('/api/wallet', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
           if (!initializeResponse.ok) throw new Error('Unable to initialize wallet');
           const wallet = await initializeResponse.json() as { availableBalanceMinor?: unknown };
           const balance = Number(wallet.availableBalanceMinor);
@@ -39,7 +37,6 @@ export default function PayPage() {
           if (!cancelled) setBalanceMinor(balance);
           return;
         }
-
         if (!response.ok) throw new Error('Unable to load wallet');
         const wallet = await response.json() as { availableBalanceMinor?: unknown };
         const balance = Number(wallet.availableBalanceMinor);
@@ -52,106 +49,66 @@ export default function PayPage() {
         if (!cancelled) setWalletLoading(false);
       }
     };
-
     void loadWallet();
     return () => { cancelled = true; };
   }, [authLoading, currentUser]);
 
   if (authLoading) return null;
 
+  const quick = [
+    { to: '/os/pay/send', icon: ArrowUpRight, title: 'Send', text: 'UniquePay or bank' },
+    { to: '/os/pay/receive', icon: ArrowDownRight, title: 'Receive', text: 'ID, phone or temporary ID' },
+    { to: '/os/pay/ajo', icon: CircleDollarSign, title: 'Cycle Ajo', text: 'Group contribution cycles' },
+    { to: '/os/pay/verification', icon: ShieldCheck, title: 'Verify', text: 'NIN, BVN and account KYC' },
+  ];
+
+  const services = [
+    { to: '/os/pay/history', icon: Receipt, title: 'Transactions' },
+    { to: '/os/pay/beneficiaries', icon: Users, title: 'Beneficiaries' },
+    { to: '/os/pay/school-payments', icon: FileText, title: 'School fees' },
+    { to: '/os/pay/security', icon: ShieldCheck, title: 'Security' },
+  ];
+
+  const verification = [
+    { icon: Fingerprint, title: 'NIN / vNIN', text: 'Identity validation' },
+    { icon: Landmark, title: 'BVN', text: 'Bank identity validation' },
+    { icon: Banknote, title: 'Bank account', text: 'Account ownership check' },
+    { icon: Smartphone, title: 'Phone', text: 'Account phone verification' },
+  ];
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">UniquePay Dashboard</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage your payments, invoices, and receipts securely.</p>
+    <div className="space-y-6 pb-12 max-w-6xl mx-auto">
+      <section className="rounded-3xl bg-slate-950 p-6 text-white md:p-8">
+        <div className="flex items-start justify-between gap-4">
+          <div><p className="text-sm font-medium text-emerald-300">UNIQUEPAY</p><h1 className="mt-1 text-2xl font-bold">Money, identity and everyday payments</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">Your wallet, transfers, savings, Cycle Ajo and verification tools in one place.</p></div>
+          <Link to="/os/pay/settings" aria-label="UniquePay settings" className="rounded-xl bg-white/10 p-3 hover:bg-white/15"><Settings className="h-5 w-5" /></Link>
         </div>
-        <div className="flex gap-2">
-          <Link to="/os/pay/security" className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600">
-            <ShieldCheck className="w-5 h-5" />
-          </Link>
-          <Link to="/os/pay/settings" className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600">
-            <Settings className="w-5 h-5" />
-          </Link>
+        <div className="mt-6 rounded-2xl bg-emerald-500/15 p-5">
+          <p className="text-sm text-slate-300">Available Balance</p>
+          <p className="mt-1 text-4xl font-bold">{walletLoading ? 'Loading…' : balanceMinor === null ? '—' : money(balanceMinor)}</p>
+          {walletError && <p className="mt-2 text-sm text-amber-300">{walletError}</p>}
+          <div className="mt-5 flex flex-wrap gap-3"><Link to="/os/pay/send" className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950"><ArrowUpRight className="h-4 w-4" /> Send money</Link><Link to="/os/payment-requests/new" className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-white"><ArrowDownRight className="h-4 w-4" /> Request money</Link></div>
         </div>
-      </div>
+      </section>
 
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {quick.map(({ to, icon: Icon, title, text }) => <Link key={to} to={to} className="rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-emerald-300 hover:bg-emerald-50"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-950 text-emerald-300"><Icon className="h-5 w-5" /></div><h2 className="mt-3 text-sm font-semibold text-slate-900">{title}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{text}</p></Link>)}
+      </section>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        {/* Balances */}
-        <div className="md:col-span-2 bg-slate-900 text-white p-8 rounded-3xl relative overflow-hidden">
-          <div className="relative z-10">
-            <p className="text-slate-400 font-medium">Available Balance</p>
-            <h2 className="text-4xl md:text-5xl font-bold mt-2">
-              {walletLoading ? 'Loading…' : balanceMinor === null ? '—' : '₦' + (balanceMinor / 100).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </h2>
-            {walletError && <p className="text-sm text-amber-300 mt-2">{walletError}</p>}
-            <div className="flex gap-4 mt-8">
-              <Link to="/os/payment-requests/new" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
-                <ArrowDownRight className="w-4 h-4" /> Request Money
-              </Link>
-              <Link to="/os/pay/send" className="bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
-                <ArrowUpRight className="w-4 h-4" /> Send Money
-              </Link>
-            </div>
-          </div>
-          <div className="absolute top-0 right-0 -mt-8 -mr-8 w-48 h-48 bg-blue-500/30 blur-3xl rounded-full" />
-        </div>
+      <section className="rounded-3xl border border-slate-200 bg-white p-6">
+        <div className="flex items-center justify-between"><div><p className="text-sm font-medium text-emerald-600">Identity & KYC</p><h2 className="mt-1 text-xl font-bold text-slate-900">Verification Center</h2></div><Link to="/os/pay/verification" className="text-sm font-semibold text-emerald-700">View all</Link></div>
+        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">{verification.map(({ icon: Icon, title, text }) => <Link key={title} to="/os/pay/verification" className="rounded-2xl bg-slate-50 p-4"><Icon className="h-5 w-5 text-slate-700" /><p className="mt-3 text-sm font-semibold text-slate-900">{title}</p><p className="mt-1 text-xs text-slate-500">{text}</p><span className="mt-3 inline-block rounded-full bg-white px-2 py-1 text-[10px] font-medium text-slate-500">Provider required</span></Link>)}</div>
+      </section>
 
-        {/* Quick Links */}
-        <div className="bg-white border border-slate-200 p-6 rounded-3xl flex flex-col justify-between space-y-4">
-          <h3 className="font-semibold text-slate-900">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-3 flex-1">
-             <Link to="/os/invoices/new" className="bg-slate-50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-slate-100 transition-colors text-center text-sm font-medium text-slate-700">
-               <FileText className="w-6 h-6 text-indigo-500" />
-               Create Invoice
-             </Link>
-             <Link to="/os/pay/school-payments" className="bg-slate-50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-slate-100 transition-colors text-center text-sm font-medium text-slate-700">
-               <Receipt className="w-6 h-6 text-emerald-500" />
-               School Fees
-             </Link>
-             <Link to="/os/payment-requests" className="bg-slate-50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-slate-100 transition-colors text-center text-sm font-medium text-slate-700">
-               <ArrowDownRight className="w-6 h-6 text-blue-500" />
-               Requests
-             </Link>
-             <Link to="/os/pay/receive" className="bg-slate-50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-slate-100 transition-colors text-center text-sm font-medium text-slate-700">
-               <Wallet className="w-6 h-6 text-slate-600" />
-               Receive
-             </Link>
-          </div>
-        </div>
-      </div>
+      <section className="grid gap-4 md:grid-cols-2">
+        <Link to="/os/pay/ajo" className="rounded-3xl border border-slate-200 bg-white p-6 hover:border-emerald-300"><div className="flex items-center gap-3"><div className="rounded-xl bg-emerald-50 p-3"><CalendarClock className="h-6 w-6 text-emerald-600" /></div><div><p className="text-sm font-medium text-emerald-600">Savings</p><h2 className="font-bold text-slate-900">Cycle Ajo</h2></div></div><p className="mt-4 text-sm leading-6 text-slate-500">Create contribution rules, member count, schedule and payout order. Activation remains behind the regulated payment integration.</p></Link>
+        <div className="rounded-3xl border border-slate-200 bg-white p-6"><div className="flex items-center gap-3"><div className="rounded-xl bg-slate-100 p-3"><WalletCards className="h-6 w-6 text-slate-700" /></div><div><p className="text-sm font-medium text-slate-500">Financial tools</p><h2 className="font-bold text-slate-900">Payments & services</h2></div></div><div className="mt-4 grid grid-cols-2 gap-2">{services.map(({ to, icon: Icon, title }) => <Link key={to} to={to} className="rounded-xl bg-slate-50 px-3 py-3 text-xs font-semibold text-slate-700"><Icon className="mb-1 h-4 w-4 text-slate-500" />{title}</Link>)}</div></div>
+      </section>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white border border-slate-200 rounded-3xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-semibold text-slate-900">Recent Transactions</h3>
-            <Link to="/os/pay/history" className="text-sm text-blue-600 font-medium hover:underline">View All</Link>
-          </div>
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Wallet className="w-8 h-8 text-slate-400" />
-            </div>
-            <p className="text-sm font-medium text-slate-900">No recent transactions</p>
-            <p className="text-xs text-slate-500 mt-1">Your payment history will appear here.</p>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-3xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-semibold text-slate-900">Pending Requests</h3>
-            <Link to="/os/payment-requests" className="text-sm text-blue-600 font-medium hover:underline">View All</Link>
-          </div>
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <ArrowDownRight className="w-8 h-8 text-slate-400" />
-            </div>
-            <p className="text-sm font-medium text-slate-900">No pending requests</p>
-            <p className="text-xs text-slate-500 mt-1">You're all caught up.</p>
-          </div>
-        </div>
-      </div>
+      <section className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between"><h2 className="font-semibold text-slate-900">Recent Transactions</h2><Link to="/os/pay/history" className="text-sm font-semibold text-emerald-700">View All</Link></div><div className="py-10 text-center"><Wallet className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm font-medium text-slate-900">No recent transactions</p><p className="mt-1 text-xs text-slate-500">Real payment activity will appear here.</p></div></div>
+        <div className="rounded-3xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between"><h2 className="font-semibold text-slate-900">Account verification</h2><Link to="/os/pay/verification" className="text-sm font-semibold text-emerald-700">Open</Link></div><div className="mt-4 rounded-2xl bg-amber-50 p-4"><p className="text-sm font-semibold text-amber-900">Provider integrations pending</p><p className="mt-1 text-xs leading-5 text-amber-800">The UI is ready, but UniquePay will only display a verified NIN/BVN result after an authorized provider returns it.</p></div></div>
+      </section>
     </div>
   );
 }
