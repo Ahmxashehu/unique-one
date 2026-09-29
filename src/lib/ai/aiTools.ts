@@ -237,6 +237,7 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
     products,
     summary: {
       schemaVersion: 1,
+      summaryVersion: "ai-40",
       orderCount: orders.length,
       customerOrderCount: orders.filter((order) => order.side === "customer").length,
       sellerOrderCount: orders.filter((order) => order.side === "seller").length,
@@ -271,6 +272,7 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
         businesses: contextTruncated.businesses,
         products: contextTruncated.products,
       },
+      contextComplete: !contextTruncated.orders && !contextTruncated.businesses && !contextTruncated.products,
       contextLoadedAt: new Date().toISOString(),
       coverage: {
         ordersLoaded: orders.length,
@@ -285,6 +287,7 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
         businessesMissingNames,
         productsMissingNames,
       },
+      requestScope: "authorized-user-context",
       contextWarnings: [
         ...(ordersMissingTotals > 0
           ? [`Loaded order context has ${ordersMissingTotals} record(s) without a supplied total amount.`]
