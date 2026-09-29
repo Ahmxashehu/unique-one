@@ -1,3 +1,10 @@
+export type UniqueAiCapabilityContract = {
+  version: 1;
+  readOnly: true;
+  contexts: readonly ["account", "orders", "businesses", "products"];
+  mutations: readonly [];
+};
+
 export type UniqueAiUserContext = {
   fullName: string;
   uniqueOneId?: string;
