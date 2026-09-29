@@ -85,4 +85,5 @@ export type UniqueAiRequest = {
   uid: string;
   message: unknown;
   history?: unknown;
+  requestId?: unknown;
 };
