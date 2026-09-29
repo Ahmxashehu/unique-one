@@ -389,6 +389,7 @@ const app = express();
         return res.status(400).json({
           error: { code: "INVALID_REQUEST", message: "x-request-id is invalid." },
           requestId: resolvedRequestId,
+          capabilities: UNIQUE_AI_CAPABILITIES,
         });
       }
       const responseText = await generateUniqueAiResponse({ uid, message, history, requestId: resolvedRequestId });
@@ -400,10 +401,10 @@ const app = express();
       });
     } catch (error) {
       if (error instanceof UniqueAiValidationError) {
-        return res.status(400).json({ error: { code: "INVALID_REQUEST", message: error.message }, requestId: resolvedRequestId });
+        return res.status(400).json({ error: { code: "INVALID_REQUEST", message: error.message }, requestId: resolvedRequestId, capabilities: UNIQUE_AI_CAPABILITIES });
       }
       console.error('Unique AI request failed:', { requestId: resolvedRequestId, error });
-      return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Unique AI is temporarily unavailable. Please try again shortly." }, requestId: resolvedRequestId });
+      return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Unique AI is temporarily unavailable. Please try again shortly." }, requestId: resolvedRequestId, capabilities: UNIQUE_AI_CAPABILITIES });
     }
   });
 
