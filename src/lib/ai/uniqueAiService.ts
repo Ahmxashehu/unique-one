@@ -263,6 +263,22 @@ function validateAuthorizedContext(
     throw new UniqueAiValidationError("Authorized AI order-side counts do not match loaded order counts.");
   }
 
+  const refundedOrderCount = summary.orderStatusCounts.refunded ?? 0;
+  const unknownOrderCount = summary.orderStatusCounts.unknown ?? 0;
+  if (
+    summary.activeOrderCount + summary.cancelledOrderCount + refundedOrderCount !== summary.orderCount ||
+    summary.ordersWithUnknownStatus !== unknownOrderCount
+  ) {
+    throw new UniqueAiValidationError("Authorized AI order status totals are inconsistent.");
+  }
+  if (
+    summary.contextLimits.orders !== 20 ||
+    summary.contextLimits.businesses !== 5 ||
+    summary.contextLimits.products !== 30
+  ) {
+    throw new UniqueAiValidationError("Authorized AI context limits are unsupported.");
+  }
+
   if (
     summary.productsWithoutQuantity + summary.productsWithQuantity + summary.productsOutOfStock > summary.productCount
   ) {
