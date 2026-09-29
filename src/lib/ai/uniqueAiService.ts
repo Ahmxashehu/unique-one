@@ -238,7 +238,7 @@ function validateAuthorizedContext(
   if (!Number.isFinite(Date.parse(summary.contextLoadedAt))) {
     throw new UniqueAiValidationError("Authorized AI context timestamp is invalid.");
   }
-  if (summary.contextWarnings.some((warning) => typeof warning !== "string" || warning.length > MAX_CONTEXT_WARNING_LENGTH)) {
+  if (summary.contextWarnings.some((warning) => typeof warning !== "string" || warning.length > MAX_CONTEXT_WARNING_LENGTH || !warning.trim())) {
     throw new UniqueAiValidationError("Authorized AI context warnings are invalid.");
   }
 
@@ -427,8 +427,12 @@ function classifyAiError(error: unknown): string {
   }
   if (error instanceof Error) {
     if (/timed out/i.test(error.message)) return "timeout";
-    if (/invalid response/i.test(error.message)) return "invalid_output";
-    if (/GEMINI_API_KEY/i.test(error.message)) return "configuration";
+    if (/safety filters|safety/i.test(error.message)) return "safety_blocked";
+    if (/recitation/i.test(error.message)) return "recitation_blocked";
+    if (/invalid response|unsupported action claim|empty response/i.test(error.message)) return "invalid_output";
+    if (/GEMINI_API_KEY|GEMINI_MODEL/i.test(error.message)) return "configuration";
+    if (/429|rate limit/i.test(error.message)) return "rate_limited";
+    if (/503|unavailable|temporar/i.test(error.message)) return "transient_model_error";
   }
   return "generation";
 }
@@ -592,7 +596,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
       requestId,
       model,
       success: false,
-      durationMs: Date.now() - startedAt,
+      durationMs: sanitizeAuditDuration(Date.now() - startedAt),
       outputLength: 0,
       errorType: sanitizeAuditErrorType(classifyAiError(error)),
       context,
