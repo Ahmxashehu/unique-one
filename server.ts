@@ -358,19 +358,32 @@ async function startServer() {
       const requestIdHeader = req.headers["x-request-id"];
       const requestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
       if (requestId !== undefined && (typeof requestId !== "string" || !/^[A-Za-z0-9._:-]{1,64}$/.test(requestId.trim()))) {
+        res.setHeader("Cache-Control", "no-store");
         return errorResponse(res, 'INVALID_REQUEST', 'x-request-id is invalid.');
       }
-      const responseText = await generateUniqueAiResponse({ uid, message, history, requestId });
-      if (typeof requestId === "string" && requestId.trim()) {
-        res.setHeader("X-Request-ID", requestId.trim());
-      }
+      const resolvedRequestId = typeof requestId === "string" && requestId.trim()
+        ? requestId.trim()
+        : `ai_${randomUUID().replace(/-/g, "")}`.slice(0, 64);
+      const responseText = await generateUniqueAiResponse({ uid, message, history, requestId: resolvedRequestId });
+      res.setHeader("X-Request-ID", resolvedRequestId);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({
         message: responseText,
         readOnly: true,
-        ...(typeof requestId === "string" && requestId.trim() ? { requestId: requestId.trim() } : {}),
+        requestId: resolvedRequestId,
       });
     } catch (error) {
+      res.setHeader("Cache-Control", "no-store");
+      const requestIdHeader = req.headers["x-request-id"];
+      const requestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
+      if (typeof requestId === "string" && /^[A-Za-z0-9._:-]{1,64}$/.test(requestId.trim())) {
+        res.setHeader("X-Request-ID", requestId.trim());
+        if (error instanceof UniqueAiValidationError) {
+          return res.status(400).json({ error: { code: "INVALID_REQUEST", message: error.message }, requestId: requestId.trim() });
+        }
+        console.error('Unique AI request failed:', { requestId: requestId.trim(), error });
+        return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Unique AI is temporarily unavailable. Please try again shortly." }, requestId: requestId.trim() });
+      }
       if (error instanceof UniqueAiValidationError) {
         return errorResponse(res, 'INVALID_REQUEST', error.message);
       }
