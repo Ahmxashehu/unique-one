@@ -299,6 +299,16 @@ function idempotencyDocumentId(senderUid: string, idempotencyKey: string) {
   // of separator characters, while keeping the Firestore document ID bounded.
   return createHash('sha256').update(senderUid + '\0' + idempotencyKey).digest('hex');
 }
+
+function resolveAiRequestId(req: Request): string {
+  const requestIdHeader = req.headers["x-request-id"];
+  const suppliedRequestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
+  if (typeof suppliedRequestId === "string") {
+    const trimmed = suppliedRequestId.trim();
+    if (/^[A-Za-z0-9._:-]{1,64}$/.test(trimmed)) return trimmed;
+  }
+  return `ai_${randomUUID().replace(/-/g, "")}`.slice(0, 64);
+}
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
@@ -336,14 +346,14 @@ async function startServer() {
       const uid = (req as any).user?.uid;
       return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
     },
-    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many AI requests. Please try again shortly.'),
+    handler: (req, res) => {
+      const requestId = resolveAiRequestId(req);
+      res.setHeader("X-Request-ID", requestId);
+      res.setHeader("Cache-Control", "no-store");
+      return errorResponse(res, 'RATE_LIMITED', 'Too many AI requests. Please try again shortly.');
+    },
   }), async (req, res) => {
-    const requestIdHeader = req.headers["x-request-id"];
-    const suppliedRequestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
-    const resolvedRequestId =
-      typeof suppliedRequestId === "string" && /^[A-Za-z0-9._:-]{1,64}$/.test(suppliedRequestId.trim())
-        ? suppliedRequestId.trim()
-        : `ai_${randomUUID().replace(/-/g, "")}`.slice(0, 64);
+    const resolvedRequestId = resolveAiRequestId(req);
     res.setHeader("X-Request-ID", resolvedRequestId);
     res.setHeader("Cache-Control", "no-store");
     try {
@@ -351,7 +361,7 @@ async function startServer() {
         return errorResponse(res, 'INVALID_REQUEST', 'The AI request body must be a plain object.');
       }
       const payload = req.body as Record<string, unknown>;
-      const allowedKeys = new Set(['message', 'history', 'requestId']);
+      const allowedKeys = new Set(['message', 'history']);
       for (const key of Object.keys(payload)) {
         if (!allowedKeys.has(key)) {
           return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
