@@ -240,6 +240,31 @@ function validateAuthorizedContext(
   ) {
     throw new UniqueAiValidationError("Authorized AI summary contains invalid breakdown counts.");
   }
+
+  const sumCounts = (counts: Record<string, number>): number =>
+    Object.values(counts).reduce((total, count) => total + count, 0);
+
+  if (
+    sumCounts(summary.orderStatusCounts) !== summary.orderCount ||
+    sumCounts(summary.orderSideStatusCounts) !== summary.orderCount ||
+    sumCounts(summary.businessCategoryCounts) !== summary.businessCount ||
+    sumCounts(summary.businessStatusCounts) !== summary.businessCount ||
+    sumCounts(summary.businessVerificationCounts) !== summary.businessCount ||
+    sumCounts(summary.productCategoryCounts) !== summary.productCount ||
+    sumCounts(summary.productStatusCounts) !== summary.productCount
+  ) {
+    throw new UniqueAiValidationError("Authorized AI summary breakdown totals do not match loaded record counts.");
+  }
+
+  if (summary.customerOrderCount + summary.sellerOrderCount !== summary.orderCount) {
+    throw new UniqueAiValidationError("Authorized AI order-side counts do not match loaded order counts.");
+  }
+
+  if (
+    summary.productsWithoutQuantity + summary.productsWithQuantity + summary.productsOutOfStock > summary.productCount
+  ) {
+    throw new UniqueAiValidationError("Authorized AI product quantity metadata is inconsistent.");
+  }
   if (!Number.isFinite(Date.parse(summary.contextLoadedAt))) {
     throw new UniqueAiValidationError("Authorized AI context timestamp is invalid.");
   }
