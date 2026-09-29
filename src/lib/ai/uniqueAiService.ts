@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import type { SafetySetting } from "@google/genai";
 import { getAuthorizedPlatformContext } from "./aiTools";
 import type { UniqueAiConversationTurn, UniqueAiRequest } from "./aiTypes";
 
@@ -19,7 +20,7 @@ const MODEL_REQUEST_TIMEOUT_MS = 30_000;
 const MAX_MODEL_OUTPUT_TOKENS = 1_000;
 const MAX_CONTEXT_WARNING_LENGTH = 240;
 const AI_CONTEXT_SCHEMA_VERSION = 1;
-const MODEL_SAFETY_SETTINGS = [
+const MODEL_SAFETY_SETTINGS: SafetySetting[] = [
   { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
   { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
   { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
