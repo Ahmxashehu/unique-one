@@ -269,6 +269,15 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
         productsMissingNames,
       },
       contextWarnings: [
+        ...(ordersMissingTotals > 0
+          ? [`Loaded order context has ${ordersMissingTotals} record(s) without a supplied total amount.`]
+          : []),
+        ...(businessesMissingNames > 0
+          ? [`Loaded business context has ${businessesMissingNames} record(s) using the fallback unnamed label.`]
+          : []),
+        ...(productsMissingNames > 0
+          ? [`Loaded product context has ${productsMissingNames} record(s) using the fallback unnamed label.`]
+          : []),
         ...(contextTruncated.orders
           ? [`Order context reached its limit of ${MAX_ORDER_CONTEXT} loaded records; additional records were not included.`]
           : []),
