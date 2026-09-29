@@ -46,6 +46,7 @@ export default function UniqueAiPage() {
   const [error, setError] = useState("");
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
   const [requestState, setRequestState] = useState<"idle" | "sending" | "retrying">("idle");
+  const [lastRequestId, setLastRequestId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -104,10 +105,15 @@ export default function UniqueAiPage() {
         throw new Error("Unique AI returned a mismatched request ID.");
       }
 
+      if (typeof payload?.requestId !== "string" || !/^[A-Za-z0-9._:-]{1,64}$/.test(payload.requestId)) {
+        throw new Error("Unique AI returned an invalid request ID.");
+      }
+
       if (typeof payload?.message !== "string" || !payload.message.trim()) {
         throw new Error("Unique AI returned an empty response.");
       }
 
+      setLastRequestId(payload.requestId);
       setMessages((current) => [
         ...current,
         { id: crypto.randomUUID(), role: "assistant", text: payload.message!.trim() },
@@ -131,6 +137,7 @@ export default function UniqueAiPage() {
     setMessages([]);
     setError("");
     setLastFailedMessage(null);
+    setLastRequestId(null);
   };
 
   return (
@@ -257,7 +264,9 @@ export default function UniqueAiPage() {
           </div>
           <div className="mt-2 flex items-center justify-between gap-3 px-1 text-xs text-slate-400">
             <span>Read-only assistant for now. Each request is traceable with a temporary request ID; it cannot change payments, orders, products, or other platform records. Answers use only authorized records loaded for the current request and may be incomplete when a context limit is reached.</span>
-            <span aria-live="polite">{message.length}/4000</span>
+            <span className="text-right" aria-live="polite">
+              {lastRequestId ? `Request: ${lastRequestId}` : "Request ID will appear after a response"} · {message.length}/4000
+            </span>
           </div>
         </form>
       </div>
