@@ -8,6 +8,7 @@ const MAX_PROMPT_LENGTH = 4_000;
 const MAX_OUTPUT_LENGTH = 8_000;
 const MAX_HISTORY_TURNS = 6;
 const MAX_HISTORY_TEXT_LENGTH = 1_000;
+const MAX_HISTORY_TOTAL_LENGTH = 6_000;
 const MAX_CONTEXT_JSON_LENGTH = 60_000;
 const MAX_MODEL_NAME_LENGTH = 100;
 
@@ -70,6 +71,7 @@ function getHistory(value: unknown): UniqueAiConversationTurn[] {
     );
   }
 
+  let totalLength = 0;
   return value.map((turn, index) => {
     if (!turn || typeof turn !== "object") {
       throw new UniqueAiValidationError(`history turn ${index + 1} is invalid.`);
@@ -86,6 +88,10 @@ function getHistory(value: unknown): UniqueAiConversationTurn[] {
       throw new UniqueAiValidationError(
         `history turn ${index + 1} must contain 1-${MAX_HISTORY_TEXT_LENGTH} characters.`,
       );
+    }
+    totalLength += text.length;
+    if (totalLength > MAX_HISTORY_TOTAL_LENGTH) {
+      throw new UniqueAiValidationError(`history exceeds the maximum combined length of ${MAX_HISTORY_TOTAL_LENGTH} characters.`);
     }
     return { role: candidate.role, text };
   });
