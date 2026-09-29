@@ -18,6 +18,8 @@ const MAX_AUDIT_DURATION_MS = 120_000;
 const MAX_REQUEST_ID_LENGTH = 64;
 const MODEL_REQUEST_TIMEOUT_MS = 30_000;
 const MAX_MODEL_OUTPUT_TOKENS = 1_000;
+const MAX_MODEL_ATTEMPTS = 2;
+const MODEL_RETRY_DELAY_MS = 250;
 const MAX_CONTEXT_WARNING_LENGTH = 240;
 const AI_CONTEXT_SCHEMA_VERSION = 1;
 const MODEL_SAFETY_SETTINGS: SafetySetting[] = [
@@ -429,7 +431,7 @@ function classifyAiError(error: unknown): string {
     if (/timed out/i.test(error.message)) return "timeout";
     if (/safety filters|safety/i.test(error.message)) return "safety_blocked";
     if (/recitation/i.test(error.message)) return "recitation_blocked";
-    if (/invalid response|unsupported action claim|empty response/i.test(error.message)) return "invalid_output";
+    if (/invalid response|unsupported action claim|empty response|truncated by the output limit/i.test(error.message)) return "invalid_output";
     if (/GEMINI_API_KEY|GEMINI_MODEL/i.test(error.message)) return "configuration";
     if (/429|rate limit/i.test(error.message)) return "rate_limited";
     if (/503|unavailable|temporar/i.test(error.message)) return "transient_model_error";
@@ -471,7 +473,7 @@ async function generateModelResponse(
   try {
     let response: Awaited<ReturnType<typeof ai.models.generateContent>> | undefined;
     let lastError: unknown;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    for (let attempt = 0; attempt < MAX_MODEL_ATTEMPTS; attempt += 1) {
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
       try {
         const timeoutPromise = new Promise<never>((_, reject) => {
@@ -491,8 +493,8 @@ async function generateModelResponse(
         break;
       } catch (error) {
         lastError = error;
-        if (attempt === 1 || !isLikelyTransientModelError(error)) throw error;
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        if (attempt === MAX_MODEL_ATTEMPTS - 1 || !isLikelyTransientModelError(error)) throw error;
+        await new Promise((resolve) => setTimeout(resolve, MODEL_RETRY_DELAY_MS));
       } finally {
         if (timeoutId) clearTimeout(timeoutId);
       }
@@ -509,6 +511,9 @@ async function generateModelResponse(
     }
     if (finishReason === "RECITATION") {
       throw new Error("Gemini response was blocked by recitation controls.");
+    }
+    if (finishReason === "MAX_TOKENS") {
+      throw new Error("Gemini response was truncated by the output limit.");
     }
     return response.text;
   } finally {
