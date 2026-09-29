@@ -385,7 +385,6 @@ async function startServer() {
       console.error('Unique AI request failed:', { requestId: resolvedRequestId, error });
       return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Unique AI is temporarily unavailable. Please try again shortly." }, requestId: resolvedRequestId });
     }
-    }
   });
 
   app.post("/api/business/staff/accept-invite", rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
