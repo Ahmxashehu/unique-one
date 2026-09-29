@@ -30,6 +30,7 @@ export default function AppLayout() {
     { name: 'My Requests', path: '/os/requests', icon: ClipboardList },
     { name: 'UniquePay', path: '/os/pay', icon: Wallet },
     { name: 'Unique AI', path: '/os/ai', icon: Sparkles },
+    { name: 'Jobs', path: '/os/jobs', icon: Briefcase },
     { name: 'Contributions', path: '/os/contributions', icon: HeartHandshake },
   ];
 
