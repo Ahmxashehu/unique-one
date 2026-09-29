@@ -227,7 +227,10 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
     (product) => typeof product.quantity === "number" && product.quantity > 0,
   ).length;
   const productsOutOfStock = products.filter(
-    (product) => typeof product.quantity === "number" && product.quantity <= 0,
+    (product) => typeof product.quantity === "number" && product.quantity === 0,
+  ).length;
+  const productsWithInvalidQuantity = products.filter(
+    (product) => typeof product.quantity === "number" && (!Number.isSafeInteger(product.quantity) || product.quantity < 0),
   ).length;
 
   return {
@@ -262,6 +265,7 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
       inventoryUnitCount,
       productsWithQuantity,
       productsOutOfStock,
+      productsWithInvalidQuantity,
       contextLimits: {
         orders: MAX_ORDER_CONTEXT,
         businesses: MAX_BUSINESS_CONTEXT,
