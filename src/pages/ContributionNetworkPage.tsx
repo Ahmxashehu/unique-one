@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { addDoc, collection, getDocs, limit, orderBy, query, serverTimestamp, where } from "firebase/firestore";
+import { addDoc, collection, getDocs, limit , orderBy, query, serverTimestamp, where } from "firebase/firestore";
 import { HeartHandshake, Plus, ClipboardList, Users, Clock3, CheckCircle2, Loader2 } from "lucide-react";
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
@@ -49,8 +49,8 @@ export default function ContributionNetworkPage() {
     setNotice("");
     try {
       const [publishedSnap, ownedSnap] = await Promise.all([
-        getDocs(query(collection(db, "contributionRequests"), where("status", "==", "published"), orderBy("createdAt", "desc"), limit(50))),
-        getDocs(query(collection(db, "contributionRequests"), where("requesterUid", "==", currentUser.uid), orderBy("createdAt", "desc"), limit(50))),
+        getDocs(query(collection(db, "contributionRequests"), where("status", "==", "published"), limit(50))),
+        getDocs(query(collection(db, "contributionRequests"), where("requesterUid", "==", currentUser.uid), limit(50))),
       ]);
       const map = new Map<string, ContributionRequest>();
       [...publishedSnap.docs, ...ownedSnap.docs].forEach((item) => {
