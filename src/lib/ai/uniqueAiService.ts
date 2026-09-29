@@ -228,6 +228,7 @@ function validateAuthorizedContext(
       summary.productsWithoutQuantity,
       summary.productsWithQuantity,
       summary.productsOutOfStock,
+      summary.productsWithInvalidQuantity,
       summary.contextLimits.orders,
       summary.contextLimits.businesses,
       summary.contextLimits.products,
@@ -411,7 +412,10 @@ function validateAuthorizedContext(
     (product) => typeof product.quantity === "number" && product.quantity > 0,
   ).length;
   const productOutOfStockCount = context.products.filter(
-    (product) => typeof product.quantity === "number" && product.quantity <= 0,
+    (product) => typeof product.quantity === "number" && product.quantity === 0,
+  ).length;
+  const productInvalidQuantityCount = context.products.filter(
+    (product) => typeof product.quantity === "number" && (!Number.isSafeInteger(product.quantity) || product.quantity < 0),
   ).length;
   const productWithoutCategoryCount = context.products.filter((product) => !product.category).length;
   const productWithoutStatusCount = context.products.filter((product) => !product.status).length;
@@ -423,16 +427,17 @@ function validateAuthorizedContext(
   const inventoryMissingQuantityCount = context.products.filter(
     (product) => product.quantity === undefined,
   ).length;
-  const inventoryKnownCount = productQuantityCount + productOutOfStockCount;
+  const inventoryKnownCount = productQuantityCount + productOutOfStockCount + productInvalidQuantityCount;
   const inventoryUnitCount = context.products.reduce(
     (total, product) =>
       total + (typeof product.quantity === "number" && product.quantity > 0 ? product.quantity : 0),
     0,
   );
   if (summary.productsWithQuantity !== productQuantityCount ||
+      summary.productsWithInvalidQuantity !== productInvalidQuantityCount ||
       summary.productsOutOfStock !== productOutOfStockCount ||
       summary.productsWithoutQuantity !== inventoryMissingQuantityCount ||
-      summary.productsWithQuantity + summary.productsOutOfStock + summary.productsWithoutQuantity !== summary.productCount ||
+      summary.productsWithQuantity + summary.productsOutOfStock + summary.productsWithInvalidQuantity + summary.productsWithoutQuantity !== summary.productCount ||
       summary.productsWithoutCategory !== productWithoutCategoryCount ||
       summary.productsWithUnknownStatus !== productWithoutStatusCount ||
       summary.businessesWithoutCategory !== businessWithoutCategoryCount ||
