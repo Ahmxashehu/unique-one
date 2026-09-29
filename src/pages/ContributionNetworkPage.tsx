@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { HeartHandshake, Plus, ClipboardList, Users, Clock3, CheckCircle2 } from "lucide-react";
 
 const categories = [
@@ -19,7 +19,7 @@ export default function ContributionNetworkPage() {
   const [description, setDescription] = useState("");
   const [notice, setNotice] = useState("");
 
-  const submitRequest = (event: React.FormEvent) => {
+  const submitRequest = (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim() || !description.trim()) {
       setNotice("Please provide a title and describe what contribution is needed.");
