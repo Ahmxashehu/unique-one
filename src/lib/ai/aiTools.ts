@@ -195,7 +195,6 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
   const ordersMissingTotals = orders.filter((order) => order.totalAmount === undefined).length;
   const businessesMissingNames = businesses.filter((business) => !business.name.trim() || business.name === "Unnamed business").length;
   const productsMissingNames = products.filter((product) => !product.name.trim() || product.name === "Unnamed product").length;
-  const productsWithInvalidQuantities = products.filter((product) => product.quantity !== undefined && (!Number.isFinite(product.quantity) || product.quantity < 0)).length;
 
   const inventoryUnitCount = products.reduce(
     (total, product) =>
@@ -268,7 +267,6 @@ export async function getAuthorizedPlatformContext(uid: string): Promise<UniqueA
         ordersMissingTotals,
         businessesMissingNames,
         productsMissingNames,
-        productsWithInvalidQuantities,
       },
       contextWarnings: [
         ...(contextTruncated.orders
