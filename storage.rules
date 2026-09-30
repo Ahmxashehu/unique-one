@@ -30,9 +30,12 @@ service firebase.storage {
       allow read: if true;
       allow create, update: if signedIn()
         && request.auth.uid == uid
+        && firestore.get(/databases/(default)/documents/products/$(productId)).data.sellerId == request.auth.uid
         && validImage()
         && request.resource.size <= 5 * 1024 * 1024;
-      allow delete: if signedIn() && request.auth.uid == uid;
+      allow delete: if signedIn()
+        && request.auth.uid == uid
+        && firestore.get(/databases/(default)/documents/products/$(productId)).data.sellerId == request.auth.uid;
     }
 
     // Private profile media. Users may manage only their own profile image.
@@ -69,9 +72,12 @@ service firebase.storage {
       allow read: if true;
       allow create, update: if signedIn()
         && request.auth.uid == uid
+        && firestore.get(/databases/(default)/documents/businesses/$(businessId)).data.ownerUid == request.auth.uid
         && validImage()
         && request.resource.size <= 5 * 1024 * 1024;
-      allow delete: if signedIn() && request.auth.uid == uid;
+      allow delete: if signedIn()
+        && request.auth.uid == uid
+        && firestore.get(/databases/(default)/documents/businesses/$(businessId)).data.ownerUid == request.auth.uid;
     }
 
     // Business documents remain private and can only be uploaded by the business owner.
@@ -79,10 +85,11 @@ service firebase.storage {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create, update: if signedIn()
         && request.auth.uid == uid
-        && (
-          validDocument() && request.resource.size <= 20 * 1024 * 1024
-        );
-      allow delete: if signedIn() && request.auth.uid == uid;
+        && firestore.get(/databases/(default)/documents/businesses/$(businessId)).data.ownerUid == request.auth.uid
+        && validDocument() && request.resource.size <= 20 * 1024 * 1024;
+      allow delete: if signedIn()
+        && request.auth.uid == uid
+        && firestore.get(/databases/(default)/documents/businesses/$(businessId)).data.ownerUid == request.auth.uid;
     }
 
     // Deny every unrecognized path by default.
