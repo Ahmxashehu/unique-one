@@ -1,5 +1,6 @@
 import React from 'react';
 import { Shield, Key, AlertTriangle, Smartphone } from 'lucide-react';
+import PasskeySecurityCard from '../../components/security/PasskeySecurityCard';
 
 export default function PaySecurityPage() {
   return (
@@ -8,6 +9,8 @@ export default function PaySecurityPage() {
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Payment Security</h1>
         <p className="text-sm text-slate-500 mt-1">Manage your PIN, limits, and security alerts.</p>
       </div>
+
+      <PasskeySecurityCard />
 
       <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 space-y-8">
         

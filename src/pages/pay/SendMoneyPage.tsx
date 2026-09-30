@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowUpRight, Search, ShieldCheck, User, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { createBiometricAssertion, type BiometricAssertion } from '../../components/security/PasskeySecurityCard';
 
 type Recipient = {
   uid: string;
@@ -21,6 +22,7 @@ export default function SendMoneyPage() {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [transactionPin, setTransactionPin] = useState('');
+  const [biometricBusy, setBiometricBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleResolveRecipient = async (e: React.FormEvent) => {
@@ -85,6 +87,12 @@ export default function SendMoneyPage() {
         ? crypto.randomUUID()
         : `transfer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+      let biometricAssertion: BiometricAssertion | undefined;
+      if (amountMinor >= 5_000_000) {
+        setBiometricBusy(true);
+        try { biometricAssertion = await createBiometricAssertion(currentUser); }
+        finally { setBiometricBusy(false); }
+      }
       const response = await fetch('/api/wallet/transfer', {
         method: 'POST',
         headers: {
@@ -98,6 +106,7 @@ export default function SendMoneyPage() {
           idempotencyKey,
           ...(description.trim() ? { description: description.trim() } : {}),
           transactionPin,
+          ...(biometricAssertion ? { biometricAssertion } : {}),
         }),
       });
 

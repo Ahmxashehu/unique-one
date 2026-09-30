@@ -28,7 +28,7 @@ type TransferErrorCode =
   | 'SELF_TRANSFER_NOT_ALLOWED' | 'INVALID_AMOUNT' | 'INVALID_CURRENCY'
   | 'INVALID_IDEMPOTENCY_KEY' | 'IDEMPOTENCY_KEY_CONFLICT' | 'TRANSFER_ALREADY_COMPLETED'
   | 'TRANSFER_IN_PROGRESS' | 'WALLET_NOT_FOUND' | 'WALLET_UNAVAILABLE' | 'INSUFFICIENT_FUNDS' | 'RATE_LIMITED'
-  | 'TRANSACTION_FAILED' | 'SERVICE_UNAVAILABLE' | 'NOT_FOUND' | 'BLOCKED' | 'FORBIDDEN' | 'INSUFFICIENT_STOCK';
+  | 'TRANSACTION_FAILED' | 'SERVICE_UNAVAILABLE' | 'NOT_FOUND' | 'BLOCKED' | 'FORBIDDEN' | 'INSUFFICIENT_STOCK' | 'BIOMETRIC_REQUIRED';
 interface TransferErrorResponse { error: { code: TransferErrorCode; message: string } }
 interface TransferRequestInput { recipientId: string; amountMinor: number; currency: 'NGN'; idempotencyKey: string; description?: string; transactionPin: string }
 interface CreateConversationRequestInput { type: ConversationType; title?: string; avatarUrl?: string; memberUids: string[] }
@@ -39,13 +39,16 @@ const MAX_IDEMPOTENCY_KEY_LENGTH = 128;
 const MAX_CONVERSATION_TITLE_LENGTH = 500;
 const MAX_CONVERSATION_AVATAR_URL_LENGTH = 2048;
 const MAX_CONVERSATION_MEMBER_COUNT = 50;
+const PASSKEY_CHALLENGE_TTL_MS = 5 * 60_000;
+const PASSKEY_COLLECTION = 'passkeys';
+const PASSKEY_CHALLENGES_COLLECTION = 'passkeyChallenges';
 const CONVERSATION_CREATE_WINDOW_MS = 60_000;
 const MAX_CONVERSATION_CREATES_PER_WINDOW = 10;
 const COMMUNICATION_CONVERSATION_TYPES = new Set<ConversationType>(['direct', 'group', 'business']);
 const transferErrorStatus: Record<TransferErrorCode, number> = {
   UNAUTHENTICATED: 401, INVALID_REQUEST: 400, INVALID_RECIPIENT: 400, RECIPIENT_NOT_FOUND: 404,
   SELF_TRANSFER_NOT_ALLOWED: 400, INVALID_AMOUNT: 400, INVALID_CURRENCY: 400, INVALID_IDEMPOTENCY_KEY: 400,
-  IDEMPOTENCY_KEY_CONFLICT: 409, TRANSFER_ALREADY_COMPLETED: 200, TRANSFER_IN_PROGRESS: 409, RATE_LIMITED: 429,
+  IDEMPOTENCY_KEY_CONFLICT: 409, TRANSFER_ALREADY_COMPLETED: 200, TRANSFER_IN_PROGRESS: 409, RATE_LIMITED: 429, BIOMETRIC_REQUIRED: 403,
   WALLET_NOT_FOUND: 404, WALLET_UNAVAILABLE: 403, INSUFFICIENT_FUNDS: 409, TRANSACTION_FAILED: 500,
   SERVICE_UNAVAILABLE: 503, NOT_FOUND: 404, BLOCKED: 403, FORBIDDEN: 403, INSUFFICIENT_STOCK: 409,
 };
@@ -81,6 +84,18 @@ function validateLoginPassword(value: unknown): string {
 }
 function passwordDigest(password: string, salt: string): string {
   return require('crypto').scryptSync(password, salt, 64).toString('hex');
+}
+function base64UrlToBuffer(value: string): Buffer {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  return Buffer.from(normalized + '='.repeat((4 - normalized.length % 4) % 4), 'base64');
+}
+function bufferToBase64Url(value: Buffer): string {
+  return value.toString('base64').replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_');
+}
+function requestWebAuthnOrigin(req: Request): { origin: string; rpId: string } {
+  const host = req.hostname;
+  if (!host || !/^[A-Za-z0-9.-]+$/.test(host)) throw new Error('INVALID_REQUEST');
+  return { origin: req.protocol + '://' + host, rpId: host };
 }
 function passwordDigestMatches(value: string, salt: string, expectedHex: string): boolean {
   const crypto = require('crypto');
@@ -851,6 +866,123 @@ const app = express();
       return res.status(200).json({ uid: wallet.uid, currency: wallet.currency, availableBalanceMinor: wallet.availableBalanceMinor, status: wallet.status, createdAt: wallet.createdAt.toDate().toISOString(), updatedAt: wallet.updatedAt.toDate().toISOString() });
     } catch (error) { console.error("Error initializing wallet:", error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to initialize wallet.'); }
   });
+  app.post('/api/auth/passkey/registration-options', rateLimit({ windowMs: 5 * 60_000, limit: 5, standardHeaders: true, legacyHeaders: false, handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many passkey setup attempts. Please try again later.') }), authenticate, async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const { origin, rpId } = requestWebAuthnOrigin(req);
+      const crypto = require('crypto');
+      const challenge = crypto.randomBytes(32);
+      const challengeId = bufferToBase64Url(crypto.randomBytes(18));
+      await adminDb.collection(PASSKEY_CHALLENGES_COLLECTION).doc(challengeId).set({
+        uid, type: 'registration', challenge: bufferToBase64Url(challenge), origin, rpId,
+        expiresAt: Timestamp.fromMillis(Date.now() + PASSKEY_CHALLENGE_TTL_MS), createdAt: Timestamp.now(),
+      });
+      const user = await getAuth().getUser(uid);
+      return res.json({
+        challenge: bufferToBase64Url(challenge), challengeId, rp: { name: 'Unique One', id: rpId },
+        user: { id: bufferToBase64Url(Buffer.from(uid, 'utf8')), name: user.email || user.phoneNumber || uid, displayName: user.displayName || uid },
+        pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+        authenticatorSelection: { residentKey: 'preferred', userVerification: 'required' }, timeout: 120000, attestation: 'none'
+      });
+    } catch (error) {
+      console.error('Passkey registration options failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to prepare biometric security setup.');
+    }
+  });
+
+  app.post('/api/auth/passkey/register', rateLimit({ windowMs: 5 * 60_000, limit: 5, standardHeaders: true, legacyHeaders: false, handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many passkey registration attempts. Please try again later.') }), authenticate, async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const challengeId = typeof req.body?.challengeId === 'string' ? req.body.challengeId : '';
+      const credentialId = typeof req.body?.credentialId === 'string' ? req.body.credentialId : '';
+      const clientDataJSON = base64UrlToBuffer(String(req.body?.clientDataJSON || ''));
+      const authenticatorData = base64UrlToBuffer(String(req.body?.authenticatorData || ''));
+      const publicKey = base64UrlToBuffer(String(req.body?.publicKey || ''));
+      if (!challengeId || !credentialId || clientDataJSON.length > 4096 || authenticatorData.length < 37 || publicKey.length < 32 || publicKey.length > 4096) return errorResponse(res, 'INVALID_REQUEST', 'The passkey registration response is invalid.');
+      const challengeRef = adminDb.collection(PASSKEY_CHALLENGES_COLLECTION).doc(challengeId);
+      const challengeSnap = await challengeRef.get();
+      if (!challengeSnap.exists) return errorResponse(res, 'FORBIDDEN', 'The passkey setup challenge is invalid or expired.');
+      const challengeData = challengeSnap.data()!;
+      await challengeRef.delete();
+      if (challengeData.uid !== uid || challengeData.type !== 'registration' || challengeData.expiresAt.toMillis() < Date.now()) return errorResponse(res, 'FORBIDDEN', 'The passkey setup challenge is invalid or expired.');
+      const { origin, rpId } = requestWebAuthnOrigin(req);
+      let clientData: any;
+      try { clientData = JSON.parse(clientDataJSON.toString('utf8')); } catch { return errorResponse(res, 'INVALID_REQUEST', 'The passkey client data is invalid.'); }
+      if (challengeData.origin !== origin || challengeData.rpId !== rpId || clientData.type !== 'webauthn.create' || clientData.challenge !== challengeData.challenge || clientData.origin !== origin) return errorResponse(res, 'FORBIDDEN', 'The passkey registration could not be verified.');
+      const crypto = require('crypto');
+      if (!authenticatorData.subarray(0, 32).equals(crypto.createHash('sha256').update(rpId).digest())) return errorResponse(res, 'FORBIDDEN', 'The passkey relying-party binding is invalid.');
+      const flags = authenticatorData[32];
+      if ((flags & 0x45) !== 0x45) return errorResponse(res, 'FORBIDDEN', 'Biometric/user verification is required to register this credential.');
+      await adminDb.collection('authCredentials').doc(uid).collection(PASSKEY_COLLECTION).doc(credentialId).set({
+        credentialId, publicKey: publicKey.toString('base64'), algorithm: -7, signCount: authenticatorData.readUInt32BE(33),
+        createdAt: Timestamp.now(), lastUsedAt: Timestamp.now(), origin, rpId
+      });
+      return res.json({ ok: true, registered: true });
+    } catch (error) {
+      console.error('Passkey registration failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to register biometric security right now.');
+    }
+  });
+
+  app.post('/api/auth/passkey/assertion-options', rateLimit({ windowMs: 5 * 60_000, limit: 12, standardHeaders: true, legacyHeaders: false, handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many biometric verification attempts. Please try again later.') }), authenticate, async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const credentials = await adminDb.collection('authCredentials').doc(uid).collection(PASSKEY_COLLECTION).get();
+      if (credentials.empty) return errorResponse(res, 'NOT_FOUND', 'No biometric security credential is registered on this account.');
+      const { origin, rpId } = requestWebAuthnOrigin(req);
+      const crypto = require('crypto');
+      const challenge = crypto.randomBytes(32);
+      const challengeId = bufferToBase64Url(crypto.randomBytes(18));
+      await adminDb.collection(PASSKEY_CHALLENGES_COLLECTION).doc(challengeId).set({
+        uid, type: 'assertion', challenge: bufferToBase64Url(challenge), origin, rpId,
+        expiresAt: Timestamp.fromMillis(Date.now() + PASSKEY_CHALLENGE_TTL_MS), createdAt: Timestamp.now()
+      });
+      return res.json({ challenge: bufferToBase64Url(challenge), challengeId, rpId, timeout: 120000, userVerification: 'required', allowCredentials: credentials.docs.map(doc => ({ type: 'public-key', id: doc.id })) });
+    } catch (error) {
+      console.error('Passkey assertion options failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to prepare biometric verification.');
+    }
+  });
+
+  app.post('/api/auth/passkey/assert', rateLimit({ windowMs: 5 * 60_000, limit: 12, standardHeaders: true, legacyHeaders: false, handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many biometric verification attempts. Please try again shortly.') }), authenticate, async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const challengeId = typeof req.body?.challengeId === 'string' ? req.body.challengeId : '';
+      const credentialId = typeof req.body?.credentialId === 'string' ? req.body.credentialId : '';
+      const clientDataJSON = base64UrlToBuffer(String(req.body?.clientDataJSON || ''));
+      const authenticatorData = base64UrlToBuffer(String(req.body?.authenticatorData || ''));
+      const signature = base64UrlToBuffer(String(req.body?.signature || ''));
+      if (!challengeId || !credentialId || clientDataJSON.length > 4096 || authenticatorData.length < 37 || signature.length < 32) return errorResponse(res, 'INVALID_REQUEST', 'The biometric response is invalid.');
+      const challengeRef = adminDb.collection(PASSKEY_CHALLENGES_COLLECTION).doc(challengeId);
+      const challengeSnap = await challengeRef.get();
+      if (!challengeSnap.exists) return errorResponse(res, 'FORBIDDEN', 'The biometric challenge is invalid or expired.');
+      const challengeData = challengeSnap.data()!;
+      await challengeRef.delete();
+      if (challengeData.uid !== uid || challengeData.type !== 'assertion' || challengeData.expiresAt.toMillis() < Date.now()) return errorResponse(res, 'FORBIDDEN', 'The biometric challenge is invalid or expired.');
+      const { origin, rpId } = requestWebAuthnOrigin(req);
+      let clientData: any;
+      try { clientData = JSON.parse(clientDataJSON.toString('utf8')); } catch { return errorResponse(res, 'INVALID_REQUEST', 'The biometric client data is invalid.'); }
+      if (challengeData.origin !== origin || challengeData.rpId !== rpId || clientData.type !== 'webauthn.get' || clientData.challenge !== challengeData.challenge || clientData.origin !== origin) return errorResponse(res, 'FORBIDDEN', 'The biometric assertion could not be verified.');
+      const crypto = require('crypto');
+      if (!authenticatorData.subarray(0, 32).equals(crypto.createHash('sha256').update(rpId).digest()) || (authenticatorData[32] & 0x05) !== 0x05) return errorResponse(res, 'FORBIDDEN', 'User verification is required.');
+      const credentialRef = adminDb.collection('authCredentials').doc(uid).collection(PASSKEY_COLLECTION).doc(credentialId);
+      const credentialSnap = await credentialRef.get();
+      if (!credentialSnap.exists) return errorResponse(res, 'FORBIDDEN', 'This biometric credential is not registered for the account.');
+      const credential = credentialSnap.data()!;
+      const publicKey = crypto.createPublicKey({ key: Buffer.from(String(credential.publicKey), 'base64'), format: 'der', type: 'spki' });
+      const signedData = Buffer.concat([authenticatorData, crypto.createHash('sha256').update(clientDataJSON).digest()]);
+      if (!crypto.verify('sha256', signedData, publicKey, signature)) return errorResponse(res, 'FORBIDDEN', 'Biometric verification failed.');
+      const signCount = authenticatorData.readUInt32BE(33);
+      const previousCount = Number(credential.signCount || 0);
+      if (previousCount > 0 && signCount > 0 && signCount <= previousCount) return errorResponse(res, 'FORBIDDEN', 'The biometric credential counter is invalid.');
+      await credentialRef.update({ signCount, lastUsedAt: Timestamp.now() });
+      return res.json({ ok: true, verified: true });
+    } catch (error) {
+      console.error('Passkey assertion failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Biometric verification could not be completed.');
+    }
+  });
+
   app.post('/api/auth/transaction-pin/verify', rateLimit({
     windowMs: 5 * 60_000,
     limit: 8,
@@ -892,6 +1024,35 @@ const app = express();
     } catch (error) {
       console.error('Transaction PIN verification failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to verify the Transaction PIN right now.');
+    }
+    if (amountMinor >= 5_000_000) {
+      const biometricAssertion = req.body?.biometricAssertion;
+      if (!biometricAssertion?.challengeId || !biometricAssertion?.credentialId || !biometricAssertion?.clientDataJSON || !biometricAssertion?.authenticatorData || !biometricAssertion?.signature) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification is required for transfers of ₦50,000 or more.');
+      const challengeRef = adminDb.collection(PASSKEY_CHALLENGES_COLLECTION).doc(String(biometricAssertion.challengeId));
+      const challengeSnap = await challengeRef.get();
+      if (!challengeSnap.exists) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification is required. Please try again.');
+      const challengeData = challengeSnap.data()!;
+      await challengeRef.delete();
+      const { origin, rpId } = requestWebAuthnOrigin(req);
+      const clientDataJSON = base64UrlToBuffer(String(biometricAssertion.clientDataJSON));
+      const authenticatorData = base64UrlToBuffer(String(biometricAssertion.authenticatorData));
+      const signature = base64UrlToBuffer(String(biometricAssertion.signature));
+      let clientData: any;
+      try { clientData = JSON.parse(clientDataJSON.toString('utf8')); } catch { return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification could not be verified.'); }
+      if (challengeData.uid !== senderUid || challengeData.type !== 'assertion' || challengeData.expiresAt.toMillis() < Date.now() || challengeData.origin !== origin || challengeData.rpId !== rpId || clientData.type !== 'webauthn.get' || clientData.challenge !== challengeData.challenge || clientData.origin !== origin) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification could not be verified.');
+      const crypto = require('crypto');
+      if (!authenticatorData.subarray(0, 32).equals(crypto.createHash('sha256').update(rpId).digest()) || (authenticatorData[32] & 0x05) !== 0x05) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification requires user verification.');
+      const credentialRef = adminDb.collection('authCredentials').doc(senderUid).collection(PASSKEY_COLLECTION).doc(String(biometricAssertion.credentialId));
+      const credentialSnap = await credentialRef.get();
+      if (!credentialSnap.exists) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'This biometric credential is not registered.');
+      const credential = credentialSnap.data()!;
+      const publicKey = crypto.createPublicKey({ key: Buffer.from(String(credential.publicKey), 'base64'), format: 'der', type: 'spki' });
+      const signedData = Buffer.concat([authenticatorData, crypto.createHash('sha256').update(clientDataJSON).digest()]);
+      if (!crypto.verify('sha256', signedData, publicKey, signature)) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification failed.');
+      const signCount = authenticatorData.readUInt32BE(33);
+      const previousCount = Number(credential.signCount || 0);
+      if (previousCount > 0 && signCount > 0 && signCount <= previousCount) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'The biometric credential counter is invalid.');
+      await credentialRef.update({ signCount, lastUsedAt: Timestamp.now() });
     }
     try {
       if (!(await readUserExists(recipientId))) return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'The recipient user does not exist.');
