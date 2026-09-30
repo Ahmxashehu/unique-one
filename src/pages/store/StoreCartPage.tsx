@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag, Trash2, ArrowRight, Loader2, Minus, Plus, ChevronLeft, ShieldCheck } from 'lucide-react';
+import { createBiometricAssertion, type BiometricAssertion } from '../../components/security/PasskeySecurityCard';
 import { collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Product, CartItem } from '../../lib/os/types';
@@ -15,6 +16,11 @@ export default function StoreCartPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [checkingOut, setCheckingOut] = useState(false);
+  const [transactionPin, setTransactionPin] = useState('');
+  const [paymentBusy, setPaymentBusy] = useState(false);
+  const [paymentStep, setPaymentStep] = useState(false);
+  const [pendingOrderIds, setPendingOrderIds] = useState<string[]>([]);
+  const [pendingPaymentKey, setPendingPaymentKey] = useState('');
 
   const loadCart = async () => {
     if (!currentUser) { setItems([]); setLoading(false); return; }
@@ -78,11 +84,56 @@ export default function StoreCartPage() {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error?.message || 'Could not create your order.');
-      navigate('/os/orders');
+      const orderIds = Array.isArray(payload?.orderIds) ? payload.orderIds.filter((id: unknown): id is string => typeof id === 'string') : [];
+      if (orderIds.length === 0) throw new Error('Your order was created without a payment reference. Please contact support before retrying.');
+      setPendingOrderIds(orderIds);
+      setPendingPaymentKey(idempotencyKey);
+      setPaymentStep(true);
+      await payOrders(orderIds, idempotencyKey);
+
     } catch (err: any) {
       setError(err?.message || 'Could not create your order. Your cart is still available.');
     } finally {
       setCheckingOut(false);
+    }
+  };
+
+  const payOrders = async (orderIds: string[], checkoutIdempotencyKey: string) => {
+    if (!currentUser || paymentBusy) return;
+    if (!/^\\d{4}$/.test(transactionPin)) {
+      setError('Enter your 4-digit Transaction PIN to pay for this order.');
+      setPaymentStep(true);
+      return;
+    }
+    setPaymentBusy(true);
+    setError('');
+    try {
+      const token = await currentUser.getIdToken();
+      const paymentIdempotencyKey = `store-pay-${checkoutIdempotencyKey}`;
+      let biometricAssertion: BiometricAssertion | undefined;
+      const requestPayment = async () => {
+        const response = await fetch('/api/store/pay', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderIds, idempotencyKey: paymentIdempotencyKey, transactionPin, ...(biometricAssertion ? { biometricAssertion } : {}) }),
+        });
+        const body = await response.json().catch(() => ({}));
+        return { response, body };
+      };
+      let result = await requestPayment();
+      if (result.response.status === 403 && result.body?.error?.code === 'BIOMETRIC_REQUIRED') {
+        setError(null);
+        setPaymentBusy(true);
+        biometricAssertion = await createBiometricAssertion(currentUser);
+        result = await requestPayment();
+      }
+      if (!result.response.ok) throw new Error(result.body?.error?.message || 'UniquePay payment could not be completed.');
+      navigate('/os/orders');
+    } catch (err: any) {
+      setError(err?.message || 'UniquePay payment could not be completed. Your order remains unpaid.');
+      setPaymentStep(true);
+    } finally {
+      setPaymentBusy(false);
     }
   };
 
@@ -131,15 +182,45 @@ export default function StoreCartPage() {
             <div className="flex items-center justify-between"><h2 className="font-bold text-slate-900">Order Summary</h2><ShieldCheck className="w-5 h-5 text-emerald-600" /></div>
             <div className="flex justify-between mt-4 text-sm text-slate-600"><span>Subtotal</span><span>{items[0]?.product.currency === 'NGN' ? '₦' : '$'}{total.toLocaleString()}</span></div>
             <div className="flex justify-between mt-3 pt-3 border-t font-bold text-slate-900"><span>Total</span><span>{items[0]?.product.currency === 'NGN' ? '₦' : '$'}{total.toLocaleString()}</span></div>
-            <button
-              onClick={handleCheckout}
-              disabled={checkingOut}
-              className="w-full mt-6 bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {checkingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-              {checkingOut ? 'Creating order…' : 'Place Order'}
-            </button>
-            <p className="text-xs text-slate-500 mt-3">Your order is created first. Payment is handled through the UniquePay payment step after the order is created.</p>
+            {paymentStep && (
+              <div className="mt-5 p-4 rounded-xl bg-emerald-50 border border-emerald-100 space-y-3">
+                <div>
+                  <h3 className="font-bold text-slate-900">Pay with UniquePay</h3>
+                  <p className="text-xs text-slate-600 mt-1">Enter your 4-digit Transaction PIN. Biometric verification may be requested for your first transaction or higher-value payments.</p>
+                </div>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={transactionPin}
+                  onChange={e => setTransactionPin(e.target.value.replace(/\\D/g, '').slice(0, 4))}
+                  placeholder="4-digit Transaction PIN"
+                  className="w-full px-3 py-3 bg-white border border-emerald-200 rounded-xl text-center tracking-[0.35em] font-bold"
+                  disabled={paymentBusy}
+                />
+                <button
+                  onClick={() => {
+                    if (pendingOrderIds.length > 0 && pendingPaymentKey) payOrders(pendingOrderIds, pendingPaymentKey);
+                  }}
+                  disabled={paymentBusy}
+                  className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {paymentBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                  {paymentBusy ? 'Processing UniquePay…' : 'Pay with UniquePay'}
+                </button>
+              </div>
+            )}
+            {!paymentStep && (
+              <button
+                onClick={handleCheckout}
+                disabled={checkingOut}
+                className="w-full mt-6 bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {checkingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                {checkingOut ? 'Creating order…' : 'Continue to UniquePay'}
+              </button>
+            )}
+            <p className="text-xs text-slate-500 mt-3">Orders are created from your real cart, then settled through the UniquePay wallet.</p>
           </div>
         </div>
       )}
