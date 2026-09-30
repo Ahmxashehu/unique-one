@@ -30,6 +30,8 @@ function formatPrice(product: Product) {
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [jobs, setJobs] = useState<Array<{ id: string; title?: string; companyName?: string; location?: string; description?: string; category?: string }>>([]);
+  const [contributions, setContributions] = useState<Array<{ id: string; title?: string; description?: string; category?: string; location?: string }>>([]);
   const [mode, setMode] = useState<EdgeMode>('for-you');
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState<Record<string, boolean>>({});
@@ -70,9 +72,41 @@ export default function HomePage() {
       },
     );
 
+    const jobsQuery = query(
+      collection(db, 'jobs'),
+      where('status', '==', 'published'),
+      limit(8),
+    );
+    const unsubscribeJobs = onSnapshot(
+      jobsQuery,
+      (snapshot) => {
+        if (!cancelled) {
+          setJobs(snapshot.docs.map((item) => ({ id: item.id, ...(item.data() as Omit<(typeof jobs)[number], 'id'>) })));
+        }
+      },
+      (error) => console.error('Unique jobs feed could not load:', error),
+    );
+
+    const contributionsQuery = query(
+      collection(db, 'contributionRequests'),
+      where('status', '==', 'published'),
+      limit(8),
+    );
+    const unsubscribeContributions = onSnapshot(
+      contributionsQuery,
+      (snapshot) => {
+        if (!cancelled) {
+          setContributions(snapshot.docs.map((item) => ({ id: item.id, ...(item.data() as Omit<(typeof contributions)[number], 'id'>) })));
+        }
+      },
+      (error) => console.error('Unique contribution feed could not load:', error),
+    );
+
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeJobs();
+      unsubscribeContributions();
     };
   }, []);
 
@@ -89,6 +123,26 @@ export default function HomePage() {
 
   const edgeProducts =
     mode === 'discover' ? filteredProducts.slice(0, 12) : filteredProducts.slice(0, 6);
+
+  const filteredJobs = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return jobs;
+    return jobs.filter((job) =>
+      [job.title, job.companyName, job.location, job.description, job.category]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term)),
+    );
+  }, [jobs, search]);
+
+  const filteredContributions = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return contributions;
+    return contributions.filter((item) =>
+      [item.title, item.description, item.location, item.category]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term)),
+    );
+  }, [contributions, search]);
 
   const shareProduct = async (product: Product) => {
     const url = window.location.origin + `/store/product/${product.id}`;
@@ -303,7 +357,8 @@ export default function HomePage() {
                   </Link>
                 </div>
               ) : (
-                edgeProducts.map((product) => (
+                <>
+                  {edgeProducts.map((product) => (
                   <article
                     key={product.id}
                     className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
@@ -417,7 +472,42 @@ export default function HomePage() {
                       </div>
                     </div>
                   </article>
-                ))
+                ))}
+                  {mode !== 'following' && filteredJobs.slice(0, mode === 'discover' ? 4 : 2).map((job) => (
+                    <article key={`job-${job.id}`} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">Opportunity</span>
+                          <h3 className="mt-3 text-lg font-black">{job.title || 'Open opportunity'}</h3>
+                          <p className="mt-1 text-sm font-semibold text-slate-700">{job.companyName || 'Unique organization'}</p>
+                          <p className="mt-1 text-sm text-slate-500">{job.location || 'Location available in Unique'}</p>
+                        </div>
+                        <TrendingUp className="h-5 w-5 text-violet-500" />
+                      </div>
+                      {job.description && <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-500">{job.description}</p>}
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        <Link to="/os/jobs" className="rounded-full bg-slate-950 px-4 py-2 text-xs font-bold text-white">Apply / Explore</Link>
+                        <button type="button" onClick={() => navigator.share?.({ title: job.title || 'Unique opportunity', text: job.description || job.title || '' })} className="rounded-full border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700">Share</button>
+                      </div>
+                    </article>
+                  ))}
+                  {mode === 'discover' && filteredContributions.slice(0, 4).map((item) => (
+                    <article key={`contribution-${item.id}`} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-700"><Users className="h-5 w-5" /></span>
+                        <div>
+                          <span className="text-xs font-bold uppercase tracking-[0.12em] text-amber-700">Community request</span>
+                          <h3 className="mt-1 font-black">{item.title || 'A Unique community request'}</h3>
+                        </div>
+                      </div>
+                      {item.description && <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-500">{item.description}</p>}
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        <Link to="/os/contributions" className="rounded-full bg-amber-600 px-4 py-2 text-xs font-bold text-white">View request</Link>
+                        <Link to="/os/contributions" className="rounded-full border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700">Offer help</Link>
+                      </div>
+                    </article>
+                  ))}
+                </>
               )}
             </div>
 
