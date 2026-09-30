@@ -48,8 +48,15 @@ function validatePassword(value: unknown): string {
   return value;
 }
 
+const WEAK_TRANSACTION_PINS = new Set(['0000','1111','2222','3333','4444','5555','6666','7777','8888','9999','1234','4321','1212','2121']);
 function validatePin(value: unknown): string {
   if (typeof value !== 'string' || !/^\d{4}$/.test(value)) throw new Error('INVALID_PIN');
+  if (WEAK_TRANSACTION_PINS.has(value)) throw new Error('INVALID_PIN');
+  const digits = value.split('').map(Number);
+  if (digits.every((digit, index) => index === 0 || digit === digits[0])) throw new Error('INVALID_PIN');
+  const ascending = digits.every((digit, index) => index === 0 || digit === digits[index - 1] + 1);
+  const descending = digits.every((digit, index) => index === 0 || digit === digits[index - 1] - 1);
+  if (ascending || descending) throw new Error('INVALID_PIN');
   return value;
 }
 
