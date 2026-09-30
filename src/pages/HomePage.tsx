@@ -43,6 +43,54 @@ export default function HomePage() {
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState('');
   const [followingIds, setFollowingIds] = useState<string[]>([]);
+  const [activePromo, setActivePromo] = useState(0);
+
+  const promotionalPosters = [
+    {
+      eyebrow: 'UNIQUE ONE',
+      title: 'Everything happening around you, in one Unique experience.',
+      description: 'Discover, connect, buy, book, pay and grow in one intelligent environment.',
+      action: 'Explore Unique',
+      href: '/discover',
+      icon: Compass,
+      tone: 'from-emerald-500 via-emerald-400 to-teal-300',
+    },
+    {
+      eyebrow: 'UNIQUE STORE',
+      title: 'Discover products and services made for your world.',
+      description: 'Find real published products and services from businesses and providers on Unique.',
+      action: 'Open Store',
+      href: '/store',
+      icon: ShoppingBag,
+      tone: 'from-slate-900 via-slate-800 to-emerald-900',
+    },
+    {
+      eyebrow: 'UNIQUE AI',
+      title: 'Meet the AI that understands your Unique world.',
+      description: 'Ask, discover, navigate and get help across your authorized Unique experience.',
+      action: 'Try Unique AI',
+      href: '/os/ai',
+      icon: Sparkles,
+      tone: 'from-emerald-700 via-teal-700 to-slate-900',
+    },
+    {
+      eyebrow: 'ACTIVE EDGE',
+      title: 'See what is happening now.',
+      description: 'Live products, businesses, services and opportunities come together in one active stream.',
+      action: 'Open Active Edge',
+      href: '#active-edge',
+      icon: Zap,
+      tone: 'from-slate-950 via-emerald-950 to-emerald-700',
+    },
+  ];
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setActivePromo((current) => (current + 1) % promotionalPosters.length);
+    }, 60000);
+
+    return () => window.clearInterval(timer);
+  }, [promotionalPosters.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -333,66 +381,88 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Hero: the platform, not a static marketing page */}
-        <section className="overflow-hidden rounded-[2rem] bg-slate-950 px-5 py-8 text-white shadow-sm sm:px-8 lg:px-10">
-          <div className="grid items-end gap-8 lg:grid-cols-[1.2fr_.8fr]">
-            <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-emerald-300">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                UNIQUE ONE · Africa → World
-              </div>
-              <h1 className="max-w-3xl text-4xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-                Everything happening around you, in one Unique experience.
-              </h1>
-              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-                Discover people, businesses, products, services and opportunities while
-                staying connected to the things that matter to you.
-              </p>
-              <div className="mt-7 flex flex-wrap gap-3">
-                <Link
-                  to="/os/ai"
-                  className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-emerald-300/30 bg-emerald-400 px-5 py-3 text-sm font-black text-slate-950 shadow-[0_0_30px_rgba(52,211,153,0.25)] transition hover:scale-[1.03] hover:bg-emerald-300"
+        {/* Promotional poster carousel: rotates automatically every minute and remains manually navigable. */}
+        <section aria-label="Unique promotional posters" className="relative overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-sm">
+          <div className="relative min-h-[430px] sm:min-h-[470px]">
+            {promotionalPosters.map((poster, index) => {
+              const PosterIcon = poster.icon;
+              const isActive = index === activePromo;
+              return (
+                <div
+                  key={poster.eyebrow}
+                  aria-hidden={!isActive}
+                  className={`absolute inset-0 transition-all duration-700 ease-out ${isActive ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-8 opacity-0'}`}
                 >
-                  <span className="absolute inset-0 animate-pulse bg-white/20" />
-                  <span className="relative flex h-6 w-6 items-center justify-center rounded-full bg-white/80">
-                    <Sparkles className="h-4 w-4 animate-pulse text-emerald-700" />
-                  </span>
-                  <span className="relative">New · Unique AI</span>
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('for-you');
-                    document.getElementById('active-edge')?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full bg-emerald-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-300"
-                >
-                  <Zap className="h-4 w-4" />
-                  Open Active Edge
-                </button>
-                <Link
-                  to="/store"
-                  className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white"
-                >
-                  Explore Store <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
+                  <div className={`absolute inset-0 bg-gradient-to-br ${poster.tone}`} />
+                  <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
+                  <div className="absolute -bottom-32 left-1/3 h-80 w-80 rounded-full bg-black/10 blur-3xl" />
 
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                ['Discover', 'Products & services', Compass],
-                ['Connect', 'People & communities', Users],
-                ['Experience', 'Live updates & stories', Play],
-                ['Grow', 'Business & opportunities', TrendingUp],
-              ].map(([title, subtitle, Icon]) => (
-                <div key={String(title)} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <Icon className="mb-5 h-5 w-5 text-emerald-300" />
-                  <p className="font-bold">{title}</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-400">{subtitle}</p>
+                  <div className="relative flex min-h-[430px] flex-col justify-between p-6 sm:min-h-[470px] sm:p-9 lg:p-12">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/10 px-3 py-1.5 text-xs font-black tracking-[0.14em] backdrop-blur">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+                        {poster.eyebrow}
+                      </div>
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/20 bg-white/10 backdrop-blur sm:h-16 sm:w-16">
+                        <PosterIcon className="h-7 w-7 sm:h-8 sm:w-8" />
+                      </div>
+                    </div>
+
+                    <div className="max-w-3xl">
+                      <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-white/70">
+                        Promotional experience
+                      </p>
+                      <h1 className="text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+                        {poster.title}
+                      </h1>
+                      <p className="mt-5 max-w-2xl text-base leading-7 text-white/80 sm:text-lg">
+                        {poster.description}
+                      </p>
+                      <div className="mt-7 flex flex-wrap gap-3">
+                        {poster.href.startsWith('#') ? (
+                          <button
+                            type="button"
+                            onClick={() => document.getElementById('active-edge')?.scrollIntoView({ behavior: 'smooth' })}
+                            className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg transition hover:scale-[1.03]"
+                          >
+                            {poster.action} <ArrowRight className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <Link
+                            to={poster.href}
+                            className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg transition hover:scale-[1.03]"
+                          >
+                            {poster.action} <ArrowRight className="h-4 w-4" />
+                          </Link>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setActivePromo((current) => (current + 1) % promotionalPosters.length)}
+                          className="rounded-full border border-white/25 bg-white/10 px-5 py-3 text-sm font-bold backdrop-blur transition hover:bg-white/20"
+                        >
+                          Next poster
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2" aria-label={`Poster ${index + 1} of ${promotionalPosters.length}`}>
+                        {promotionalPosters.map((_, dotIndex) => (
+                          <button
+                            key={dotIndex}
+                            type="button"
+                            onClick={() => setActivePromo(dotIndex)}
+                            aria-label={`Show poster ${dotIndex + 1}`}
+                            className={`h-1.5 rounded-full transition-all ${dotIndex === activePromo ? 'w-9 bg-white' : 'w-2 bg-white/40 hover:bg-white/70'}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs font-semibold text-white/60">Changes every 60 seconds</span>
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </section>
 
