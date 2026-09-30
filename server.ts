@@ -361,7 +361,14 @@ const app = express();
     catch (_) { return errorResponse(res, 'UNAUTHENTICATED', 'The supplied Firebase token is invalid or expired.'); }
   };
 
-  app.post('/api/auth/phone/register-password', async (req, res) => {
+  app.post('/api/auth/phone/register-password', rateLimit({
+    windowMs: 10 * 60_000,
+    limit: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many registration attempts. Please try again later.'),
+  }), async (req, res) => {
     try {
       const authHeader = req.headers.authorization;
       if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) return errorResponse(res, 'UNAUTHENTICATED', 'Phone verification is required.');
@@ -397,7 +404,68 @@ const app = express();
       return errorResponse(res, code as TransferErrorCode, error?.message || 'Registration could not be completed.');
     }
   });
-  app.post('/api/auth/phone/login', async (req, res) => {
+  app.post('/api/auth/phone/reset-password', rateLimit({
+    windowMs: 10 * 60_000,
+    limit: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many password reset attempts. Please try again later.'),
+  }), async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+        return errorResponse(res, 'UNAUTHENTICATED', 'Verified phone recovery is required.');
+      }
+      const decoded = await getAuth().verifyIdToken(authHeader.slice(7));
+      const phone = normalizeAuthPhone(req.body?.phone);
+      if (decoded.phone_number !== phone) {
+        return errorResponse(res, 'FORBIDDEN', 'The verified phone number does not match the recovery phone number.');
+      }
+      const password = validateLoginPassword(req.body?.password);
+      const confirmPassword = validateLoginPassword(req.body?.confirmPassword);
+      if (password !== confirmPassword) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The 6-digit login passwords do not match.');
+      }
+
+      const credentialRef = adminDb.collection('authCredentials').doc(decoded.uid);
+      const credentialSnapshot = await credentialRef.get();
+      if (!credentialSnapshot.exists) {
+        return errorResponse(res, 'INVALID_REQUEST', 'This account does not have a recoverable login credential yet.');
+      }
+      const credential = credentialSnapshot.data() as { uid?: string; phone?: string; transactionPinSalt?: string; transactionPinHash?: string } | undefined;
+      if (!credential?.uid || credential.uid !== decoded.uid || credential.phone !== phone) {
+        return errorResponse(res, 'FORBIDDEN', 'The verified phone does not match the account credential.');
+      }
+
+      const loginSalt = randomUUID().replace(/-/g, '');
+      const now = Timestamp.now();
+      await credentialRef.update({
+        loginPasswordSalt: loginSalt,
+        loginPasswordHash: passwordDigest(password, loginSalt),
+        updatedAt: now,
+      });
+      await adminDb.collection('users').doc(decoded.uid).set({
+        lastLogin: now.toDate().toISOString(),
+        verificationStatus: 'phone_verified',
+      }, { merge: true });
+      return res.json({ ok: true, passwordReset: true });
+    } catch (error: any) {
+      const code = error?.code === 'auth/id-token-expired' || error?.code === 'auth/argument-error'
+        ? 'UNAUTHENTICATED'
+        : error instanceof RequestValidationError ? error.code : 'INVALID_REQUEST';
+      return errorResponse(res, code as TransferErrorCode, error?.message || 'Password reset could not be completed.');
+    }
+  });
+
+  app.post('/api/auth/phone/login', rateLimit({
+    windowMs: 5 * 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many login attempts. Please try again later.'),
+  }), async (req, res) => {
     try {
       const phone = normalizeAuthPhone(req.body?.phone);
       const password = validateLoginPassword(req.body?.password);
