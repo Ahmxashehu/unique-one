@@ -13,11 +13,21 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [photoError, setPhotoError] = useState('');
+  const defaultShipping = userData?.shippingAddresses?.find(address => address.isDefault) || userData?.shippingAddresses?.[0];
   const [formData, setFormData] = useState({
     fullName: userData?.fullName || '',
     phone: userData?.phone || '',
     username: userData?.username || '',
     preferredLanguage: userData?.preferredLanguage || 'en',
+    shippingLabel: defaultShipping?.label || 'Home',
+    shippingRecipientName: defaultShipping?.recipientName || userData?.fullName || '',
+    shippingPhone: defaultShipping?.phone || userData?.phone || '',
+    shippingState: defaultShipping?.state || '',
+    shippingLga: defaultShipping?.lga || '',
+    shippingTown: defaultShipping?.town || '',
+    shippingArea: defaultShipping?.area || '',
+    shippingFullAddress: defaultShipping?.fullAddress || '',
+    shippingLandmark: defaultShipping?.landmark || '',
   });
 
   if (!userData) {
@@ -58,9 +68,9 @@ export default function ProfilePage() {
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
         fullName: formData.fullName.trim(),
-        phone: formData.phone.trim(),
         username: formData.username.trim(),
         preferredLanguage: formData.preferredLanguage,
+        shippingAddresses: [{ id: defaultShipping?.id || 'default', label: formData.shippingLabel.trim() || 'Home', recipientName: formData.shippingRecipientName.trim(), phone: formData.shippingPhone.trim(), country: 'Nigeria', state: formData.shippingState.trim(), lga: formData.shippingLga.trim(), town: formData.shippingTown.trim(), area: formData.shippingArea.trim(), fullAddress: formData.shippingFullAddress.trim(), landmark: formData.shippingLandmark.trim(), isDefault: true }],
       });
       setIsEditing(false);
     } catch (err) {
@@ -186,17 +196,8 @@ export default function ProfilePage() {
             <label className="text-sm font-medium text-slate-500 flex items-center gap-2">
               <Phone className="w-4 h-4" /> Phone Number
             </label>
-            {isEditing ? (
-              <input 
-                type="tel" 
-                value={formData.phone}
-                onChange={e => setFormData({...formData, phone: e.target.value})}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 focus:outline-none" 
-                placeholder="+234..."
-              />
-            ) : (
-              <p className="text-slate-900 font-medium">{userData.phone || <span className="text-slate-400 italic">Not set</span>}</p>
-            )}
+            <p className="text-slate-900 font-medium">{userData.phone || <span className="text-slate-400 italic">Not set</span>}</p>
+            {isEditing && <p className="text-xs text-slate-400 mt-1">Phone/Unique ID cannot be edited here. Use the protected phone-change verification flow.</p>}
           </div>
 
           <div className="space-y-1">
@@ -219,6 +220,21 @@ export default function ProfilePage() {
             </label>
             <p className="text-slate-900 font-medium">{new Date(userData.lastLogin).toLocaleString()}</p>
           </div>
+        </div>
+        <div className="mt-8 pt-8 border-t border-slate-100">
+          <div className="flex items-center gap-2 mb-4"><MapPin className="w-5 h-5 text-slate-500"/><h3 className="text-lg font-bold text-slate-900">Shipping Details</h3></div>
+          <p className="text-sm text-slate-500 mb-4">Your shipping address is private and used for Store checkout and delivery. You can update it without changing your Unique ID.</p>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <input disabled={!isEditing} value={formData.shippingLabel} onChange={e=>setFormData({...formData,shippingLabel:e.target.value})} placeholder="Address label (Home, Office)" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+            <input disabled={!isEditing} value={formData.shippingRecipientName} onChange={e=>setFormData({...formData,shippingRecipientName:e.target.value})} placeholder="Recipient name" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+            <input disabled={!isEditing} value={formData.shippingPhone} onChange={e=>setFormData({...formData,shippingPhone:e.target.value})} placeholder="Delivery phone" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+            <input disabled={!isEditing} value={formData.shippingState} onChange={e=>setFormData({...formData,shippingState:e.target.value})} placeholder="State" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+            <input disabled={!isEditing} value={formData.shippingLga} onChange={e=>setFormData({...formData,shippingLga:e.target.value})} placeholder="LGA" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+            <input disabled={!isEditing} value={formData.shippingTown} onChange={e=>setFormData({...formData,shippingTown:e.target.value})} placeholder="Town / City" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+            <input disabled={!isEditing} value={formData.shippingArea} onChange={e=>setFormData({...formData,shippingArea:e.target.value})} placeholder="Area" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+            <input disabled={!isEditing} value={formData.shippingLandmark} onChange={e=>setFormData({...formData,shippingLandmark:e.target.value})} placeholder="Landmark (optional)" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+          </div>
+          <textarea disabled={!isEditing} value={formData.shippingFullAddress} onChange={e=>setFormData({...formData,shippingFullAddress:e.target.value})} rows={3} placeholder="Full delivery address" className="w-full mt-4 px-4 py-2 border border-slate-200 rounded-lg resize-none disabled:bg-slate-50"/>
         </div>
       </div>
     </div>
