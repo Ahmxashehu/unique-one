@@ -86,6 +86,8 @@ import StoreQuoteRequestPage from "./pages/store/StoreQuoteRequestPage";
 
 import { OfflineQueueProvider } from "./contexts/OfflineQueueContext";
 import SyncOverlay from "./components/SyncOverlay";
+import U1Loader from "./components/U1Loader";
+import { useEffect, useState } from "react";
 
 import CreatePaymentRequestPage from "./pages/pay/CreatePaymentRequestPage";
 import CreateInvoicePage from "./pages/pay/CreateInvoicePage";
@@ -109,6 +111,13 @@ import MasterVisionPage from "./pages/MasterVisionPage";
 
 
 export default function App() {
+  const [u1Booting, setU1Booting] = useState(true);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setU1Booting(false), 900);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   return (
     <AuthProvider>
       <OfflineQueueProvider>
@@ -117,6 +126,7 @@ export default function App() {
             <OfflineIndicator />
           <InstallPrompt />
           <SyncOverlay />
+          <U1Loader visible={u1Booting} />
           <div className="flex-1 relative overflow-hidden">
             <Routes>
               {/* Public Ecosystem Routes */}
