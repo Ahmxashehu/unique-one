@@ -418,9 +418,15 @@ const app = express();
   app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
   const authenticate = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to access this resource.');
-    try { (req as any).user = await getAuth().verifyIdToken(authHeader.split('Bearer ')[1]); next(); }
-    catch (_) { return errorResponse(res, 'UNAUTHENTICATED', 'The supplied Firebase token is invalid or expired.'); }
+    if (typeof authHeader !== 'string') return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to access this resource.');
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    if (!token || /\s/.test(token)) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to access this resource.');
+    try {
+      (req as any).user = await getAuth().verifyIdToken(token);
+      return next();
+    } catch (_) {
+      return errorResponse(res, 'UNAUTHENTICATED', 'The supplied Firebase token is invalid or expired.');
+    }
   };
 
   app.post('/api/auth/phone/register-password', rateLimit({
