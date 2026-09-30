@@ -4,7 +4,8 @@ export type UniqueOtpPurpose =
   | 'registration'
   | 'password_reset'
   | 'phone_change'
-  | 'transaction_step_up';
+  | 'transaction_step_up'
+  | 'email_verification';
 
 export type UniqueOtpChannel = 'sms' | 'email';
 
