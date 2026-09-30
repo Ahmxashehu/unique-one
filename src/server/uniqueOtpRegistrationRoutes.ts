@@ -20,7 +20,7 @@ function validateOptionalEmail(value: unknown): string {
   if (value === undefined || value === null || value === '') return '';
   if (typeof value !== 'string') throw new Error('INVALID_EMAIL');
   const email = value.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(email) || email.length > 254) throw new Error('INVALID_EMAIL');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new Error('INVALID_EMAIL');
   return email;
 }
 
@@ -229,7 +229,6 @@ export function registerUniqueOtpRegistrationRoutes(app: Express) {
         }
         throw error;
       }
-      return res.json({ ok: true, uid, uniqueOneId: uniqueIdFromPhone(phone), hasSecurePin: true, emailVerified: false });
     } catch (error: any) {
       if (['INVALID_PASSWORD','INVALID_PIN','INVALID_NAME','INVALID_EMAIL','INVALID_REQUEST'].includes(error?.message)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: error?.message === 'INVALID_EMAIL' ? 'Enter a valid email address or leave it blank.' : 'Check your registration details and try again.' } });
       if (error?.message === 'REGISTRATION_SESSION_INVALID') return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'The registration verification session is invalid, expired, or already used.' } });
