@@ -38,41 +38,42 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
+    const productsQuery = query(
+      collection(db, 'products'),
+      where('status', '==', 'published'),
+      limit(18),
+    );
 
-    const loadHomeData = async () => {
-      setLoading(true);
-      try {
-        const productsQuery = query(
-          collection(db, 'products'),
-          where('status', '==', 'published'),
-          limit(18),
-        );
+    setLoading(true);
 
-        const unsubscribe = onSnapshot(
-          productsQuery,
-          (snapshot) => {
-            if (cancelled) return;
-            const realProducts = snapshot.docs
-              .map((productDoc) => ({ ...(productDoc.data() as Product), id: productDoc.id }))
-              .filter(
-                (product) =>
-                  product.name &&
-                  Number.isFinite(Number(product.price)) &&
-                  Number(product.quantity) > 0,
-              );
-            setProducts(realProducts);
-            setLoading(false);
-          },
-          (error) => {
-            console.error('Unique home feed could not load:', error);
-            if (!cancelled) {
-              setProducts([]);
-              setLoading(false);
-            }
-          },
-        );
+    const unsubscribe = onSnapshot(
+      productsQuery,
+      (snapshot) => {
+        if (cancelled) return;
+        const realProducts = snapshot.docs
+          .map((productDoc) => ({ ...(productDoc.data() as Product), id: productDoc.id }))
+          .filter(
+            (product) =>
+              product.name &&
+              Number.isFinite(Number(product.price)) &&
+              Number(product.quantity) > 0,
+          );
+        setProducts(realProducts);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Unique home feed could not load:', error);
+        if (!cancelled) {
+          setProducts([]);
+          setLoading(false);
+        }
+      },
+    );
 
-        return unsubscribe;
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   const filteredProducts = useMemo(() => {
@@ -139,11 +140,11 @@ export default function HomePage() {
             {[
               ['Pay', '/os/pay'],
               ['Buy', '/store'],
-              ['Sell', '/store'],
+              ['Sell', '/os/business/catalog/new-product'],
               ['Send', '/os/pay'],
               ['Book', '/discover'],
               ['Hire', '/discover'],
-              ['Chat', '/os'],
+              ['Chat', '/os/messages'],
               ['Discover', '/discover'],
             ].map(([label, href]) => (
               <Link
