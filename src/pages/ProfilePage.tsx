@@ -13,7 +13,17 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [photoError, setPhotoError] = useState('');
+  const [emailDraft, setEmailDraft] = useState(userData?.email || '');
+  const [emailCode, setEmailCode] = useState('');
+  const [emailRemaining, setEmailRemaining] = useState(0);
+  const [emailResendRemaining, setEmailResendRemaining] = useState(0);
+  const [emailMessage, setEmailMessage] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
   const defaultShipping = userData?.shippingAddresses?.find(address => address.isDefault) || userData?.shippingAddresses?.[0];
+  React.useEffect(() => {
+    setEmailDraft(userData?.email || '');
+  }, [userData?.email]);
   const [formData, setFormData] = useState({
     fullName: userData?.fullName || '',
     phone: userData?.phone || '',
@@ -59,6 +69,80 @@ export default function ProfilePage() {
       setPhotoLoading(false);
     }
   };
+
+  const requestEmailVerification = async () => {
+    if (!currentUser) return;
+    const email = emailDraft.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailError('Enter a valid email address.');
+      return;
+    }
+    setEmailError('');
+    setEmailMessage('');
+    setEmailLoading(true);
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/auth/unique-otp/email/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ email }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || 'Unable to send email verification.');
+      setEmailRemaining(body.expiresInSeconds || 300);
+      setEmailResendRemaining(body.resendAfterSeconds || 30);
+      setEmailCode('');
+      setEmailMessage('UniqueOTP sent to your email address.');
+    } catch (error) {
+      setEmailError(error instanceof Error ? error.message : 'Unable to send email verification.');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const verifyEmail = async () => {
+    if (!currentUser) return;
+    const email = emailDraft.trim().toLowerCase();
+    if (emailRemaining <= 0) {
+      setEmailError('This email verification code has expired. Request a new UniqueOTP.');
+      return;
+    }
+    if (!/^\d{6}$/.test(emailCode)) {
+      setEmailError('Enter the 6-digit UniqueOTP.');
+      return;
+    }
+    setEmailError('');
+    setEmailMessage('');
+    setEmailLoading(true);
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/auth/unique-otp/email/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ email, code: emailCode }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || 'Email verification failed.');
+      setEmailMessage('Email verified successfully. You can now use this email to sign in.');
+      setEmailRemaining(0);
+      setEmailCode('');
+      setEmailResendRemaining(0);
+      window.location.reload();
+    } catch (error) {
+      setEmailError(error instanceof Error ? error.message : 'Email verification failed.');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (emailRemaining <= 0 && emailResendRemaining <= 0) return;
+    const timer = window.setInterval(() => {
+      setEmailRemaining(value => Math.max(0, value - 1));
+      setEmailResendRemaining(value => Math.max(0, value - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [emailRemaining, emailResendRemaining]);
 
   const handleSave = async () => {
     if (!currentUser) return;
@@ -188,8 +272,33 @@ export default function ProfilePage() {
             <label className="text-sm font-medium text-slate-500 flex items-center gap-2">
               <Mail className="w-4 h-4" /> Email Address
             </label>
-            <p className="text-slate-900 font-medium">{userData.email}</p>
-            {isEditing && <p className="text-xs text-slate-400 mt-1">Email cannot be changed directly.</p>}
+            <div className="flex flex-col gap-2">
+              <input
+                type="email"
+                value={emailDraft}
+                onChange={e => { setEmailDraft(e.target.value); setEmailError(''); setEmailMessage(''); }}
+                disabled={userData.emailVerified === true || emailLoading}
+                placeholder="you@example.com"
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"
+              />
+              {userData.emailVerified === true ? (
+                <p className="text-xs text-green-600 font-medium">✓ Verified email — accepted as a login identifier.</p>
+              ) : (
+                <>
+                  <p className="text-xs text-slate-500">Your email is optional. Verify it with UniqueOTP to use it for login.</p>
+                  {emailRemaining > 0 && <p className="text-xs text-slate-500">Code expires in {Math.floor(emailRemaining / 60)}:{String(emailRemaining % 60).padStart(2, '0')}.</p>}
+                  {emailResendRemaining > 0 && <p className="text-xs text-slate-400">Resend available in {emailResendRemaining}s.</p>}
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={requestEmailVerification} disabled={emailLoading || emailResendRemaining > 0} className="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm disabled:opacity-50">
+                      {emailLoading ? 'Sending...' : emailRemaining > 0 ? 'Send again' : 'Verify email'}
+                    </button>
+                    {emailRemaining > 0 && <><input type="text" inputMode="numeric" maxLength={6} value={emailCode} onChange={e => setEmailCode(e.target.value.replace(/\D/g, ''))} placeholder="6-digit UniqueOTP" className="px-3 py-2 border border-slate-200 rounded-lg text-sm" /><button type="button" onClick={verifyEmail} disabled={emailLoading || emailRemaining <= 0} className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm disabled:opacity-50">Verify</button></>}
+                  </div>
+                  {emailError && <p className="text-xs text-red-600">{emailError}</p>}
+                  {emailMessage && <p className="text-xs text-green-600">{emailMessage}</p>}
+                </>
+              )}
+            </div>
           </div>
 
           <div className="space-y-1">
