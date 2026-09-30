@@ -1,4 +1,4 @@
-import type { Express } from 'express';
+import type { Express, RequestHandler } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { createHash, randomUUID, scryptSync } from 'crypto';
 import { getAuth } from 'firebase-admin/auth';
@@ -25,7 +25,43 @@ function tokenHash(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-export function registerUniqueOtpRoutes(app: Express) {
+export function registerUniqueOtpRoutes(app: Express, authenticate?: RequestHandler) {
+  if (authenticate) {
+    app.post('/api/auth/unique-otp/email/request', authenticate, rateLimit({ windowMs: 10 * 60_000, limit: 5, standardHeaders: true, legacyHeaders: true, keyGenerator: (req) => ipKeyGenerator(req.ip) }), async (req, res) => {
+      try {
+        const uid = typeof (req as any).user?.uid === 'string' ? (req as any).user.uid : '';
+        if (!uid) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication is required.' } });
+        const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter a valid email address.' } });
+        const existing = await getFirestore().collection('users').where('email', '==', email).limit(1).get();
+        if (!existing.empty && existing.docs[0].id !== uid) return res.status(409).json({ error: { code: 'EMAIL_ALREADY_REGISTERED', message: 'That email address is already linked to another Unique One account.' } });
+        await getUniqueOtpService('email').issue({ destination: email, purpose: 'email_verification', channel: 'email' });
+        return res.json({ ok: true, email, expiresInSeconds: 300, resendAfterSeconds: 30 });
+      } catch (error: any) {
+        console.error('UniqueOTP email verification request failed:', error);
+        return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'We could not send the email verification code right now.' } });
+      }
+    });
+
+    app.post('/api/auth/unique-otp/email/verify', authenticate, rateLimit({ windowMs: 10 * 10_000, limit: 8, standardHeaders: true, legacyHeaders: true, keyGenerator: (req) => ipKeyGenerator(req.ip) }), async (req, res) => {
+      try {
+        const uid = typeof (req as any).user?.uid === 'string' ? (req as any).user.uid : '';
+        if (!uid) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication is required.' } });
+        const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+        const code = typeof req.body?.code === 'string' ? req.body.code : '';
+        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || !/^\\d{6}$/.test(code)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter a valid email address and 6-digit UniqueOTP.' } });
+        const verified = await getUniqueOtpService('email').verify({ destination: email, purpose: 'email_verification', code });
+        if (!verified) return res.status(403).json({ error: { code: 'OTP_INVALID', message: 'The email UniqueOTP is invalid, expired, or already used.' } });
+        const existing = await getFirestore().collection('users').where('email', '==', email).limit(1).get();
+        if (!existing.empty && existing.docs[0].id !== uid) return res.status(409).json({ error: { code: 'EMAIL_ALREADY_REGISTERED', message: 'That email address is already linked to another Unique One account.' } });
+        await getFirestore().collection('users').doc(uid).set({ email, emailVerified: true }, { merge: true });
+        return res.json({ ok: true, email, emailVerified: true });
+      } catch (error: any) {
+        console.error('UniqueOTP email verification failed:', error);
+        return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Email verification could not be completed.' } });
+      }
+    });
+  }
   app.post('/api/auth/unique-otp/recovery/request', rateLimit({
     windowMs: 10 * 60_000,
     limit: 5,
