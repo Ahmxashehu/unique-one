@@ -11,11 +11,11 @@ export default function SecurityPage() {
   const [passwordError,setPasswordError]=useState('');
   const [passwordLoading,setPasswordLoading]=useState(false);
   const weakLoginPins=new Set(['000000','111111','123456','654321','121212','112233','123123']);
-  const passwordChecks=useMemo(()=>[{ok:/^\\d{6}$/.test(newPassword),label:'Exactly 6 digits'},{ok:newPassword.length===6&&!weakLoginPins.has(newPassword),label:'Avoid obvious or common patterns'},{ok:newPassword.length===6&&newPassword!==currentPassword,label:'Different from your current Login PIN'}],[newPassword,currentPassword]);
+  const passwordChecks=useMemo(()=>[{ok:/^\d{6}$/.test(newPassword),label:'Exactly 6 digits'},{ok:newPassword.length===6&&!weakLoginPins.has(newPassword),label:'Avoid obvious or common patterns'},{ok:newPassword.length===6&&newPassword!==currentPassword,label:'Different from your current Login PIN'}],[newPassword,currentPassword]);
   const handlePasswordChange=async()=>{
     setPasswordError('');setPasswordMessage('');
-    if(!/^\\d{6}$/.test(currentPassword)){setPasswordError('Enter your current 6-digit Login PIN.');return;}
-    if(!/^\\d{6}$/.test(newPassword)||weakLoginPins.has(newPassword)){setPasswordError('Choose a valid 6-digit Login PIN that is not an obvious pattern.');return;}
+    if(!/^\d{6}$/.test(currentPassword)){setPasswordError('Enter your current 6-digit Login PIN.');return;}
+    if(!/^\d{6}$/.test(newPassword)||weakLoginPins.has(newPassword)){setPasswordError('Choose a valid 6-digit Login PIN that is not an obvious pattern.');return;}
     if(newPassword!==confirmNewPassword){setPasswordError('The new Login PINs do not match.');return;}
     if(!currentUser){setPasswordError('Your session has expired. Please sign in again.');return;}
     setPasswordLoading(true);
