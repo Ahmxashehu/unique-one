@@ -25,7 +25,7 @@ export interface UniqueOtpRecord {
 export interface UniqueOtpStore {
   invalidateActive(input: { destination: string; purpose: UniqueOtpPurpose }): Promise<void>;
   create(record: UniqueOtpRecord): Promise<void>;
-  findActive(input: { destination: string; purpose: UniqueOtpPurpose; now: Date }): Promise<UniqueOtpRecord | null>;
+  findActive(input: { destination: string; purpose: UniqueOtpPurpose; channel: UniqueOtpChannel; now: Date }): Promise<UniqueOtpRecord | null>;
   consume(id: string, consumedAt: Date): Promise<boolean>;
   incrementAttempts(id: string, attempts: number): Promise<void>;
 }
@@ -130,7 +130,7 @@ export class UniqueOtpService {
     const destination = assertDestination(input.destination);
     const code = assertOtpCode(input.code);
     const now = new Date();
-    const record = await this.options.store.findActive({ destination, purpose: input.purpose, now });
+    const record = await this.options.store.findActive({ destination, purpose: input.purpose, channel: input.channel, now });
     if (!record || record.consumedAt || record.expiresAt.getTime() <= now.getTime()) return false;
     if (record.attempts >= record.maxAttempts) return false;
 
