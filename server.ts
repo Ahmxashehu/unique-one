@@ -517,7 +517,7 @@ const app = express();
       if (!identifier) return errorResponse(res, 'INVALID_REQUEST', 'Enter your phone number, Unique ID, or verified email.');
 
       let uid = '';
-      let user: FirebaseAuthTypes.UserRecord | null = null;
+      let user: UserRecord | null = null;
 
       if (/^0\d{10}$/.test(identifier)) {
         user = await getAuth().getUserByPhoneNumber(normalizeAuthPhone(identifier));
