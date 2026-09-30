@@ -103,7 +103,7 @@ export function registerUniqueOtpRegistrationRoutes(app: Express) {
       const phone = normalizePhone(req.body?.phone);
       const code = typeof req.body?.code === 'string' ? req.body.code : '';
       if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter the 6-digit UniqueOTP.' } });
-      const verified = await getUniqueOtpService('sms').verify({ destination: phone, purpose: 'registration', code });
+      const verified = await getUniqueOtpService('sms').verify({ destination: phone, purpose: 'registration', channel: 'sms', code });
       if (!verified) return res.status(403).json({ error: { code: 'OTP_INVALID', message: 'The UniqueOTP is invalid, expired, or already used.' } });
 
       const auth = getAuth();
