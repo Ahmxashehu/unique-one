@@ -1,6 +1,7 @@
 import type { Express, Request, RequestHandler } from "express";
 import { createHash } from "crypto";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { registerUniqueOtpRoutes } from "./uniqueOtpRoutes";
 
 type VerificationType = "nin" | "vNIN" | "bvn" | "bank_account" | "phone";
 type MatchInput = { firstName?: string; lastName?: string; dateOfBirth?: string; phone?: string };
@@ -87,6 +88,8 @@ function evaluateMatch(entity: Record<string, unknown>, match: MatchInput) {
 }
 
 export function registerIdentityVerificationRoutes(app: Express, authenticate: RequestHandler) {
+  registerUniqueOtpRoutes(app);
+
   app.get("/api/verification/status", authenticate, async (req, res) => {
     const uid = (req as Request & { user?: { uid?: string } }).user?.uid;
     if (!uid) return res.status(401).json({ error: { code: "UNAUTHENTICATED", message: "Authentication is required." } });
@@ -160,7 +163,6 @@ export function registerIdentityVerificationRoutes(app: Express, authenticate: R
       matchStatus,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
-      // Deliberately never persist the submitted NIN/BVN/vNIN/phone/NUBAN.
     });
 
     return res.status(providerValidated ? 200 : 422).json({
