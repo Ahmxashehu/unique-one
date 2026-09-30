@@ -114,7 +114,7 @@ export function registerUniqueOtpRoutes(app: Express) {
         const loginSalt = randomUUID().replace(/-/g, '');
         transaction.update(credentialRef.doc(uid), {
           loginPasswordSalt: loginSalt,
-          loginPasswordHash: require('crypto').scryptSync(password, loginSalt, 64).toString('hex'),
+          loginPasswordHash: scryptSync(password, loginSalt, 64).toString('hex'),
           updatedAt: Timestamp.now(),
         });
         transaction.update(sessionRef, { consumedAt: Timestamp.now() });
