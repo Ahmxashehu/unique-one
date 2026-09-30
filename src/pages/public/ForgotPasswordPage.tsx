@@ -1,8 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, KeyRound, Loader2, Phone, ShieldCheck } from 'lucide-react';
-import { RecaptchaVerifier, signInWithPhoneNumber, signOut } from 'firebase/auth';
-import { auth } from '../../lib/firebase';
 
 function normalizePhone(value: string) {
   const t = value.trim().replace(/[\s()-]/g, '');
@@ -15,14 +13,13 @@ export default function ForgotPasswordPage() {
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [recoveryToken, setRecoveryToken] = useState('');
   const [step, setStep] = useState<'phone' | 'otp' | 'password'>('phone');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
   const [otpRemainingSeconds, setOtpRemainingSeconds] = useState(0);
   const [resendRemainingSeconds, setResendRemainingSeconds] = useState(0);
-  const confirmation = useRef<Awaited<ReturnType<typeof signInWithPhoneNumber>> | null>(null);
-  const verifier = useRef<RecaptchaVerifier | null>(null);
 
   const OTP_TTL_SECONDS = 5 * 60;
 
@@ -46,15 +43,8 @@ export default function ForgotPasswordPage() {
     return () => window.clearInterval(timer);
   }, [resendRemainingSeconds]);
 
-  const getRecaptcha = () => {
-    if (!verifier.current) {
-      verifier.current = new RecaptchaVerifier(auth, 'forgot-password-recaptcha', { size: 'invisible' });
-    }
-    return verifier.current;
-  };
-
-  const sendCode = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const requestCode = async (event?: React.FormEvent) => {
+    event?.preventDefault();
     setError('');
     const normalized = normalizePhone(phone);
     if (!/^\+\d{8,15}$/.test(normalized)) {
@@ -63,14 +53,22 @@ export default function ForgotPasswordPage() {
     }
     setLoading(true);
     try {
-      confirmation.current = await signInWithPhoneNumber(auth, normalized, getRecaptcha());
-      setOtpExpiresAt(Date.now() + OTP_TTL_SECONDS * 1000);
-      setOtpRemainingSeconds(OTP_TTL_SECONDS);
-      setResendRemainingSeconds(30);
+      const response = await fetch('/api/auth/unique-otp/recovery/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: normalized, channel: 'sms' }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || 'We could not send the verification code.');
+      setPhone(normalized);
+      const expiresIn = typeof body?.expiresInSeconds === 'number' ? body.expiresInSeconds : OTP_TTL_SECONDS;
+      const resendAfter = typeof body?.resendAfterSeconds === 'number' ? body.resendAfterSeconds : 30;
+      setOtpExpiresAt(Date.now() + expiresIn * 1000);
+      setOtpRemainingSeconds(expiresIn);
+      setResendRemainingSeconds(resendAfter);
+      setCode('');
       setStep('otp');
     } catch (err: any) {
-      verifier.current?.clear();
-      verifier.current = null;
       setError(err?.message || 'We could not send the verification code.');
     } finally {
       setLoading(false);
@@ -79,26 +77,12 @@ export default function ForgotPasswordPage() {
 
   const resendCode = async () => {
     if (loading || resendRemainingSeconds > 0) return;
-    setError('');
-    setLoading(true);
-    try {
-      confirmation.current = await signInWithPhoneNumber(auth, normalizePhone(phone), getRecaptcha());
-      setOtpExpiresAt(Date.now() + OTP_TTL_SECONDS * 1000);
-      setOtpRemainingSeconds(OTP_TTL_SECONDS);
-      setResendRemainingSeconds(30);
-      setCode('');
-    } catch (err: any) {
-      verifier.current?.clear();
-      verifier.current = null;
-      setError(err?.message || 'We could not resend the verification code.');
-    } finally {
-      setLoading(false);
-    }
+    await requestCode();
   };
 
   const verifyCode = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!confirmation.current || !/^\d{6}$/.test(code)) {
+    if (!/^\d{6}$/.test(code)) {
       setError('Enter the 6-digit verification code.');
       return;
     }
@@ -109,8 +93,19 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError('');
     try {
-      await confirmation.current.confirm(code);
+      const response = await fetch('/api/auth/unique-otp/recovery/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: normalizePhone(phone), code }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || 'The verification code is invalid or expired.');
+      if (typeof body?.recoveryToken !== 'string' || !body.recoveryToken) {
+        throw new Error('Recovery verification did not return a valid session.');
+      }
+      setRecoveryToken(body.recoveryToken);
       setStep('password');
+      setCode('');
     } catch (err: any) {
       setError(err?.message || 'The verification code is invalid or expired.');
     } finally {
@@ -133,23 +128,25 @@ export default function ForgotPasswordPage() {
       setError('Your 6-digit login passwords do not match.');
       return;
     }
+    if (!recoveryToken) {
+      setError('Your recovery session is missing. Please start again.');
+      setStep('phone');
+      return;
+    }
     setLoading(true);
     try {
-      const user = auth.currentUser;
-      if (!user?.phoneNumber) throw new Error('Verified phone recovery session is no longer available. Please start again.');
-      const token = await user.getIdToken();
-      const response = await fetch('/api/auth/phone/reset-password', {
+      const response = await fetch('/api/auth/unique-otp/recovery/reset-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phone: normalizePhone(phone),
+          recoveryToken,
           password,
           confirmPassword,
         }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error?.message || 'Password reset could not be completed.');
-      await signOut(auth);
+      setRecoveryToken('');
       navigate('/login', { replace: true, state: { message: 'Your login password has been changed. Please sign in with your new 6-digit password.' } });
     } catch (err: any) {
       setError(err?.message || 'Password reset could not be completed.');
@@ -170,14 +167,14 @@ export default function ForgotPasswordPage() {
         {error && <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm text-center">{error}</div>}
 
         {step === 'phone' && (
-          <form onSubmit={sendCode} className="space-y-4">
+          <form onSubmit={requestCode} className="space-y-4">
             <label className="block text-sm font-medium text-slate-700">Registered phone number</label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl" placeholder="+234 801 234 5678" autoComplete="tel" required />
             </div>
             <button disabled={loading} className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2">
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Send phone OTP <ShieldCheck className="w-4 h-4" /></>}
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Send UniqueOTP <ShieldCheck className="w-4 h-4" /></>}
             </button>
           </form>
         )}
@@ -187,7 +184,7 @@ export default function ForgotPasswordPage() {
             <div className="text-center">
               <ShieldCheck className="w-9 h-9 mx-auto text-green-600 mb-2" />
               <p className="font-semibold text-slate-900">Verify your phone</p>
-              <p className="text-sm text-slate-500 mt-1">Enter the 6-digit OTP sent to your registered phone.</p>
+              <p className="text-sm text-slate-500 mt-1">Enter the 6-digit UniqueOTP sent to your registered phone.</p>
               <p className={`text-sm font-semibold mt-3 ${otpRemainingSeconds <= 30 ? 'text-red-600' : 'text-green-700'}`} aria-live="polite">
                 {otpRemainingSeconds > 0
                   ? `OTP expires in ${Math.floor(otpRemainingSeconds / 60)}:${String(otpRemainingSeconds % 60).padStart(2, '0')}`
@@ -221,7 +218,6 @@ export default function ForgotPasswordPage() {
           </Link>
         </div>
       </div>
-      <div id="forgot-password-recaptcha" />
     </div>
   );
 }
