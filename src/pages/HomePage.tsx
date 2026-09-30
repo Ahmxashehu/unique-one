@@ -91,6 +91,19 @@ export default function HomePage() {
   const edgeProducts =
     mode === 'discover' ? filteredProducts.slice(0, 12) : filteredProducts.slice(0, 6);
 
+  const shareProduct = async (product: Product) => {
+    const url = window.location.origin + `/store/product/${product.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: product.name, text: product.description || product.name, url });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') console.error('Product share failed:', error);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[#f7f9f8] text-slate-950">
       {/* Sticky discovery header */}
@@ -190,7 +203,7 @@ export default function HomePage() {
             <div>
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-emerald-300">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                UNIQUE ONE · Nigeria → Africa → World
+                UNIQUE ONE · Africa → World
               </div>
               <h1 className="max-w-3xl text-4xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl">
                 Everything happening around you, in one Unique experience.
@@ -371,19 +384,34 @@ export default function HomePage() {
                             <Heart className={`h-4 w-4 ${liked[product.id] ? 'fill-current text-rose-500' : ''}`} />
                             Like
                           </button>
-                          <button type="button" className="flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50">
+                          <Link
+                            to={`/os/messages/new?product=${product.id}&seller=${product.sellerId}`}
+                            className="flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                          >
                             <MessageCircle className="h-4 w-4" /> Discuss
-                          </button>
-                          <button type="button" className="flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50">
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => void shareProduct(product)}
+                            className="flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                          >
                             <Share2 className="h-4 w-4" /> Share
                           </button>
                         </div>
-                        <Link
-                          to={`/store/product/${product.id}`}
-                          className="rounded-full bg-slate-950 px-4 py-2 text-xs font-bold text-white"
-                        >
-                          View
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            to={`/store/product/${product.id}`}
+                            className="rounded-full border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                          >
+                            View
+                          </Link>
+                          <Link
+                            to={`/store/product/${product.id}`}
+                            className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                          >
+                            Buy
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   </article>
