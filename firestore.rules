@@ -191,13 +191,7 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.sellerId == request.auth.uid) || isAdmin();
             allow create: if false;
-      allow update: if isAuthenticated()
-        && request.resource.data.customerId == resource.data.customerId
-        && request.resource.data.sellerId == resource.data.sellerId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-        && request.resource.data.status in ['draft', 'pending', 'confirmed', 'processing', 'ready_for_pickup', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'refunded', 'disputed']
-        && (resource.data.customerId == request.auth.uid || resource.data.sellerId == request.auth.uid)
-        || isAdmin();
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
     match /productRequests/{requestId} {
