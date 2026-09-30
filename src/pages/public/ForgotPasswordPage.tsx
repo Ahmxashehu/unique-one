@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, KeyRound, Loader2, Phone, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, KeyRound, Loader2, MessageCircle, Phone, ShieldCheck } from 'lucide-react';
+
+type RecoveryChannel = 'sms' | 'whatsapp';
 
 function normalizePhone(value: string) {
   const t = value.trim().replace(/[\s()-]/g, '');
@@ -14,7 +16,9 @@ export default function ForgotPasswordPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [recoveryToken, setRecoveryToken] = useState('');
-  const [step, setStep] = useState<'phone' | 'otp' | 'password'>('phone');
+  const [step, setStep] = useState<'phone' | 'channel' | 'otp' | 'password'>('phone');
+  const [channel, setChannel] = useState<RecoveryChannel>('sms');
+  const [whatsappAvailable, setWhatsappAvailable] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
@@ -28,9 +32,7 @@ export default function ForgotPasswordPage() {
     const update = () => {
       const remaining = Math.max(0, Math.ceil((otpExpiresAt - Date.now()) / 1000));
       setOtpRemainingSeconds(remaining);
-      if (remaining === 0) {
-        setError('This OTP has expired. Please request a new verification code.');
-      }
+      if (remaining === 0) setError('This OTP has expired. Please request a new verification code.');
     };
     update();
     const timer = window.setInterval(update, 1000);
@@ -43,7 +45,7 @@ export default function ForgotPasswordPage() {
     return () => window.clearInterval(timer);
   }, [resendRemainingSeconds]);
 
-  const requestCode = async (event?: React.FormEvent) => {
+  const chooseRecoveryMethod = async (event?: React.FormEvent) => {
     event?.preventDefault();
     setError('');
     const normalized = normalizePhone(phone);
@@ -53,14 +55,39 @@ export default function ForgotPasswordPage() {
     }
     setLoading(true);
     try {
+      const response = await fetch('/api/auth/unique-otp/recovery/options', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: normalized }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || 'We could not load verification options.');
+      setPhone(normalized);
+      setWhatsappAvailable(body?.whatsappBeta === true);
+      setChannel('sms');
+      setStep('channel');
+    } catch (err: any) {
+      setError(err?.message || 'We could not load verification options.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const requestCode = async (selectedChannel: RecoveryChannel = channel) => {
+    if (loading) return;
+    setError('');
+    const normalized = normalizePhone(phone);
+    setLoading(true);
+    try {
       const response = await fetch('/api/auth/unique-otp/recovery/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: normalized, channel: 'sms' }),
+        body: JSON.stringify({ phone: normalized, channel: selectedChannel }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error?.message || 'We could not send the verification code.');
       setPhone(normalized);
+      setChannel(selectedChannel);
       const expiresIn = typeof body?.expiresInSeconds === 'number' ? body.expiresInSeconds : OTP_TTL_SECONDS;
       const resendAfter = typeof body?.resendAfterSeconds === 'number' ? body.resendAfterSeconds : 30;
       setOtpExpiresAt(Date.now() + expiresIn * 1000);
@@ -77,7 +104,7 @@ export default function ForgotPasswordPage() {
 
   const resendCode = async () => {
     if (loading || resendRemainingSeconds > 0) return;
-    await requestCode();
+    await requestCode(channel);
   };
 
   const verifyCode = async (event: React.FormEvent) => {
@@ -96,13 +123,11 @@ export default function ForgotPasswordPage() {
       const response = await fetch('/api/auth/unique-otp/recovery/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: normalizePhone(phone), code }),
+        body: JSON.stringify({ phone: normalizePhone(phone), code, channel }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error?.message || 'The verification code is invalid or expired.');
-      if (typeof body?.recoveryToken !== 'string' || !body.recoveryToken) {
-        throw new Error('Recovery verification did not return a valid session.');
-      }
+      if (typeof body?.recoveryToken !== 'string' || !body.recoveryToken) throw new Error('Recovery verification did not return a valid session.');
       setRecoveryToken(body.recoveryToken);
       setStep('password');
       setCode('');
@@ -138,11 +163,7 @@ export default function ForgotPasswordPage() {
       const response = await fetch('/api/auth/unique-otp/recovery/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recoveryToken,
-          password,
-          confirmPassword,
-        }),
+        body: JSON.stringify({ recoveryToken, password, confirmPassword }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error?.message || 'Password reset could not be completed.');
@@ -167,33 +188,53 @@ export default function ForgotPasswordPage() {
         {error && <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm text-center">{error}</div>}
 
         {step === 'phone' && (
-          <form onSubmit={requestCode} className="space-y-4">
+          <form onSubmit={chooseRecoveryMethod} className="space-y-4">
             <label className="block text-sm font-medium text-slate-700">Registered phone number</label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl" placeholder="+234 801 234 5678" autoComplete="tel" required />
             </div>
             <button disabled={loading} className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2">
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Send UniqueOTP <ShieldCheck className="w-4 h-4" /></>}
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Continue <ShieldCheck className="w-4 h-4" /></>}
             </button>
           </form>
+        )}
+
+        {step === 'channel' && (
+          <div className="space-y-3">
+            <div className="text-center mb-5">
+              <ShieldCheck className="w-9 h-9 mx-auto text-green-600 mb-2" />
+              <p className="font-semibold text-slate-900">Choose how to receive your UniqueOTP</p>
+              <p className="text-sm text-slate-500 mt-1">We'll send the same secure 6-digit verification code through your selected channel.</p>
+            </div>
+            <button type="button" disabled={loading} onClick={() => requestCode('sms')} className="w-full border border-slate-200 rounded-2xl p-4 text-left hover:border-green-500 hover:bg-green-50 disabled:opacity-50">
+              <span className="font-semibold text-slate-900 block">SMS</span>
+              <span className="text-sm text-slate-500">Send the UniqueOTP by SMS</span>
+            </button>
+            {whatsappAvailable && (
+              <button type="button" disabled={loading} onClick={() => requestCode('whatsapp')} className="w-full border border-slate-200 rounded-2xl p-4 text-left hover:border-green-500 hover:bg-green-50 disabled:opacity-50">
+                <span className="font-semibold text-slate-900 flex items-center gap-2"><MessageCircle className="w-5 h-5" /> WhatsApp <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Beta</span></span>
+                <span className="text-sm text-slate-500">Send the UniqueOTP to WhatsApp</span>
+              </button>
+            )}
+            {loading && <div className="text-center text-sm text-slate-500">Sending UniqueOTP...</div>}
+          </div>
         )}
 
         {step === 'otp' && (
           <form onSubmit={verifyCode} className="space-y-4">
             <div className="text-center">
-              <ShieldCheck className="w-9 h-9 mx-auto text-green-600 mb-2" />
-              <p className="font-semibold text-slate-900">Verify your phone</p>
-              <p className="text-sm text-slate-500 mt-1">Enter the 6-digit UniqueOTP sent to your registered phone.</p>
+              {channel === 'whatsapp' ? <MessageCircle className="w-9 h-9 mx-auto text-green-600 mb-2" /> : <ShieldCheck className="w-9 h-9 mx-auto text-green-600 mb-2" />}
+              <p className="font-semibold text-slate-900">Verify your {channel === 'whatsapp' ? 'WhatsApp' : 'phone'}</p>
+              <p className="text-sm text-slate-500 mt-1">Enter the 6-digit UniqueOTP sent by {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}.</p>
               <p className={`text-sm font-semibold mt-3 ${otpRemainingSeconds <= 30 ? 'text-red-600' : 'text-green-700'}`} aria-live="polite">
-                {otpRemainingSeconds > 0
-                  ? `OTP expires in ${Math.floor(otpRemainingSeconds / 60)}:${String(otpRemainingSeconds % 60).padStart(2, '0')}`
-                  : 'OTP expired'}
+                {otpRemainingSeconds > 0 ? `OTP expires in ${Math.floor(otpRemainingSeconds / 60)}:${String(otpRemainingSeconds % 60).padStart(2, '0')}` : 'OTP expired'}
               </p>
             </div>
             <input autoFocus inputMode="numeric" maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} className="w-full text-center tracking-[0.5em] text-xl py-3 border border-slate-200 rounded-xl" placeholder="••••••" autoComplete="one-time-code" required />
             <button disabled={loading || otpRemainingSeconds <= 0} className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">{loading ? 'Verifying...' : otpRemainingSeconds > 0 ? 'Verify OTP' : 'OTP expired'}</button>
             <button type="button" onClick={resendCode} disabled={loading || resendRemainingSeconds > 0} className="w-full text-sm font-semibold text-green-700 disabled:text-slate-400 disabled:cursor-not-allowed">{resendRemainingSeconds > 0 ? `Resend OTP in ${resendRemainingSeconds}s` : 'Resend OTP'}</button>
+            <button type="button" onClick={() => setStep('channel')} disabled={loading} className="w-full text-sm text-slate-500">Change verification method</button>
           </form>
         )}
 
