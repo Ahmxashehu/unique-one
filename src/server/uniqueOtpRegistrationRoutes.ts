@@ -20,12 +20,12 @@ function validateOptionalEmail(value: unknown): string {
   if (value === undefined || value === null || value === '') return '';
   if (typeof value !== 'string') throw new Error('INVALID_EMAIL');
   const email = value.trim().toLowerCase();
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254) throw new Error('INVALID_EMAIL');
+  if (!/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(email) || email.length > 254) throw new Error('INVALID_EMAIL');
   return email;
 }
 
 function validateText(value: unknown, required: boolean, max = 120): string {
-  const text = typeof value === 'string' ? value.trim().replace(/\\s+/g, ' ').slice(0, max) : '';
+  const text = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, max) : '';
   if (required && !text) throw new Error('INVALID_REQUEST');
   return text;
 }
