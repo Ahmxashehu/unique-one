@@ -20,6 +20,7 @@ export default function SendMoneyPage() {
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [transactionPin, setTransactionPin] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const handleResolveRecipient = async (e: React.FormEvent) => {
@@ -66,6 +67,10 @@ export default function SendMoneyPage() {
       setError('Enter a valid amount and verified recipient.');
       return;
     }
+    if (!/^\d{4}$/.test(transactionPin)) {
+      setError('Enter your 4-digit Transaction PIN to authorize this payment.');
+      return;
+    }
     if (!navigator.onLine) {
       setError('Live money movement cannot be completed offline. Please connect to the internet.');
       return;
@@ -92,6 +97,7 @@ export default function SendMoneyPage() {
           currency: 'NGN',
           idempotencyKey,
           ...(description.trim() ? { description: description.trim() } : {}),
+          transactionPin,
         }),
       });
 
@@ -150,6 +156,24 @@ export default function SendMoneyPage() {
                 />
               </div>
               <p className="text-xs text-slate-500 mt-2">We verify the recipient before allowing the transfer.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Transaction PIN</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={4}
+                value={transactionPin}
+                onChange={e => setTransactionPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="••••"
+                className="w-full px-4 py-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-lg tracking-[0.5em] text-center font-semibold"
+                required
+                disabled={loading}
+                aria-label="4-digit Transaction PIN"
+              />
+              <p className="text-xs text-slate-500 mt-2">Required to authorize this transfer. Never share your PIN.</p>
             </div>
 
             <button

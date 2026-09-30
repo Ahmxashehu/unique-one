@@ -30,7 +30,7 @@ type TransferErrorCode =
   | 'TRANSFER_IN_PROGRESS' | 'WALLET_NOT_FOUND' | 'WALLET_UNAVAILABLE' | 'INSUFFICIENT_FUNDS' | 'RATE_LIMITED'
   | 'TRANSACTION_FAILED' | 'SERVICE_UNAVAILABLE' | 'NOT_FOUND' | 'BLOCKED' | 'FORBIDDEN' | 'INSUFFICIENT_STOCK';
 interface TransferErrorResponse { error: { code: TransferErrorCode; message: string } }
-interface TransferRequestInput { recipientId: string; amountMinor: number; currency: 'NGN'; idempotencyKey: string; description?: string }
+interface TransferRequestInput { recipientId: string; amountMinor: number; currency: 'NGN'; idempotencyKey: string; description?: string; transactionPin: string }
 interface CreateConversationRequestInput { type: ConversationType; title?: string; avatarUrl?: string; memberUids: string[] }
 const WALLET_CURRENCY = 'NGN';
 const WALLET_STATUSES = new Set<WalletDocument['status']>(['active', 'suspended', 'locked']);
@@ -81,6 +81,25 @@ function validateLoginPassword(value: unknown): string {
 }
 function passwordDigest(password: string, salt: string): string {
   return require('crypto').scryptSync(password, salt, 64).toString('hex');
+}
+function passwordDigestMatches(value: string, salt: string, expectedHex: string): boolean {
+  const crypto = require('crypto');
+  const actual = crypto.scryptSync(value, salt, 64);
+  const expected = Buffer.from(expectedHex, 'hex');
+  return expected.length === actual.length && crypto.timingSafeEqual(actual, expected);
+}
+function validateTransactionPin(value: unknown): string {
+  if (typeof value !== 'string' || !/^\d{4}$/.test(value)) {
+    throw new RequestValidationError('INVALID_REQUEST', 'Your Transaction PIN must be exactly 4 digits.');
+  }
+  return value;
+}
+async function verifyTransactionPin(uid: string, pin: unknown): Promise<boolean> {
+  const credential = await adminDb.collection('authCredentials').doc(uid).get();
+  if (!credential.exists) return false;
+  const data = credential.data() as { transactionPinSalt?: unknown; transactionPinHash?: unknown } | undefined;
+  if (typeof data?.transactionPinSalt !== 'string' || typeof data.transactionPinHash !== 'string') return false;
+  return passwordDigestMatches(String(pin), data.transactionPinSalt, data.transactionPinHash);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -134,9 +153,10 @@ async function ensureWalletForUser(uid: string): Promise<WalletDocument> {
 function validateTransferRequest(body: unknown, senderUid: string): TransferRequestInput {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('INVALID_REQUEST');
   const payload = body as Record<string, unknown>;
-  const allowedKeys = new Set(['recipientId', 'amountMinor', 'currency', 'idempotencyKey', 'description', 'senderUid']);
+  const allowedKeys = new Set(['recipientId', 'amountMinor', 'currency', 'idempotencyKey', 'description', 'senderUid', 'transactionPin']);
   for (const key of Object.keys(payload)) if (!allowedKeys.has(key)) throw new Error('INVALID_REQUEST');
   if ('senderUid' in payload) throw new Error('INVALID_REQUEST');
+  const transactionPin = validateTransactionPin(payload.transactionPin);
   if (typeof payload.recipientId !== 'string') throw new Error('INVALID_RECIPIENT');
   const recipientId = payload.recipientId.trim();
   if (!isSafeFirebaseUid(recipientId)) throw new Error('INVALID_RECIPIENT');
@@ -145,7 +165,7 @@ function validateTransferRequest(body: unknown, senderUid: string): TransferRequ
   if (payload.currency !== WALLET_CURRENCY) throw new Error('INVALID_CURRENCY');
   if (!isSafeIdempotencyKey(payload.idempotencyKey)) throw new Error('INVALID_IDEMPOTENCY_KEY');
   const description = sanitizeDescription(payload.description);
-  return { recipientId, amountMinor: payload.amountMinor, currency: 'NGN', idempotencyKey: payload.idempotencyKey.trim(), description };
+  return { recipientId, amountMinor: payload.amountMinor, currency: 'NGN', idempotencyKey: payload.idempotencyKey.trim(), description, transactionPin };
 }
 function sanitizeRequiredAuthUid(value: unknown): string {
   if (!isSafeFirebaseUid(value)) {
@@ -831,6 +851,28 @@ const app = express();
       return res.status(200).json({ uid: wallet.uid, currency: wallet.currency, availableBalanceMinor: wallet.availableBalanceMinor, status: wallet.status, createdAt: wallet.createdAt.toDate().toISOString(), updatedAt: wallet.updatedAt.toDate().toISOString() });
     } catch (error) { console.error("Error initializing wallet:", error); return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to initialize wallet.'); }
   });
+  app.post('/api/auth/transaction-pin/verify', rateLimit({
+    windowMs: 5 * 60_000,
+    limit: 8,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many PIN attempts. Please try again later.'),
+  }), authenticate, async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const pin = validateTransactionPin(req.body?.transactionPin);
+      const valid = await verifyTransactionPin(uid, pin);
+      if (!valid) return errorResponse(res, 'FORBIDDEN', 'Incorrect Transaction PIN.');
+      return res.json({ ok: true, verified: true });
+    } catch (error: any) {
+      return errorResponse(res, error instanceof RequestValidationError ? error.code : 'INVALID_REQUEST', error?.message || 'PIN verification failed.');
+    }
+  });
+
   app.post("/api/wallet/transfer", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false, handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many transfer requests were made. Please try again shortly.') }), authenticate, async (req, res) => {
     const senderUid = (req as any).user?.uid as string | undefined;
     if (!senderUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to initiate a transfer.');
@@ -844,7 +886,13 @@ const app = express();
       };
       return errorResponse(res, code, messages[code] ?? 'Invalid transfer request.');
     }
-    const { recipientId, amountMinor, currency, idempotencyKey, description } = validatedRequest;
+    const { recipientId, amountMinor, currency, idempotencyKey, description, transactionPin } = validatedRequest;
+    try {
+      if (!(await verifyTransactionPin(senderUid, transactionPin))) return errorResponse(res, 'FORBIDDEN', 'Incorrect Transaction PIN.');
+    } catch (error) {
+      console.error('Transaction PIN verification failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to verify the Transaction PIN right now.');
+    }
     try {
       if (!(await readUserExists(recipientId))) return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'The recipient user does not exist.');
     } catch (error) {
