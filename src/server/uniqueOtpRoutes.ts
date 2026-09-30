@@ -54,7 +54,7 @@ export function registerUniqueOtpRoutes(app: Express, authenticate?: RequestHand
         const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
         const code = typeof req.body?.code === 'string' ? req.body.code : '';
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{6}$/.test(code)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter a valid email address and 6-digit UniqueOTP.' } });
-        const verified = await getUniqueOtpService('email').verify({ destination: email, purpose: 'email_verification', code });
+        const verified = await getUniqueOtpService('email').verify({ destination: email, purpose: 'email_verification', channel: 'email', code });
         if (!verified) return res.status(403).json({ error: { code: 'OTP_INVALID', message: 'The email UniqueOTP is invalid, expired, or already used.' } });
         const existing = await getFirestore().collection('users').where('email', '==', email).limit(1).get();
         if (!existing.empty && existing.docs[0].id !== uid) return res.status(409).json({ error: { code: 'EMAIL_ALREADY_REGISTERED', message: 'That email address is already linked to another Unique One account.' } });
@@ -127,7 +127,7 @@ export function registerUniqueOtpRoutes(app: Express, authenticate?: RequestHand
       if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter the 6-digit verification code.' } });
       const requestedChannel = req.body?.channel;
       const channel: RecoveryChannel = requestedChannel === 'whatsapp' ? 'whatsapp' : 'sms';
-      const verified = await getUniqueOtpService(channel).verify({ destination: phone, purpose: 'password_reset', code });
+      const verified = await getUniqueOtpService(channel).verify({ destination: phone, purpose: 'password_reset', channel, code });
       if (!verified) return res.status(403).json({ error: { code: 'OTP_INVALID', message: 'The verification code is invalid, expired, or already used.' } });
 
       const user = await getAuth().getUserByPhoneNumber(phone);
