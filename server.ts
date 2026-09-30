@@ -449,6 +449,44 @@ const app = express();
       return errorResponse(res, code as TransferErrorCode, error?.message || 'Registration could not be completed.');
     }
   });
+  app.post('/api/auth/change-password', authenticate, rateLimit({
+    windowMs: 10 * 60_000,
+    limit: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many password change attempts. Please try again later.'),
+  }), async (req, res) => {
+    try {
+      const uid = typeof (req as any).user?.uid === 'string' ? (req as any).user.uid : '';
+      if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to change your Login PIN.');
+      const currentPassword = validateLoginPassword(req.body?.currentPassword);
+      const newPassword = validateLoginPassword(req.body?.newPassword);
+      const confirmNewPassword = validateLoginPassword(req.body?.confirmNewPassword);
+      if (newPassword !== confirmNewPassword) return errorResponse(res, 'INVALID_REQUEST', 'The new 6-digit Login PINs do not match.');
+
+      const credentialRef = adminDb.collection('authCredentials').doc(uid);
+      const snapshot = await credentialRef.get();
+      const credential = snapshot.data() as { loginPasswordSalt?: string; loginPasswordHash?: string } | undefined;
+      if (!credential?.loginPasswordSalt || !credential.loginPasswordHash) return errorResponse(res, 'INVALID_REQUEST', 'This account does not have a Login PIN configured.');
+      if (passwordDigest(currentPassword, credential.loginPasswordSalt) !== credential.loginPasswordHash) {
+        return errorResponse(res, 'UNAUTHENTICATED', 'Your current 6-digit Login PIN is incorrect.');
+      }
+      if (currentPassword === newPassword) return errorResponse(res, 'INVALID_REQUEST', 'Your new Login PIN must be different from your current Login PIN.');
+
+      const loginSalt = randomUUID().replace(/-/g, '');
+      await credentialRef.update({
+        loginPasswordSalt: loginSalt,
+        loginPasswordHash: passwordDigest(newPassword, loginSalt),
+        updatedAt: Timestamp.now(),
+      });
+      return res.json({ ok: true, passwordChanged: true });
+    } catch (error: any) {
+      const code = error instanceof RequestValidationError ? error.code : 'INVALID_REQUEST';
+      return errorResponse(res, code as TransferErrorCode, error?.message || 'Login PIN could not be changed.');
+    }
+  });
+
   app.post('/api/auth/phone/reset-password', rateLimit({
     windowMs: 10 * 60_000,
     limit: 5,
