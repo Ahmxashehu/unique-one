@@ -110,9 +110,6 @@ export default function HomePage() {
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <Link to="/os" className="flex shrink-0 items-center gap-2 font-black tracking-tight">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-sm text-white">
-              U1
-            </span>
             <span className="hidden sm:block">UNIQUE</span>
           </Link>
 
@@ -134,12 +131,6 @@ export default function HomePage() {
           >
             <Bell className="h-4 w-4" />
           </button>
-          <Link
-            to="/store"
-            className="hidden rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white sm:block"
-          >
-            Store
-          </Link>
         </div>
       </header>
 
