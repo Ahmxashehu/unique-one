@@ -22,21 +22,10 @@ export interface UniqueOtpRecord {
 }
 
 export interface UniqueOtpStore {
-  invalidateActive(input: {
-    destination: string;
-    purpose: UniqueOtpPurpose;
-  }): Promise<void>;
-
+  invalidateActive(input: { destination: string; purpose: UniqueOtpPurpose }): Promise<void>;
   create(record: UniqueOtpRecord): Promise<void>;
-
-  findActive(input: {
-    destination: string;
-    purpose: UniqueOtpPurpose;
-    now: Date;
-  }): Promise<UniqueOtpRecord | null>;
-
-  consume(id: string, consumedAt: Date): Promise<void>;
-
+  findActive(input: { destination: string; purpose: UniqueOtpPurpose; now: Date }): Promise<UniqueOtpRecord | null>;
+  consume(id: string, consumedAt: Date): Promise<boolean>;
   incrementAttempts(id: string, attempts: number): Promise<void>;
 }
 
@@ -75,27 +64,17 @@ const DEFAULT_MAX_ATTEMPTS = 5;
 
 function assertDestination(value: string): string {
   const destination = value.trim();
-  if (!destination || destination.length > 320) {
-    throw new Error('INVALID_OTP_DESTINATION');
-  }
+  if (!destination || destination.length > 320) throw new Error('INVALID_OTP_DESTINATION');
   return destination;
 }
 
 function assertOtpCode(value: string): string {
-  if (!/^\d{6}$/.test(value)) {
-    throw new Error('INVALID_OTP_CODE');
-  }
+  if (!/^\d{6}$/.test(value)) throw new Error('INVALID_OTP_CODE');
   return value;
 }
 
 function hashOtp(code: string, recordId: string, pepper: string): string {
-  return createHash('sha256')
-    .update(recordId)
-    .update(':')
-    .update(code)
-    .update(':')
-    .update(pepper)
-    .digest('hex');
+  return createHash('sha256').update(recordId).update(':').update(code).update(':').update(pepper).digest('hex');
 }
 
 function hashesMatch(actualHex: string, expectedHex: string): boolean {
@@ -121,50 +100,28 @@ export class UniqueOtpService {
     this.ttlSeconds = options.ttlSeconds ?? DEFAULT_TTL_SECONDS;
     this.maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     this.pepper = options.pepper ?? process.env.UNIQUE_OTP_PEPPER ?? '';
-
-    if (!Number.isInteger(this.ttlSeconds) || this.ttlSeconds < 60 || this.ttlSeconds > 15 * 60) {
-      throw new Error('INVALID_OTP_TTL');
-    }
-    if (!Number.isInteger(this.maxAttempts) || this.maxAttempts < 1 || this.maxAttempts > 10) {
-      throw new Error('INVALID_OTP_ATTEMPTS');
-    }
-    if (this.pepper.length < 16) {
-      throw new Error('UNIQUE_OTP_PEPPER_REQUIRED');
-    }
+    if (!Number.isInteger(this.ttlSeconds) || this.ttlSeconds < 60 || this.ttlSeconds > 15 * 60) throw new Error('INVALID_OTP_TTL');
+    if (!Number.isInteger(this.maxAttempts) || this.maxAttempts < 1 || this.maxAttempts > 10) throw new Error('INVALID_OTP_ATTEMPTS');
+    if (this.pepper.length < 16) throw new Error('UNIQUE_OTP_PEPPER_REQUIRED');
   }
 
   async issue(input: IssueOtpInput): Promise<{ expiresAt: Date; resendAfterSeconds: number }> {
     const destination = assertDestination(input.destination);
     await this.options.store.invalidateActive({ destination, purpose: input.purpose });
-
     const id = generateOtpId();
     const code = generateOtpCode();
     const createdAt = new Date();
     const expiresAt = new Date(createdAt.getTime() + this.ttlSeconds * 1000);
-
     const record: UniqueOtpRecord = {
-      id,
-      destination,
-      purpose: input.purpose,
-      channel: input.channel,
-      codeHash: hashOtp(code, id, this.pepper),
-      expiresAt,
-      attempts: 0,
-      maxAttempts: this.maxAttempts,
-      createdAt,
+      id, destination, purpose: input.purpose, channel: input.channel,
+      codeHash: hashOtp(code, id, this.pepper), expiresAt, attempts: 0,
+      maxAttempts: this.maxAttempts, createdAt,
     };
-
     await this.options.store.create(record);
-
-    // The code is passed only to the delivery provider and is never returned or persisted in plaintext.
     await this.options.provider.send({
-      destination,
-      code,
-      purpose: input.purpose,
-      channel: input.channel,
+      destination, code, purpose: input.purpose, channel: input.channel,
       expiresInSeconds: this.ttlSeconds,
     });
-
     return { expiresAt, resendAfterSeconds: 30 };
   }
 
@@ -172,29 +129,16 @@ export class UniqueOtpService {
     const destination = assertDestination(input.destination);
     const code = assertOtpCode(input.code);
     const now = new Date();
-    const record = await this.options.store.findActive({
-      destination,
-      purpose: input.purpose,
-      now,
-    });
+    const record = await this.options.store.findActive({ destination, purpose: input.purpose, now });
+    if (!record || record.consumedAt || record.expiresAt.getTime() <= now.getTime()) return false;
+    if (record.attempts >= record.maxAttempts) return false;
 
-    if (!record || record.consumedAt || record.expiresAt.getTime() <= now.getTime()) {
-      return false;
-    }
-
-    if (record.attempts >= record.maxAttempts) {
-      return false;
-    }
-
-    const candidateHash = hashOtp(code, record.id, this.pepper);
-    const matches = hashesMatch(candidateHash, record.codeHash);
-
+    const matches = hashesMatch(hashOtp(code, record.id, this.pepper), record.codeHash);
     if (!matches) {
       await this.options.store.incrementAttempts(record.id, record.attempts + 1);
       return false;
     }
 
-    await this.options.store.consume(record.id, now);
-    return true;
+    return this.options.store.consume(record.id, now);
   }
 }
