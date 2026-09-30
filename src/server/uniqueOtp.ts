@@ -7,7 +7,7 @@ export type UniqueOtpPurpose =
   | 'transaction_step_up'
   | 'email_verification';
 
-export type UniqueOtpChannel = 'sms' | 'email';
+export type UniqueOtpChannel = 'sms' | 'whatsapp' | 'email';
 
 export interface UniqueOtpRecord {
   id: string;
