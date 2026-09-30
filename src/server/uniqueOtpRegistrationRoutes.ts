@@ -151,6 +151,10 @@ export function registerUniqueOtpRegistrationRoutes(app: Express) {
       const fullName = fullNameFromParts(firstName, otherName, lastName);
 
       const db = getFirestore();
+      if (email) {
+        const emailSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
+        if (!emailSnapshot.empty) return res.status(409).json({ error: { code: 'EMAIL_ALREADY_REGISTERED', message: 'That email address is already linked to another Unique One account.' } });
+      }
       const sessionRef = db.collection('uniqueOtpRegistrationSessions').doc(hashToken(token));
       let uid = '';
       let phone = '';
