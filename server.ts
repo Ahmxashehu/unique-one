@@ -482,21 +482,29 @@ const app = express();
       const confirmNewPassword = validateLoginPassword(req.body?.confirmNewPassword);
       if (newPassword !== confirmNewPassword) return errorResponse(res, 'INVALID_REQUEST', 'The new 6-digit Login PINs do not match.');
 
-      const credentialRef = adminDb.collection('authCredentials').doc(uid);
-      const snapshot = await credentialRef.get();
-      const credential = snapshot.data() as { loginPasswordSalt?: string; loginPasswordHash?: string } | undefined;
-      if (!credential?.loginPasswordSalt || !credential.loginPasswordHash) return errorResponse(res, 'INVALID_REQUEST', 'This account does not have a Login PIN configured.');
-      if (!passwordDigestMatches(currentPassword, credential.loginPasswordSalt, credential.loginPasswordHash)) {
-        return errorResponse(res, 'UNAUTHENTICATED', 'Your current 6-digit Login PIN is incorrect.');
-      }
       if (currentPassword === newPassword) return errorResponse(res, 'INVALID_REQUEST', 'Your new Login PIN must be different from your current Login PIN.');
 
-      const loginSalt = randomUUID().replace(/-/g, '');
-      await credentialRef.update({
-        loginPasswordSalt: loginSalt,
-        loginPasswordHash: passwordDigest(newPassword, loginSalt),
-        updatedAt: Timestamp.now(),
-      });
+      const credentialRef = adminDb.collection('authCredentials').doc(uid);
+      try {
+        await adminDb.runTransaction(async transaction => {
+          const snapshot = await transaction.get(credentialRef);
+          const credential = snapshot.data() as { loginPasswordSalt?: string; loginPasswordHash?: string } | undefined;
+          if (!credential?.loginPasswordSalt || !credential.loginPasswordHash) throw new Error('LOGIN_CREDENTIAL_MISSING');
+          if (!passwordDigestMatches(currentPassword, credential.loginPasswordSalt, credential.loginPasswordHash)) {
+            throw new Error('CURRENT_LOGIN_PIN_INVALID');
+          }
+          const loginSalt = randomUUID().replace(/-/g, '');
+          transaction.update(credentialRef, {
+            loginPasswordSalt: loginSalt,
+            loginPasswordHash: passwordDigest(newPassword, loginSalt),
+            updatedAt: Timestamp.now(),
+          });
+        });
+      } catch (error: any) {
+        if (error?.message === 'LOGIN_CREDENTIAL_MISSING') return errorResponse(res, 'INVALID_REQUEST', 'This account does not have a Login PIN configured.');
+        if (error?.message === 'CURRENT_LOGIN_PIN_INVALID') return errorResponse(res, 'UNAUTHENTICATED', 'Your current 6-digit Login PIN is incorrect.');
+        throw error;
+      }
       return res.json({ ok: true, passwordChanged: true });
     } catch (error: any) {
       const code = error instanceof RequestValidationError ? error.code : 'INVALID_REQUEST';
