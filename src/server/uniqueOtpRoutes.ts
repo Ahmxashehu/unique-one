@@ -159,6 +159,14 @@ export function registerUniqueOtpRoutes(app: Express, authenticate?: RequestHand
         });
         transaction.update(sessionRef, { consumedAt: Timestamp.now() });
       });
+      // Password recovery changes the credential first; then revoke refresh tokens so
+      // previously issued Firebase sessions cannot silently remain authorized.
+      try {
+        await getAuth().revokeRefreshTokens(uid);
+      } catch (revokeError) {
+        console.error('UniqueOTP password reset session revocation failed:', revokeError);
+        return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Password was changed, but active sessions could not be safely revoked. Please sign in again later.' } });
+      }
       await db.collection('users').doc(uid).set({ lastLogin: new Date().toISOString(), verificationStatus: 'phone_verified' }, { merge: true });
       return res.json({ ok: true, passwordReset: true });
     } catch (error: any) {
