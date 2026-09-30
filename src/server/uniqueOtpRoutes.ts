@@ -3,9 +3,9 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { createHash, randomUUID, scryptSync } from 'crypto';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { getUniqueOtpService } from './uniqueOtpRuntime';
+import { getUniqueOtpService, isWhatsAppOtpConfigured } from './uniqueOtpRuntime';
 
-type RecoveryChannel = 'sms' | 'email';
+type RecoveryChannel = 'sms' | 'whatsapp' | 'email';
 
 function normalizePhone(value: unknown): string {
   if (typeof value !== 'string') throw new Error('INVALID_PHONE');
@@ -66,6 +66,27 @@ export function registerUniqueOtpRoutes(app: Express, authenticate?: RequestHand
       }
     });
   }
+  app.post('/api/auth/unique-otp/recovery/options', rateLimit({
+    windowMs: 10 * 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: true,
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+  }), async (req, res) => {
+    try {
+      normalizePhone(req.body?.phone);
+      return res.json({
+        ok: true,
+        channels: isWhatsAppOtpConfigured() ? ['sms', 'whatsapp'] : ['sms'],
+        whatsappBeta: isWhatsAppOtpConfigured(),
+      });
+    } catch (error: any) {
+      if (error?.message === 'INVALID_PHONE') return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter a valid registered phone number.' } });
+      console.error('UniqueOTP recovery options failed:', error);
+      return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Recovery options are temporarily unavailable.' } });
+    }
+  });
+
   app.post('/api/auth/unique-otp/recovery/request', rateLimit({
     windowMs: 10 * 60_000,
     limit: 5,
@@ -76,8 +97,11 @@ export function registerUniqueOtpRoutes(app: Express, authenticate?: RequestHand
   }), async (req, res) => {
     try {
       const phone = normalizePhone(req.body?.phone);
-      const channel: RecoveryChannel = req.body?.channel === 'email' ? 'email' : 'sms';
-      if (channel !== 'sms') return res.status(400).json({ error: { code: 'UNSUPPORTED_CHANNEL', message: 'Phone recovery currently uses SMS.' } });
+      const requestedChannel = req.body?.channel;
+      const channel: RecoveryChannel = requestedChannel === 'whatsapp' ? 'whatsapp' : 'sms';
+      if (channel === 'whatsapp' && !isWhatsAppOtpConfigured()) {
+        return res.status(400).json({ error: { code: 'WHATSAPP_BETA_UNAVAILABLE', message: 'WhatsApp OTP (Beta) is not available yet.' } });
+      }
       const user = await getAuth().getUserByPhoneNumber(phone);
       await getUniqueOtpService(channel).issue({ destination: phone, purpose: 'password_reset', channel });
       return res.json({ ok: true, channel, expiresInSeconds: 300, resendAfterSeconds: 30, recoveryStarted: true });
@@ -101,7 +125,9 @@ export function registerUniqueOtpRoutes(app: Express, authenticate?: RequestHand
       const phone = normalizePhone(req.body?.phone);
       const code = typeof req.body?.code === 'string' ? req.body.code : '';
       if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter the 6-digit verification code.' } });
-      const verified = await getUniqueOtpService('sms').verify({ destination: phone, purpose: 'password_reset', code });
+      const requestedChannel = req.body?.channel;
+      const channel: RecoveryChannel = requestedChannel === 'whatsapp' ? 'whatsapp' : 'sms';
+      const verified = await getUniqueOtpService(channel).verify({ destination: phone, purpose: 'password_reset', code });
       if (!verified) return res.status(403).json({ error: { code: 'OTP_INVALID', message: 'The verification code is invalid, expired, or already used.' } });
 
       const user = await getAuth().getUserByPhoneNumber(phone);
