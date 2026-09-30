@@ -442,7 +442,7 @@ const app = express();
       if (password !== confirmPassword) return errorResponse(res, 'INVALID_REQUEST', 'The 6-digit login passwords do not match.');
       const transactionPin = typeof req.body?.transactionPin === 'string' ? req.body.transactionPin : '';
       const confirmTransactionPin = typeof req.body?.confirmTransactionPin === 'string' ? req.body.confirmTransactionPin : '';
-      if (!/^\\d{4}$/.test(transactionPin) || !/^\\d{4}$/.test(confirmTransactionPin)) return errorResponse(res, 'INVALID_REQUEST', 'Your Transaction PIN must be exactly 4 digits.');
+      if (!/^\d{4}$/.test(transactionPin) || !/^\d{4}$/.test(confirmTransactionPin)) return errorResponse(res, 'INVALID_REQUEST', 'Your Transaction PIN must be exactly 4 digits.');
       if (transactionPin !== confirmTransactionPin) return errorResponse(res, 'INVALID_REQUEST', 'The Transaction PINs do not match.');
       const fullName = typeof req.body?.fullName === 'string' ? req.body.fullName.trim().slice(0, 120) : '';
       const now = Timestamp.now();
@@ -486,7 +486,7 @@ const app = express();
       const snapshot = await credentialRef.get();
       const credential = snapshot.data() as { loginPasswordSalt?: string; loginPasswordHash?: string } | undefined;
       if (!credential?.loginPasswordSalt || !credential.loginPasswordHash) return errorResponse(res, 'INVALID_REQUEST', 'This account does not have a Login PIN configured.');
-      if (passwordDigest(currentPassword, credential.loginPasswordSalt) !== credential.loginPasswordHash) {
+      if (!passwordDigestMatches(currentPassword, credential.loginPasswordSalt, credential.loginPasswordHash)) {
         return errorResponse(res, 'UNAUTHENTICATED', 'Your current 6-digit Login PIN is incorrect.');
       }
       if (currentPassword === newPassword) return errorResponse(res, 'INVALID_REQUEST', 'Your new Login PIN must be different from your current Login PIN.');
@@ -596,7 +596,7 @@ const app = express();
       if (!user || !uid) return errorResponse(res, 'UNAUTHENTICATED', 'Invalid login identifier or 6-digit Login PIN.');
       const snap = await adminDb.collection('authCredentials').doc(uid).get();
       const credential = snap.data() as {loginPasswordSalt?:string;loginPasswordHash?:string}|undefined;
-      if (!credential?.loginPasswordSalt || !credential.loginPasswordHash || passwordDigest(password,credential.loginPasswordSalt)!==credential.loginPasswordHash) return errorResponse(res,'UNAUTHENTICATED','Invalid login identifier or 6-digit Login PIN.');
+      if (!credential?.loginPasswordSalt || !credential.loginPasswordHash || !passwordDigestMatches(password, credential.loginPasswordSalt, credential.loginPasswordHash)) return errorResponse(res,'UNAUTHENTICATED','Invalid login identifier or 6-digit Login PIN.');
       const customToken=await getAuth().createCustomToken(uid);
       await adminDb.collection('users').doc(uid).set({lastLogin:new Date().toISOString()},{merge:true});
       return res.json({customToken});
