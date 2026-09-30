@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingBag, Trash2, ArrowRight, Loader2, Minus, Plus, ChevronLeft, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, Trash2, ArrowRight, Loader2, Minus, Plus, ChevronLeft, ShieldCheck, MapPin } from 'lucide-react';
 import { createBiometricAssertion, type BiometricAssertion } from '../../components/security/PasskeySecurityCard';
 import { collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -10,7 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 type CartRow = CartItem & { product: Product };
 
 export default function StoreCartPage() {
-  const { currentUser } = useAuth();
+  const { currentUser, userData } = useAuth();
   const navigate = useNavigate();
   const [items, setItems] = useState<CartRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +21,7 @@ export default function StoreCartPage() {
   const [paymentStep, setPaymentStep] = useState(false);
   const [pendingOrderIds, setPendingOrderIds] = useState<string[]>([]);
   const [pendingPaymentKey, setPendingPaymentKey] = useState('');
+  const [selectedShippingAddressId, setSelectedShippingAddressId] = useState('');
 
   const loadCart = async () => {
     if (!currentUser) { setItems([]); setLoading(false); return; }
@@ -53,6 +54,12 @@ export default function StoreCartPage() {
 
   useEffect(() => { loadCart(); }, [currentUser]);
 
+  useEffect(() => {
+    const addresses = userData?.shippingAddresses || [];
+    const defaultAddress = addresses.find(address => address.isDefault) || addresses[0];
+    setSelectedShippingAddressId(defaultAddress?.id || '');
+  }, [userData?.uid, userData?.shippingAddresses]);
+
   const removeItem = async (item: CartRow) => {
     try {
       await deleteDoc(doc(db, 'carts', item.id));
@@ -80,7 +87,7 @@ export default function StoreCartPage() {
       const response = await fetch('/api/store/checkout', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idempotencyKey }),
+        body: JSON.stringify({ idempotencyKey, shippingAddressId: selectedShippingAddressId || undefined }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error?.message || 'Could not create your order.');
@@ -180,6 +187,22 @@ export default function StoreCartPage() {
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 h-fit lg:sticky lg:top-24">
             <div className="flex items-center justify-between"><h2 className="font-bold text-slate-900">Order Summary</h2><ShieldCheck className="w-5 h-5 text-emerald-600" /></div>
+            <div className="mt-4 p-4 rounded-xl border border-slate-200 bg-slate-50">
+              <div className="flex items-center gap-2 mb-2"><MapPin className="w-4 h-4 text-slate-500"/><h3 className="font-semibold text-slate-900">Delivery address</h3></div>
+              {(userData?.shippingAddresses?.length || 0) > 0 ? (
+                <>
+                  <select value={selectedShippingAddressId} onChange={e=>setSelectedShippingAddressId(e.target.value)} disabled={checkingOut || paymentBusy} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm">
+                    {(userData?.shippingAddresses || []).map(address => <option key={address.id} value={address.id}>{address.label}{address.isDefault ? ' — Default' : ''}</option>)}
+                  </select>
+                  {(() => {
+                    const address = (userData?.shippingAddresses || []).find(item => item.id === selectedShippingAddressId) || (userData?.shippingAddresses || []).find(item => item.isDefault) || userData?.shippingAddresses?.[0];
+                    return address ? <p className="text-xs text-slate-500 mt-2">{address.recipientName} · {address.phone}<br/>{address.fullAddress}, {address.area}, {address.town}, {address.lga}, {address.state}</p> : null;
+                  })()}
+                </>
+              ) : (
+                <div className="text-xs text-slate-500">Add a shipping address in your Profile before checkout.</div>
+              )}
+            </div>
             <div className="flex justify-between mt-4 text-sm text-slate-600"><span>Subtotal</span><span>{items[0]?.product.currency === 'NGN' ? '₦' : '$'}{total.toLocaleString()}</span></div>
             <div className="flex justify-between mt-3 pt-3 border-t font-bold text-slate-900"><span>Total</span><span>{items[0]?.product.currency === 'NGN' ? '₦' : '$'}{total.toLocaleString()}</span></div>
             {paymentStep && (
@@ -213,11 +236,11 @@ export default function StoreCartPage() {
             {!paymentStep && (
               <button
                 onClick={handleCheckout}
-                disabled={checkingOut}
+                disabled={checkingOut || !selectedShippingAddressId}
                 className="w-full mt-6 bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {checkingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                {checkingOut ? 'Creating order…' : 'Continue to UniquePay'}
+                {checkingOut ? 'Creating order…' : selectedShippingAddressId ? 'Continue to UniquePay' : 'Add a delivery address'}
               </button>
             )}
             <p className="text-xs text-slate-500 mt-3">Orders are created from your real cart, then settled through the UniquePay wallet.</p>
