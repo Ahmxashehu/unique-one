@@ -129,7 +129,7 @@ export default function StoreCartPage() {
       };
       let result = await requestPayment();
       if (result.response.status === 403 && result.body?.error?.code === 'BIOMETRIC_REQUIRED') {
-        setError(null);
+        setError('');
         setPaymentBusy(true);
         biometricAssertion = await createBiometricAssertion(currentUser);
         result = await requestPayment();
