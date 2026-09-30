@@ -38,6 +38,7 @@ export default function HomePage() {
   const [liked, setLiked] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState('');
+  const [followingIds, setFollowingIds] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,8 +142,26 @@ export default function HomePage() {
     );
   }, [products, search]);
 
-  const edgeProducts =
-    mode === 'discover' ? filteredProducts.slice(0, 12) : filteredProducts.slice(0, 6);
+  const edgeProducts = useMemo(() => {
+    const source = filteredProducts.filter((product) => {
+      if (mode !== 'following') return true;
+      return followingIds.includes(String(product.sellerId || ''));
+    });
+
+    if (mode === 'discover') {
+      return source.slice(0, 12);
+    }
+
+    if (mode === 'for-you') {
+      return [...source].sort((a, b) => {
+        const aScore = (liked[a.id] ? 5 : 0) + (saved[a.id] ? 4 : 0) + (a.category ? 1 : 0);
+        const bScore = (liked[b.id] ? 5 : 0) + (saved[b.id] ? 4 : 0) + (b.category ? 1 : 0);
+        return bScore - aScore;
+      }).slice(0, 8);
+    }
+
+    return source.slice(0, 8);
+  }, [filteredProducts, mode, followingIds, liked, saved]);
 
   const filteredJobs = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -405,16 +424,34 @@ export default function HomePage() {
                           </p>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSaved((current) => ({ ...current, [product.id]: !current[product.id] }))
-                        }
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const sellerId = String(product.sellerId || '');
+                            if (sellerId) {
+                              setFollowingIds((current) =>
+                                current.includes(sellerId)
+                                  ? current.filter((id) => id !== sellerId)
+                                  : [...current, sellerId],
+                              );
+                            }
+                          }}
+                          className="rounded-full px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50"
+                        >
+                          {followingIds.includes(String(product.sellerId || '')) ? 'Following' : 'Follow'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSaved((current) => ({ ...current, [product.id]: !current[product.id] }))
+                          }
                         aria-label={saved[product.id] ? 'Unsave' : 'Save'}
                         className="rounded-full p-2 hover:bg-slate-100"
                       >
-                        <Bookmark className={`h-5 w-5 ${saved[product.id] ? 'fill-current text-emerald-600' : 'text-slate-500'}`} />
-                      </button>
+                          <Bookmark className={`h-5 w-5 ${saved[product.id] ? 'fill-current text-emerald-600' : 'text-slate-500'}`} />
+                        </button>
+                      </div>
                     </div>
 
                     <Link to={`/store/product/${product.id}`} className="block">
