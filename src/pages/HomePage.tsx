@@ -32,6 +32,7 @@ export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [jobs, setJobs] = useState<Array<{ id: string; title?: string; companyName?: string; location?: string; description?: string; category?: string }>>([]);
   const [contributions, setContributions] = useState<Array<{ id: string; title?: string; description?: string; category?: string; location?: string }>>([]);
+  const [businesses, setBusinesses] = useState<Array<{ id: string; name?: string; businessName?: string; description?: string; ownerUid?: string; category?: string; status?: string; verificationStatus?: string }>>([]);
   const [mode, setMode] = useState<EdgeMode>('for-you');
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState<Record<string, boolean>>({});
@@ -87,6 +88,24 @@ export default function HomePage() {
       (error) => console.error('Unique jobs feed could not load:', error),
     );
 
+    const businessesQuery = query(
+      collection(db, 'businesses'),
+      limit(12),
+    );
+    const unsubscribeBusinesses = onSnapshot(
+      businessesQuery,
+      (snapshot) => {
+        if (!cancelled) {
+          setBusinesses(
+            snapshot.docs
+              .map((item) => ({ id: item.id, ...(item.data() as Omit<(typeof businesses)[number], 'id'>) }))
+              .filter((business) => business.businessName || business.name),
+          );
+        }
+      },
+      (error) => console.error('Unique business feed could not load:', error),
+    );
+
     const contributionsQuery = query(
       collection(db, 'contributionRequests'),
       where('status', '==', 'published'),
@@ -107,6 +126,7 @@ export default function HomePage() {
       unsubscribe();
       unsubscribeJobs();
       unsubscribeContributions();
+      unsubscribeBusinesses();
     };
   }, []);
 
@@ -143,6 +163,16 @@ export default function HomePage() {
         .some((value) => String(value).toLowerCase().includes(term)),
     );
   }, [contributions, search]);
+
+  const filteredBusinesses = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return businesses;
+    return businesses.filter((business) =>
+      [business.name, business.businessName, business.description, business.category]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term)),
+    );
+  }, [businesses, search]);
 
   const shareProduct = async (product: Product) => {
     const url = window.location.origin + `/store/product/${product.id}`;
@@ -473,6 +503,29 @@ export default function HomePage() {
                     </div>
                   </article>
                 ))}
+                  {mode !== 'following' && filteredBusinesses.slice(0, mode === 'discover' ? 4 : 2).map((business) => (
+                    <article key={`business-${business.id}`} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700"><StoreIcon className="h-5 w-5" /></div>
+                          <div>
+                            <span className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Business</span>
+                            <h3 className="mt-1 font-black">{business.businessName || business.name}</h3>
+                            <p className="text-xs text-slate-500">{business.category || 'Business & services'}</p>
+                          </div>
+                        </div>
+                        {(business.verificationStatus === 'verified' || business.status === 'verified') && (
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">Verified</span>
+                        )}
+                      </div>
+                      {business.description && <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-500">{business.description}</p>}
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        {business.ownerUid && <Link to={`/store/seller/${business.ownerUid}`} className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white">Visit business</Link>}
+                        {business.ownerUid && <Link to={`/os/messages/new?user=${business.ownerUid}`} className="rounded-full border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700">Message</Link>}
+                        <Link to="/discover" className="rounded-full border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700">Discover services</Link>
+                      </div>
+                    </article>
+                  ))}
                   {mode !== 'following' && filteredJobs.slice(0, mode === 'discover' ? 4 : 2).map((job) => (
                     <article key={`job-${job.id}`} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                       <div className="flex items-start justify-between gap-4">
