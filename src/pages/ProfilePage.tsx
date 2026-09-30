@@ -1,4 +1,19 @@
 import React, { useState } from 'react';
+
+type ShippingAddress = {
+  id: string;
+  label: string;
+  recipientName: string;
+  phone: string;
+  country: string;
+  state: string;
+  lga: string;
+  town: string;
+  area: string;
+  fullAddress: string;
+  landmark?: string;
+  isDefault: boolean;
+};
 import { Link } from 'react-router-dom';
 import { User, Mail, Phone, MapPin, BadgeCheck, Clock, Save, Loader2, ShieldCheck, Hash, MessageSquare, Camera } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,6 +40,9 @@ export default function ProfilePage() {
     setEmailDraft(userData?.email || '');
   }, [userData?.email]);
   const [formData, setFormData] = useState({
+    firstName: userData?.firstName || '',
+    otherName: userData?.otherName || '',
+    lastName: userData?.lastName || '',
     fullName: userData?.fullName || '',
     phone: userData?.phone || '',
     username: userData?.username || '',
@@ -38,7 +56,25 @@ export default function ProfilePage() {
     shippingArea: defaultShipping?.area || '',
     shippingFullAddress: defaultShipping?.fullAddress || '',
     shippingLandmark: defaultShipping?.landmark || '',
+    communicationLocationVisibility: userData?.communicationProfile?.locationVisibility || 'city_only',
   });
+  const [shippingAddresses, setShippingAddresses] = useState<ShippingAddress[]>(() =>
+    (userData?.shippingAddresses || []).map(address => ({ ...address })) as ShippingAddress[]
+  );
+
+  React.useEffect(() => {
+    setShippingAddresses((userData?.shippingAddresses || []).map(address => ({ ...address })) as ShippingAddress[]);
+    setFormData(current => ({
+      ...current,
+      firstName: userData?.firstName || '',
+      otherName: userData?.otherName || '',
+      lastName: userData?.lastName || '',
+      fullName: userData?.fullName || '',
+      username: userData?.username || '',
+      preferredLanguage: userData?.preferredLanguage || 'en',
+      communicationLocationVisibility: userData?.communicationProfile?.locationVisibility || 'city_only',
+    }));
+  }, [userData?.uid]);
 
   if (!userData) {
     return <div className="p-8 text-center text-slate-500">Loading profile...</div>;
@@ -150,11 +186,39 @@ export default function ProfilePage() {
     setPhotoError('');
     try {
       const userRef = doc(db, 'users', currentUser.uid);
+      const currentAddresses = shippingAddresses.length > 0 ? shippingAddresses : [{
+        id: 'default',
+        label: formData.shippingLabel.trim() || 'Home',
+        recipientName: formData.shippingRecipientName.trim(),
+        phone: formData.shippingPhone.trim(),
+        country: 'Nigeria',
+        state: formData.shippingState.trim(),
+        lga: formData.shippingLga.trim(),
+        town: formData.shippingTown.trim(),
+        area: formData.shippingArea.trim(),
+        fullAddress: formData.shippingFullAddress.trim(),
+        landmark: formData.shippingLandmark.trim(),
+        isDefault: true,
+      } as ShippingAddress];
+      const normalizedAddresses = currentAddresses.map(address => ({ ...address, label: address.label.trim() || 'Address', recipientName: address.recipientName.trim(), phone: address.phone.trim(), country: address.country || 'Nigeria', state: address.state.trim(), lga: address.lga.trim(), town: address.town.trim(), area: address.area.trim(), fullAddress: address.fullAddress.trim(), landmark: address.landmark?.trim() || '', isDefault: false }));
+      const defaultId = normalizedAddresses.find(address => address.id === (defaultShipping?.id || 'default'))?.id || normalizedAddresses[0]?.id;
+      const finalAddresses = normalizedAddresses.map(address => ({ ...address, isDefault: address.id === defaultId }));
+      const fullName = [formData.firstName, formData.otherName, formData.lastName].filter(Boolean).join(' ').trim() || formData.fullName.trim();
       await updateDoc(userRef, {
-        fullName: formData.fullName.trim(),
+        firstName: formData.firstName.trim(),
+        otherName: formData.otherName.trim(),
+        lastName: formData.lastName.trim(),
+        fullName,
         username: formData.username.trim(),
         preferredLanguage: formData.preferredLanguage,
-        shippingAddresses: (userData.shippingAddresses || []).map(address => address.id === (defaultShipping?.id || 'default') ? { ...address, label: formData.shippingLabel.trim() || 'Home', recipientName: formData.shippingRecipientName.trim(), phone: formData.shippingPhone.trim(), country: 'Nigeria', state: formData.shippingState.trim(), lga: formData.shippingLga.trim(), town: formData.shippingTown.trim(), area: formData.shippingArea.trim(), fullAddress: formData.shippingFullAddress.trim(), landmark: formData.shippingLandmark.trim(), isDefault: true } : { ...address, isDefault: false }),
+        communicationProfile: {
+          ...(userData.communicationProfile || {}),
+          firstName: formData.firstName.trim(),
+          otherName: formData.otherName.trim(),
+          lastName: formData.lastName.trim(),
+          locationVisibility: formData.communicationLocationVisibility,
+        },
+        shippingAddresses: finalAddresses,
       });
       setIsEditing(false);
     } catch (err) {
@@ -231,6 +295,24 @@ export default function ProfilePage() {
                 </span>
               ))}
             </div>
+          </div>
+        </div>
+
+        <div className="mb-8 pb-8 border-b border-slate-100">
+          <div className="flex items-center gap-2 mb-4"><User className="w-5 h-5 text-slate-500"/><h3 className="text-lg font-bold text-slate-900">Customer ownership & communication profile</h3></div>
+          <p className="text-sm text-slate-500 mb-4">You control the non-sensitive information people can use to recognize and communicate with you. Your phone, Unique ID, verification records, NIN/BVN, and PINs remain protected.</p>
+          <div className="grid sm:grid-cols-3 gap-4">
+            <input disabled={!isEditing} value={formData.firstName} onChange={e=>setFormData({...formData,firstName:e.target.value})} placeholder="First name" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+            <input disabled={!isEditing} value={formData.otherName} onChange={e=>setFormData({...formData,otherName:e.target.value})} placeholder="Other / middle name" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+            <input disabled={!isEditing} value={formData.lastName} onChange={e=>setFormData({...formData,lastName:e.target.value})} placeholder="Last name" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+          </div>
+          <div className="mt-4 grid sm:grid-cols-2 gap-4">
+            <select disabled={!isEditing} value={formData.communicationLocationVisibility} onChange={e=>setFormData({...formData,communicationLocationVisibility:e.target.value as typeof formData.communicationLocationVisibility})} className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50">
+              <option value="hidden">Communication location: Hidden</option>
+              <option value="city_only">Communication location: City only</option>
+              <option value="contacts">Communication location: Contacts</option>
+              <option value="everyone">Communication location: Everyone</option>
+            </select>
           </div>
         </div>
 
@@ -331,20 +413,37 @@ export default function ProfilePage() {
           </div>
         </div>
         <div className="mt-8 pt-8 border-t border-slate-100">
-          <div className="flex items-center gap-2 mb-4"><MapPin className="w-5 h-5 text-slate-500"/><h3 className="text-lg font-bold text-slate-900">Shipping Details</h3></div>
-          <p className="text-sm text-slate-500 mb-4">Your shipping address is private and used for Store checkout and delivery. You can update it without changing your Unique ID.</p>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <input disabled={!isEditing} value={formData.shippingLabel} onChange={e=>setFormData({...formData,shippingLabel:e.target.value})} placeholder="Address label (Home, Office)" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
-            <input disabled={!isEditing} value={formData.shippingRecipientName} onChange={e=>setFormData({...formData,shippingRecipientName:e.target.value})} placeholder="Recipient name" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
-            <input disabled={!isEditing} value={formData.shippingPhone} onChange={e=>setFormData({...formData,shippingPhone:e.target.value})} placeholder="Delivery phone" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
-            <input disabled={!isEditing} value={formData.shippingState} onChange={e=>setFormData({...formData,shippingState:e.target.value})} placeholder="State" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
-            <input disabled={!isEditing} value={formData.shippingLga} onChange={e=>setFormData({...formData,shippingLga:e.target.value})} placeholder="LGA" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
-            <input disabled={!isEditing} value={formData.shippingTown} onChange={e=>setFormData({...formData,shippingTown:e.target.value})} placeholder="Town / City" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
-            <input disabled={!isEditing} value={formData.shippingArea} onChange={e=>setFormData({...formData,shippingArea:e.target.value})} placeholder="Area" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
-            <input disabled={!isEditing} value={formData.shippingLandmark} onChange={e=>setFormData({...formData,shippingLandmark:e.target.value})} placeholder="Landmark (optional)" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-2"><MapPin className="w-5 h-5 text-slate-500"/><h3 className="text-lg font-bold text-slate-900">Shipping Addresses</h3></div>
+            {isEditing && <button type="button" onClick={() => setShippingAddresses(current => [...current, { id: 'address-' + Date.now(), label: 'New address', recipientName: formData.firstName + (formData.lastName ? ' ' + formData.lastName : ''), phone: userData.phone || '', country: 'Nigeria', state: '', lga: '', town: '', area: '', fullAddress: '', landmark: '', isDefault: current.length === 0 }])} className="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm">Add address</button>}
           </div>
-          <textarea disabled={!isEditing} value={formData.shippingFullAddress} onChange={e=>setFormData({...formData,shippingFullAddress:e.target.value})} rows={3} placeholder="Full delivery address" className="w-full mt-4 px-4 py-2 border border-slate-200 rounded-lg resize-none disabled:bg-slate-50"/>
-        </div>
+          <p className="text-sm text-slate-500 mb-4">Keep multiple private delivery addresses such as Home, Office, or another destination. One address is always marked as the default for Store checkout.</p>
+          <div className="space-y-4">
+            {(shippingAddresses.length ? shippingAddresses : [{
+              id: 'default', label: formData.shippingLabel || 'Home', recipientName: formData.shippingRecipientName || userData.fullName, phone: formData.shippingPhone || userData.phone || '', country: 'Nigeria', state: formData.shippingState, lga: formData.shippingLga, town: formData.shippingTown, area: formData.shippingArea, fullAddress: formData.shippingFullAddress, landmark: formData.shippingLandmark, isDefault: true
+            } as ShippingAddress]).map((address, index) => (
+              <div key={address.id} className="border border-slate-200 rounded-2xl p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <input disabled={!isEditing} value={address.label} onChange={e=>setShippingAddresses(current=>current.map(item=>item.id===address.id?{...item,label:e.target.value}:item))} placeholder="Home / Office" className="px-3 py-2 border border-slate-200 rounded-lg font-semibold disabled:bg-slate-50"/>
+                    {address.isDefault && <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-50 text-green-700">Default</span>}
+                  </div>
+                  {isEditing && shippingAddresses.length > 1 && <button type="button" onClick={()=>setShippingAddresses(current=>{const remaining=current.filter(item=>item.id!==address.id); if(address.isDefault && remaining[0]) remaining[0]={...remaining[0],isDefault:true}; return remaining;})} className="text-xs text-red-600">Remove</button>}
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {([
+                    ['recipientName','Recipient name'],['phone','Delivery phone'],['state','State'],['lga','LGA'],['town','Town / City'],['area','Area'],['landmark','Landmark (optional)'],['fullAddress','Full address']
+                  ] as const).map(([key,placeholder]) => key === 'fullAddress' ? (
+                    <textarea key={key} disabled={!isEditing} value={address[key]} onChange={e=>setShippingAddresses(current=>current.map(item=>item.id===address.id?{...item,[key]:e.target.value}:item))} rows={2} placeholder={placeholder} className="w-full px-3 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50 sm:col-span-2"/>
+                  ) : (
+                    <input key={key} disabled={!isEditing} value={address[key] || ''} onChange={e=>setShippingAddresses(current=>current.map(item=>item.id===address.id?{...item,[key]:e.target.value}:item))} placeholder={placeholder} className="w-full px-3 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+                  ))}
+                </div>
+                {isEditing && <button type="button" onClick={()=>setShippingAddresses(current=>current.map(item=>({...item,isDefault:item.id===address.id})))} className="mt-3 text-sm text-slate-700 underline">Set as default checkout address</button>}
+              </div>
+            ))}
+          </div>
+        </div>        </div>
       </div>
     </div>
   );
