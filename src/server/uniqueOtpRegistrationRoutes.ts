@@ -1,6 +1,6 @@
 import type { Express } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
-import { createHash, randomUUID } from 'crypto';
+import { createHash, randomUUID, scryptSync } from 'crypto';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getUniqueOtpService } from './uniqueOtpRuntime';
@@ -172,8 +172,8 @@ export function registerUniqueOtpRegistrationRoutes(app: Express) {
         const loginSalt = randomUUID().replace(/-/g, '');
         const pinSalt = randomUUID().replace(/-/g, '');
         transaction.create(credentialRef, {
-          uid, phone, loginPasswordSalt: loginSalt, loginPasswordHash: require('crypto').scryptSync(password, loginSalt, 64).toString('hex'),
-          transactionPinSalt: pinSalt, transactionPinHash: require('crypto').scryptSync(transactionPin, pinSalt, 64).toString('hex'),
+          uid, phone, loginPasswordSalt: loginSalt, loginPasswordHash: scryptSync(password, loginSalt, 64).toString('hex'),
+          transactionPinSalt: pinSalt, transactionPinHash: scryptSync(transactionPin, pinSalt, 64).toString('hex'),
           createdAt: now, updatedAt: now,
         });
         const uniqueOneId = uniqueIdFromPhone(phone);
