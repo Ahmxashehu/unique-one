@@ -17,7 +17,7 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
-import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Product } from '../lib/os/types';
 
@@ -42,39 +42,37 @@ export default function HomePage() {
     const loadHomeData = async () => {
       setLoading(true);
       try {
-        const snapshot = await getDocs(
-          query(
-            collection(db, 'products'),
-            where('status', '==', 'published'),
-            limit(18),
-          ),
+        const productsQuery = query(
+          collection(db, 'products'),
+          where('status', '==', 'published'),
+          limit(18),
         );
 
-        if (cancelled) return;
+        const unsubscribe = onSnapshot(
+          productsQuery,
+          (snapshot) => {
+            if (cancelled) return;
+            const realProducts = snapshot.docs
+              .map((productDoc) => ({ ...(productDoc.data() as Product), id: productDoc.id }))
+              .filter(
+                (product) =>
+                  product.name &&
+                  Number.isFinite(Number(product.price)) &&
+                  Number(product.quantity) > 0,
+              );
+            setProducts(realProducts);
+            setLoading(false);
+          },
+          (error) => {
+            console.error('Unique home feed could not load:', error);
+            if (!cancelled) {
+              setProducts([]);
+              setLoading(false);
+            }
+          },
+        );
 
-        const realProducts = snapshot.docs
-          .map((doc) => ({ ...(doc.data() as Product), id: doc.id }))
-          .filter(
-            (product) =>
-              product.name &&
-              Number.isFinite(Number(product.price)) &&
-              Number(product.quantity) > 0,
-          );
-
-        setProducts(realProducts);
-      } catch (error) {
-        console.error('Unique home feed could not load:', error);
-        // Keep the shell usable even when Firestore is temporarily unavailable.
-        if (!cancelled) setProducts([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    void loadHomeData();
-    return () => {
-      cancelled = true;
-    };
+        return unsubscribe;
   }, []);
 
   const filteredProducts = useMemo(() => {
@@ -124,13 +122,13 @@ export default function HomePage() {
             />
           </div>
 
-          <button
-            type="button"
+          <Link
+            to="/os/notifications"
             className="hidden h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white sm:flex"
             aria-label="Notifications"
           >
             <Bell className="h-4 w-4" />
-          </button>
+          </Link>
         </div>
       </header>
 
