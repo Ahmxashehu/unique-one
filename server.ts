@@ -572,14 +572,29 @@ const app = express();
     }
   });
 
-  app.post('/api/auth/phone/login', rateLimit({
+  app.post('/api/auth/phone/login',
+  rateLimit({
     windowMs: 5 * 60_000,
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => ipKeyGenerator(req.ip),
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many login attempts. Please try again later.'),
-  }), async (req, res) => {
+  }),
+  rateLimit({
+    windowMs: 10 * 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('authLoginIdentifierRateLimits', 10 * 60_000),
+    keyGenerator: (req) => {
+      const rawIdentifier = typeof req.body?.identifier === 'string' ? req.body.identifier.trim().toLowerCase() : '';
+      const identifierKey = createHash('sha256').update(rawIdentifier || 'missing-identifier').digest('hex');
+      return `identifier:${identifierKey}`;
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many login attempts for this account identifier. Please try again shortly.'),
+  }),
+  async (req, res) => {
     try {
       const identifier = typeof req.body?.identifier === 'string' ? req.body.identifier.trim().toLowerCase() : '';
       const password = validateLoginPassword(req.body?.password);
