@@ -6,7 +6,7 @@ type U1LoaderProps = {
 };
 
 export default function U1Loader({
-  visible = true,
+  visible = false,
   minDurationMs = 700,
 }: U1LoaderProps) {
   const [show, setShow] = useState(visible);
