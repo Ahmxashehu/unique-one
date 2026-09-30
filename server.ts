@@ -4,7 +4,7 @@ import { createHash, randomUUID } from "crypto";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import rateLimit, { ipKeyGenerator, type Store } from "express-rate-limit";
-import { initializeApp, getApps } from "firebase-admin/app";
+import { applicationDefault, initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
@@ -70,6 +70,7 @@ class RequestValidationError extends Error {
   }
 }
 if (getApps().length === 0) initializeApp({
+  credential: applicationDefault(),
   projectId: "unique-one-9731b",
   storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "unique-one-9731b.firebasestorage.app",
 });
