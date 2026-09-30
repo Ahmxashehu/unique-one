@@ -288,7 +288,11 @@ service cloud.firestore {
     }
     match /staffMembers/{staffId} { allow read: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.uid == request.auth.uid); allow create, update, delete: if false; }
     match /branches/{branchId} {
-      allow read: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+      allow read: if isAuthenticated()
+        && resource.data.ownerUid == request.auth.uid
+        && resource.data.businessId is string
+        && exists(/databases/$(database)/documents/businesses/$(resource.data.businessId))
+        && get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.ownerUid == request.auth.uid;
       allow create: if isAuthenticated()
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.businessId is string
