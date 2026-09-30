@@ -2632,17 +2632,17 @@ const app = express();
         const customerWalletRef = adminDb.collection('wallets').doc(uid);
         const snapshots = await Promise.all([transaction.get(customerWalletRef), ...walletRefs.map((ref) => transaction.get(ref))]);
         const customerWalletSnap = snapshots[0];
-        if (!customerWalletSnap.exists) throw new RequestValidationError('WALLET_NOT_FOUND', 'Your UniquePay wallet is not available.');
+        if (!customerWalletSnap.exists) throw new Error('STORE_WALLET_NOT_FOUND');
         const customerWallet = validateWalletDocument(customerWalletSnap.data(), uid);
-        if (customerWallet.status !== 'active') throw new RequestValidationError('WALLET_UNAVAILABLE', 'Your UniquePay wallet is unavailable.');
-        if (customerWallet.availableBalanceMinor < amountMinor) throw new RequestValidationError('INSUFFICIENT_FUNDS', 'Insufficient UniquePay wallet balance.');
+        if (customerWallet.status !== 'active') throw new Error('STORE_WALLET_UNAVAILABLE');
+        if (customerWallet.availableBalanceMinor < amountMinor) throw new Error('STORE_INSUFFICIENT_FUNDS');
 
         const sellerWallets = new Map<string, WalletDocument>();
         Array.from(sellerTotals.keys()).forEach((sellerId, index) => {
           const snap = snapshots[index + 1];
-          if (!snap.exists) throw new RequestValidationError('WALLET_NOT_FOUND', 'A seller UniquePay wallet is not available.');
+          if (!snap.exists) throw new Error('STORE_SELLER_WALLET_NOT_FOUND');
           const wallet = validateWalletDocument(snap.data(), sellerId);
-          if (wallet.status !== 'active') throw new RequestValidationError('WALLET_UNAVAILABLE', 'A seller UniquePay wallet is unavailable.');
+          if (wallet.status !== 'active') throw new Error('STORE_SELLER_WALLET_UNAVAILABLE');
           sellerWallets.set(sellerId, wallet);
         });
 
@@ -2650,7 +2650,7 @@ const app = express();
         const paymentTransactionIds: string[] = [];
         for (const [sellerId, sellerTotalNaira] of sellerTotals) {
           const sellerAmountMinor = Math.round(sellerTotalNaira * 100);
-          if (!Number.isSafeInteger(sellerAmountMinor) || sellerAmountMinor <= 0) throw new RequestValidationError('INVALID_AMOUNT', 'A Store seller payment amount is invalid.');
+          if (!Number.isSafeInteger(sellerAmountMinor) || sellerAmountMinor <= 0) throw new Error('STORE_INVALID_AMOUNT');
           const sellerWallet = sellerWallets.get(sellerId)!;
           const transactionId = adminDb.collection('transactions').doc().id;
           const reference = `UP-ST-${transactionId}`;
@@ -2669,13 +2669,13 @@ const app = express();
         }
 
         const customerBalanceAfter = customerWallet.availableBalanceMinor - amountMinor;
-        if (!Number.isSafeInteger(customerBalanceAfter) || customerBalanceAfter < 0) throw new RequestValidationError('TRANSACTION_FAILED', 'The Store payment would exceed the safe wallet accounting range.');
+        if (!Number.isSafeInteger(customerBalanceAfter) || customerBalanceAfter < 0) throw new Error('STORE_TRANSACTION_FAILED');
         transaction.update(customerWalletRef, { availableBalanceMinor: customerBalanceAfter, updatedAt: now });
         for (const [sellerId, sellerTotalNaira] of sellerTotals) {
           const sellerAmountMinor = Math.round(sellerTotalNaira * 100);
           const sellerWallet = sellerWallets.get(sellerId)!;
           const sellerBalanceAfter = sellerWallet.availableBalanceMinor + sellerAmountMinor;
-          if (!Number.isSafeInteger(sellerBalanceAfter)) throw new RequestValidationError('TRANSACTION_FAILED', 'The seller wallet balance would exceed the safe wallet accounting range.');
+          if (!Number.isSafeInteger(sellerBalanceAfter)) throw new Error('STORE_TRANSACTION_FAILED');
           transaction.update(adminDb.collection('wallets').doc(sellerId), { availableBalanceMinor: sellerBalanceAfter, updatedAt: now });
         }
 
@@ -2689,10 +2689,13 @@ const app = express();
       });
       return res.status(200).json(result);
     } catch (error) {
-      if (error instanceof RequestValidationError) {
-        const status: TransferErrorCode = error.code;
-        return errorResponse(res, status, error.message);
-      }
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'STORE_WALLET_NOT_FOUND' || code === 'STORE_SELLER_WALLET_NOT_FOUND') return errorResponse(res, 'WALLET_NOT_FOUND', 'A required UniquePay wallet is not available.');
+      if (code === 'STORE_WALLET_UNAVAILABLE' || code === 'STORE_SELLER_WALLET_UNAVAILABLE') return errorResponse(res, 'WALLET_UNAVAILABLE', 'A required UniquePay wallet is unavailable.');
+      if (code === 'STORE_INSUFFICIENT_FUNDS') return errorResponse(res, 'INSUFFICIENT_FUNDS', 'Insufficient UniquePay wallet balance.');
+      if (code === 'STORE_INVALID_AMOUNT') return errorResponse(res, 'INVALID_AMOUNT', 'The Store payment amount is invalid.');
+      if (code === 'STORE_TRANSACTION_FAILED') return errorResponse(res, 'TRANSACTION_FAILED', 'The Store payment could not be safely recorded.');
       console.error('Store payment failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Store payment could not be completed. Your order remains unpaid.');
     }
