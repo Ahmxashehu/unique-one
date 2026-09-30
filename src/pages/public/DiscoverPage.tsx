@@ -88,6 +88,8 @@ export default function DiscoverPage() {
           </div>
         )}
 
+      </section>
+
       <section>
         <div className="flex items-center gap-2 mb-6">
           <Briefcase className="w-5 h-5 text-emerald-600" />
@@ -105,8 +107,7 @@ export default function DiscoverPage() {
                 <h3 className="mt-3 font-semibold text-slate-900">{service.title}</h3>
                 <p className="text-sm text-slate-500 mt-1 line-clamp-2">{service.description}</p>
                 <div className="mt-4 flex items-center justify-between">
-                  <span className="font-bold text-slate-900">{service.currency === 'NGN' ? '₦' : '
-}{Number(service.price || 0).toLocaleString()}</span>
+                  <span className="font-bold text-slate-900">{service.currency === 'NGN' ? '₦' : '$'}{Number(service.price || 0).toLocaleString()}</span>
                   <span className="text-xs text-slate-500">{service.durationHours || 0}h</span>
                 </div>
                 <div className="mt-4 flex gap-2">
