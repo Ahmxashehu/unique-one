@@ -47,7 +47,7 @@ export default function ForgotPasswordPage() {
 
   const ensureRecaptcha = () => {
     if (recaptchaRef.current) return recaptchaRef.current;
-    const verifier = new RecaptchaVerifier(auth, 'firebase-recovery-recaptcha', { size: 'invisible' });
+    const verifier = new RecaptchaVerifier(auth, 'firebase-recovery-recaptcha', { size: 'normal' });
     recaptchaRef.current = verifier;
     return verifier;
   };
@@ -64,6 +64,7 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     try {
       const verifier = ensureRecaptcha();
+      await verifier.render();
       const result = await signInWithPhoneNumber(auth, normalized, verifier);
       setConfirmationResult(result);
       setPhone(normalized);
@@ -204,7 +205,7 @@ export default function ForgotPasswordPage() {
           </form>
         )}
 
-        <div id="firebase-recovery-recaptcha" aria-hidden="true" />
+        <div id="firebase-recovery-recaptcha" className="my-3" />
 
         {step === 'password' && (
           <form onSubmit={resetPassword} className="space-y-4">
