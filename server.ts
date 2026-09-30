@@ -113,9 +113,22 @@ function passwordDigestMatches(value: string, salt: string, expectedHex: string)
   const expected = Buffer.from(expectedHex, 'hex');
   return expected.length === actual.length && crypto.timingSafeEqual(actual, expected);
 }
+const WEAK_TRANSACTION_PINS = new Set(['0000','1111','2222','3333','4444','5555','6666','7777','8888','9999','1234','4321','1212','2121']);
 function validateTransactionPin(value: unknown): string {
   if (typeof value !== 'string' || !/^\d{4}$/.test(value)) {
     throw new RequestValidationError('INVALID_REQUEST', 'Your Transaction PIN must be exactly 4 digits.');
+  }
+  if (WEAK_TRANSACTION_PINS.has(value)) {
+    throw new RequestValidationError('INVALID_REQUEST', 'Choose a Transaction PIN that is not an obvious or common pattern.');
+  }
+  const digits = value.split('').map(Number);
+  if (digits.every((digit, index) => index === 0 || digit === digits[0])) {
+    throw new RequestValidationError('INVALID_REQUEST', 'Choose a Transaction PIN that is not an obvious repeated pattern.');
+  }
+  const ascending = digits.every((digit, index) => index === 0 || digit === digits[index - 1] + 1);
+  const descending = digits.every((digit, index) => index === 0 || digit === digits[index - 1] - 1);
+  if (ascending || descending) {
+    throw new RequestValidationError('INVALID_REQUEST', 'Choose a Transaction PIN that is not an obvious sequence.');
   }
   return value;
 }
