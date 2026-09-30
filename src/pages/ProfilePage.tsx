@@ -70,7 +70,7 @@ export default function ProfilePage() {
         fullName: formData.fullName.trim(),
         username: formData.username.trim(),
         preferredLanguage: formData.preferredLanguage,
-        shippingAddresses: [{ id: defaultShipping?.id || 'default', label: formData.shippingLabel.trim() || 'Home', recipientName: formData.shippingRecipientName.trim(), phone: formData.shippingPhone.trim(), country: 'Nigeria', state: formData.shippingState.trim(), lga: formData.shippingLga.trim(), town: formData.shippingTown.trim(), area: formData.shippingArea.trim(), fullAddress: formData.shippingFullAddress.trim(), landmark: formData.shippingLandmark.trim(), isDefault: true }],
+        shippingAddresses: (userData.shippingAddresses || []).map(address => address.id === (defaultShipping?.id || 'default') ? { ...address, label: formData.shippingLabel.trim() || 'Home', recipientName: formData.shippingRecipientName.trim(), phone: formData.shippingPhone.trim(), country: 'Nigeria', state: formData.shippingState.trim(), lga: formData.shippingLga.trim(), town: formData.shippingTown.trim(), area: formData.shippingArea.trim(), fullAddress: formData.shippingFullAddress.trim(), landmark: formData.shippingLandmark.trim(), isDefault: true } : { ...address, isDefault: false }),
       });
       setIsEditing(false);
     } catch (err) {
