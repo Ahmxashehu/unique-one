@@ -101,18 +101,16 @@ export function registerUniqueOtpRegistrationRoutes(app: Express) {
       if (!verified) return res.status(403).json({ error: { code: 'OTP_INVALID', message: 'The UniqueOTP is invalid, expired, or already used.' } });
 
       const auth = getAuth();
-      let user;
       try {
-        user = await auth.getUserByPhoneNumber(phone);
+        await auth.getUserByPhoneNumber(phone);
         return res.status(409).json({ error: { code: 'PHONE_ALREADY_REGISTERED', message: 'This phone number is already registered. Please log in.' } });
       } catch (error: any) {
         if (error?.code !== 'auth/user-not-found') throw error;
       }
-      user = await auth.createUser({ phoneNumber: phone, disabled: false });
       const registrationToken = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
       const now = Timestamp.now();
       await getFirestore().collection('uniqueOtpRegistrationSessions').doc(hashToken(registrationToken)).set({
-        uid: user.uid, phone, purpose: 'registration', createdAt: now,
+        phone, purpose: 'registration', createdAt: now,
         expiresAt: Timestamp.fromMillis(Date.now() + 10 * 60_000), consumedAt: null,
       });
       return res.json({ ok: true, verified: true, registrationToken, expiresInSeconds: 600 });
@@ -156,38 +154,81 @@ export function registerUniqueOtpRegistrationRoutes(app: Express) {
         if (!emailSnapshot.empty) return res.status(409).json({ error: { code: 'EMAIL_ALREADY_REGISTERED', message: 'That email address is already linked to another Unique One account.' } });
       }
       const sessionRef = db.collection('uniqueOtpRegistrationSessions').doc(hashToken(token));
-      let uid = '';
-      let phone = '';
-      const now = Timestamp.now();
-      await db.runTransaction(async transaction => {
-        const session = await transaction.get(sessionRef);
-        if (!session.exists) throw new Error('REGISTRATION_SESSION_INVALID');
-        const data = session.data() as Record<string, unknown>;
-        if (data.purpose !== 'registration' || data.consumedAt || !(data.expiresAt instanceof Timestamp) || data.expiresAt.toMillis() <= Date.now() || typeof data.uid !== 'string' || typeof data.phone !== 'string') throw new Error('REGISTRATION_SESSION_INVALID');
-        uid = data.uid;
-        phone = data.phone;
-        const credentialRef = db.collection('authCredentials').doc(uid);
-        const existing = await transaction.get(credentialRef);
-        if (existing.exists) throw new Error('ALREADY_PROVISIONED');
-        const loginSalt = randomUUID().replace(/-/g, '');
-        const pinSalt = randomUUID().replace(/-/g, '');
-        transaction.create(credentialRef, {
-          uid, phone, loginPasswordSalt: loginSalt, loginPasswordHash: scryptSync(password, loginSalt, 64).toString('hex'),
-          transactionPinSalt: pinSalt, transactionPinHash: scryptSync(transactionPin, pinSalt, 64).toString('hex'),
-          createdAt: now, updatedAt: now,
+      const sessionSnapshot = await sessionRef.get();
+      if (!sessionSnapshot.exists) throw new Error('REGISTRATION_SESSION_INVALID');
+      const sessionData = sessionSnapshot.data() as Record<string, unknown>;
+      if (
+        sessionData.purpose !== 'registration' ||
+        sessionData.consumedAt ||
+        !(sessionData.expiresAt instanceof Timestamp) ||
+        sessionData.expiresAt.toMillis() <= Date.now() ||
+        typeof sessionData.phone !== 'string'
+      ) throw new Error('REGISTRATION_SESSION_INVALID');
+
+      const phone = sessionData.phone;
+      const auth = getAuth();
+      let createdUser: Awaited<ReturnType<typeof auth.createUser>> | null = null;
+      try {
+        try {
+          await auth.getUserByPhoneNumber(phone);
+          throw new Error('PHONE_ALREADY_REGISTERED');
+        } catch (error: any) {
+          if (error?.message === 'PHONE_ALREADY_REGISTERED') throw error;
+          if (error?.code !== 'auth/user-not-found') throw error;
+        }
+
+        createdUser = await auth.createUser({ phoneNumber: phone, disabled: false });
+        const uid = createdUser.uid;
+        const now = Timestamp.now();
+
+        await db.runTransaction(async transaction => {
+          const session = await transaction.get(sessionRef);
+          if (!session.exists) throw new Error('REGISTRATION_SESSION_INVALID');
+          const data = session.data() as Record<string, unknown>;
+          if (
+            data.purpose !== 'registration' ||
+            data.consumedAt ||
+            !(data.expiresAt instanceof Timestamp) ||
+            data.expiresAt.toMillis() <= Date.now() ||
+            data.phone !== phone
+          ) throw new Error('REGISTRATION_SESSION_INVALID');
+
+          const credentialRef = db.collection('authCredentials').doc(uid);
+          const existing = await transaction.get(credentialRef);
+          if (existing.exists) throw new Error('ALREADY_PROVISIONED');
+
+          const loginSalt = randomUUID().replace(/-/g, '');
+          const pinSalt = randomUUID().replace(/-/g, '');
+          transaction.create(credentialRef, {
+            uid, phone, loginPasswordSalt: loginSalt, loginPasswordHash: scryptSync(password, loginSalt, 64).toString('hex'),
+            transactionPinSalt: pinSalt, transactionPinHash: scryptSync(transactionPin, pinSalt, 64).toString('hex'),
+            createdAt: now, updatedAt: now,
+          });
+          const uniqueOneId = uniqueIdFromPhone(phone);
+          transaction.set(db.collection('users').doc(uid), {
+            uid, email, emailVerified: false, phone, phoneVerified: true, uniqueOneId,
+            firstName, otherName, lastName, fullName, roles: ['customer'], permissions: [], status: 'active',
+            preferredLanguage: 'en', createdAt: now.toDate().toISOString(), lastLogin: now.toDate().toISOString(),
+            verificationStatus: 'phone_verified', hasSecurePin: true, twoFactorEnabled: false,
+            address: { country, state, lga, town, area, fullAddress, landmark },
+            shippingAddresses: [{ id: 'default', label: 'Home', recipientName: fullName, phone, country, state, lga, town, area, fullAddress, landmark, isDefault: true }],
+            communicationProfile: { firstName, otherName, lastName, profilePhotoUrl: '', locationVisibility: 'city_only' },
+          }, { merge: true });
+          transaction.update(sessionRef, { consumedAt: now });
         });
-        const uniqueOneId = uniqueIdFromPhone(phone);
-        transaction.set(db.collection('users').doc(uid), {
-          uid, email, emailVerified: false, phone, phoneVerified: true, uniqueOneId,
-          firstName, otherName, lastName, fullName, roles: ['customer'], permissions: [], status: 'active',
-          preferredLanguage: 'en', createdAt: now.toDate().toISOString(), lastLogin: now.toDate().toISOString(),
-          verificationStatus: 'phone_verified', hasSecurePin: true, twoFactorEnabled: false,
-          address: { country, state, lga, town, area, fullAddress, landmark },
-          shippingAddresses: [{ id: 'default', label: 'Home', recipientName: fullName, phone, country, state, lga, town, area, fullAddress, landmark, isDefault: true }],
-          communicationProfile: { firstName, otherName, lastName, profilePhotoUrl: '', locationVisibility: 'city_only' },
-        }, { merge: true });
-        transaction.update(sessionRef, { consumedAt: now });
-      });
+
+        return res.json({ ok: true, uid, uniqueOneId: uniqueIdFromPhone(phone), hasSecurePin: true, emailVerified: false });
+      } catch (error: any) {
+        if (createdUser?.uid) {
+          try { await auth.deleteUser(createdUser.uid); } catch (cleanupError) {
+            console.error('Failed to clean up incomplete Firebase registration user:', cleanupError);
+          }
+        }
+        if (error?.message === 'PHONE_ALREADY_REGISTERED' || error?.code === 'auth/phone-number-already-exists') {
+          return res.status(409).json({ error: { code: 'PHONE_ALREADY_REGISTERED', message: 'This phone number is already registered. Please log in.' } });
+        }
+        throw error;
+      }
       return res.json({ ok: true, uid, uniqueOneId: uniqueIdFromPhone(phone), hasSecurePin: true, emailVerified: false });
     } catch (error: any) {
       if (['INVALID_PASSWORD','INVALID_PIN','INVALID_NAME','INVALID_EMAIL','INVALID_REQUEST'].includes(error?.message)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: error?.message === 'INVALID_EMAIL' ? 'Enter a valid email address or leave it blank.' : 'Check your registration details and try again.' } });
