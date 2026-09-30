@@ -1,6 +1,6 @@
 import React,{useEffect,useMemo,useState} from 'react';
 import {Link,useNavigate} from 'react-router-dom';
-import {Loader2,Phone,KeyRound,User,ShieldCheck,Mail,MapPin,ChevronRight,ChevronLeft,Lock} from 'lucide-react';
+import {Loader2,Phone,KeyRound,ShieldCheck,Mail,MapPin,ChevronRight,ChevronLeft,Lock} from 'lucide-react';
 
 const NIGERIAN_STATES = ['Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta','Ebonyi','Edo','Ekiti','Enugu','Federal Capital Territory','Gombe','Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi','Kogi','Kwara','Lagos','Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto','Taraba','Yobe','Zamfara'];
 
@@ -41,7 +41,6 @@ export default function RegisterPage(){
 
   const passwordChecks=useMemo(()=>passwordGuidance(password),[password]);
   const otpTime=useMemo(()=>{const m=Math.floor(otpRemaining/60).toString().padStart(2,'0');const s=(otpRemaining%60).toString().padStart(2,'0');return `${m}:${s}`;},[otpRemaining]);
-  const fullName=[firstName.trim(),otherName.trim(),lastName.trim()].filter(Boolean).join(' ');
 
   const sendOtp=async()=>{
     setError('');setMessage('');
