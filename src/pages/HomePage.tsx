@@ -259,6 +259,17 @@ export default function HomePage() {
           </div>
 
           <Link
+            to="/os/ai"
+            aria-label="Open Unique AI"
+            className="group relative hidden h-10 items-center gap-2 overflow-hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 text-emerald-800 shadow-sm transition hover:scale-[1.03] hover:border-emerald-300 hover:bg-emerald-100 sm:inline-flex"
+          >
+            <span className="absolute inset-0 animate-pulse bg-emerald-200/30" />
+            <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm">
+              <Sparkles className="h-4 w-4 animate-pulse text-emerald-600" />
+            </span>
+            <span className="relative text-xs font-black tracking-tight">Unique AI</span>
+          </Link>
+          <Link
             to="/os/notifications"
             className="hidden h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white sm:flex"
             aria-label="Notifications"
@@ -338,6 +349,16 @@ export default function HomePage() {
                 staying connected to the things that matter to you.
               </p>
               <div className="mt-7 flex flex-wrap gap-3">
+                <Link
+                  to="/os/ai"
+                  className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-emerald-300/30 bg-emerald-400 px-5 py-3 text-sm font-black text-slate-950 shadow-[0_0_30px_rgba(52,211,153,0.25)] transition hover:scale-[1.03] hover:bg-emerald-300"
+                >
+                  <span className="absolute inset-0 animate-pulse bg-white/20" />
+                  <span className="relative flex h-6 w-6 items-center justify-center rounded-full bg-white/80">
+                    <Sparkles className="h-4 w-4 animate-pulse text-emerald-700" />
+                  </span>
+                  <span className="relative">New · Unique AI</span>
+                </Link>
                 <button
                   type="button"
                   onClick={() => {
