@@ -18,8 +18,26 @@ export default function ForgotPasswordPage() {
   const [step, setStep] = useState<'phone' | 'otp' | 'password'>('phone');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
+  const [otpRemainingSeconds, setOtpRemainingSeconds] = useState(0);
   const confirmation = useRef<Awaited<ReturnType<typeof signInWithPhoneNumber>> | null>(null);
   const verifier = useRef<RecaptchaVerifier | null>(null);
+
+  const OTP_TTL_SECONDS = 5 * 60;
+
+  React.useEffect(() => {
+    if (step !== 'otp' || otpExpiresAt === null) return;
+    const update = () => {
+      const remaining = Math.max(0, Math.ceil((otpExpiresAt - Date.now()) / 1000));
+      setOtpRemainingSeconds(remaining);
+      if (remaining === 0) {
+        setError('This OTP has expired. Please request a new verification code.');
+      }
+    };
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [step, otpExpiresAt]);
 
   const getRecaptcha = () => {
     if (!verifier.current) {
@@ -39,6 +57,8 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     try {
       confirmation.current = await signInWithPhoneNumber(auth, normalized, getRecaptcha());
+      setOtpExpiresAt(Date.now() + OTP_TTL_SECONDS * 1000);
+      setOtpRemainingSeconds(OTP_TTL_SECONDS);
       setStep('otp');
     } catch (err: any) {
       verifier.current?.clear();
@@ -53,6 +73,10 @@ export default function ForgotPasswordPage() {
     event.preventDefault();
     if (!confirmation.current || !/^\d{6}$/.test(code)) {
       setError('Enter the 6-digit verification code.');
+      return;
+    }
+    if (otpRemainingSeconds <= 0) {
+      setError('This OTP has expired. Please request a new verification code.');
       return;
     }
     setLoading(true);
@@ -137,9 +161,14 @@ export default function ForgotPasswordPage() {
               <ShieldCheck className="w-9 h-9 mx-auto text-green-600 mb-2" />
               <p className="font-semibold text-slate-900">Verify your phone</p>
               <p className="text-sm text-slate-500 mt-1">Enter the 6-digit OTP sent to your registered phone.</p>
+              <p className={`text-sm font-semibold mt-3 ${otpRemainingSeconds <= 30 ? 'text-red-600' : 'text-green-700'}`} aria-live="polite">
+                {otpRemainingSeconds > 0
+                  ? `OTP expires in ${Math.floor(otpRemainingSeconds / 60)}:${String(otpRemainingSeconds % 60).padStart(2, '0')}`
+                  : 'OTP expired'}
+              </p>
             </div>
             <input autoFocus inputMode="numeric" maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} className="w-full text-center tracking-[0.5em] text-xl py-3 border border-slate-200 rounded-xl" placeholder="••••••" autoComplete="one-time-code" required />
-            <button disabled={loading} className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold">{loading ? 'Verifying...' : 'Verify OTP'}</button>
+            <button disabled={loading || otpRemainingSeconds <= 0} className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">{loading ? 'Verifying...' : otpRemainingSeconds > 0 ? 'Verify OTP' : 'OTP expired'}</button>
           </form>
         )}
 
