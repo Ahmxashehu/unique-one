@@ -303,10 +303,15 @@ service cloud.firestore {
         && resource.data.ownerUid == request.auth.uid
         && request.resource.data.ownerUid == resource.data.ownerUid
         && request.resource.data.businessId == resource.data.businessId
+        && exists(/databases/$(database)/documents/businesses/$(resource.data.businessId))
+        && get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.ownerUid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','type','address','phone','status','updatedAt'])
         && request.resource.data.type in ['headquarters','branch','warehouse','farm_site','storefront']
         && request.resource.data.status in ['active','inactive'];
-      allow delete: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+      allow delete: if isAuthenticated()
+        && resource.data.ownerUid == request.auth.uid
+        && exists(/databases/$(database)/documents/businesses/$(resource.data.businessId))
+        && get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.ownerUid == request.auth.uid;
     }
     match /suppliers/{supplierId} {
       allow read: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
