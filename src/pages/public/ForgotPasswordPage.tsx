@@ -20,6 +20,7 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('');
   const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
   const [otpRemainingSeconds, setOtpRemainingSeconds] = useState(0);
+  const [resendRemainingSeconds, setResendRemainingSeconds] = useState(0);
   const confirmation = useRef<Awaited<ReturnType<typeof signInWithPhoneNumber>> | null>(null);
   const verifier = useRef<RecaptchaVerifier | null>(null);
 
@@ -38,6 +39,12 @@ export default function ForgotPasswordPage() {
     const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
   }, [step, otpExpiresAt]);
+
+  React.useEffect(() => {
+    if (resendRemainingSeconds <= 0) return;
+    const timer = window.setInterval(() => setResendRemainingSeconds(v => Math.max(0, v - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [resendRemainingSeconds]);
 
   const getRecaptcha = () => {
     if (!verifier.current) {
@@ -59,11 +66,31 @@ export default function ForgotPasswordPage() {
       confirmation.current = await signInWithPhoneNumber(auth, normalized, getRecaptcha());
       setOtpExpiresAt(Date.now() + OTP_TTL_SECONDS * 1000);
       setOtpRemainingSeconds(OTP_TTL_SECONDS);
+      setResendRemainingSeconds(30);
       setStep('otp');
     } catch (err: any) {
       verifier.current?.clear();
       verifier.current = null;
       setError(err?.message || 'We could not send the verification code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendCode = async () => {
+    if (loading || resendRemainingSeconds > 0) return;
+    setError('');
+    setLoading(true);
+    try {
+      confirmation.current = await signInWithPhoneNumber(auth, normalizePhone(phone), getRecaptcha());
+      setOtpExpiresAt(Date.now() + OTP_TTL_SECONDS * 1000);
+      setOtpRemainingSeconds(OTP_TTL_SECONDS);
+      setResendRemainingSeconds(30);
+      setCode('');
+    } catch (err: any) {
+      verifier.current?.clear();
+      verifier.current = null;
+      setError(err?.message || 'We could not resend the verification code.');
     } finally {
       setLoading(false);
     }
@@ -169,6 +196,7 @@ export default function ForgotPasswordPage() {
             </div>
             <input autoFocus inputMode="numeric" maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} className="w-full text-center tracking-[0.5em] text-xl py-3 border border-slate-200 rounded-xl" placeholder="••••••" autoComplete="one-time-code" required />
             <button disabled={loading || otpRemainingSeconds <= 0} className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">{loading ? 'Verifying...' : otpRemainingSeconds > 0 ? 'Verify OTP' : 'OTP expired'}</button>
+            <button type="button" onClick={resendCode} disabled={loading || resendRemainingSeconds > 0} className="w-full text-sm font-semibold text-green-700 disabled:text-slate-400 disabled:cursor-not-allowed">{resendRemainingSeconds > 0 ? `Resend OTP in ${resendRemainingSeconds}s` : 'Resend OTP'}</button>
           </form>
         )}
 
