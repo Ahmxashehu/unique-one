@@ -23,26 +23,26 @@ export default function StoreSearchPage() {
   const [wishlistLoading, setWishlistLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const categoryOptions: Array<{ key: string; label: string }> = [
-    { key: 'electronics', label: 'Electronics' },
-    { key: 'phones_accessories', label: 'Phones & Accessories' },
-    { key: 'fashion', label: 'Fashion' },
-    { key: 'shoes', label: 'Shoes' },
-    { key: 'beauty', label: 'Beauty' },
-    { key: 'home_furniture', label: 'Home & Furniture' },
-    { key: 'building_materials', label: 'Building Materials' },
-    { key: 'cement', label: 'Cement' },
-    { key: 'agriculture', label: 'Agriculture' },
-    { key: 'fertilizer', label: 'Fertilizer' },
-    { key: 'seeds', label: 'Seeds' },
-    { key: 'farm_equipment', label: 'Farm Equipment' },
-    { key: 'food_groceries', label: 'Food & Groceries' },
-    { key: 'machinery', label: 'Machinery' },
-    { key: 'vehicles', label: 'Vehicles' },
-    { key: 'property', label: 'Property' },
-    { key: 'services', label: 'Services' },
-    { key: 'digital_products', label: 'Digital Products' },
-    { key: 'other', label: 'Other' },
+  const categoryOptions: Array<[string, string]> = [
+    ['electronics', 'Electronics'],
+    ['phones_accessories', 'Phones & Accessories'],
+    ['fashion', 'Fashion'],
+    ['shoes', 'Shoes'],
+    ['beauty', 'Beauty'],
+    ['home_furniture', 'Home & Furniture'],
+    ['building_materials', 'Building Materials'],
+    ['cement', 'Cement'],
+    ['agriculture', 'Agriculture'],
+    ['fertilizer', 'Fertilizer'],
+    ['seeds', 'Seeds'],
+    ['farm_equipment', 'Farm Equipment'],
+    ['food_groceries', 'Food & Groceries'],
+    ['machinery', 'Machinery'],
+    ['vehicles', 'Vehicles'],
+    ['property', 'Property'],
+    ['services', 'Services'],
+    ['digital_products', 'Digital Products'],
+    ['other', 'Other'],
   ];
 
   useEffect(() => {
@@ -132,7 +132,7 @@ export default function StoreSearchPage() {
         {showMobileFilters && (
           <div className="md:hidden bg-white border border-slate-200 rounded-2xl p-4 space-y-4">
             <div><h3 className="font-semibold text-slate-900 mb-3">Categories</h3><div className="grid grid-cols-2 gap-2">
-              {categoryOptions.map(({ key: cat, label }) => (
+              {categoryOptions.map(([cat, label]) => (
                 <Link key={cat} to={`/store/search?cat=${cat}`} className={`text-sm p-2 rounded-lg border ${filterCat === cat ? 'text-emerald-700 font-medium border-emerald-200 bg-emerald-50' : 'text-slate-600 border-slate-200'}`}>{label}</Link>
               ))}
             </div></div>
