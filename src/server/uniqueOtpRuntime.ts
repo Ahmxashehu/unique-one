@@ -4,8 +4,12 @@ import { ResendEmailOtpProvider } from './resendEmailOtpProvider';
 import { TermiiSmsProvider } from './termiiSmsProvider';
 import { UniqueOtpService, type UniqueOtpChannel } from './uniqueOtp';
 
+export function isWhatsAppOtpConfigured(): boolean {
+  return Boolean(process.env.TERMII_API_KEY && process.env.TERMII_WHATSAPP_DEVICE_ID);
+}
+
 export function getUniqueOtpService(channel: UniqueOtpChannel): UniqueOtpService {
-  const provider = channel === 'sms'
+  const provider = channel === 'sms' || channel === 'whatsapp'
     ? new TermiiSmsProvider()
     : new ResendEmailOtpProvider();
 
