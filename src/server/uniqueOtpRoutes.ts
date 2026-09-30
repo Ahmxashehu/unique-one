@@ -32,7 +32,7 @@ export function registerUniqueOtpRoutes(app: Express, authenticate?: RequestHand
         const uid = typeof (req as any).user?.uid === 'string' ? (req as any).user.uid : '';
         if (!uid) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication is required.' } });
         const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter a valid email address.' } });
+        if (!/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(email) || email.length > 254) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter a valid email address.' } });
         const existing = await getFirestore().collection('users').where('email', '==', email).limit(1).get();
         if (!existing.empty && existing.docs[0].id !== uid) return res.status(409).json({ error: { code: 'EMAIL_ALREADY_REGISTERED', message: 'That email address is already linked to another Unique One account.' } });
         await getUniqueOtpService('email').issue({ destination: email, purpose: 'email_verification', channel: 'email' });
@@ -49,7 +49,7 @@ export function registerUniqueOtpRoutes(app: Express, authenticate?: RequestHand
         if (!uid) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication is required.' } });
         const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
         const code = typeof req.body?.code === 'string' ? req.body.code : '';
-        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || !/^\\d{6}$/.test(code)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter a valid email address and 6-digit UniqueOTP.' } });
+        if (!/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(email) || !/^\d{6}$/.test(code)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter a valid email address and 6-digit UniqueOTP.' } });
         const verified = await getUniqueOtpService('email').verify({ destination: email, purpose: 'email_verification', code });
         if (!verified) return res.status(403).json({ error: { code: 'OTP_INVALID', message: 'The email UniqueOTP is invalid, expired, or already used.' } });
         const existing = await getFirestore().collection('users').where('email', '==', email).limit(1).get();
