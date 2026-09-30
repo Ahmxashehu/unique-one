@@ -131,6 +131,59 @@ export default function HomePage() {
       </header>
 
       <div className="mx-auto max-w-7xl px-4 pb-20 pt-5 sm:px-6 lg:px-8">
+        {/* Quick actions: direct paths into the existing Unique ecosystem */}
+        <section aria-label="Quick actions" className="mt-5 overflow-x-auto pb-1">
+          <div className="flex min-w-max gap-2">
+            {[
+              ['Pay', '/os/pay'],
+              ['Buy', '/store'],
+              ['Sell', '/store'],
+              ['Send', '/os/pay'],
+              ['Book', '/discover'],
+              ['Hire', '/discover'],
+              ['Chat', '/os'],
+              ['Discover', '/discover'],
+            ].map(([label, href]) => (
+              <Link
+                key={label}
+                to={href}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-300 hover:text-emerald-700"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* Your Unique Day: entry points only; no fabricated activity counts */}
+        <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Your Unique Day</p>
+              <h2 className="mt-1 text-xl font-black tracking-tight">Pick up where you left off</h2>
+              <p className="mt-1 text-sm text-slate-500">Jump into the parts of Unique One you use most.</p>
+            </div>
+            <Link to="/os" className="text-sm font-bold text-emerald-700">Open UniqueOS →</Link>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              ['Orders', '/store'],
+              ['Payments', '/os/pay'],
+              ['Messages', '/os'],
+              ['Discover', '/discover'],
+            ].map(([label, href]) => (
+              <Link
+                key={label}
+                to={href}
+                className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-800"
+              >
+                {label}
+                <span className="mt-1 block text-xs font-medium text-slate-400">Open →</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
         {/* Hero: the platform, not a static marketing page */}
         <section className="overflow-hidden rounded-[2rem] bg-slate-950 px-5 py-8 text-white shadow-sm sm:px-8 lg:px-10">
           <div className="grid items-end gap-8 lg:grid-cols-[1.2fr_.8fr]">
