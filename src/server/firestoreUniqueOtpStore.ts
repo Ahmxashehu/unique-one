@@ -1,11 +1,11 @@
 import { Timestamp, type CollectionReference } from 'firebase-admin/firestore';
-import type { UniqueOtpRecord, UniqueOtpPurpose, UniqueOtpStore } from './uniqueOtp';
+import type { UniqueOtpRecord, UniqueOtpPurpose, UniqueOtpStore, UniqueOtpChannel } from './uniqueOtp';
 
 type StoredOtp = {
   id: string;
   destination: string;
   purpose: UniqueOtpPurpose;
-  channel: 'sms' | 'email';
+  channel: UniqueOtpChannel;
   codeHash: string;
   expiresAt: Timestamp;
   attempts: number;
@@ -56,11 +56,11 @@ export class FirestoreUniqueOtpStore implements UniqueOtpStore {
     } satisfies StoredOtp);
   }
 
-  async findActive(input: { destination: string; purpose: UniqueOtpPurpose; now: Date }): Promise<UniqueOtpRecord | null> {
+  async findActive(input: { destination: string; purpose: UniqueOtpPurpose; channel: UniqueOtpChannel; now: Date }): Promise<UniqueOtpRecord | null> {
     const snapshot = await this.collection.where('destination', '==', input.destination).where('purpose', '==', input.purpose).where('consumedAt', '==', null).limit(10).get();
     const active = snapshot.docs
       .map((doc) => doc.data() as StoredOtp)
-      .filter((data) => data.expiresAt.toMillis() > input.now.getTime())
+      .filter((data) => data.channel === input.channel && data.expiresAt.toMillis() > input.now.getTime())
       .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis())[0];
     return active ? toRecord(active) : null;
   }
