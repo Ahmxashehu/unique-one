@@ -93,24 +93,40 @@ export default function SendMoneyPage() {
         try { biometricAssertion = await createBiometricAssertion(currentUser); }
         finally { setBiometricBusy(false); }
       }
-      const response = await fetch('/api/wallet/transfer', {
+
+      const transferBody = () => JSON.stringify({
+        recipientId: recipient.uid,
+        amountMinor,
+        currency: 'NGN',
+        idempotencyKey,
+        ...(description.trim() ? { description: description.trim() } : {}),
+        transactionPin,
+        ...(biometricAssertion ? { biometricAssertion } : {}),
+      });
+
+      const submitTransfer = async () => fetch('/api/wallet/transfer', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          recipientId: recipient.uid,
-          amountMinor,
-          currency: 'NGN',
-          idempotencyKey,
-          ...(description.trim() ? { description: description.trim() } : {}),
-          transactionPin,
-          ...(biometricAssertion ? { biometricAssertion } : {}),
-        }),
+        body: transferBody(),
       });
 
-      const payload = await response.json().catch(() => null);
+      let response = await submitTransfer();
+      let payload = await response.json().catch(() => null);
+
+      if (!response.ok && payload?.error?.code === 'BIOMETRIC_REQUIRED' && !biometricAssertion) {
+        setBiometricBusy(true);
+        try {
+          biometricAssertion = await createBiometricAssertion(currentUser);
+        } finally {
+          setBiometricBusy(false);
+        }
+        response = await submitTransfer();
+        payload = await response.json().catch(() => null);
+      }
+
       if (!response.ok || !payload?.id) {
         throw new Error(payload?.error?.message || 'The transfer could not be completed.');
       }
