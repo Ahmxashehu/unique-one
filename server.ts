@@ -2527,6 +2527,177 @@ const app = express();
     }
   });
 
+  app.post("/api/store/pay", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('storePaymentRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Store payment attempts. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!isPlainObject(req.body) || !isSafeIdempotencyKey(req.body.idempotencyKey) ||
+          typeof req.body.transactionPin !== 'string' || !/^\\d{4}$/.test(req.body.transactionPin)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid payment idempotency key and 4-digit Transaction PIN are required.');
+      }
+      const idempotencyKey = req.body.idempotencyKey.trim();
+      if (!(await verifyTransactionPin(uid, req.body.transactionPin))) {
+        return errorResponse(res, 'FORBIDDEN', 'Incorrect Transaction PIN.');
+      }
+
+      const orders = Array.isArray(req.body.orderIds) ? req.body.orderIds : [];
+      if (orders.length < 1 || orders.length > 50 || !orders.every((id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id))) {
+        return errorResponse(res, 'INVALID_REQUEST', 'One or more order IDs are invalid.');
+      }
+
+      const orderIds = Array.from(new Set(orders as string[]));
+      const orderSnapshots = await Promise.all(orderIds.map((id) => adminDb.collection('orders').doc(id).get()));
+      const sellerTotals = new Map<string, number>();
+      let totalAmountNaira = 0;
+
+      for (const snapshot of orderSnapshots) {
+        if (!snapshot.exists) return errorResponse(res, 'NOT_FOUND', 'One or more Store orders could not be found.');
+        const order = snapshot.data() as Record<string, unknown>;
+        if (order.customerId !== uid || order.currency !== 'NGN') return errorResponse(res, 'FORBIDDEN', 'You can only pay for your own NGN Store orders.');
+        if (order.status !== 'pending') return errorResponse(res, 'INVALID_REQUEST', 'One or more Store orders are no longer awaiting payment.');
+        if (!isSafeFirebaseUid(order.sellerId) || typeof order.totalAmount !== 'number' || !Number.isFinite(order.totalAmount) || order.totalAmount <= 0) {
+          return errorResponse(res, 'INVALID_REQUEST', 'One or more Store orders have invalid payment data.');
+        }
+        totalAmountNaira += order.totalAmount;
+        sellerTotals.set(order.sellerId, (sellerTotals.get(order.sellerId) || 0) + order.totalAmount);
+      }
+
+      const amountMinor = Math.round(totalAmountNaira * 100);
+      if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) return errorResponse(res, 'INVALID_AMOUNT', 'The Store payment amount is invalid.');
+
+      const biometricLevel = biometricStepUpLevel(amountMinor);
+      let hasPreviousTransaction = false;
+      if (biometricLevel === 0) {
+        const previousTransactionSnapshot = await adminDb.collection('transactions').where('senderId', '==', uid).limit(1).get();
+        hasPreviousTransaction = !previousTransactionSnapshot.empty;
+      }
+      const biometricRequired = biometricLevel > 0 || !hasPreviousTransaction;
+      if (biometricRequired) {
+        const assertion = req.body?.biometricAssertion;
+        if (!assertion?.challengeId || !assertion?.credentialId || !assertion?.clientDataJSON || !assertion?.authenticatorData || !assertion?.signature) {
+          return errorResponse(res, 'BIOMETRIC_REQUIRED', biometricLevel >= 3 ? 'Biometric verification is required for Store payments of ₦500,000 or more.' : biometricLevel >= 2 ? 'Biometric verification is required for Store payments of ₦200,000 or more.' : biometricLevel >= 1 ? 'Biometric verification is required for Store payments of ₦50,000 or more.' : 'Biometric verification is required for your first wallet transaction.');
+        }
+        const challengeRef = adminDb.collection(PASSKEY_CHALLENGES_COLLECTION).doc(String(assertion.challengeId));
+        const challengeSnap = await challengeRef.get();
+        if (!challengeSnap.exists) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification is required. Please try again.');
+        const challengeData = challengeSnap.data()!;
+        await challengeRef.delete();
+        const { origin, rpId } = requestWebAuthnOrigin(req);
+        const clientDataJSON = base64UrlToBuffer(String(assertion.clientDataJSON));
+        const authenticatorData = base64UrlToBuffer(String(assertion.authenticatorData));
+        const signature = base64UrlToBuffer(String(assertion.signature));
+        let clientData: any;
+        try { clientData = JSON.parse(clientDataJSON.toString('utf8')); } catch { return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification could not be verified.'); }
+        if (challengeData.uid !== uid || challengeData.type !== 'assertion' || challengeData.expiresAt.toMillis() < Date.now() || challengeData.origin !== origin || challengeData.rpId !== rpId || clientData.type !== 'webauthn.get' || clientData.challenge !== challengeData.challenge || clientData.origin !== origin) {
+          return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification could not be verified.');
+        }
+        const crypto = require('crypto');
+        if (!authenticatorData.subarray(0, 32).equals(crypto.createHash('sha256').update(rpId).digest()) || (authenticatorData[32] & 0x05) !== 0x05) {
+          return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification requires user verification.');
+        }
+        const credentialRef = adminDb.collection('authCredentials').doc(uid).collection(PASSKEY_COLLECTION).doc(String(assertion.credentialId));
+        const credentialSnap = await credentialRef.get();
+        if (!credentialSnap.exists) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'This biometric credential is not registered.');
+        const credential = credentialSnap.data()!;
+        const publicKey = crypto.createPublicKey({ key: Buffer.from(String(credential.publicKey), 'base64'), format: 'der', type: 'spki' });
+        const signedData = Buffer.concat([authenticatorData, crypto.createHash('sha256').update(clientDataJSON).digest()]);
+        if (!crypto.verify('sha256', signedData, publicKey, signature)) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification failed.');
+        const signCount = authenticatorData.readUInt32BE(33);
+        const previousCount = Number(credential.signCount || 0);
+        if (previousCount > 0 && signCount > 0 && signCount <= previousCount) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'The biometric credential counter is invalid.');
+        await credentialRef.update({ signCount, lastUsedAt: Timestamp.now() });
+      }
+
+      const idempotencyRef = adminDb.collection('storePaymentIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
+      const fingerprint = [uid, orderIds.join(','), String(amountMinor)].join('|');
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const existing = await transaction.get(idempotencyRef);
+        if (existing.exists) {
+          const data = existing.data() || {};
+          if (data.requestFingerprint !== fingerprint) throw new RequestValidationError('INVALID_REQUEST', 'This payment idempotency key was already used with different payment data.');
+          return data.result;
+        }
+
+        const walletRefs = Array.from(sellerTotals.keys()).map((sellerId) => adminDb.collection('wallets').doc(sellerId));
+        const customerWalletRef = adminDb.collection('wallets').doc(uid);
+        const snapshots = await Promise.all([transaction.get(customerWalletRef), ...walletRefs.map((ref) => transaction.get(ref))]);
+        const customerWalletSnap = snapshots[0];
+        if (!customerWalletSnap.exists) throw new RequestValidationError('WALLET_NOT_FOUND', 'Your UniquePay wallet is not available.');
+        const customerWallet = validateWalletDocument(customerWalletSnap.data(), uid);
+        if (customerWallet.status !== 'active') throw new RequestValidationError('WALLET_UNAVAILABLE', 'Your UniquePay wallet is unavailable.');
+        if (customerWallet.availableBalanceMinor < amountMinor) throw new RequestValidationError('INSUFFICIENT_FUNDS', 'Insufficient UniquePay wallet balance.');
+
+        const sellerWallets = new Map<string, WalletDocument>();
+        Array.from(sellerTotals.keys()).forEach((sellerId, index) => {
+          const snap = snapshots[index + 1];
+          if (!snap.exists) throw new RequestValidationError('WALLET_NOT_FOUND', 'A seller UniquePay wallet is not available.');
+          const wallet = validateWalletDocument(snap.data(), sellerId);
+          if (wallet.status !== 'active') throw new RequestValidationError('WALLET_UNAVAILABLE', 'A seller UniquePay wallet is unavailable.');
+          sellerWallets.set(sellerId, wallet);
+        });
+
+        const now = Timestamp.now();
+        const paymentTransactionIds: string[] = [];
+        for (const [sellerId, sellerTotalNaira] of sellerTotals) {
+          const sellerAmountMinor = Math.round(sellerTotalNaira * 100);
+          if (!Number.isSafeInteger(sellerAmountMinor) || sellerAmountMinor <= 0) throw new RequestValidationError('INVALID_AMOUNT', 'A Store seller payment amount is invalid.');
+          const sellerWallet = sellerWallets.get(sellerId)!;
+          const transactionId = adminDb.collection('transactions').doc().id;
+          const reference = `UP-ST-${transactionId}`;
+          const transactionRef = adminDb.collection('transactions').doc(transactionId);
+          transaction.create(transactionRef, {
+            id: transactionId, reference, senderId: uid, recipientId: sellerId, amount: sellerAmountMinor,
+            currency: 'NGN', type: 'merchant_payment', sourceModule: 'unique_store.checkout',
+            provider: 'unique_pay_internal_wallet', status: 'completed', relatedOrderIds: orderIds,
+            createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor',
+          });
+          const debitRef = adminDb.collection('ledgerEntries').doc();
+          const creditRef = adminDb.collection('ledgerEntries').doc();
+          transaction.create(debitRef, { id: debitRef.id, transactionId, reference, uid, direction: 'debit', amountMinor: sellerAmountMinor, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now });
+          transaction.create(creditRef, { id: creditRef.id, transactionId, reference, uid: sellerId, direction: 'credit', amountMinor: sellerAmountMinor, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now });
+                    paymentTransactionIds.push(transactionId);
+        }
+
+        const customerBalanceAfter = customerWallet.availableBalanceMinor - amountMinor;
+        if (!Number.isSafeInteger(customerBalanceAfter) || customerBalanceAfter < 0) throw new RequestValidationError('TRANSACTION_FAILED', 'The Store payment would exceed the safe wallet accounting range.');
+        transaction.update(customerWalletRef, { availableBalanceMinor: customerBalanceAfter, updatedAt: now });
+        for (const [sellerId, sellerTotalNaira] of sellerTotals) {
+          const sellerAmountMinor = Math.round(sellerTotalNaira * 100);
+          const sellerWallet = sellerWallets.get(sellerId)!;
+          const sellerBalanceAfter = sellerWallet.availableBalanceMinor + sellerAmountMinor;
+          if (!Number.isSafeInteger(sellerBalanceAfter)) throw new RequestValidationError('TRANSACTION_FAILED', 'The seller wallet balance would exceed the safe wallet accounting range.');
+          transaction.update(adminDb.collection('wallets').doc(sellerId), { availableBalanceMinor: sellerBalanceAfter, updatedAt: now });
+        }
+
+        for (const orderId of orderIds) {
+          const orderRef = adminDb.collection('orders').doc(orderId);
+          transaction.update(orderRef, { status: 'confirmed', paymentStatus: 'paid', paidAt: now, updatedAt: now, paymentTransactionIds });
+        }
+        const paymentResult = { status: 'completed', orderIds, transactionIds: paymentTransactionIds, amountMinor, idempotencyKey };
+        transaction.create(idempotencyRef, { uid, orderIds, amountMinor, requestFingerprint: fingerprint, status: 'completed', result: paymentResult, createdAt: now, updatedAt: now });
+        return paymentResult;
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof RequestValidationError) {
+        const status: TransferErrorCode = error.code;
+        return errorResponse(res, status, error.message);
+      }
+      console.error('Store payment failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Store payment could not be completed. Your order remains unpaid.');
+    }
+  });
+
   app.get("/api/calendar/events", authenticate, async (req, res) => {
     try {
       const authHeader = req.headers.authorization; if (!authHeader) return res.status(401).json({ error: "No authorization header" });
