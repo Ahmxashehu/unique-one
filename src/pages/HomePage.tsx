@@ -623,95 +623,20 @@ export default function HomePage() {
                           <p className="mt-1 text-sm font-semibold text-slate-700">{service.providerName || 'Unique provider'}</p>
                           <p className="mt-1 text-xs text-slate-500">{service.category || 'Professional Services'}</p>
                         </div>
-                        <BriefcaseIcon />
+                        <BriefcaseIcon className="h-5 w-5 text-emerald-600" />
                       </div>
                       {service.description && <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-500">{service.description}</p>}
                       <div className="mt-4 flex items-center justify-between">
-                        <span className="font-black text-emerald-700">{service.currency === 'NGN' ? '₦' : '
-                    <article key={`contribution-${item.id}`} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-700"><Users className="h-5 w-5" /></span>
-                        <div>
-                          <span className="text-xs font-bold uppercase tracking-[0.12em] text-amber-700">Community request</span>
-                          <h3 className="mt-1 font-black">{item.title || 'A Unique community request'}</h3>
-                        </div>
-                      </div>
-                      {item.description && <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-500">{item.description}</p>}
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        <Link to="/os/contributions" className="rounded-full bg-amber-600 px-4 py-2 text-xs font-bold text-white">View request</Link>
-                        <Link to="/os/contributions" className="rounded-full border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700">Offer help</Link>
-                      </div>
-                    </article>
-                  ))}
-                </>
-              )}
-            </div>
-
-            <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-              <div className="rounded-3xl border border-slate-200 bg-white p-5">
-                <div className="flex items-center gap-2">
-                  <Compass className="h-5 w-5 text-emerald-600" />
-                  <h3 className="font-black">Discover Collection</h3>
-                </div>
-                <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Browse the real marketplace signal behind the Edge. Products appear from
-                  published seller inventory only.
-                </p>
-                <div className="mt-4 space-y-2">
-                  {filteredProducts.slice(0, 4).map((product) => (
-                    <Link
-                      key={product.id}
-                      to={`/store/product/${product.id}`}
-                      className="flex items-center gap-3 rounded-2xl p-2 hover:bg-slate-50"
-                    >
-                      <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100">
-                        {product.images?.[0] ? (
-                          <img src={product.images[0]} alt="" className="h-full w-full object-cover" />
-                        ) : null}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{product.name}</p>
-                        <p className="text-xs text-emerald-700">{formatPrice(product)}</p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-                <Link
-                  to="/discover"
-                  className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"
-                >
-                  Explore everything <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-
-              <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5">
-                <div className="flex items-center gap-2 font-black text-emerald-900">
-                  <Sparkles className="h-5 w-5" />
-                  One platform, many experiences
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-semibold text-emerald-900">
-                  <Link to="/store" className="rounded-2xl bg-white/80 p-3">Buy & Sell</Link>
-                  <Link to="/os/pay" className="rounded-2xl bg-white/80 p-3">Pay</Link>
-                  <Link to="/discover" className="rounded-2xl bg-white/80 p-3">Discover</Link>
-                  <Link to="/os" className="rounded-2xl bg-white/80 p-3">UniqueOS</Link>
-                </div>
-              </div>
-            </aside>
-          </div>
-        </section>
-      </div>
-    </main>
-  );
-}
-}{Number(service.price || 0).toLocaleString()}</span>
+                        <span className="font-black text-emerald-700">{service.currency === 'NGN' ? '₦' : '$'}{Number(service.price || 0).toLocaleString()}</span>
                         <span className="text-xs text-slate-500">{service.durationHours || 0}h</span>
                       </div>
                       <div className="mt-5 flex flex-wrap gap-2">
                         {service.ownerUid && <Link to={`/os/messages/new?user=${service.ownerUid}`} className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white">Ask provider</Link>}
-                        <Link to="/discover" className="rounded-full border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700">View services</Link>
+                        <Link to="/os/services" className="rounded-full border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700">View services</Link>
                       </div>
                     </article>
                   ))}
+
                   {mode === 'discover' && filteredContributions.slice(0, 4).map((item) => (
                     <article key={`contribution-${item.id}`} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                       <div className="flex items-center gap-3">
