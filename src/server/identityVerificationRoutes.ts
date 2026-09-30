@@ -89,7 +89,7 @@ function evaluateMatch(entity: Record<string, unknown>, match: MatchInput) {
 }
 
 export function registerIdentityVerificationRoutes(app: Express, authenticate: RequestHandler) {
-  registerUniqueOtpRoutes(app);
+  registerUniqueOtpRoutes(app, authenticate);
   registerUniqueOtpRegistrationRoutes(app);
 
   app.get("/api/verification/status", authenticate, async (req, res) => {
