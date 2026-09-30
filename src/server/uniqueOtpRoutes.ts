@@ -1,6 +1,6 @@
 import type { Express } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
-import { createHash, randomUUID } from 'crypto';
+import { createHash, randomUUID, scryptSync } from 'crypto';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getUniqueOtpService } from './uniqueOtpRuntime';
