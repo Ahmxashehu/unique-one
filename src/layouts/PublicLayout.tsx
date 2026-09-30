@@ -24,7 +24,7 @@ export default function PublicLayout() {
             <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">U1</span>
             </div>
-            <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">UNIQUE ONE 🇳🇬</span>
+            <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">UNIQUE ONE</span>
           </Link>
           
           <nav className="hidden md:flex gap-6 items-center">
