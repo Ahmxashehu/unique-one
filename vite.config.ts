@@ -30,7 +30,7 @@ export default defineConfig(() => {
           id: '/',
           start_url: '/',
           scope: '/',
-          name: 'Unique One 🇳🇬',
+          name: 'Unique One',
           short_name: 'Unique One',
           description: 'The public ecosystem powered by UniqueOS.',
           theme_color: '#ffffff',
