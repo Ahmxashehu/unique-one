@@ -57,6 +57,7 @@ export interface IssueOtpInput {
 export interface VerifyOtpInput {
   destination: string;
   purpose: UniqueOtpPurpose;
+  channel: UniqueOtpChannel;
   code: string;
 }
 
