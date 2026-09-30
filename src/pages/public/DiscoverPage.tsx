@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { TrendingUp, Store as StoreIcon, Loader2, ShoppingBag } from 'lucide-react';
+import { Briefcase, TrendingUp, Store as StoreIcon, Loader2, ShoppingBag } from 'lucide-react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Product } from '../../lib/os/types';
 
 export default function DiscoverPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [services, setServices] = useState<Array<{ id: string; title?: string; providerName?: string; category?: string; description?: string; price?: number; currency?: string; durationHours?: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -28,7 +29,16 @@ export default function DiscoverPage() {
         setLoading(false);
       }
     };
+    const loadServices = async () => {
+      try {
+        const snapshot = await getDocs(query(collection(db, 'services'), where('status', '==', 'published')));
+        setServices(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Omit<(typeof services)[number], 'id'>) })).slice(0, 6));
+      } catch (err) {
+        console.error('Error loading Discover services:', err);
+      }
+    };
     loadProducts();
+    loadServices();
   }, []);
 
   return (
@@ -74,6 +84,36 @@ export default function DiscoverPage() {
                   <p className="text-sm text-slate-500 mt-1 line-clamp-2">{product.description || 'Published product from a Unique seller.'}</p>
                 </div>
               </Link>
+            ))}
+          </div>
+        )}
+
+      <section>
+        <div className="flex items-center gap-2 mb-6">
+          <Briefcase className="w-5 h-5 text-emerald-600" />
+          <h2 className="text-xl font-semibold text-slate-900">Services</h2>
+        </div>
+        {services.length === 0 ? (
+          <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center">
+            <p className="text-sm text-slate-500">No published services yet. Real provider services will appear here.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {services.map(service => (
+              <article key={service.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full">{service.category || 'Service'}</span>
+                <h3 className="mt-3 font-semibold text-slate-900">{service.title}</h3>
+                <p className="text-sm text-slate-500 mt-1 line-clamp-2">{service.description}</p>
+                <div className="mt-4 flex items-center justify-between">
+                  <span className="font-bold text-slate-900">{service.currency === 'NGN' ? '₦' : '
+}{Number(service.price || 0).toLocaleString()}</span>
+                  <span className="text-xs text-slate-500">{service.durationHours || 0}h</span>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  {service.providerName && <span className="text-xs text-slate-500 truncate flex-1">{service.providerName}</span>}
+                  <Link to="/os/services" className="text-xs font-bold text-emerald-700">View →</Link>
+                </div>
+              </article>
             ))}
           </div>
         )}
