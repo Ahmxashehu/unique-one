@@ -2531,6 +2531,34 @@ const app = express();
         }
         const cartSnapshot = await transaction.get(adminDb.collection('carts').where('customerId', '==', uid));
         if (cartSnapshot.empty) throw new RequestValidationError('INVALID_REQUEST', 'Your cart is empty.');
+        const userSnapshot = await transaction.get(adminDb.collection('users').doc(uid));
+        if (!userSnapshot.exists) throw new RequestValidationError('UNAUTHENTICATED', 'Your customer profile could not be found.');
+        const userData = userSnapshot.data() as Record<string, unknown>;
+        const shippingAddresses = Array.isArray(userData.shippingAddresses) ? userData.shippingAddresses : [];
+        const requestedShippingAddressId = typeof req.body.shippingAddressId === 'string' ? req.body.shippingAddressId.trim() : '';
+        const defaultShippingAddress = shippingAddresses.find((address: any) => address && address.isDefault === true) || shippingAddresses[0];
+        const selectedShippingAddress = requestedShippingAddressId
+          ? shippingAddresses.find((address: any) => address && address.id === requestedShippingAddressId)
+          : defaultShippingAddress;
+        if (!selectedShippingAddress || typeof selectedShippingAddress !== 'object') {
+          throw new RequestValidationError('INVALID_REQUEST', 'Select a valid shipping address before checkout.');
+        }
+        const shippingAddress = {
+          id: typeof selectedShippingAddress.id === 'string' ? selectedShippingAddress.id : 'default',
+          label: typeof selectedShippingAddress.label === 'string' ? selectedShippingAddress.label.slice(0, 80) : 'Shipping',
+          recipientName: typeof selectedShippingAddress.recipientName === 'string' ? selectedShippingAddress.recipientName.slice(0, 120) : '',
+          phone: typeof selectedShippingAddress.phone === 'string' ? selectedShippingAddress.phone.slice(0, 30) : '',
+          country: typeof selectedShippingAddress.country === 'string' ? selectedShippingAddress.country.slice(0, 80) : 'Nigeria',
+          state: typeof selectedShippingAddress.state === 'string' ? selectedShippingAddress.state.slice(0, 80) : '',
+          lga: typeof selectedShippingAddress.lga === 'string' ? selectedShippingAddress.lga.slice(0, 100) : '',
+          town: typeof selectedShippingAddress.town === 'string' ? selectedShippingAddress.town.slice(0, 100) : '',
+          area: typeof selectedShippingAddress.area === 'string' ? selectedShippingAddress.area.slice(0, 120) : '',
+          fullAddress: typeof selectedShippingAddress.fullAddress === 'string' ? selectedShippingAddress.fullAddress.slice(0, 300) : '',
+          landmark: typeof selectedShippingAddress.landmark === 'string' ? selectedShippingAddress.landmark.slice(0, 160) : '',
+        };
+        if (!shippingAddress.recipientName || !shippingAddress.phone || !shippingAddress.state || !shippingAddress.lga || !shippingAddress.town || !shippingAddress.area || !shippingAddress.fullAddress) {
+          throw new RequestValidationError('INVALID_REQUEST', 'Complete your selected shipping address before checkout.');
+        }
         const carts = cartSnapshot.docs.map((snapshot) => ({ ref: snapshot.ref, id: snapshot.id, data: snapshot.data() as Record<string, unknown> }));
         const productSnapshots = new Map<string, FirebaseFirestore.DocumentSnapshot>();
         for (const cart of carts) {
@@ -2591,7 +2619,7 @@ const app = express();
           const totalAmount = items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
           transaction.create(orderRef, {
             id: orderRef.id, customerId: uid, sellerId, items, totalAmount, currency: 'NGN',
-            status: 'pending', createdAt: now, updatedAt: now,
+            status: 'pending', shippingAddress, createdAt: now, updatedAt: now,
           });
           orderIds.push(orderRef.id);
         }
