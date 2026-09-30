@@ -107,6 +107,11 @@ export default function ForgotPasswordPage() {
     try {
       const credential = await confirmationResult.confirm(code);
       const idToken = await credential.user.getIdToken(true);
+      // Firebase Phone Auth signs the browser in temporarily. End that Firebase session
+      // immediately after obtaining the verified ID token so the app cannot redirect to
+      // the dashboard before the password-reset step is shown.
+      await signOut(auth);
+      setConfirmationResult(null);
       const response = await fetch('/api/auth/firebase-phone/recovery/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,8 +120,6 @@ export default function ForgotPasswordPage() {
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error?.message || 'Phone verification could not be completed.');
       if (typeof body?.recoveryToken !== 'string' || !body.recoveryToken) throw new Error('Recovery verification did not return a valid session.');
-      await signOut(auth);
-      setConfirmationResult(null);
       setRecoveryToken(body.recoveryToken);
       setStep('password');
       setCode('');
