@@ -2541,6 +2541,7 @@ const app = express();
   }), async (req, res) => {
     try {
       const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const paymentBody = req.body as Record<string, unknown>;
       if (!isPlainObject(req.body) || !isSafeIdempotencyKey(req.body.idempotencyKey) ||
           typeof req.body.transactionPin !== 'string' || !/^\\d{4}$/.test(req.body.transactionPin)) {
         return errorResponse(res, 'INVALID_REQUEST', 'A valid payment idempotency key and 4-digit Transaction PIN are required.');
@@ -2583,7 +2584,7 @@ const app = express();
       }
       const biometricRequired = biometricLevel > 0 || !hasPreviousTransaction;
       if (biometricRequired) {
-        const assertion = req.body?.biometricAssertion;
+        const assertion = paymentBody.biometricAssertion;
         if (!assertion?.challengeId || !assertion?.credentialId || !assertion?.clientDataJSON || !assertion?.authenticatorData || !assertion?.signature) {
           return errorResponse(res, 'BIOMETRIC_REQUIRED', biometricLevel >= 3 ? 'Biometric verification is required for Store payments of ₦500,000 or more.' : biometricLevel >= 2 ? 'Biometric verification is required for Store payments of ₦200,000 or more.' : biometricLevel >= 1 ? 'Biometric verification is required for Store payments of ₦50,000 or more.' : 'Biometric verification is required for your first wallet transaction.');
         }
