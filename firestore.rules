@@ -84,7 +84,23 @@ service cloud.firestore {
         || isAdmin();
       allow delete: if isAdmin();
     }
-    match /profiles/{userId} { allow read: if isOwner(userId) || isAdmin(); allow create, update: if isOwner(userId) || isAdmin(); allow delete: if isAdmin(); }
+    match /profiles/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId)
+        && request.resource.data.diff({}).affectedKeys().hasOnly([
+          'uid','firstName','otherName','lastName','fullName','profilePhotoUrl',
+          'preferredLanguage','communicationProfile'
+        ])
+        && request.resource.data.uid == userId;
+      allow update: if (isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'firstName','otherName','lastName','fullName','profilePhotoUrl',
+          'preferredLanguage','communicationProfile'
+        ])
+        && request.resource.data.uid == resource.data.uid)
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
     match /jobs/{jobId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.employerUid == request.auth.uid) || isAdmin();
       allow create: if isAuthenticated() && request.resource.data.employerUid == request.auth.uid && request.resource.data.status in ['draft','published'];
