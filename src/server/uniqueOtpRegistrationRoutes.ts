@@ -43,8 +43,12 @@ function hashToken(token: string): string {
 }
 
 function validatePassword(value: unknown): string {
-  const weak = new Set(['000000','111111','123456','654321','121212','112233','123123']);
+  const weak = new Set(['000000','111111','222222','333333','444444','555555','666666','777777','888888','999999','123456','654321','121212','212121','112233','123123']);
   if (typeof value !== 'string' || !/^\d{6}$/.test(value) || weak.has(value)) throw new Error('INVALID_PASSWORD');
+  const digits = value.split('').map(Number);
+  const ascending = digits.every((digit,index)=>index===0||digit===digits[index-1]+1);
+  const descending = digits.every((digit,index)=>index===0||digit===digits[index-1]-1);
+  if (ascending || descending) throw new Error('INVALID_PASSWORD');
   return value;
 }
 
