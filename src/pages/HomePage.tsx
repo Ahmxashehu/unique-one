@@ -17,7 +17,7 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
-import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Product } from '../lib/os/types';
 
@@ -46,7 +46,6 @@ export default function HomePage() {
           query(
             collection(db, 'products'),
             where('status', '==', 'published'),
-            orderBy('createdAt', 'desc'),
             limit(18),
           ),
         );
