@@ -361,5 +361,32 @@ service cloud.firestore {
         && request.resource.data.lng <= 180;
       allow delete: if isAdmin();
     }
+    match /services/{serviceId} {
+      allow read: if resource.data.status == 'published'
+        || (isAuthenticated() && resource.data.ownerUid == request.auth.uid)
+        || isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status in ['draft','published']
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 2000
+        && request.resource.data.price is number
+        && request.resource.data.price >= 0
+        && request.resource.data.durationHours is number
+        && request.resource.data.durationHours > 0;
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'providerName','title','category','description','price','currency','durationHours','status','updatedAt'
+          ])
+          && request.resource.data.status in ['draft','published']);
+      allow delete: if isAdmin();
+    }
   }
 }
