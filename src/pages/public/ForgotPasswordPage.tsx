@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, KeyRound, Loader2, MessageCircle, Phone, ShieldCheck } from 'lucide-react';
-
-type RecoveryChannel = 'sms' | 'whatsapp';
+import { ArrowLeft, KeyRound, Loader2, Phone, ShieldCheck } from 'lucide-react';
+import { RecaptchaVerifier, signInWithPhoneNumber, signOut, type ConfirmationResult } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
 
 function normalizePhone(value: string) {
   const t = value.trim().replace(/[\s()-]/g, '');
@@ -17,8 +17,8 @@ export default function ForgotPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [recoveryToken, setRecoveryToken] = useState('');
   const [step, setStep] = useState<'phone' | 'channel' | 'otp' | 'password'>('phone');
-  const [channel, setChannel] = useState<RecoveryChannel>('sms');
-  const [whatsappAvailable, setWhatsappAvailable] = useState(false);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const recaptchaRef = React.useRef<RecaptchaVerifier | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
@@ -45,8 +45,16 @@ export default function ForgotPasswordPage() {
     return () => window.clearInterval(timer);
   }, [resendRemainingSeconds]);
 
-  const chooseRecoveryMethod = async (event?: React.FormEvent) => {
+  const ensureRecaptcha = () => {
+    if (recaptchaRef.current) return recaptchaRef.current;
+    const verifier = new RecaptchaVerifier(auth, 'firebase-recovery-recaptcha', { size: 'invisible' });
+    recaptchaRef.current = verifier;
+    return verifier;
+  };
+
+  const requestCode = async (event?: React.FormEvent) => {
     event?.preventDefault();
+    if (loading) return;
     setError('');
     const normalized = normalizePhone(phone);
     if (!/^\+\d{8,15}$/.test(normalized)) {
@@ -55,48 +63,19 @@ export default function ForgotPasswordPage() {
     }
     setLoading(true);
     try {
-      const response = await fetch('/api/auth/unique-otp/recovery/options', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: normalized }),
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message || 'We could not load verification options.');
+      const verifier = ensureRecaptcha();
+      const result = await signInWithPhoneNumber(auth, normalized, verifier);
+      setConfirmationResult(result);
       setPhone(normalized);
-      setWhatsappAvailable(body?.whatsappBeta === true);
-      setChannel('sms');
-      setStep('channel');
-    } catch (err: any) {
-      setError(err?.message || 'We could not load verification options.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const requestCode = async (selectedChannel: RecoveryChannel = channel) => {
-    if (loading) return;
-    setError('');
-    const normalized = normalizePhone(phone);
-    setLoading(true);
-    try {
-      const response = await fetch('/api/auth/unique-otp/recovery/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: normalized, channel: selectedChannel }),
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message || 'We could not send the verification code.');
-      setPhone(normalized);
-      setChannel(selectedChannel);
-      const expiresIn = typeof body?.expiresInSeconds === 'number' ? body.expiresInSeconds : OTP_TTL_SECONDS;
-      const resendAfter = typeof body?.resendAfterSeconds === 'number' ? body.resendAfterSeconds : 30;
-      setOtpExpiresAt(Date.now() + expiresIn * 1000);
-      setOtpRemainingSeconds(expiresIn);
-      setResendRemainingSeconds(resendAfter);
+      setOtpExpiresAt(Date.now() + OTP_TTL_SECONDS * 1000);
+      setOtpRemainingSeconds(OTP_TTL_SECONDS);
+      setResendRemainingSeconds(30);
       setCode('');
       setStep('otp');
     } catch (err: any) {
-      setError(err?.message || 'We could not send the verification code.');
+      try { recaptchaRef.current?.clear(); } catch {}
+      recaptchaRef.current = null;
+      setError(err?.message || 'We could not send the Firebase SMS verification code.');
     } finally {
       setLoading(false);
     }
@@ -104,7 +83,7 @@ export default function ForgotPasswordPage() {
 
   const resendCode = async () => {
     if (loading || resendRemainingSeconds > 0) return;
-    await requestCode(channel);
+    await requestCode();
   };
 
   const verifyCode = async (event: React.FormEvent) => {
@@ -113,26 +92,35 @@ export default function ForgotPasswordPage() {
       setError('Enter the 6-digit verification code.');
       return;
     }
+    if (!confirmationResult) {
+      setError('Your verification session is missing. Please request a new code.');
+      setStep('phone');
+      return;
+    }
     if (otpRemainingSeconds <= 0) {
-      setError('This OTP has expired. Please request a new verification code.');
+      setError('This verification code has expired. Please request a new code.');
       return;
     }
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('/api/auth/unique-otp/recovery/verify', {
+      const credential = await confirmationResult.confirm(code);
+      const idToken = await credential.user.getIdToken(true);
+      const response = await fetch('/api/auth/firebase-phone/recovery/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: normalizePhone(phone), code, channel }),
+        body: JSON.stringify({ idToken, phone: normalizePhone(phone) }),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message || 'The verification code is invalid or expired.');
+      if (!response.ok) throw new Error(body?.error?.message || 'Phone verification could not be completed.');
       if (typeof body?.recoveryToken !== 'string' || !body.recoveryToken) throw new Error('Recovery verification did not return a valid session.');
+      await signOut(auth);
+      setConfirmationResult(null);
       setRecoveryToken(body.recoveryToken);
       setStep('password');
       setCode('');
     } catch (err: any) {
-      setError(err?.message || 'The verification code is invalid or expired.');
+      setError(err?.message || 'The Firebase verification code is invalid or expired.');
     } finally {
       setLoading(false);
     }
@@ -188,7 +176,7 @@ export default function ForgotPasswordPage() {
         {error && <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm text-center">{error}</div>}
 
         {step === 'phone' && (
-          <form onSubmit={chooseRecoveryMethod} className="space-y-4">
+          <form onSubmit={requestCode} className="space-y-4">
             <label className="block text-sm font-medium text-slate-700">Registered phone number</label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -200,33 +188,12 @@ export default function ForgotPasswordPage() {
           </form>
         )}
 
-        {step === 'channel' && (
-          <div className="space-y-3">
-            <div className="text-center mb-5">
-              <ShieldCheck className="w-9 h-9 mx-auto text-green-600 mb-2" />
-              <p className="font-semibold text-slate-900">Choose how to receive your UniqueOTP</p>
-              <p className="text-sm text-slate-500 mt-1">We'll send the same secure 6-digit verification code through your selected channel.</p>
-            </div>
-            <button type="button" disabled={loading} onClick={() => requestCode('sms')} className="w-full border border-slate-200 rounded-2xl p-4 text-left hover:border-green-500 hover:bg-green-50 disabled:opacity-50">
-              <span className="font-semibold text-slate-900 block">SMS</span>
-              <span className="text-sm text-slate-500">Send the UniqueOTP by SMS</span>
-            </button>
-            {whatsappAvailable && (
-              <button type="button" disabled={loading} onClick={() => requestCode('whatsapp')} className="w-full border border-slate-200 rounded-2xl p-4 text-left hover:border-green-500 hover:bg-green-50 disabled:opacity-50">
-                <span className="font-semibold text-slate-900 flex items-center gap-2"><MessageCircle className="w-5 h-5" /> WhatsApp <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Beta</span></span>
-                <span className="text-sm text-slate-500">Send the UniqueOTP to WhatsApp</span>
-              </button>
-            )}
-            {loading && <div className="text-center text-sm text-slate-500">Sending UniqueOTP...</div>}
-          </div>
-        )}
-
         {step === 'otp' && (
           <form onSubmit={verifyCode} className="space-y-4">
             <div className="text-center">
-              {channel === 'whatsapp' ? <MessageCircle className="w-9 h-9 mx-auto text-green-600 mb-2" /> : <ShieldCheck className="w-9 h-9 mx-auto text-green-600 mb-2" />}
-              <p className="font-semibold text-slate-900">Verify your {channel === 'whatsapp' ? 'WhatsApp' : 'phone'}</p>
-              <p className="text-sm text-slate-500 mt-1">Enter the 6-digit UniqueOTP sent by {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}.</p>
+              <ShieldCheck className="w-9 h-9 mx-auto text-green-600 mb-2" />
+              <p className="font-semibold text-slate-900">Verify your phone</p>
+              <p className="text-sm text-slate-500 mt-1">Enter the 6-digit UniqueOTP sent by Firebase SMS.</p>
               <p className={`text-sm font-semibold mt-3 ${otpRemainingSeconds <= 30 ? 'text-red-600' : 'text-green-700'}`} aria-live="polite">
                 {otpRemainingSeconds > 0 ? `OTP expires in ${Math.floor(otpRemainingSeconds / 60)}:${String(otpRemainingSeconds % 60).padStart(2, '0')}` : 'OTP expired'}
               </p>
@@ -234,9 +201,10 @@ export default function ForgotPasswordPage() {
             <input autoFocus inputMode="numeric" maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} className="w-full text-center tracking-[0.5em] text-xl py-3 border border-slate-200 rounded-xl" placeholder="••••••" autoComplete="one-time-code" required />
             <button disabled={loading || otpRemainingSeconds <= 0} className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">{loading ? 'Verifying...' : otpRemainingSeconds > 0 ? 'Verify OTP' : 'OTP expired'}</button>
             <button type="button" onClick={resendCode} disabled={loading || resendRemainingSeconds > 0} className="w-full text-sm font-semibold text-green-700 disabled:text-slate-400 disabled:cursor-not-allowed">{resendRemainingSeconds > 0 ? `Resend OTP in ${resendRemainingSeconds}s` : 'Resend OTP'}</button>
-            <button type="button" onClick={() => setStep('channel')} disabled={loading} className="w-full text-sm text-slate-500">Change verification method</button>
           </form>
         )}
+
+        <div id="firebase-recovery-recaptcha" aria-hidden="true" />
 
         {step === 'password' && (
           <form onSubmit={resetPassword} className="space-y-4">
