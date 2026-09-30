@@ -28,6 +28,8 @@ export default function RegisterPage(){
   const [area,setArea]=useState('');
   const [fullAddress,setFullAddress]=useState('');
   const [landmark,setLandmark]=useState('');
+  const [nin,setNin]=useState('');
+  const [bvn,setBvn]=useState('');
   const [password,setPassword]=useState('');
   const [confirmPassword,setConfirmPassword]=useState('');
   const [transactionPin,setTransactionPin]=useState('');
@@ -72,6 +74,8 @@ export default function RegisterPage(){
     if(!firstName.trim()||!lastName.trim()){setError('Enter your first name and last name.');return;}
     if(email&&(!/^\S+@\S+\.\S+$/.test(email.trim()))){setError('Enter a valid email address or leave it blank.');return;}
     if(!state||!lga.trim()||!town.trim()||!area.trim()||!fullAddress.trim()){setError('Complete your location and full address.');return;}
+    if(nin && !/^\d{11}$/.test(nin)){setError('NIN must be exactly 11 digits, or leave it blank.');return;}
+    if(bvn && !/^\d{11}$/.test(bvn)){setError('BVN must be exactly 11 digits, or leave it blank.');return;}
     setStep('security');
   };
 
@@ -83,7 +87,7 @@ export default function RegisterPage(){
     if(transactionPin!==confirmTransactionPin){setError('Your 4-digit Transaction PINs do not match.');return;}
     setLoading(true);
     try{
-      const r=await fetch('/api/auth/unique-otp/registration/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({registrationToken,password,confirmPassword,transactionPin,confirmTransactionPin,firstName,otherName,lastName,email,country:'Nigeria',state,lga,town,area,fullAddress,landmark})});
+      const r=await fetch('/api/auth/unique-otp/registration/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({registrationToken,password,confirmPassword,transactionPin,confirmTransactionPin,firstName,otherName,lastName,email,country:'Nigeria',state,lga,town,area,fullAddress,landmark,nin,bvn})});
       const b=await r.json();
       if(!r.ok)throw new Error(b?.error?.message||'Registration could not be completed.');
       setMessage(`Account created. Your Unique ID is ${b.uniqueOneId}.`);
@@ -109,6 +113,14 @@ export default function RegisterPage(){
       <div><label className="text-sm font-medium text-slate-700">Other / Middle Name</label><input value={otherName} onChange={e=>setOtherName(e.target.value)} className="w-full mt-1 px-4 py-3 border border-slate-200 rounded-xl"/></div>
       <div><label className="text-sm font-medium text-slate-700">Email Address <span className="text-slate-400">(Optional)</span></label><div className="relative mt-1"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"/><input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl" placeholder="you@example.com" autoComplete="email"/></div><p className="text-xs text-slate-500 mt-1">If you add it, we will verify it with UniqueOTP before it can be used as a login identifier.</p></div>
       <div className="pt-2 border-t border-slate-100"><p className="font-semibold text-slate-900 mb-3 flex items-center gap-2"><MapPin className="w-4 h-4"/> Location & shipping address</p><div><label className="text-sm font-medium text-slate-700">Country</label><input value="Nigeria" disabled className="w-full mt-1 px-4 py-3 border border-slate-200 rounded-xl bg-slate-50"/></div><div className="grid sm:grid-cols-2 gap-4 mt-4"><div><label className="text-sm font-medium text-slate-700">State *</label><select value={state} onChange={e=>setState(e.target.value)} className="w-full mt-1 px-4 py-3 border border-slate-200 rounded-xl bg-white"><option value="">Select State</option>{NIGERIAN_STATES.map(item=><option key={item} value={item}>{item}</option>)}</select></div><div><label className="text-sm font-medium text-slate-700">Local Government Area *</label><input value={lga} onChange={e=>setLga(e.target.value)} className="w-full mt-1 px-4 py-3 border border-slate-200 rounded-xl" placeholder="Enter your LGA"/></div><div><label className="text-sm font-medium text-slate-700">Town / City *</label><input value={town} onChange={e=>setTown(e.target.value)} className="w-full mt-1 px-4 py-3 border border-slate-200 rounded-xl"/></div><div><label className="text-sm font-medium text-slate-700">Area *</label><input value={area} onChange={e=>setArea(e.target.value)} className="w-full mt-1 px-4 py-3 border border-slate-200 rounded-xl"/></div></div><div className="mt-4"><label className="text-sm font-medium text-slate-700">Full Address *</label><textarea value={fullAddress} onChange={e=>setFullAddress(e.target.value)} rows={3} className="w-full mt-1 px-4 py-3 border border-slate-200 rounded-xl resize-none" placeholder="House number, street name, etc."/></div><div className="mt-4"><label className="text-sm font-medium text-slate-700">Landmark <span className="text-slate-400">(Optional)</span></label><input value={landmark} onChange={e=>setLandmark(e.target.value)} className="w-full mt-1 px-4 py-3 border border-slate-200 rounded-xl"/></div></div>
+      <div className="pt-3 border-t border-slate-100">
+        <p className="font-semibold text-slate-900 mb-2">Identity information <span className="text-slate-400 font-normal">(Optional)</span></p>
+        <p className="text-xs text-slate-500 mb-3">You can provide your NIN or BVN now, or add and verify them later in the Verification Center. They are protected from ordinary profile editing.</p>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div><label className="text-sm font-medium text-slate-700">NIN</label><input inputMode="numeric" maxLength={11} value={nin} onChange={e=>setNin(e.target.value.replace(/\D/g,'').slice(0,11))} className="w-full mt-1 px-4 py-3 border border-slate-200 rounded-xl" placeholder="11-digit NIN"/></div>
+          <div><label className="text-sm font-medium text-slate-700">BVN</label><input inputMode="numeric" maxLength={11} value={bvn} onChange={e=>setBvn(e.target.value.replace(/\D/g,'').slice(0,11))} className="w-full mt-1 px-4 py-3 border border-slate-200 rounded-xl" placeholder="11-digit BVN"/></div>
+        </div>
+      </div>
       <div className="flex gap-3"><button type="button" onClick={()=>{setStep('phone');setMessage('Phone verification is complete.');}} className="flex-1 py-3 rounded-xl border border-slate-200 font-semibold flex items-center justify-center gap-2"><ChevronLeft className="w-4 h-4"/>Back</button><button type="button" onClick={continueDetails} className="flex-1 bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2">Continue <ChevronRight className="w-4 h-4"/></button></div>
     </div>}
 
