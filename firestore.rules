@@ -179,12 +179,30 @@ service cloud.firestore {
     match /aiAuditLogs/{logId} { allow read, create, update, delete: if false; }
     match /products/{productId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isAdmin();
-      allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.keys().hasOnly([
+          'id','sellerId','businessId','name','description','category','images','hasVideo',
+          'price','currency','discount','condition','quantity','minOrderQuantity',
+          'wholesalePrice','bulkPrice','variants','location','deliveryOptions',
+          'pickupOptions','status','createdAt','updatedAt'
+        ])
+        && request.resource.data.id == productId
+        && request.resource.data.sellerId == request.auth.uid
+        && request.resource.data.status in ['draft','published','out_of_stock']
+        && request.resource.data.price is number
+        && request.resource.data.quantity is number
+        && request.resource.data.minOrderQuantity is number;
       allow update: if isAuthenticated()
         && resource.data.sellerId == request.auth.uid
         && request.resource.data.sellerId == resource.data.sellerId
-        && request.resource.data.diff(resource.data).affectedKeys().hasNone(['sellerId', 'createdAt'])
-        && request.resource.data.status in ['draft', 'published', 'out_of_stock']
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'businessId','name','description','category','images','hasVideo','price','currency',
+          'discount','condition','quantity','minOrderQuantity','wholesalePrice','bulkPrice',
+          'variants','location','deliveryOptions','pickupOptions','status','updatedAt'
+        ])
+        && request.resource.data.status in ['draft','published','out_of_stock']
         || isAdmin();
       allow delete: if isAdmin();
     }
