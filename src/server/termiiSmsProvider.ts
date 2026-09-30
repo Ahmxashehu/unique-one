@@ -23,25 +23,28 @@ export class TermiiSmsProvider implements UniqueOtpProvider {
   private readonly apiKey: string;
   private readonly senderId: string;
   private readonly whatsappDeviceId: string;
+  private readonly whatsappTemplateId: string;
   private readonly baseUrl: string;
 
   constructor(options?: {
     apiKey?: string;
     senderId?: string;
     whatsappDeviceId?: string;
+    whatsappTemplateId?: string;
     baseUrl?: string;
   }) {
     this.apiKey = options?.apiKey ?? process.env.TERMII_API_KEY ?? '';
     this.senderId = options?.senderId ?? process.env.TERMII_SENDER_ID ?? 'UniqueOTP';
     this.whatsappDeviceId = options?.whatsappDeviceId ?? process.env.TERMII_WHATSAPP_DEVICE_ID ?? '';
+    this.whatsappTemplateId = options?.whatsappTemplateId ?? process.env.TERMII_WHATSAPP_TEMPLATE_ID ?? '';
     this.baseUrl = (options?.baseUrl ?? process.env.TERMII_BASE_URL ?? DEFAULT_TERMII_BASE_URL).replace(/\/$/, '');
 
     if (!this.apiKey) throw new Error('TERMII_API_KEY_REQUIRED');
     if (!/^[A-Za-z0-9 ._-]{3,11}$/.test(this.senderId)) {
       throw new Error('INVALID_TERMII_SENDER_ID');
     }
-    if (!this.whatsappDeviceId && process.env.TERMII_WHATSAPP_DEVICE_ID !== undefined) {
-      throw new Error('TERMII_WHATSAPP_DEVICE_ID_REQUIRED');
+    if (this.whatsappDeviceId && !this.whatsappTemplateId) {
+      throw new Error('TERMII_WHATSAPP_TEMPLATE_ID_REQUIRED');
     }
   }
 
@@ -61,17 +64,27 @@ export class TermiiSmsProvider implements UniqueOtpProvider {
 
     if (isWhatsApp && !this.whatsappDeviceId) throw new Error('TERMII_WHATSAPP_NOT_CONFIGURED');
 
-    const response = await fetch(`${this.baseUrl}/api/sms/send`, {
+    const endpoint = isWhatsApp ? `${this.baseUrl}/api/send/template` : `${this.baseUrl}/api/sms/send`;
+    const payload = isWhatsApp
+      ? {
+          phone_number: phoneNumber,
+          device_id: this.whatsappDeviceId,
+          template_id: this.whatsappTemplateId,
+          api_key: this.apiKey,
+          data: { product_name: 'Unique One', otp: input.code, expiry_time: `${expiryMinutes} minutes` },
+        }
+      : {
+          api_key: this.apiKey,
+          to: phoneNumber,
+          from: this.senderId,
+          sms: `Unique One: Your ${purpose} code is ${input.code}. It expires in ${expiryMinutes} minutes. Do not share this code.`,
+          type: 'plain',
+          channel: 'dnd',
+        };
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        api_key: this.apiKey,
-        to: phoneNumber,
-        from: isWhatsApp ? this.whatsappDeviceId : this.senderId,
-        sms: `Unique One: Your ${purpose} code is ${input.code}. It expires in ${expiryMinutes} minutes. Do not share this code.`,
-        type: 'plain',
-        channel: isWhatsApp ? 'whatsapp' : 'dnd',
-      }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(10_000),
     });
 
