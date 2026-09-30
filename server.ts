@@ -87,9 +87,13 @@ function normalizeAuthPhone(value: unknown): string {
   if (!/^\+\d{8,15}$/.test(normalized)) throw new RequestValidationError('INVALID_REQUEST', 'Enter a valid phone number.');
   return normalized;
 }
-const WEAK_LOGIN_PASSWORDS = new Set(['000000','111111','123456','654321','121212','112233','123123']);
+const WEAK_LOGIN_PASSWORDS = new Set(['000000','111111','222222','333333','444444','555555','666666','777777','888888','999999','123456','654321','121212','212121','112233','123123']);
 function validateLoginPassword(value: unknown): string {
   if (typeof value !== 'string' || !/^\d{6}$/.test(value) || WEAK_LOGIN_PASSWORDS.has(value)) throw new RequestValidationError('INVALID_REQUEST', 'Your login password must be exactly 6 digits and cannot be an obvious weak pattern.');
+  const digits = value.split('').map(Number);
+  const ascending = digits.every((digit,index)=>index===0||digit===digits[index-1]+1);
+  const descending = digits.every((digit,index)=>index===0||digit===digits[index-1]-1);
+  if (ascending || descending) throw new RequestValidationError('INVALID_REQUEST', 'Choose a Login PIN that is not an obvious sequence.');
   return value;
 }
 function passwordDigest(password: string, salt: string): string {
