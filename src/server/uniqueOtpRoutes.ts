@@ -113,6 +113,36 @@ export function registerUniqueOtpRoutes(app: Express, authenticate?: RequestHand
     }
   });
 
+  app.post('/api/auth/firebase-phone/recovery/verify', rateLimit({
+    windowMs: 10 * 10_000,
+    limit: 8,
+    standardHeaders: true,
+    legacyHeaders: true,
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+  }), async (req, res) => {
+    try {
+      const idToken = typeof req.body?.idToken === 'string' ? req.body.idToken.trim() : '';
+      const phone = normalizePhone(req.body?.phone);
+      if (!idToken) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Firebase phone verification is required.' } });
+      const decoded = await getAuth().verifyIdToken(idToken);
+      if (decoded.phone_number !== phone) return res.status(403).json({ error: { code: 'PHONE_VERIFICATION_MISMATCH', message: 'The verified phone does not match this account.' } });
+      const userDoc = await getFirestore().collection('users').doc(decoded.uid).get();
+      if (!userDoc.exists || userDoc.data()?.phone !== phone) return res.status(403).json({ error: { code: 'ACCOUNT_NOT_FOUND', message: 'No matching Unique One account was found.' } });
+      const recoveryToken = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
+      const now = Timestamp.now();
+      await getFirestore().collection('uniqueOtpRecoverySessions').doc(tokenHash(recoveryToken)).set({
+        uid: decoded.uid, phone, purpose: 'password_reset', provider: 'firebase_phone_auth',
+        createdAt: now, expiresAt: Timestamp.fromMillis(Date.now() + 10 * 60_000), consumedAt: null,
+      });
+      return res.json({ ok: true, verified: true, recoveryToken, expiresInSeconds: 600 });
+    } catch (error: any) {
+      if (error?.message === 'INVALID_PHONE') return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter a valid registered phone number.' } });
+      if (error?.code === 'auth/invalid-id-token' || error?.code === 'auth/id-token-expired' || error?.code === 'auth/id-token-revoked') return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Firebase phone verification is invalid or expired.' } });
+      console.error('Firebase phone recovery verification failed:', error);
+      return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Phone verification could not be completed.' } });
+    }
+  });
+
   app.post('/api/auth/unique-otp/recovery/verify', rateLimit({
     windowMs: 10 * 10_000,
     limit: 8,
