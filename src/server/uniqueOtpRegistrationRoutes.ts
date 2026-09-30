@@ -30,6 +30,12 @@ function validateText(value: unknown, required: boolean, max = 120): string {
   return text;
 }
 
+function validateOptionalIdentityNumber(value: unknown, field: string): string {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value !== 'string' || !/^\d{11}$/.test(value.trim())) throw new Error(`INVALID_${field}`);
+  return value.trim();
+}
+
 function uniqueIdFromPhone(phone: string): string {
   return phone.slice(4);
 }
@@ -146,6 +152,8 @@ export function registerUniqueOtpRegistrationRoutes(app: Express) {
       const area = validateText(req.body?.area, true, 120);
       const fullAddress = validateText(req.body?.fullAddress, true, 300);
       const landmark = validateText(req.body?.landmark, false, 160);
+      const nin = validateOptionalIdentityNumber(req.body?.nin, 'NIN');
+      const bvn = validateOptionalIdentityNumber(req.body?.bvn, 'BVN');
       const fullName = fullNameFromParts(firstName, otherName, lastName);
 
       const db = getFirestore();
@@ -207,6 +215,7 @@ export function registerUniqueOtpRegistrationRoutes(app: Express) {
           const uniqueOneId = uniqueIdFromPhone(phone);
           transaction.set(db.collection('users').doc(uid), {
             uid, email, emailVerified: false, phone, phoneVerified: true, uniqueOneId,
+            nin: nin || '', bvn: bvn || '', ninVerified: false, bvnVerified: false,
             firstName, otherName, lastName, fullName, roles: ['customer'], permissions: [], status: 'active',
             preferredLanguage: 'en', createdAt: now.toDate().toISOString(), lastLogin: now.toDate().toISOString(),
             verificationStatus: 'phone_verified', hasSecurePin: true, twoFactorEnabled: false,
@@ -230,7 +239,7 @@ export function registerUniqueOtpRegistrationRoutes(app: Express) {
         throw error;
       }
     } catch (error: any) {
-      if (['INVALID_PASSWORD','INVALID_PIN','INVALID_NAME','INVALID_EMAIL','INVALID_REQUEST'].includes(error?.message)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: error?.message === 'INVALID_EMAIL' ? 'Enter a valid email address or leave it blank.' : 'Check your registration details and try again.' } });
+      if (['INVALID_PASSWORD','INVALID_PIN','INVALID_NAME','INVALID_EMAIL','INVALID_NIN','INVALID_BVN','INVALID_REQUEST'].includes(error?.message)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: error?.message === 'INVALID_EMAIL' ? 'Enter a valid email address or leave it blank.' : 'Check your registration details and try again.' } });
       if (error?.message === 'REGISTRATION_SESSION_INVALID') return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'The registration verification session is invalid, expired, or already used.' } });
       if (error?.message === 'ALREADY_PROVISIONED') return res.status(409).json({ error: { code: 'ALREADY_REGISTERED', message: 'This registration has already been completed.' } });
       console.error('UniqueOTP registration completion failed:', error);
