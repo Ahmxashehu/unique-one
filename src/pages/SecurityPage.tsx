@@ -1,23 +1,30 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Shield, Key, Smartphone, Clock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '../lib/firebase';
 
 export default function SecurityPage() {
   const { userData, currentUser } = useAuth();
-  const [resetSent, setResetSent] = useState(false);
-
-  const handlePasswordReset = async () => {
-    if (!currentUser?.email) return;
-    try {
-      await sendPasswordResetEmail(auth, currentUser.email);
-      setResetSent(true);
-      setTimeout(() => setResetSent(false), 5000);
-    } catch (err) {
-      console.error(err);
-      alert('Failed to send reset email.');
-    }
+  const [currentPassword,setCurrentPassword]=useState('');
+  const [newPassword,setNewPassword]=useState('');
+  const [confirmNewPassword,setConfirmNewPassword]=useState('');
+  const [passwordMessage,setPasswordMessage]=useState('');
+  const [passwordError,setPasswordError]=useState('');
+  const [passwordLoading,setPasswordLoading]=useState(false);
+  const weakLoginPins=new Set(['000000','111111','123456','654321','121212','112233','123123']);
+  const passwordChecks=useMemo(()=>[{ok:/^\\d{6}$/.test(newPassword),label:'Exactly 6 digits'},{ok:newPassword.length===6&&!weakLoginPins.has(newPassword),label:'Avoid obvious or common patterns'},{ok:newPassword.length===6&&newPassword!==currentPassword,label:'Different from your current Login PIN'}],[newPassword,currentPassword]);
+  const handlePasswordChange=async()=>{
+    setPasswordError('');setPasswordMessage('');
+    if(!/^\\d{6}$/.test(currentPassword)){setPasswordError('Enter your current 6-digit Login PIN.');return;}
+    if(!/^\\d{6}$/.test(newPassword)||weakLoginPins.has(newPassword)){setPasswordError('Choose a valid 6-digit Login PIN that is not an obvious pattern.');return;}
+    if(newPassword!==confirmNewPassword){setPasswordError('The new Login PINs do not match.');return;}
+    if(!currentUser){setPasswordError('Your session has expired. Please sign in again.');return;}
+    setPasswordLoading(true);
+    try{
+      const token=await currentUser.getIdToken();
+      const r=await fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({currentPassword,newPassword,confirmNewPassword})});
+      const b=await r.json();if(!r.ok)throw new Error(b?.error?.message||'Login PIN could not be changed.');
+      setCurrentPassword('');setNewPassword('');setConfirmNewPassword('');setPasswordMessage('Your 6-digit Login PIN has been changed successfully.');
+    }catch(err:any){setPasswordError(err.message||'Login PIN could not be changed.');}finally{setPasswordLoading(false);}
   };
 
   return (
@@ -32,14 +39,18 @@ export default function SecurityPage() {
           <Key className="w-5 h-5 text-slate-500" /> Password & PIN
         </h2>
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-slate-100 rounded-xl">
+          <div className="p-4 border border-slate-100 rounded-xl space-y-4">
             <div>
-              <p className="font-medium text-slate-900">Account Password</p>
-              <p className="text-sm text-slate-500">Reset through Firebase Authentication.</p>
+              <p className="font-medium text-slate-900">Change 6-digit Login PIN</p>
+              <p className="text-sm text-slate-500">Enter your current Login PIN, then choose and confirm a new one.</p>
             </div>
-            <button onClick={handlePasswordReset} className="px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors">
-              {resetSent ? 'Email Sent!' : 'Reset Password'}
-            </button>
+            {passwordError&&<div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-sm">{passwordError}</div>}
+            {passwordMessage&&<div className="p-3 rounded-lg bg-green-50 border border-green-100 text-green-700 text-sm">{passwordMessage}</div>}
+            <input type="password" inputMode="numeric" maxLength={6} value={currentPassword} onChange={e=>setCurrentPassword(e.target.value.replace(/\\D/g,''))} placeholder="Current 6-digit Login PIN" className="w-full px-4 py-3 border border-slate-200 rounded-xl" autoComplete="current-password"/>
+            <input type="password" inputMode="numeric" maxLength={6} value={newPassword} onChange={e=>setNewPassword(e.target.value.replace(/\\D/g,''))} placeholder="New 6-digit Login PIN" className="w-full px-4 py-3 border border-slate-200 rounded-xl" autoComplete="new-password"/>
+            <div className="space-y-1">{passwordChecks.map(item=><p key={item.label} className={`text-xs ${item.ok?'text-green-600':'text-slate-500'}`}>{item.ok?'✓':'○'} {item.label}</p>)}</div>
+            <input type="password" inputMode="numeric" maxLength={6} value={confirmNewPassword} onChange={e=>setConfirmNewPassword(e.target.value.replace(/\\D/g,''))} placeholder="Confirm new 6-digit Login PIN" className="w-full px-4 py-3 border border-slate-200 rounded-xl" autoComplete="new-password"/>
+            <button onClick={handlePasswordChange} disabled={passwordLoading} className="px-4 py-3 bg-slate-900 text-white font-medium rounded-xl disabled:opacity-50">{passwordLoading?'Updating...':'Change Login PIN'}</button>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-slate-100 rounded-xl">
