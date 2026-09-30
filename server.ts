@@ -511,6 +511,12 @@ const app = express();
         if (error?.message === 'CURRENT_LOGIN_PIN_INVALID') return errorResponse(res, 'UNAUTHENTICATED', 'Your current 6-digit Login PIN is incorrect.');
         throw error;
       }
+      try {
+        await getAuth().revokeRefreshTokens(uid);
+      } catch (revokeError) {
+        console.error('Login PIN session revocation failed:', revokeError);
+        return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Login PIN changed, but active sessions could not be safely revoked. Please sign in again later.');
+      }
       return res.json({ ok: true, passwordChanged: true });
     } catch (error: any) {
       const code = error instanceof RequestValidationError ? error.code : 'INVALID_REQUEST';
