@@ -107,7 +107,7 @@ export default function StoreCartPage() {
 
   const payOrders = async (orderIds: string[], checkoutIdempotencyKey: string) => {
     if (!currentUser || paymentBusy) return;
-    if (!/^\\d{4}$/.test(transactionPin)) {
+    if (!/^\d{4}$/.test(transactionPin)) {
       setError('Enter your 4-digit Transaction PIN to pay for this order.');
       setPaymentStep(true);
       return;
@@ -216,7 +216,7 @@ export default function StoreCartPage() {
                   inputMode="numeric"
                   maxLength={4}
                   value={transactionPin}
-                  onChange={e => setTransactionPin(e.target.value.replace(/\\D/g, '').slice(0, 4))}
+                  onChange={e => setTransactionPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   placeholder="4-digit Transaction PIN"
                   className="w-full px-3 py-3 bg-white border border-emerald-200 rounded-xl text-center tracking-[0.35em] font-bold"
                   disabled={paymentBusy}
