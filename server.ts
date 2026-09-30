@@ -99,7 +99,7 @@ function base64UrlToBuffer(value: string): Buffer {
   return Buffer.from(normalized + '='.repeat((4 - normalized.length % 4) % 4), 'base64');
 }
 function bufferToBase64Url(value: Buffer): string {
-  return value.toString('base64').replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_');
+  return value.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 function requestWebAuthnOrigin(req: Request): { origin: string; rpId: string } {
   const host = req.hostname;
