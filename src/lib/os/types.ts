@@ -15,12 +15,20 @@ export interface UniqueUser {
   uid: string;
   email: string;
   phone?: string;
+  phoneVerified?: boolean;
   username?: string;
-  uniqueOneId: string; // e.g. U1-XXXXXX
+  uniqueOneId: string; // 10-digit registered phone number without the first 0
+  firstName?: string;
+  otherName?: string;
+  lastName?: string;
   fullName: string;
+  emailVerified?: boolean;
   profilePhotoUrl?: string;
   preferredLanguage: string;
   location?: { lat: number; lng: number; address: string };
+  address?: { country: string; state: string; lga: string; town: string; area: string; fullAddress: string; landmark?: string };
+  shippingAddresses?: Array<{ id: string; label: string; recipientName: string; phone: string; country: string; state: string; lga: string; town: string; area: string; fullAddress: string; landmark?: string; isDefault: boolean }>;
+  communicationProfile?: { firstName?: string; otherName?: string; lastName?: string; profilePhotoUrl?: string; locationVisibility?: 'hidden' | 'city_only' | 'contacts' | 'everyone' };
   roles: Role[];
   permissions: Permission[]; // Custom overrides
   status: 'active' | 'suspended' | 'pending_verification' | 'banned';
