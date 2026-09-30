@@ -167,7 +167,12 @@ service cloud.firestore {
         (isAuthenticated()
           && resource.data.ownerUid == request.auth.uid
           && request.resource.data.ownerUid == resource.data.ownerUid
-          && request.resource.data.diff(resource.data).affectedKeys().hasNone(['ownerUid', 'status', 'verificationStatus', 'createdAt']));
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.verificationStatus == resource.data.verificationStatus
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name','registrationNumber','description','contactEmail','contactPhone','categories'
+          ]));
       allow delete: if isAdmin();
     }
     match /roles/{roleId} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
