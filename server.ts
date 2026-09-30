@@ -512,17 +512,41 @@ const app = express();
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many login attempts. Please try again later.'),
   }), async (req, res) => {
     try {
-      const phone = normalizeAuthPhone(req.body?.phone);
+      const identifier = typeof req.body?.identifier === 'string' ? req.body.identifier.trim().toLowerCase() : '';
       const password = validateLoginPassword(req.body?.password);
-      const user = await getAuth().getUserByPhoneNumber(phone);
-      const snap = await adminDb.collection('authCredentials').doc(user.uid).get();
+      if (!identifier) return errorResponse(res, 'INVALID_REQUEST', 'Enter your phone number, Unique ID, or verified email.');
+
+      let uid = '';
+      let user: FirebaseAuthTypes.UserRecord | null = null;
+
+      if (/^0\d{10}$/.test(identifier)) {
+        user = await getAuth().getUserByPhoneNumber(normalizeAuthPhone(identifier));
+        uid = user.uid;
+      } else if (/^\d{10}$/.test(identifier)) {
+        user = await getAuth().getUserByPhoneNumber('+234' + identifier);
+        uid = user.uid;
+      } else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
+        const emailSnapshot = await adminDb.collection('users').where('email', '==', identifier).limit(1).get();
+        if (!emailSnapshot.empty) {
+          const data = emailSnapshot.docs[0].data() as { uid?: unknown; emailVerified?: unknown };
+          if (data.emailVerified === true && typeof data.uid === 'string') {
+            uid = data.uid;
+            user = await getAuth().getUser(uid);
+          }
+        }
+      } else {
+        return errorResponse(res, 'INVALID_REQUEST', 'Use an 11-digit phone number, 10-digit Unique ID, or verified email.');
+      }
+
+      if (!user || !uid) return errorResponse(res, 'UNAUTHENTICATED', 'Invalid login identifier or 6-digit Login PIN.');
+      const snap = await adminDb.collection('authCredentials').doc(uid).get();
       const credential = snap.data() as {loginPasswordSalt?:string;loginPasswordHash?:string}|undefined;
-      if (!credential?.loginPasswordSalt || !credential.loginPasswordHash || passwordDigest(password,credential.loginPasswordSalt)!==credential.loginPasswordHash) return errorResponse(res,'UNAUTHENTICATED','Invalid phone number or 6-digit login password.');
-      const customToken=await getAuth().createCustomToken(user.uid);
-      await adminDb.collection('users').doc(user.uid).set({lastLogin:new Date().toISOString()},{merge:true});
+      if (!credential?.loginPasswordSalt || !credential.loginPasswordHash || passwordDigest(password,credential.loginPasswordSalt)!==credential.loginPasswordHash) return errorResponse(res,'UNAUTHENTICATED','Invalid login identifier or 6-digit Login PIN.');
+      const customToken=await getAuth().createCustomToken(uid);
+      await adminDb.collection('users').doc(uid).set({lastLogin:new Date().toISOString()},{merge:true});
       return res.json({customToken});
     } catch(error:any) {
-      if(error?.code==='auth/user-not-found') return errorResponse(res,'UNAUTHENTICATED','Invalid phone number or 6-digit login password.');
+      if(error?.code==='auth/user-not-found') return errorResponse(res,'UNAUTHENTICATED','Invalid login identifier or 6-digit Login PIN.');
       const code=error instanceof RequestValidationError?error.code:'UNAUTHENTICATED';
       return errorResponse(res,code as TransferErrorCode,error?.message||'Unable to sign in.');
     }
