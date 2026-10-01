@@ -111,3 +111,129 @@ a {
     scroll-behavior: auto !important;
   }
 }
+
+
+/* Platform-wide mobile experience layer.
+   Keeps every existing feature/function intact while normalizing dense desktop
+   layouts for phone widths. Page-specific desktop breakpoints remain untouched. */
+@media (max-width: 767px) {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+  }
+
+  table {
+    max-width: 100%;
+  }
+
+  pre,
+  code {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  /* Prevent common fixed-width cards/controls from forcing horizontal scroll. */
+  [class~="w-80"],
+  [class~="w-96"],
+  [class~="w-[28rem]"],
+  [class~="w-[32rem]"] {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  [class~="max-w-7xl"],
+  [class~="max-w-6xl"],
+  [class~="max-w-5xl"],
+  [class~="max-w-4xl"] {
+    max-width: 100%;
+  }
+
+  /* Dense desktop grids become comfortable two-column mobile cards. */
+  [class~="grid-cols-4"],
+  [class~="grid-cols-5"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  [class~="grid-cols-3"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Large desktop spacing becomes phone-sized without removing content. */
+  [class~="p-12"] {
+    padding: 1.25rem;
+  }
+
+  [class~="p-10"] {
+    padding: 1.25rem;
+  }
+
+  [class~="p-8"] {
+    padding: 1rem;
+  }
+
+  [class~="p-6"] {
+    padding: 1rem;
+  }
+
+  [class~="py-20"] {
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+  }
+
+  [class~="py-16"] {
+    padding-top: 2.5rem;
+    padding-bottom: 2.5rem;
+  }
+
+  [class~="py-12"] {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+
+  /* Keep large headings readable without making the page feel oversized. */
+  [class~="text-6xl"] {
+    font-size: 2.25rem;
+    line-height: 1.08;
+  }
+
+  [class~="text-5xl"] {
+    font-size: 2rem;
+    line-height: 1.1;
+  }
+
+  [class~="text-4xl"] {
+    font-size: 1.875rem;
+    line-height: 1.12;
+  }
+
+  /* Long labels/buttons wrap instead of pushing the viewport wider. */
+  button,
+  a {
+    max-width: 100%;
+  }
+
+  [class~="whitespace-nowrap"] {
+    overflow-wrap: normal;
+  }
+
+  /* Horizontal tables/listing strips remain intentionally scrollable. */
+  [class~="overflow-x-auto"] {
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  /* Safe bottom space for the shared mobile navigation. */
+  main {
+    min-width: 0;
+  }
+}
