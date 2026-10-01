@@ -346,7 +346,7 @@ export default function UniqueAiPage() {
             type="button"
             disabled={loading}
             onClick={() => setMessage(QUICK_PROMPTS[suggestedIndex])}
-            className="relative block w-full min-w-0 overflow-hidden pr-1 text-left"
+            className="group relative block w-full min-w-0 overflow-hidden pr-1 text-left"
             aria-label={`Use suggested question: ${QUICK_PROMPTS[suggestedIndex]}`}
           >
             <span
