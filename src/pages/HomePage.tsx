@@ -607,6 +607,7 @@ export default function HomePage() {
                         ['Images', Compass],
                         ['PDF Reader', Bookmark],
                         ['Contacts', Users],
+                        ['Status Saver', Bookmark],
                       ].map(([label, Icon]) => (
                         <Link
                           key={String(label)}
