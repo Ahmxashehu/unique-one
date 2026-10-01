@@ -297,16 +297,15 @@ export default function UniqueAiPage() {
     }
   };
 
-  const clearConversation = () => {
-    if (loading) return;
-    setMessages([]);
-    setError("");
-    setLastFailedMessage(null);
-    setLastRequestId(null);
-  };
-
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-x-hidden sm:gap-4">
+    <>
+      <style>{`
+        @keyframes uniqueAiSuggestedSlide {
+          from { opacity: 0; transform: translateX(18px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
+      <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-x-hidden sm:gap-4">
       <div className="flex min-h-[58px] min-w-0 items-center rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm sm:min-h-[68px] sm:px-4">
         <div className="min-w-0 w-full">
           <div className="mb-1.5 flex items-center gap-1.5">
@@ -322,7 +321,8 @@ export default function UniqueAiPage() {
             className="group block w-full min-w-0 overflow-hidden text-left"
             aria-label={`Use suggested question: ${QUICK_PROMPTS[suggestedIndex]}`}
           >
-            <span className="block min-w-0 truncate text-sm font-semibold text-slate-800 transition-colors group-hover:text-emerald-700 sm:text-base animate-[slideIn_.55s_ease-out]">
+            <span className="block min-w-0 truncate text-sm font-semibold text-slate-800 transition-colors group-hover:text-emerald-700 sm:text-base"
+            style={{ animation: "uniqueAiSuggestedSlide 550ms ease-out both" }}>
               {QUICK_PROMPTS[suggestedIndex]}
             </span>
           </button>
@@ -432,5 +432,6 @@ export default function UniqueAiPage() {
         </form>
       </div>
     </div>
+    </>
   );
 }
