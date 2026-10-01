@@ -9,7 +9,7 @@ type MobileBottomNavProps = {
 
 const publicItems = [
   { name: "Home", path: "/", icon: Home },
-  { name: "Discover", path: "/discover", icon: Compass },
+  { name: "Active Edge", path: "/discover", icon: Compass },
   { name: "Search", path: "/search", icon: Search },
   { name: "AI", path: "/ai", icon: Sparkles },
 ];
