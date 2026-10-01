@@ -457,7 +457,7 @@ export default function HomePage() {
                           />
                         ))}
                       </div>
-                      <span className="text-xs font-semibold text-white/60">Changes every 60 seconds</span>
+                      <span className="text-xs font-semibold text-white/60">Changes every 15 seconds</span>
                     </div>
                   </div>
                 </div>
