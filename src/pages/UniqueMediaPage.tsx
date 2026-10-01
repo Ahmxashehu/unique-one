@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { FileText, Image as ImageIcon, Music2, Play, Search, Users, Upload, X } from 'lucide-react';
+import { FileText, Image as ImageIcon, Music2, Play, Search, Users, Upload, X, Share2, Cloud, Download, Smartphone } from 'lucide-react';
+import { AuthActionGate } from '../components/auth/AuthActionGate';
 
 type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
 
@@ -31,6 +32,7 @@ export default function UniqueMediaPage() {
   const [search, setSearch] = useState('');
   const [contactSearch, setContactSearch] = useState('');
   const [contactMessage, setContactMessage] = useState('');
+  const [shareMessage, setShareMessage] = useState('');
 
   const filteredMedia = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -58,6 +60,23 @@ export default function UniqueMediaPage() {
       if (item) URL.revokeObjectURL(item.url);
       return current.filter((entry) => entry.id !== id);
     });
+  };
+
+  const shareMedia = async (item: LocalMedia) => {
+    try {
+      if (navigator.share && navigator.canShare?.({ files: [item.file] })) {
+        await navigator.share({ title: item.file.name, files: [item.file] });
+        setShareMessage('Ready to share from your device.');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = item.url;
+      link.download = item.file.name;
+      link.click();
+      setShareMessage('Downloaded for sharing. Your device can send it over Wi‑Fi, hotspot or another available sharing method.');
+    } catch (error) {
+      if ((error as DOMException)?.name !== 'AbortError') setShareMessage('This device or browser does not support direct file sharing here.');
+    }
   };
 
   const openMedia = (item: LocalMedia) => {
@@ -164,9 +183,14 @@ export default function UniqueMediaPage() {
                     </button>
                     <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
                       <span className="text-xs text-slate-400">{Math.max(1, Math.round(item.file.size / 1024))} KB</span>
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => shareMedia(item)} className="rounded-full p-2 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600" aria-label={`Share ${item.file.name}`}>
+                          <Share2 className="h-4 w-4" />
+                        </button>
                       <button type="button" onClick={() => removeMedia(item.id)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-red-500" aria-label="Remove from UniqueMedia">
                         <X className="h-4 w-4" />
                       </button>
+                      </div>
                     </div>
                   </article>
                 );
