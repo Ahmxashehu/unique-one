@@ -464,7 +464,20 @@ service cloud.firestore {
           && (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.public == true
             || get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid)
           && request.resource.data.uid == request.auth.uid;
-        allow delete: if isAuthenticated() && uid == request.auth.uid;
+        allow delete: if isAuthenticated() && (uid == request.auth.uid || get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid);
+      }
+
+      match /chat/{messageId} {
+        allow read: if isAuthenticated() && (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.public == true
+          || get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid);
+        allow create: if isAuthenticated()
+          && exists(/databases/$(database)/documents/conferences/$(conferenceId)/participants/$(request.auth.uid))
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.displayName is string
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000;
+        allow update, delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
       }
 
       match /signals/{signalId} {
