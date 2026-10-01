@@ -342,6 +342,13 @@ export default function HomePage() {
   };
 
   return (
+    <style>{`
+      @keyframes uniqueMediaVertical {
+        0%, 12% { transform: translateY(110%); opacity: 0; }
+        22%, 72% { transform: translateY(0); opacity: 1; }
+        84%, 100% { transform: translateY(-110%); opacity: 0; }
+      }
+    `}</style>
     <main className="min-h-screen min-w-0 overflow-x-hidden bg-[#f7f9f8] text-slate-950">
       {/* Sticky discovery header */}
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
@@ -579,9 +586,11 @@ export default function HomePage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <h3 className="text-xl font-black tracking-tight">UniqueMedia</h3>
-                      <p className="mt-1 truncate text-xs text-slate-500 sm:text-sm">
-                        Your personal offline-first hub for videos, music, images, PDFs and contacts.
-                      </p>
+                      <div className="mt-1 h-5 overflow-hidden text-xs text-slate-500 sm:h-6 sm:text-sm">
+                        <p className="animate-[uniqueMediaVertical_9s_linear_infinite] whitespace-nowrap motion-reduce:animate-none">
+                          Your personal offline-first hub for videos, music, images, PDFs and contacts.
+                        </p>
+                      </div>
                     </div>
                   </div>
 
