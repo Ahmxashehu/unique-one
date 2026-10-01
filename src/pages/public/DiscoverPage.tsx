@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, Check, ChevronDown, Copy, Heart, ImagePlus, Loader2, MessageCircle,
+  Check, Copy, Heart, ImagePlus, Loader2, MessageCircle,
   MoreHorizontal, Plus, Send, Settings2, Share2, Sparkles, X, Building2, GraduationCap
 } from 'lucide-react';
 import {
