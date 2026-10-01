@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bot, Send, Sparkles, Trash2 } from "lucide-react";
+import { Send, Sparkles } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 type UniqueAiCapabilities = {
@@ -17,49 +17,159 @@ type ChatMessage = {
 };
 
 const QUICK_PROMPTS = [
-  "How does Unique AI protect my platform data?",
-  "What happens if the AI service times out?",
-  "How does Unique AI handle temporary model failures?",
-  "Why might an AI answer be blocked or rejected?",
-  "Can Unique AI make changes to my account?",
-  "Are AI answers based on all my records or only loaded records?",
-  "What can you help me with in Unique One?",
-  "What can Unique AI access right now?",
-  "Summarize my current orders.",
-  "What businesses and products do I have?",
-  "How many orders, businesses, and products do I have?",
-  "How many of my orders are active or cancelled?",
-  "What order statuses do I currently have?",
-  "How are my businesses grouped by category?",
-  "How are my products grouped by category?",
-  "How are my orders split between customer and seller status?",
-  "How are my businesses split by status and verification?",
-  "How are my products split by status?",
-  "How many inventory units do my loaded products contain?",
-  "Which of my AI summaries may be incomplete because of context limits?",
-  "Which of my products are missing category, status, or quantity data?",
-  "Which of my products have invalid inventory quantities?",
-  "Which of my businesses have missing category, status, or verification data?",
-  "What order data is unknown or potentially incomplete?",
-  "Which summaries are guaranteed to be based on all loaded records?",
-  "Why might my Unique AI counts be incomplete?",
-  "What request ID should I give support if Unique AI fails?",
-  "What does a blocked AI response mean?",
-  "What happens when Unique AI has no usable model response?",
-  "Does Unique AI cache my platform response?",
-  "Can Unique AI expose another user’s private data?",
-  "What happens when one of my data fields is missing?",
-  "What happens when the AI context reaches its size limit?",
+  "What can Unique One do for individuals, families, businesses, and organizations?",
+  "How does Unique One bring payments, shopping, services, communication, and discovery together?",
+  "How does Unique Store work from discovery to checkout and delivery?",
+  "How does UniquePay work for sending and receiving money?",
+  "Can my phone number work as my UniquePay account number?",
+  "How does UniquePay use a unique person ID for payments?",
+  "Can I send money to another Unique One user by email?",
+  "What payment, airtime, data, and bill services are planned for UniquePay?",
+  "How will bank transfers work inside UniquePay?",
+  "How does Unique Store connect with UniquePay?",
+  "Can I switch between Unique Store and UniquePay without creating another account?",
+  "How can a business register and create its Unique One business presence?",
+  "How do business branches and ownership work in Unique One?",
+  "How can sellers create and manage products in Unique Store?",
+  "How can customers discover products and services near them?",
+  "How does Unique Store location work from Nigeria to state, LGA, town, area, landmark, and GPS?",
+  "How can I buy, sell, hire, book, send, travel, eat, discover, connect, and grow in Unique Store?",
+  "How will business verification work on Unique One?",
+  "How can a business manage customers, staff, suppliers, inventory, and orders?",
+  "How does Unique One support SMEs and larger organizations?",
+  "How can institutions and communities use Unique One?",
+  "How can citizens use Unique One services?",
+  "How can government services eventually fit into the Unique One ecosystem?",
+  "How does Unique One support low-bandwidth users?",
+  "Can Unique One work as an installable PWA on Android?",
+  "How does Unique One work across web and mobile?",
+  "What makes Unique One different from a normal marketplace?",
+  "What makes Unique One different from a normal payment app?",
+  "How does the Unique One super-app experience work?",
+  "What does the human life operating system idea mean in Unique One?",
+  "How does the Unique One trust/main branch concept work?",
+  "How does Unique AI help me use Unique One?",
+  "What can Unique AI access when I am registered?",
+  "Can Unique AI understand my businesses, products, orders, and account context?",
+  "Can Unique AI change my account, payments, or orders?",
+  "Why is Unique AI read-only for protected platform context?",
+  "How does Unique AI protect private platform data?",
+  "How does Unique AI handle incomplete or missing data?",
+  "What happens when Unique AI reaches a context limit?",
+  "What happens if Unique AI temporarily fails?",
+  "What does a Unique AI request ID do?",
   "How does Unique AI handle an invalid model response?",
-  "How does Unique AI trace a failed request?",
-  "How can I give support the request ID safely?",
-  "Does Unique AI verify that its authorized context is internally consistent?",
-  "What does the Unique AI context completeness status mean?",
-  "What does it mean when AI context is incomplete?",
-  "What data is never exposed to Unique AI?",
-  "Which loaded order totals are unavailable?",
-  "What is my account verification status?",
-  "Can you change a payment or order for me?",
+  "How does Unique AI prevent another user’s private data from being exposed?",
+  "Can Unique AI summarize my current orders?",
+  "Can Unique AI summarize my businesses and products?",
+  "Can Unique AI explain my inventory information?",
+  "Can Unique AI explain my order statuses?",
+  "Can Unique AI explain why some platform data may be incomplete?",
+  "How can I ask Unique AI about my own platform activity?",
+  "What does registered Unique AI context include?",
+  "What is available in public Unique AI mode?",
+  "How do I register for the full Unique One experience?",
+  "How does Unique One authentication protect my account?",
+  "How does Unique One handle sessions and access tokens?",
+  "How does Unique One protect sensitive actions?",
+  "How will transaction PIN protection work?",
+  "How will OTP protection work?",
+  "How will passkeys work in Unique One?",
+  "How can fingerprint or face verification add security?",
+  "How does Unique One protect financial routes?",
+  "How does Unique One protect Firestore data?",
+  "How does Unique One protect product and profile uploads?",
+  "How does Unique One protect chat and file uploads?",
+  "How are seller and business ownership permissions enforced?",
+  "How does Unique One prevent clients from creating fake completed transactions?",
+  "How does UniquePay use transaction ledgers and idempotency?",
+  "How are Nigerian naira amounts represented safely in UniquePay?",
+  "How will UniquePay connect to licensed financial partners?",
+  "What role can a banking partner play in UniquePay?",
+  "How could NIBSS services fit into UniquePay?",
+  "How could NIN and BVN verification fit into UniquePay?",
+  "What languages can Unique One support across Africa?",
+  "How can Unique One expand from Nigeria to Africa and then globally?",
+  "How can Unique One remain affordable as it grows?",
+  "How does Unique One handle continuous platform upgrades?",
+  "How does Unique Store handle product images?",
+  "How can sellers upload product photos?",
+  "How can users upload profile photos?",
+  "How can users send photos and videos in communication?",
+  "How can users send files in Unique One communication?",
+  "How will the Unique One communication experience work?",
+  "How can chat attachments be previewed before sending?",
+  "How can Unique One avoid upload failures and stuck uploads?",
+  "How can Unique One provide a WhatsApp-like communication experience?",
+  "How can end-to-end encryption fit into Unique One communication?",
+  "How does Unique Store handle carts?",
+  "How does Unique Store handle checkout?",
+  "How does Unique Store handle orders?",
+  "How can customers track their orders?",
+  "How can sellers manage order status?",
+  "How can businesses manage inventory?",
+  "How can customers save products or businesses?",
+  "How can product hearts and favorites work?",
+  "How can businesses showcase their services?",
+  "How can providers appear in Discover?",
+  "How will Discover use real platform data?",
+  "How does the Active Edge experience work?",
+  "How can Active Edge surface posts and updates from users and businesses?",
+  "How can Unique One combine social updates with discovery?",
+  "How can users discover nearby businesses and services?",
+  "How can businesses reach relevant customers?",
+  "How can customers discover trusted providers?",
+  "How will Unique One avoid invented listings and use real platform data?",
+  "How can AI help users discover real products and services?",
+  "How can Unique One support bookings?",
+  "How can Unique One support travel services?",
+  "How can Unique One support food discovery and ordering?",
+  "How can Unique One support hiring and service requests?",
+  "How can Unique One support sending and delivery services?",
+  "How can Unique One support business-to-business activity?",
+  "How can Unique One support communities and institutions?",
+  "How can Unique One support large organizations?",
+  "How can Unique One support entrepreneurs starting a business?",
+  "How can Unique One help a seller grow?",
+  "How can Unique One help a customer save time?",
+  "How can Unique One help a business understand its orders?",
+  "How can Unique One help businesses understand products and inventory?",
+  "How can Unique One connect a business presence to payments?",
+  "How can Unique One connect commerce with communication?",
+  "How can Unique One connect discovery with transactions?",
+  "How can Unique One connect users, businesses, institutions, and communities?",
+  "What is the role of the Unique One ID?",
+  "How can Unique One identify people and businesses safely?",
+  "How can a unique person ID be used instead of a QR code?",
+  "How could temporary receiving account numbers work in UniquePay?",
+  "How could future UniquePay ATM cards work?",
+  "What are UniqueCoins and how might they fit into the future?",
+  "How can Unique One support English, French, Hausa, Igbo, and Yoruba?",
+  "How does Unique One handle notifications and important updates?",
+  "How can Unique One make the home experience personalized?",
+  "How can the home page bring together the whole Unique One experience?",
+  "How can Unique One keep the interface simple despite many capabilities?",
+  "How can Unique One remain fast on slower devices and networks?",
+  "How can Unique One provide a consistent experience across Android and desktop?",
+  "How can I find my account, business, orders, and products quickly?",
+  "How can I use Unique AI to learn a feature step by step?",
+  "Ask Unique AI to explain Unique Store.",
+  "Ask Unique AI to explain UniquePay.",
+  "Ask Unique AI to explain Unique One security.",
+  "Ask Unique AI to explain my business dashboard.",
+  "Ask Unique AI to explain my orders.",
+  "Ask Unique AI to explain my products.",
+  "Ask Unique AI to explain my account.",
+  "What is Unique One building next?",
+  "What capabilities are already available in Unique One?",
+  "Which Unique One features are connected today?",
+  "How can I get help when a Unique One feature fails?",
+  "What should I give support when Unique One reports an error?",
+  "What does a support request ID mean?",
+  "What does it mean when Unique One says data is incomplete?",
+  "How does Unique One handle service failures safely?",
+  "How does Unique One keep protected actions separate from AI answers?",
+  "What information should never be shared in a support request?",
 ];
 
 export default function UniqueAiPage() {
@@ -71,7 +181,15 @@ export default function UniqueAiPage() {
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
   const [requestState, setRequestState] = useState<"idle" | "sending" | "retrying">("idle");
   const [lastRequestId, setLastRequestId] = useState<string | null>(null);
+  const [suggestedIndex, setSuggestedIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setSuggestedIndex((current) => (current + 1) % QUICK_PROMPTS.length);
+    }, 15_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -189,32 +307,26 @@ export default function UniqueAiPage() {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-x-hidden sm:gap-4">
-      <div className="flex min-w-0 items-center justify-between gap-2 px-0.5 sm:gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 shadow-[0_0_24px_rgba(52,211,153,0.35)] sm:h-12 sm:w-12">
-            <span className="absolute inset-0 rounded-full border border-emerald-300/50 animate-ping" />
-            <span className="absolute inset-1 rounded-full border border-emerald-400/30 animate-[spin_5s_linear_infinite]" />
-            <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-emerald-400 text-[10px] font-black tracking-tight text-slate-950 shadow-[0_0_16px_rgba(52,211,153,0.8)] sm:h-8 sm:w-8 sm:text-xs">
-              U1
+      <div className="flex min-h-[58px] min-w-0 items-center rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm sm:min-h-[68px] sm:px-4">
+        <div className="min-w-0 w-full">
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:text-xs">Suggested questions</span>
+            <span className="ml-auto text-[9px] font-medium text-slate-400 sm:text-[10px]">New question every 15s</span>
+          </div>
+          <button
+            key={QUICK_PROMPTS[suggestedIndex]}
+            type="button"
+            disabled={loading}
+            onClick={() => setMessage(QUICK_PROMPTS[suggestedIndex])}
+            className="group block w-full min-w-0 overflow-hidden text-left"
+            aria-label={`Use suggested question: ${QUICK_PROMPTS[suggestedIndex]}`}
+          >
+            <span className="block min-w-0 truncate text-sm font-semibold text-slate-800 transition-colors group-hover:text-emerald-700 sm:text-base animate-[slideIn_.55s_ease-out]">
+              {QUICK_PROMPTS[suggestedIndex]}
             </span>
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-bold tracking-tight text-slate-900 sm:text-2xl">Ask Unique AI anything.</h1>
-            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium text-emerald-600 sm:text-xs">
-              <Sparkles className="h-3 w-3" />
-              <span>Unique AI</span>
-            </div>
-          </div>
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={clearConversation}
-          disabled={messages.length === 0 || loading}
-          className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:gap-2 sm:rounded-lg sm:px-3 sm:py-2 sm:text-sm"
-        >
-          <Trash2 className="h-4 w-4" />
-          Clear
-        </button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -229,25 +341,7 @@ export default function UniqueAiPage() {
                 </span>
               </div>
               <h2 className="text-lg font-black tracking-tight text-slate-900 sm:text-2xl">Ask Unique AI anything.</h2>
-              <div className="mt-3 w-full sm:mt-6">
-                <div className="mb-2 flex items-center justify-between px-0.5">
-                  <span className="text-xs font-bold text-slate-700">Suggested questions</span>
-                  <span className="text-[10px] text-slate-400 sm:text-xs">Tap one to start</span>
-                </div>
-                <div className="grid max-h-44 grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain pr-0.5 sm:mt-0 sm:max-h-none sm:grid-cols-3 sm:gap-2">
-                {QUICK_PROMPTS.map((prompt) => (
-                  <button
-                    key={prompt}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => setMessage(prompt)}
-                    className="min-w-0 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-left text-[11px] leading-4 text-slate-700 transition-colors hover:border-emerald-300 hover:bg-emerald-50 sm:p-3 sm:text-sm sm:leading-normal"
-                  >
-                    {prompt}
-                  </button>
-                ))}
-                </div>
-              </div>
+
             </div>
           ) : (
             <div className="mx-auto max-w-3xl space-y-4">
