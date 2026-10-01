@@ -36,6 +36,7 @@ export default function ConferencePage() {
   const [error, setError] = useState('');
   const peers = useRef<Record<string, RTCPeerConnection>>({});
   const processedSignals = useRef(new Set<string>());
+  const isHost = room?.hostUid === currentUser?.uid;
 
   const displayName = useMemo(
     () => userData?.displayName || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Unique user',
@@ -57,23 +58,30 @@ export default function ConferencePage() {
       () => setError('Unable to load conference participants.'),
     );
 
+    const unsubscribeChat = onSnapshot(
+      query(collection(db, 'conferences', roomId, 'chat'), orderBy('createdAt', 'asc'), limit(100)),
+      (snap) => setChatMessages(snap.docs.map((item) => ({ id: item.id, ...(item.data() as Omit<(typeof chatMessages)[number], 'id'>) }))),
+      () => setError('Conference chat is unavailable.'),
+    );
+
     const unsubscribeSignals = onSnapshot(
       query(collection(db, 'conferences', roomId, 'signals'), where('to', '==', currentUser.uid), limit(100)),
       (snap) => setSignals(snap.docs.map((item) => ({ id: item.id, ...(item.data() as Omit<Signal, 'id'>) }))),
       () => setError('Conference signaling is unavailable.'),
     );
 
-    setDoc(participantRef, { uid: currentUser.uid, displayName, joinedAt: serverTimestamp() }, { merge: true }).catch(() => setError('Could not join this conference.'));
+    setDoc(participantRef, { uid: currentUser.uid, displayName, role: isHost ? 'host' : 'participant', handRaised: false, joinedAt: serverTimestamp() }, { merge: true }).catch(() => setError('Could not join this conference.'));
 
     return () => {
       unsubscribeRoom();
       unsubscribeParticipants();
       unsubscribeSignals();
+      unsubscribeChat();
       deleteDoc(participantRef).catch(() => undefined);
       Object.values(peers.current).forEach((peer) => peer.close());
       peers.current = {};
     };
-  }, [roomId, currentUser, displayName]);
+  }, [roomId, currentUser, displayName, isHost]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -201,6 +209,38 @@ export default function ConferencePage() {
     }
   };
 
+  const toggleHand = async () => {
+    if (!roomId || !currentUser) return;
+    const next = !hand;
+    setHand(next);
+    await setDoc(doc(db, 'conferences', roomId, 'participants', currentUser.uid), { handRaised: next }, { merge: true }).catch(() => undefined);
+  };
+
+  const sendChat = async () => {
+    const text = chatText.trim();
+    if (!roomId || !currentUser || !text) return;
+    setChatText('');
+    await addDoc(collection(db, 'conferences', roomId, 'chat'), {
+      uid: currentUser.uid,
+      displayName,
+      text: text.slice(0, 1000),
+      createdAt: serverTimestamp(),
+    }).catch(() => setError('Unable to send conference message.'));
+  };
+
+  const removeParticipant = async (uid: string) => {
+    if (!isHost || !roomId || uid === currentUser?.uid) return;
+    await deleteDoc(doc(db, 'conferences', roomId, 'participants', uid)).catch(() => setError('Unable to remove participant.'));
+    const peer = peers.current[uid];
+    peer?.close();
+    delete peers.current[uid];
+    setRemoteStreams((current) => {
+      const next = { ...current };
+      delete next[uid];
+      return next;
+    });
+  };
+
   const copyInvite = async () => {
     await navigator.clipboard?.writeText(window.location.href);
     setCopied(true);
@@ -296,12 +336,27 @@ export default function ConferencePage() {
         </div>
       </section>
 
+      {chatOpen && (
+        <aside className="fixed bottom-20 right-3 z-40 flex w-[min(92vw,22rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-900/95 shadow-2xl backdrop-blur-xl sm:right-5">
+          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3"><div><p className="text-sm font-black">Conference chat</p><p className="text-[10px] text-white/40">Live room messages</p></div><button onClick={() => setChatOpen(false)} className="text-xs text-white/50">Close</button></div>
+          <div className="max-h-72 space-y-2 overflow-y-auto p-3">
+            {chatMessages.length === 0 ? <p className="py-8 text-center text-xs text-white/40">No messages yet.</p> : chatMessages.map((message) => <div key={message.id} className={`rounded-2xl px-3 py-2 ${message.uid === currentUser.uid ? 'ml-6 bg-emerald-400/15' : 'mr-6 bg-white/5'}`}><p className="text-[10px] font-bold text-emerald-300">{message.uid === currentUser.uid ? 'You' : message.displayName || 'Participant'}</p><p className="mt-1 break-words text-xs text-white/80">{message.text}</p></div>)}
+          </div>
+          <form onSubmit={(event) => { event.preventDefault(); sendChat(); }} className="flex gap-2 border-t border-white/10 p-3"><input value={chatText} onChange={(event) => setChatText(event.target.value)} maxLength={1000} placeholder="Write a message…" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-white outline-none" /><button type="submit" className="rounded-xl bg-emerald-400 px-3 py-2 text-xs font-black text-slate-950">Send</button></form>
+        </aside>
+      )}
+
+      {isHost && participants.some((participant) => participant.uid !== currentUser.uid && participant.handRaised) && (
+        <div className="fixed left-3 top-20 z-30 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-xs text-amber-100 shadow-xl sm:left-5"><div className="font-black">Raised hands</div><div className="mt-1 flex flex-wrap gap-2">{participants.filter((participant) => participant.uid !== currentUser.uid && participant.handRaised).map((participant) => <button key={participant.uid} onClick={() => removeParticipant(participant.uid)} className="rounded-full bg-black/20 px-2 py-1">{participant.displayName || 'Participant'} · Remove</button>)}</div></div>
+      )}
+
       <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-slate-950/95 px-3 py-3 backdrop-blur-xl">
         <div className="mx-auto flex max-w-xl items-center justify-center gap-2 sm:gap-3">
           <button onClick={toggleMic} className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10" aria-label={mic ? 'Mute microphone' : 'Unmute microphone'}>{mic ? <Mic /> : <MicOff />}</button>
           <button onClick={toggleCamera} className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10" aria-label={camera ? 'Turn camera off' : 'Turn camera on'}>{camera ? <Camera /> : <CameraOff />}</button>
           <button onClick={toggleScreenShare} className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-slate-950" aria-label="Share screen">{sharing ? <ScreenShare /> : <MonitorUp />}</button>
-          <button onClick={() => setHand((value) => !value)} className={`flex h-12 w-12 items-center justify-center rounded-full ${hand ? 'bg-amber-300 text-slate-950' : 'bg-white/10'}`} aria-label="Raise hand"><Hand /></button>
+          <button onClick={toggleHand} className={`flex h-12 w-12 items-center justify-center rounded-full ${hand ? 'bg-amber-300 text-slate-950' : 'bg-white/10'}`} aria-label="Raise hand"><Hand /></button>
+          <button onClick={() => setChatOpen((value) => !value)} className={`flex h-12 w-12 items-center justify-center rounded-full ${chatOpen ? 'bg-emerald-400 text-slate-950' : 'bg-white/10'}`} aria-label="Open conference chat"><MessageCircle /></button>
           <button onClick={copyInvite} className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10" aria-label="Copy invite link"><Copy /></button>
           <Link to="/" className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white" aria-label="Leave conference"><PhoneOff /></Link>
         </div>
