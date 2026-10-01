@@ -14,6 +14,7 @@ export default defineConfig(() => {
         injectRegister: 'auto',
         workbox: {
           globPatterns: ['**/*.{css,html,ico,png,svg,webmanifest}'],
+          globIgnores: ['**/*.js'],
           runtimeCaching: [
             {
               urlPattern: ({ request }) => request.destination === 'script' || request.destination === 'style',
