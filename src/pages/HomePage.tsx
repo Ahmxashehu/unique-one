@@ -907,7 +907,7 @@ export default function HomePage() {
                     </div>
                   </div>
                 </details>
-                <div className="mt-3 h-9 overflow-hidden rounded-xl bg-emerald-50 px-2.5 py-2 text-[10px] leading-4 text-emerald-800 sm:h-6 sm:text-xs"><p className="animate-[uniqueMediaVertical_9s_linear_infinite] whitespace-normal break-words motion-reduce:animate-none">Some identity, NIN modification and CAC services require an authorized external provider; the links open the relevant existing platform areas.</p></div>
+                <div className="mt-3 overflow-hidden rounded-xl bg-emerald-50 px-2 py-2 sm:rounded-full sm:px-3 sm:py-1.5"><p className="animate-[bounce_2.4s_ease-in-out_infinite] text-center text-[10px] leading-4 font-bold text-emerald-700 sm:whitespace-nowrap sm:text-xs sm:leading-normal">Some identity, NIN modification and CAC services require an authorized external provider; the links open the relevant existing platform areas.</p></div>
               </div>
               
               <div className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50 p-3.5 sm:rounded-3xl sm:p-5">
