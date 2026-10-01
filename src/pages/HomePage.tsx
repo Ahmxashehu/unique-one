@@ -579,27 +579,27 @@ export default function HomePage() {
                   <p className="mt-4 text-sm text-slate-500">Building your Unique experience...</p>
                 </div>
               ) : edgeProducts.length === 0 ? (
-                <div className="overflow-hidden rounded-3xl border border-emerald-200 bg-white p-4 text-left shadow-sm sm:p-5">
-                  <div className="flex min-w-0 items-center gap-3">
+                <div className="min-w-0 overflow-hidden rounded-2xl border border-emerald-200 bg-white p-3 text-left shadow-sm sm:rounded-3xl sm:p-5">
+                  <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
                       <Play className="h-5 w-5" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <h3 className="text-xl font-black tracking-tight">UniqueMedia</h3>
-                      <div className="mt-1 h-5 overflow-hidden text-xs text-slate-500 sm:h-6 sm:text-sm">
-                        <p className="animate-[uniqueMediaVertical_9s_linear_infinite] whitespace-nowrap motion-reduce:animate-none">
+                      <div className="mt-1 min-w-0 h-9 overflow-hidden text-xs leading-4 text-slate-500 sm:h-6 sm:text-sm sm:leading-normal">
+                        <p className="animate-[uniqueMediaVertical_9s_linear_infinite] whitespace-normal break-words motion-reduce:animate-none">
                           Your personal offline-first hub for videos, music, images, PDFs and contacts.
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <details className="group mt-4">
-                    <summary className="flex cursor-pointer list-none items-center justify-between rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800">
-                      <span>Open UniqueMedia categories</span>
+                  <details className="group mt-3 sm:mt-4">
+                    <summary className="flex min-w-0 cursor-pointer list-none items-center justify-between gap-2 rounded-xl bg-slate-950 px-3 py-3 text-xs font-bold text-white transition hover:bg-slate-800 sm:rounded-2xl sm:px-4 sm:text-sm">
+                      <span className="min-w-0 flex-1">Open UniqueMedia categories</span>
                       <ArrowRight className="h-4 w-4 transition-transform group-open:rotate-90" />
                     </summary>
-                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                    <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-5">
                       {[
                         ['Videos', Play],
                         ['Music & Audio', Play],
@@ -610,7 +610,7 @@ export default function HomePage() {
                         <Link
                           key={String(label)}
                           to="/os"
-                          className="flex min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-emerald-300 hover:bg-emerald-50"
+                          className="flex min-w-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-2.5 transition hover:border-emerald-300 hover:bg-emerald-50 sm:gap-2 sm:rounded-2xl sm:p-3"
                         >
                           <Icon className="h-4 w-4 shrink-0 text-emerald-600" />
                           <span className="truncate text-xs font-bold text-slate-700">{label}</span>
@@ -619,8 +619,8 @@ export default function HomePage() {
                     </div>
                   </details>
 
-                  <div className="mt-3 overflow-hidden rounded-full bg-emerald-50 px-3 py-1.5">
-                    <p className="animate-[bounce_2.4s_ease-in-out_infinite] whitespace-nowrap text-center text-[10px] font-bold text-emerald-700 sm:text-xs">
+                  <div className="mt-3 overflow-hidden rounded-xl bg-emerald-50 px-2 py-2 sm:rounded-full sm:px-3 sm:py-1.5">
+                    <p className="animate-[bounce_2.4s_ease-in-out_infinite] text-center text-[10px] leading-4 font-bold text-emerald-700 sm:whitespace-nowrap sm:text-xs sm:leading-normal">
                       Private by default • Works offline for local media • Device permissions stay under your control
                     </p>
                   </div>
@@ -845,12 +845,12 @@ export default function HomePage() {
             </div>
 
             <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-              <div className="rounded-3xl border border-slate-200 bg-white p-5">
+              <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 sm:rounded-3xl sm:p-5">
                 <div className="flex items-center gap-2">
                   <Compass className="h-5 w-5 text-emerald-600" />
-                  <h3 className="font-black">Discover Collection</h3>
+                  <h3 className="min-w-0 break-words text-sm font-black sm:text-base">Discover Collection</h3>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-500">
+                <p className="mt-2 break-words text-xs leading-5 text-slate-500 sm:text-sm sm:leading-6">
                   Browse the real marketplace signal behind the Edge. Products appear from
                   published seller inventory only.
                 </p>
@@ -875,19 +875,19 @@ export default function HomePage() {
                 </div>
                 <Link
                   to="/discover"
-                  className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"
+                  className="mt-4 flex min-w-0 items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-3 text-center text-xs font-bold text-white sm:rounded-2xl sm:px-4 sm:text-sm"
                 >
                   Explore everything <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
 
-              <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5">
-                <div className="flex items-center gap-2 font-black text-emerald-900">
-                  <Sparkles className="h-5 w-5" />
-                  One platform, many experiences
+              <div className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50 p-3.5 sm:rounded-3xl sm:p-5">
+                <div className="flex min-w-0 items-start gap-2 font-black text-emerald-900">
+                  <Sparkles className="mt-0.5 h-5 w-5 shrink-0" />
+                  <span className="min-w-0 break-words text-sm leading-5 sm:text-base">One platform, many experiences</span>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-semibold text-emerald-900">
-                  <Link to="/store" className="rounded-2xl bg-white/80 p-3">Sell</Link>
+                <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 text-[11px] font-semibold text-emerald-900 sm:mt-4 sm:text-xs">
+                  <Link to="/store" className="min-w-0 break-words rounded-xl bg-white/80 p-2.5 leading-4 sm:rounded-2xl sm:p-3 sm:leading-normal">Sell</Link>
                   <Link to="/os/travel" className="rounded-2xl bg-white/80 p-3">Travel</Link>
                   <Link to="/categories" className="rounded-2xl bg-white/80 p-3">Food & Dining</Link>
                   <Link to="/categories" className="rounded-2xl bg-white/80 p-3">Health & Wellness</Link>
