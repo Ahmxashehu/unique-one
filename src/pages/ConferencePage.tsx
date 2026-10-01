@@ -53,27 +53,6 @@ export default function ConferencePage() {
   );
 
   useEffect(() => {
-    if (!roomId || currentUser || !inviteToken || guestSigningIn) return;
-    let active = true;
-    setGuestSigningIn(true);
-    fetch('/api/conference/guest-session', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomId, inviteToken, uniqueOneId: guestUniqueId.trim() }),
-    })
-      .then(async (response) => {
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok || typeof payload.customToken !== 'string') throw new Error(payload?.error?.message || 'This conference invitation is invalid or expired.');
-        await signInWithCustomToken(auth, payload.customToken);
-        if (active) setIsGuest(true);
-      })
-      .catch((guestError) => {
-        if (active) setError(guestError instanceof Error ? guestError.message : 'This conference invitation is invalid or expired.');
-      })
-      .finally(() => { if (active) setGuestSigningIn(false); });
-    return () => { active = false; };
-  }, [roomId, currentUser, inviteToken, guestSigningIn, guestUniqueId]);
-
-  useEffect(() => {
     if (!roomId || !currentUser) return;
     const roomRef = doc(db, 'conferences', roomId);
     const participantRef = doc(db, 'conferences', roomId, 'participants', currentUser.uid);
