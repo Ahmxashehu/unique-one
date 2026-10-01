@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { signInWithCustomToken, signOut } from 'firebase/auth';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Camera, CameraOff, Copy, Crown, Hand, Mic, MicOff, MonitorUp,
@@ -9,7 +10,7 @@ import {
   addDoc, collection, deleteDoc, doc, limit, onSnapshot, orderBy,
   query, serverTimestamp, setDoc, where
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
 type Participant = { uid: string; displayName?: string; joinedAt?: unknown; handRaised?: boolean; role?: string };
@@ -35,17 +36,41 @@ export default function ConferencePage() {
   const [hand, setHand] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
+  const [guestSigningIn, setGuestSigningIn] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState('');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const peers = useRef<Record<string, RTCPeerConnection>>({});
   const processedSignals = useRef(new Set<string>());
   const isHost = room?.hostUid === currentUser?.uid;
+  const inviteToken = new URLSearchParams(window.location.search).get('invite') || '';
 
   const displayName = useMemo(
     () => userData?.displayName || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Unique user',
     [currentUser, userData],
   );
+
+  useEffect(() => {
+    if (!roomId || currentUser || !inviteToken || guestSigningIn) return;
+    let active = true;
+    setGuestSigningIn(true);
+    fetch('/api/conference/guest-session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId, inviteToken }),
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || typeof payload.customToken !== 'string') throw new Error(payload?.error?.message || 'This conference invitation is invalid or expired.');
+        await signInWithCustomToken(auth, payload.customToken);
+        if (active) setIsGuest(true);
+      })
+      .catch((guestError) => {
+        if (active) setError(guestError instanceof Error ? guestError.message : 'This conference invitation is invalid or expired.');
+      })
+      .finally(() => { if (active) setGuestSigningIn(false); });
+    return () => { active = false; };
+  }, [roomId, currentUser, inviteToken, guestSigningIn]);
 
   useEffect(() => {
     if (!roomId || !currentUser) return;
@@ -246,9 +271,23 @@ export default function ConferencePage() {
   };
 
   const copyInvite = async () => {
-    await navigator.clipboard?.writeText(window.location.href);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
+    if (!currentUser || !roomId || !isHost) return;
+    try {
+      const idToken = await currentUser.getIdToken();
+      const targetUniqueId = window.prompt('Invite by Unique ID (optional). Leave blank for a secure guest link.')?.trim() || undefined;
+      const response = await fetch('/api/conference/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ roomId, targetUniqueId }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || typeof payload.inviteUrl !== 'string') throw new Error(payload?.error?.message || 'Unable to create conference invitation.');
+      await navigator.clipboard?.writeText(payload.inviteUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch (inviteError) {
+      setError(inviteError instanceof Error ? inviteError.message : 'Unable to create conference invitation.');
+    }
   };
 
   if (currentUser && !roomId) {
@@ -296,8 +335,8 @@ export default function ConferencePage() {
         <div className="mx-auto max-w-lg rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
           <Video className="mx-auto h-12 w-12 text-emerald-300" />
           <h1 className="mt-4 text-2xl font-black">Join Unique Conference</h1>
-          <p className="mt-2 text-sm text-white/60">Sign in to join or host a conference.</p>
-          <Link to="/login" state={{ from: window.location.pathname }} className="mt-6 inline-flex rounded-full bg-emerald-400 px-5 py-3 font-black text-slate-950">Sign in</Link>
+          {guestSigningIn ? <p className="mt-2 text-sm text-white/60">Verifying your invitation…</p> : <p className="mt-2 text-sm text-white/60">A valid conference invitation is required for guests. No Unique One account is required.</p>}
+          {!inviteToken && <Link to="/login" state={{ from: window.location.pathname }} className="mt-6 inline-flex rounded-full bg-emerald-400 px-5 py-3 font-black text-slate-950">Sign in to continue</Link>}
         </div>
       </main>
     );
@@ -322,7 +361,7 @@ export default function ConferencePage() {
           <div className="rounded-2xl border border-white/10 bg-white/5 p-3"><Users className="h-4 w-4 text-emerald-300" /><p className="mt-2 text-lg font-black">{participants.length}</p><p className="text-[10px] text-white/50">Participants</p></div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-3"><MonitorUp className="h-4 w-4 text-emerald-300" /><p className="mt-2 text-sm font-black">{sharing ? 'Sharing' : 'Ready'}</p><p className="text-[10px] text-white/50">Presentation</p></div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-3"><Hand className="h-4 w-4 text-emerald-300" /><p className="mt-2 text-sm font-black">{hand ? 'Raised' : 'Lowered'}</p><p className="text-[10px] text-white/50">Your hand</p></div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-3"><Crown className="h-4 w-4 text-emerald-300" /><p className="mt-2 truncate text-sm font-black">{room?.hostUid === currentUser.uid ? 'Host' : 'Guest'}</p><p className="text-[10px] text-white/50">Role</p></div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-3"><Crown className="h-4 w-4 text-emerald-300" /><p className="mt-2 truncate text-sm font-black">{room?.hostUid === currentUser.uid ? 'Host' : isGuest ? 'Invited guest' : 'Participant'}</p><p className="text-[10px] text-white/50">Role</p></div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
