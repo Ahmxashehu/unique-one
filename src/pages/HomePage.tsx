@@ -197,8 +197,7 @@ export default function HomePage() {
       unsubscribeContributions();
       unsubscribeBusinesses();
       unsubscribeServices();
-    };
-  }, []);
+    };  }, []);
 
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -378,7 +377,33 @@ export default function HomePage() {
         </section>
 
         {/* Your Unique Day: entry points only; no fabricated activity counts */}
-        <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mt-6 sm:rounded-3xl sm:p-6">\n          <div className="flex items-start justify-between gap-3">\n            <div className="min-w-0">\n              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-600 sm:text-xs sm:tracking-[0.16em]">Your Unique Day</p>\n              <h2 className="mt-1 text-lg font-black leading-tight tracking-tight sm:text-xl">Pick up where you left off</h2>\n              <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 sm:text-sm">Jump into the parts of Unique One you use most.</p>\n            </div>\n            <Link to="/os" className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 sm:bg-transparent sm:px-0 sm:py-0 sm:text-sm">Open OS <span className="hidden sm:inline">→</span></Link>\n          </div>\n          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-2">\n            {[\n              ['Orders', '/store'],\n              ['Payments', '/os/pay'],\n              ['Messages', '/os'],\n              ['Discover', '/discover'],\n            ].map(([label, href]) => (\n              <Link\n                key={label}\n                to={href}\n                className="rounded-xl bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-800 sm:rounded-2xl sm:p-4 sm:text-sm"\n              >\n                {label}\n                <span className="mt-0.5 block text-[10px] font-medium text-slate-400 sm:mt-1 sm:text-xs">Open →</span>\n              </Link>\n            ))}\n          </div>\n        </section>
+        <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mt-6 sm:rounded-3xl sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-600 sm:text-xs sm:tracking-[0.16em]">Your Unique Day</p>
+              <h2 className="mt-1 text-lg font-black leading-tight tracking-tight sm:text-xl">Pick up where you left off</h2>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 sm:text-sm">Jump into the parts of Unique One you use most.</p>
+            </div>
+            <Link to="/os" className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 sm:bg-transparent sm:px-0 sm:py-0 sm:text-sm">Open OS <span className="hidden sm:inline">→</span></Link>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-2">
+            {[
+              ['Orders', '/store'],
+              ['Payments', '/os/pay'],
+              ['Messages', '/os'],
+              ['Discover', '/discover'],
+            ].map(([label, href]) => (
+              <Link
+                key={label}
+                to={href}
+                className="rounded-xl bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-800 sm:rounded-2xl sm:p-4 sm:text-sm"
+              >
+                {label}
+                <span className="mt-0.5 block text-[10px] font-medium text-slate-400 sm:mt-1 sm:text-xs">Open →</span>
+              </Link>
+            ))}
+          </div>
+        </section>
 
         {/* Promotional poster carousel: rotates automatically every 15 seconds and remains manually navigable. */}
         <section aria-label="Unique promotional posters" className="relative overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-sm">
@@ -397,8 +422,7 @@ export default function HomePage() {
                   <div className="absolute -bottom-32 left-1/3 h-80 w-80 rounded-full bg-black/10 blur-3xl" />
 
                   <div className="relative flex min-h-[430px] flex-col justify-between p-6 sm:min-h-[470px] sm:p-9 lg:p-12">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/10 px-3 py-1.5 text-xs font-black tracking-[0.14em] backdrop-blur">
+                    <div className="flex items-start justify-between gap-4">                      <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/10 px-3 py-1.5 text-xs font-black tracking-[0.14em] backdrop-blur">
                         <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
                         {poster.eyebrow}
                       </div>
@@ -597,8 +621,7 @@ export default function HomePage() {
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <h3 className="font-bold">{product.name}</h3>
-                          <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-500">
-                            {product.description || 'Published by a Unique seller.'}
+                          <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-500">                            {product.description || 'Published by a Unique seller.'}
                           </p>
                         </div>
                         <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-black text-emerald-700">
@@ -797,8 +820,7 @@ export default function HomePage() {
                 </div>
               </div>
             </aside>
-          </div>
-        </section>
+          </div>        </section>
       </div>
     </main>
   );
