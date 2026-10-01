@@ -2854,7 +2854,7 @@ const app = express();
     } catch (error) { console.error("Calendar API Error:", error); return res.status(500).json({ error: "Failed to fetch calendar events" }); }
   });
   if (process.env.NODE_ENV !== "production") { const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" }); app.use(vite.middlewares); }
-  else { const distPath = path.join(process.cwd(), "dist"); app.use(express.static(distPath)); app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html"))); }
+  else {\n    const distPath = path.join(process.cwd(), "dist");\n    app.use(express.static(distPath, {\n      setHeaders: (res, filePath) => {\n        if (filePath.endsWith("index.html")) {\n          res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");\n          res.setHeader("Pragma", "no-cache");\n          res.setHeader("Expires", "0");\n        } else if (/\\.(?:js|css|woff2?|png|jpe?g|gif|svg|webp|ico)$/.test(filePath)) {\n          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");\n        }\n      },\n    }));\n    app.get("*", (req, res) => {\n      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");\n      res.setHeader("Pragma", "no-cache");\n      res.setHeader("Expires", "0");\n      res.sendFile(path.join(distPath, "index.html"));\n    });\n  }
   httpServer.listen(PORT, "0.0.0.0", () => console.log(`UniqueOS Server running on http://localhost:${PORT}`));
 }
 startServer();
