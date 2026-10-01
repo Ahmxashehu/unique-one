@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Languages, Moon, Sun } from 'lucide-react';
 
 const LANGUAGES = [
@@ -13,7 +13,7 @@ const LANGUAGES = [
 export default function AppearanceControls() {
   const [dark, setDark] = useState(false);
   const [language, setLanguage] = useState('en');
-  const [languageOpen, setLanguageOpen] = useState(false);
+  const [languageOpen, setLanguageOpen] = useState(false);\n  const languageMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('unique-one-theme');
@@ -26,7 +26,7 @@ export default function AppearanceControls() {
     document.documentElement.style.colorScheme = initialDark ? 'dark' : 'light';
   }, []);
 
-  const toggleTheme = () => {
+  useEffect(() => {\n    if (!languageOpen) return;\n    const handlePointerDown = (event: PointerEvent) => {\n      if (!languageMenuRef.current?.contains(event.target as Node)) setLanguageOpen(false);\n    };\n    const handleKeyDown = (event: KeyboardEvent) => {\n      if (event.key === 'Escape') setLanguageOpen(false);\n    };\n    document.addEventListener('pointerdown', handlePointerDown);\n    document.addEventListener('keydown', handleKeyDown);\n    return () => {\n      document.removeEventListener('pointerdown', handlePointerDown);\n      document.removeEventListener('keydown', handleKeyDown);\n    };\n  }, [languageOpen]);\n\n  const toggleTheme = () => {
     const next = !dark;
     setDark(next);
     localStorage.setItem('unique-one-theme', next ? 'dark' : 'light');
@@ -44,7 +44,7 @@ export default function AppearanceControls() {
   const currentLanguage = LANGUAGES.find((item) => item.code === language) || LANGUAGES[0];
 
   return (
-    <div className="fixed right-3 top-3 z-[80] flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/90 p-1 shadow-lg shadow-slate-900/5 backdrop-blur-xl transition-all unique-appearance-controls">
+    <div className="fixed right-3 top-3 z-[80] flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/90 p-1 shadow-lg shadow-slate-900/5 backdrop-blur-xl transition-all unique-appearance-controls">\n      <div className="unique-u1-orbit" aria-hidden="true">\n        <span className="unique-u1-orbit-ring" />\n        <span className="unique-u1-mark">U1</span>\n      </div>
       <button
         type="button"
         onClick={toggleTheme}
