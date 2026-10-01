@@ -329,7 +329,7 @@ export default function HomePage() {
 
       <div className="mx-auto max-w-7xl px-4 pb-20 pt-5 sm:px-6 lg:px-8">
         {/* Quick actions: direct paths into the existing Unique ecosystem */}
-        <section aria-label="Quick actions" className="mt-5 overflow-x-auto pb-1">
+        <section aria-label="Quick actions" className="mt-5 hidden overflow-x-auto pb-1 md:block">
           <div className="flex min-w-max gap-2">
             {[
               ['Pay', '/os/pay'],
