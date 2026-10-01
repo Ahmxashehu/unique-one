@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Home, Compass, Search, MapPin, Grid, Menu } from 'lucide-react';
+import MobileBottomNav from '../components/MobileBottomNav';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -8,15 +8,8 @@ export default function PublicLayout() {
   const { currentUser } = useAuth();
   const location = useLocation();
 
-  const bottomNav = [
-    { name: 'Home', path: '/', icon: Home },
-    { name: 'Discover', path: '/discover', icon: Compass },
-    { name: 'Search', path: '/search', icon: Search },
-    { name: 'Near Me', path: '/near-me', icon: MapPin },
-  ];
-
   return (
-    <div className="flex flex-col h-full bg-slate-50 overflow-hidden relative">
+    <div className="flex h-full min-h-0 w-full max-w-[100vw] flex-col bg-slate-50 overflow-hidden relative">
       {/* Public shell: HomePage owns its modern home header; keep navigation only on non-home pages. */}
       {location.pathname !== '/' && (
         <header className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-100 shrink-0">
@@ -53,26 +46,7 @@ export default function PublicLayout() {
         <Outlet />
       </main>
 
-      {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 w-full h-16 bg-white border-t border-slate-200 flex items-center justify-around px-2 pb-safe z-50">
-        {bottomNav.map((item) => {
-          const Icon = item.icon;
-          const isActive = location.pathname === item.path;
-          return (
-            <Link
-              key={item.name}
-              to={item.path}
-              className={cn(
-                "flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors",
-                isActive ? "text-slate-900" : "text-slate-500 hover:text-slate-900"
-              )}
-            >
-              <Icon className={cn("w-5 h-5", isActive ? "fill-slate-900 text-slate-900" : "")} />
-              <span className="text-[10px] font-medium">{item.name}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      <MobileBottomNav variant="public" onMenu={() => {}} />
     </div>
   );
 }
