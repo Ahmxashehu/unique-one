@@ -815,3 +815,85 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
     throw error;
   }
 }
+
+
+const PUBLIC_AI_SYSTEM_INSTRUCTION = [
+  "You are Unique AI, the free public AI assistant for the Unique One platform.",
+  "Answer the user's general questions helpfully, accurately, and safely. The user may ask about everyday topics, learning, writing, planning, technology, business, or Unique One.",
+  "Do not claim access to private Unique One records, accounts, balances, orders, messages, businesses, products, bookings, or other user data in public mode.",
+  "If the user asks for a Unique One account-specific fact, explain that they need to register or sign in to receive personalized platform information.",
+  "Keep responses useful and practical. Follow the model's safety requirements for harmful, illegal, or otherwise disallowed requests.",
+  "At the end of every public-mode answer, naturally remind the user that registering for Unique One unlocks the full platform experience and personalized AI assistance. Keep this reminder brief and do not make it sound like an advertisement.",
+].join(" ");
+
+export async function generatePublicUniqueAiResponse(input: { message: unknown; history?: unknown }): Promise<string> {
+  const prompt = getPrompt(input.message);
+  const history = getHistory(input.history);
+  const historyText = history.length ? JSON.stringify(history) : "[]";
+  const contextualPrompt = [
+    "<PUBLIC_AI_REQUEST>",
+    prompt,
+    "</PUBLIC_AI_REQUEST>",
+    "<RECENT_CONVERSATION>",
+    historyText,
+    "</RECENT_CONVERSATION>",
+  ].join("\n");
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
+  const configuredModel = process.env.GEMINI_MODEL?.trim();
+  if (configuredModel && (configuredModel.length > MAX_MODEL_NAME_LENGTH || !/^[A-Za-z0-9._:-]+$/.test(configuredModel))) {
+    throw new UniqueAiValidationError("GEMINI_MODEL is invalid.");
+  }
+  const model = configuredModel || DEFAULT_MODEL;
+  const ai = new GoogleGenAI({ apiKey });
+  const response = await generateModelResponseWithInstruction(ai, model, contextualPrompt, PUBLIC_AI_SYSTEM_INSTRUCTION);
+  return validateAiOutput(response.text, prompt);
+}
+
+async function generateModelResponseWithInstruction(
+  ai: GoogleGenAI,
+  model: string,
+  contextualPrompt: string,
+  systemInstruction: string,
+): Promise<{ text: string; attempts: number }> {
+  let response: Awaited<ReturnType<typeof ai.models.generateContent>> | undefined;
+  let lastError: unknown;
+  let attempts = 0;
+  for (let attempt = 0; attempt < MAX_MODEL_ATTEMPTS; attempt += 1) {
+    attempts += 1;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error("Unique AI model request timed out.")), MODEL_REQUEST_TIMEOUT_MS);
+      });
+      const responsePromise = ai.models.generateContent({
+        model,
+        contents: contextualPrompt,
+        config: {
+          systemInstruction,
+          safetySettings: MODEL_SAFETY_SETTINGS,
+          thinkingConfig: { thinkingLevel: MODEL_THINKING_LEVEL },
+          maxOutputTokens: MAX_MODEL_OUTPUT_TOKENS,
+        },
+      });
+      response = await Promise.race([responsePromise, timeoutPromise]);
+      break;
+    } catch (error) {
+      lastError = error;
+      if (attempt === MAX_MODEL_ATTEMPTS - 1 || !isLikelyTransientModelError(error)) throw error;
+      const retryDelay = Math.min(MAX_RETRY_DELAY_MS, MODEL_RETRY_DELAY_MS * 2 ** attempt);
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+  if (!response) throw (lastError instanceof Error ? lastError : new Error("Unique AI model request failed."));
+  if (typeof response.text !== "string") throw new Error("Gemini returned an invalid response.");
+  if (response.promptFeedback?.blockReason) throw new Error(`Gemini prompt was blocked: ${String(response.promptFeedback.blockReason)}.`);
+  if (!Array.isArray(response.candidates) || response.candidates.length === 0) throw new Error("Gemini returned no response candidate.");
+  const finishReason = response.candidates[0]?.finishReason;
+  if (finishReason === "SAFETY") throw new Error("Gemini response was blocked by safety filters.");
+  if (finishReason === "RECITATION") throw new Error("Gemini response was blocked by recitation controls.");
+  if (finishReason === "MAX_TOKENS") throw new Error("Gemini response was truncated by the output limit.");
+  return { text: response.text, attempts };
+}
