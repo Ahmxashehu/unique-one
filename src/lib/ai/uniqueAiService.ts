@@ -847,7 +847,8 @@ export async function generatePublicUniqueAiResponse(input: { message: unknown; 
   const model = configuredModel || DEFAULT_MODEL;
   const ai = new GoogleGenAI({ apiKey });
   const response = await generateModelResponseWithInstruction(ai, model, contextualPrompt, PUBLIC_AI_SYSTEM_INSTRUCTION);
-  return validateAiOutput(response.text, prompt);
+  const output = validateAiOutput(response.text, prompt);
+  return `${output}\n\nRegister for Unique One to unlock the full platform experience and personalized AI assistance.`;
 }
 
 async function generateModelResponseWithInstruction(
