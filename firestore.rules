@@ -381,6 +381,24 @@ service cloud.firestore {
         allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
       }
     }
+    match /edgeStatuses/{statusId} {
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.authorUid == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.status == 'published'
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 500;
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && resource.data.authorUid == request.auth.uid
+          && request.resource.data.authorUid == resource.data.authorUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text','updatedAt'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 500);
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
+    }
     match /edgePreferences/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create, update: if isOwner(userId)
