@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Camera, CameraOff, Copy, Crown, Hand, Mic, MicOff, MonitorUp,
   PhoneOff, Plus, ScreenShare, Settings, Users, Video, VideoOff,
@@ -19,7 +19,10 @@ const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 
 export default function ConferencePage() {
   const { roomId } = useParams();
+  const navigate = useNavigate();
   const { currentUser, userData } = useAuth();
+  const [newTitle, setNewTitle] = useState('Unique Conference');
+  const [creating, setCreating] = useState(false);
   const [room, setRoom] = useState<{ title?: string; description?: string; public?: boolean; hostUid?: string; status?: string } | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [signals, setSignals] = useState<Signal[]>([]);
@@ -203,6 +206,45 @@ export default function ConferencePage() {
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);
   };
+
+  if (currentUser && !roomId) {
+    const createConference = async () => {
+      setCreating(true);
+      try {
+        const conferenceRef = doc(collection(db, 'conferences'));
+        await setDoc(conferenceRef, {
+          title: newTitle.trim() || 'Unique Conference',
+          description: 'Online meeting, lecture or public conference.',
+          public: true,
+          hostUid: currentUser.uid,
+          status: 'live',
+          createdAt: serverTimestamp(),
+        });
+        navigate(`/conference/${conferenceRef.id}`);
+      } catch {
+        setError('Could not create the conference. Please try again.');
+      } finally {
+        setCreating(false);
+      }
+    };
+    return (
+      <main className="min-h-screen bg-slate-950 px-4 py-12 text-white">
+        <div className="mx-auto max-w-2xl rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl sm:p-9">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300"><Video className="h-7 w-7" /></div>
+          <p className="mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">Unique Conference</p>
+          <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Meet, teach, present and connect.</h1>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-white/60">Create a live room with camera, microphone, screen sharing, participant controls and an invite link.</p>
+          <label className="mt-6 block text-xs font-bold text-white/70">Conference title
+            <input value={newTitle} onChange={(event) => setNewTitle(event.target.value)} maxLength={120} className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none focus:border-emerald-400" />
+          </label>
+          <button onClick={createConference} disabled={creating} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-5 py-3.5 text-sm font-black text-slate-950 disabled:opacity-60">
+            {creating ? 'Creating conference…' : 'Start Public Conference'} <Plus className="h-4 w-4" />
+          </button>
+          <Link to="/" className="mt-3 block text-center text-xs font-bold text-white/50 hover:text-white">Back to Unique One</Link>
+        </div>
+      </main>
+    );
+  }
 
   if (!currentUser) {
     return (
