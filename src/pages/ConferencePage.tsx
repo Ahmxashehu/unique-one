@@ -38,6 +38,7 @@ export default function ConferencePage() {
   const [error, setError] = useState('');
   const [guestSigningIn, setGuestSigningIn] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
+  const [guestUniqueId, setGuestUniqueId] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState('');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -57,7 +58,7 @@ export default function ConferencePage() {
     setGuestSigningIn(true);
     fetch('/api/conference/guest-session', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomId, inviteToken }),
+      body: JSON.stringify({ roomId, inviteToken, uniqueOneId: guestUniqueId.trim() }),
     })
       .then(async (response) => {
         const payload = await response.json().catch(() => ({}));
@@ -70,7 +71,7 @@ export default function ConferencePage() {
       })
       .finally(() => { if (active) setGuestSigningIn(false); });
     return () => { active = false; };
-  }, [roomId, currentUser, inviteToken, guestSigningIn]);
+  }, [roomId, currentUser, inviteToken, guestSigningIn, guestUniqueId]);
 
   useEffect(() => {
     if (!roomId || !currentUser) return;
@@ -330,12 +331,38 @@ export default function ConferencePage() {
 
   if (!currentUser) {
     return (
-      <main className="min-h-screen bg-slate-950 px-4 py-16 text-white">
-        <div className="mx-auto max-w-lg rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
-          <Video className="mx-auto h-12 w-12 text-emerald-300" />
-          <h1 className="mt-4 text-2xl font-black">Join Unique Conference</h1>
-          {guestSigningIn ? <p className="mt-2 text-sm text-white/60">Verifying your invitation…</p> : <p className="mt-2 text-sm text-white/60">A valid conference invitation is required for guests. No Unique One account is required.</p>}
-          {!inviteToken && <Link to="/login" state={{ from: window.location.pathname }} className="mt-6 inline-flex rounded-full bg-emerald-400 px-5 py-3 font-black text-slate-950">Sign in to continue</Link>}
+      <main className="min-h-screen bg-slate-950 px-4 py-12 text-white">
+        <div className="mx-auto max-w-xl rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl sm:p-9">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300"><Video className="h-8 w-8" /></div>
+          <p className="mt-6 text-center text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">Unique Conference</p>
+          <h1 className="mt-2 text-center text-3xl font-black tracking-tight">Join the conference</h1>
+          <p className="mx-auto mt-3 max-w-md text-center text-sm leading-6 text-white/60">You can join an invited conference without creating a Unique One account. Enter your Unique ID to continue.</p>
+          {guestSigningIn ? <div className="mt-7 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-4 text-center text-sm font-bold text-emerald-100" role="status">Verifying your conference invitation…</div> : inviteToken ? (
+            <form onSubmit={(event) => {
+              event.preventDefault();
+              if (guestUniqueId.trim().length !== 11 || guestSigningIn) return;
+              setError('');
+              setGuestSigningIn(true);
+              fetch('/api/conference/guest-session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roomId, inviteToken, uniqueOneId: guestUniqueId.trim() }) })
+                .then(async (response) => {
+                  const payload = await response.json().catch(() => ({}));
+                  if (!response.ok || typeof payload.customToken !== 'string') throw new Error(payload?.error?.message || 'Unable to join this conference.');
+                  await signInWithCustomToken(auth, payload.customToken);
+                  setIsGuest(true);
+                })
+                .catch((joinError) => setError(joinError instanceof Error ? joinError.message : 'Unable to join this conference.'))
+                .finally(() => setGuestSigningIn(false));
+            }}>
+              <label className="mt-7 block text-xs font-bold text-white/70">Your Unique ID
+                <input value={guestUniqueId} onChange={(event) => setGuestUniqueId(event.target.value.replace(/\D/g, '').slice(0, 11))} inputMode="numeric" autoComplete="off" placeholder="Enter your 11-digit Unique ID" maxLength={11} className="mt-2 h-14 w-full rounded-2xl border border-white/10 bg-black/20 px-4 text-base font-bold tracking-[0.18em] text-white outline-none focus:border-emerald-400" required />
+              </label>
+              {error && <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs text-amber-100">{error}</div>}
+              <button type="submit" disabled={guestUniqueId.length !== 11 || guestSigningIn} className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-emerald-400 px-5 py-3.5 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">{guestSigningIn ? 'Joining…' : 'Join Conference'}</button>
+            </form>
+          ) : <div className="mt-7 rounded-2xl border border-white/10 bg-black/20 p-4 text-center text-sm text-white/60">Open the secure invitation link sent by the conference host to join.</div>}
+          <div className="my-6 flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.18em] text-white/30"><span className="h-px flex-1 bg-white/10" /><span>or</span><span className="h-px flex-1 bg-white/10" /></div>
+          <Link to="/register" state={{ from: roomId ? '/conference/' + roomId + (inviteToken ? '?invite=' + encodeURIComponent(inviteToken) : '') : '/conference' }} className="inline-flex w-full items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-3.5 text-sm font-black text-emerald-200 hover:bg-emerald-400/15">Create a Unique One account</Link>
+          <p className="mt-4 text-center text-[11px] leading-5 text-white/35">Your secure conference invitation authorizes access. Your Unique ID identifies you in the room.</p>
         </div>
       </main>
     );
