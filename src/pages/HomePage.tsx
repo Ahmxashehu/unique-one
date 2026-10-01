@@ -151,7 +151,18 @@ export default function HomePage() {
         if (!cancelled) {
           setBusinesses(
             snapshot.docs
-              .map((item) => ({ id: item.id, ...(item.data() as Omit<(typeof businesses)[number], 'id'>) }))
+              .map((item) => ({
+                id: item.id,
+                ...(item.data() as {
+                  name?: string;
+                  businessName?: string;
+                  description?: string;
+                  ownerUid?: string;
+                  category?: string;
+                  status?: string;
+                  verificationStatus?: string;
+                }),
+              }))
               .filter((business) => business.businessName || business.name),
           );
         }
