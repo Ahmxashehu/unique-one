@@ -444,10 +444,10 @@ export default function HomePage() {
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-2">
             {[
-              ['Orders', '/store'],
-              ['Payments', '/os/pay'],
+              ['UniqueStore', '/store'],
+              ['UniquePay', '/os/pay'],
               ['Messages', '/os'],
-              ['Discover', '/discover'],
+              ['UniqueValidation', '/os/validation'],
             ].map(([label, href]) => (
               <Link
                 key={label}
@@ -850,10 +850,10 @@ export default function HomePage() {
                   One platform, many experiences
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-semibold text-emerald-900">
-                  <Link to="/store" className="rounded-2xl bg-white/80 p-3">Buy & Sell</Link>
-                  <Link to="/os/pay" className="rounded-2xl bg-white/80 p-3">Pay</Link>
-                  <Link to="/discover" className="rounded-2xl bg-white/80 p-3">Discover</Link>
-                  <Link to="/os" className="rounded-2xl bg-white/80 p-3">UniqueOS</Link>
+                  <Link to="/store" className="rounded-2xl bg-white/80 p-3">Sell</Link>
+                  <Link to="/os/pay" className="rounded-2xl bg-white/80 p-3">Pay Logistics</Link>
+                  <Link to="/discover" className="rounded-2xl bg-white/80 p-3">Book Tickets</Link>
+                  <Link to="/os" className="rounded-2xl bg-white/80 p-3">UniqueCycle/Aju</Link>
                 </div>
               </div>
             </aside>
