@@ -18,6 +18,7 @@ import {
   Users,
   Zap,
   Video,
+  WalletCards,
   Briefcase as BriefcaseIcon,
 } from 'lucide-react';
 import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
@@ -480,6 +481,32 @@ export default function HomePage() {
                 </div>
               );
             })}
+          </div>
+        </section>
+
+        {/* Core Unique experiences: restored as a permanent four-option strip below the professional poster. */}
+        <section aria-label="Core Unique experiences" className="mt-4 sm:mt-5">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+            {[
+              { label: 'UniquePay', description: 'Pay & transfer', href: '/os/pay', icon: WalletCards },
+              { label: 'Unique Store', description: 'Buy & discover', href: '/store', icon: ShoppingBag },
+              { label: 'Communication', description: 'Connect & chat', href: '/os/messages', icon: MessageCircle },
+              { label: 'Online Conference', description: 'Meet & present', href: '/conference', icon: Video },
+            ].map(({ label, description, href, icon: Icon }) => (
+              <Link
+                key={label}
+                to={href}
+                className="group flex min-w-0 items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md sm:gap-3 sm:rounded-3xl sm:p-4"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 transition group-hover:bg-emerald-100 sm:h-11 sm:w-11 sm:rounded-2xl">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-black text-slate-900 sm:text-sm">{label}</span>
+                  <span className="mt-0.5 block truncate text-[10px] font-medium text-slate-500 sm:text-xs">{description}</span>
+                </span>
+              </Link>
+            ))}
           </div>
         </section>
         {/* Active Edge: social stream + discovery collection */}
