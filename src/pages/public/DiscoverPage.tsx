@@ -186,7 +186,9 @@ export default function DiscoverPage() {
     setLiked(current => ({ ...current, [post.id]: next }));
     try {
       if (next) {
-        await setDoc(likeRef, { uid: currentUser.uid, createdAt: serverTimestamp() });
+        const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
+        const userData = userSnap.exists() ? userSnap.data() : {};
+        await setDoc(likeRef, { uid: currentUser.uid, name: String(userData.fullName || currentUser.displayName || 'Unique user'), createdAt: serverTimestamp() });
       } else {
         await deleteDoc(likeRef);
       }
