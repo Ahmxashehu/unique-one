@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   ArrowRight,
   Bell,
+  Building2,
   Bookmark,
   Compass,
   Heart,
