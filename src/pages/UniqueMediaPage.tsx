@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Cloud, Download, FileText, Image as ImageIcon, Music2, Play, Search, Share2, Smartphone, Upload, Users, X } from 'lucide-react';
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
@@ -42,7 +42,6 @@ export default function UniqueMediaPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [cloudProgress, setCloudProgress] = useState(0);
   const [cloudMessage, setCloudMessage] = useState('');
-  const [backupInputRef] = useState(() => ({ current: null as HTMLInputElement | null }));
 
   const filteredMedia = useMemo(() => {
     const term = search.trim().toLowerCase();
