@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Bot, Send, Sparkles, Trash2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -79,7 +80,7 @@ export default function UniqueAiPage() {
   const sendMessage = async (event?: FormEvent, retryMessage?: string) => {
     event?.preventDefault();
     const trimmed = (retryMessage ?? message).trim();
-    if (!trimmed || loading || !currentUser) return;
+    if (!trimmed || loading) return;
 
     setError("");
     setLastFailedMessage(null);
@@ -98,16 +99,18 @@ export default function UniqueAiPage() {
     const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
 
     try {
-      const token = await currentUser.getIdToken();
       const requestId = crypto.randomUUID();
       const history = messages.slice(-6).map(({ role, text }) => ({ role, text }));
-      const response = await fetch("/api/ai/chat", {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "X-Request-ID": requestId,
+      };
+      if (currentUser) {
+        headers.Authorization = `Bearer ${await currentUser.getIdToken()}`;
+      }
+      const response = await fetch(currentUser ? "/api/ai/chat" : "/api/ai/public-chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          "X-Request-ID": requestId,
-        },
+        headers,
         body: JSON.stringify({ message: trimmed, history }),
         signal: controller.signal,
       });
@@ -131,16 +134,18 @@ export default function UniqueAiPage() {
       if (payload?.readOnly !== true) {
         throw new Error("Unique AI returned an invalid response contract.");
       }
-      if (
-        !payload.capabilities ||
-        payload.capabilities.version !== 1 ||
-        payload.capabilities.readOnly !== true ||
-        !Array.isArray(payload.capabilities.contexts) ||
-        JSON.stringify([...payload.capabilities.contexts].sort()) !== JSON.stringify(["account", "businesses", "orders", "products"]) ||
-        !Array.isArray(payload.capabilities.mutations) ||
-        payload.capabilities.mutations.length !== 0
-      ) {
-        throw new Error("Unique AI returned an invalid capability contract.");
+      if (currentUser) {
+        if (
+          !payload.capabilities ||
+          payload.capabilities.version !== 1 ||
+          payload.capabilities.readOnly !== true ||
+          !Array.isArray(payload.capabilities.contexts) ||
+          JSON.stringify([...payload.capabilities.contexts].sort()) !== JSON.stringify(["account", "businesses", "orders", "products"]) ||
+          !Array.isArray(payload.capabilities.mutations) ||
+          payload.capabilities.mutations.length !== 0
+        ) {
+          throw new Error("Unique AI returned an invalid capability contract.");
+        }
       }
 
       if (payload.requestId !== undefined && payload.requestId !== requestId) {
@@ -191,7 +196,7 @@ export default function UniqueAiPage() {
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">Unique AI</h1>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Your authenticated Unique One assistant. Platform information comes from authorized records.
+            Free AI for everyone. Sign in to let Unique AI use your authorized Unique One platform context.
           </p>
         </div>
         <button
@@ -212,12 +217,12 @@ export default function UniqueAiPage() {
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
                 <Bot className="h-7 w-7 text-emerald-600" />
               </div>
-              <h2 className="text-lg font-semibold text-slate-900">How can I help?</h2>
+              <h2 className="text-2xl font-black tracking-tight text-slate-900">Ask Unique AI anything.</h2>
               <p className="mt-2 text-sm text-slate-500">
-                Ask about your Unique One account, orders, businesses, or products. I will not invent records or claim actions I did not perform. Summary counts use only authorized records loaded for the current request. If a collection reaches its context limit, the summary may be incomplete.
+                Ask questions, learn, plan, write, explore ideas, or ask about Unique One. Public questions are free; registered users can unlock personalized platform context and the full Unique One experience.
               </p>
               <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-left text-xs leading-5 text-emerald-800">
-                <strong>Current capability:</strong> read-only access to your authorized account, order, business, and product context. No payment, order, product, business, booking, transfer, or other platform mutation is exposed to Unique AI.
+                <strong>{currentUser ? "Registered experience:" : "Free public experience:"}</strong> {currentUser ? "Unique AI can read your authorized account, order, business, and product context. Platform mutations remain protected." : "You can ask general questions without registering. Register to unlock personalized Unique One context and the full platform experience."}
               </div>
               <div className="mt-6 grid w-full gap-2 sm:grid-cols-3">
                 {QUICK_PROMPTS.map((prompt) => (
@@ -293,7 +298,7 @@ export default function UniqueAiPage() {
               }}
               rows={2}
               maxLength={4000}
-              disabled={loading || !currentUser}
+              disabled={loading}
               aria-label="Message Unique AI"
               placeholder="Ask Unique AI…"
               className="min-h-[48px] flex-1 resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50"
@@ -307,8 +312,14 @@ export default function UniqueAiPage() {
               Send
             </button>
           </div>
+          {!currentUser && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              <span>Enjoying Unique AI? Register to unlock your full Unique One experience and personalized AI.</span>
+              <Link to="/register" className="rounded-full bg-slate-900 px-3 py-1.5 font-bold text-white">Register free</Link>
+            </div>
+          )}
           <div className="mt-2 flex items-center justify-between gap-3 px-1 text-xs text-slate-400">
-            <span>Read-only assistant for now. It can read authorized account, order, business, and product context only; no platform mutations are exposed. Each request has a temporary support request ID. Answers use only authorized records loaded for the current request and may be incomplete when a context limit is reached.</span>
+            <span>{currentUser ? "Registered mode: answers can use your authorized Unique One context; platform mutations remain protected." : "Public mode is free. Register to unlock personalized Unique One context and the full platform experience."}</span>
             <span className="text-right" aria-live="polite">
               {lastRequestId ? `Request: ${lastRequestId}` : "Support request ID will appear after a response"} · {message.length}/4000
             </span>
