@@ -13,7 +13,8 @@ const LANGUAGES = [
 export default function AppearanceControls() {
   const [dark, setDark] = useState(false);
   const [language, setLanguage] = useState('en');
-  const [languageOpen, setLanguageOpen] = useState(false);\n  const languageMenuRef = useRef<HTMLDivElement>(null);
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const languageMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('unique-one-theme');
@@ -26,7 +27,23 @@ export default function AppearanceControls() {
     document.documentElement.style.colorScheme = initialDark ? 'dark' : 'light';
   }, []);
 
-  useEffect(() => {\n    if (!languageOpen) return;\n    const handlePointerDown = (event: PointerEvent) => {\n      if (!languageMenuRef.current?.contains(event.target as Node)) setLanguageOpen(false);\n    };\n    const handleKeyDown = (event: KeyboardEvent) => {\n      if (event.key === 'Escape') setLanguageOpen(false);\n    };\n    document.addEventListener('pointerdown', handlePointerDown);\n    document.addEventListener('keydown', handleKeyDown);\n    return () => {\n      document.removeEventListener('pointerdown', handlePointerDown);\n      document.removeEventListener('keydown', handleKeyDown);\n    };\n  }, [languageOpen]);\n\n  const toggleTheme = () => {
+  useEffect(() => {
+    if (!languageOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!languageMenuRef.current?.contains(event.target as Node)) setLanguageOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setLanguageOpen(false);
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [languageOpen]);
+
+  const toggleTheme = () => {
     const next = !dark;
     setDark(next);
     localStorage.setItem('unique-one-theme', next ? 'dark' : 'light');
