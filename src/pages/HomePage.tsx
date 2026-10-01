@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Users,
   Zap,
+  Video,
   Briefcase as BriefcaseIcon,
 } from 'lucide-react';
 import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
