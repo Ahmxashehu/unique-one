@@ -143,8 +143,6 @@ export default function App() {
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/ai" element={<UniqueAiPage />} />
-                <Route path="/conference" element={<ConferencePage />} />
-                <Route path="/conference/:roomId" element={<ConferencePage />} />
                 
                 {/* Unique Store Public Routes */}
                 <Route path="/store" element={<StorePage />} />
@@ -158,6 +156,9 @@ export default function App() {
                 <Route path="/store/product-request" element={<StoreProductRequestPage />} />
                 <Route path="/store/quote-request" element={<StoreQuoteRequestPage />} />
               </Route>
+              
+              <Route path="/conference" element={<ConferencePage />} />
+              <Route path="/conference/:roomId" element={<ConferencePage />} />
               
               {/* UniqueOS Internal Routes */}
               <Route path="/os" element={<AuthGuard><AppLayout /></AuthGuard>}>
