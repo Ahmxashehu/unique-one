@@ -44,6 +44,27 @@ export default function HomePage() {
   const [search, setSearch] = useState('');
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [activePromo, setActivePromo] = useState(0);
+  const [activeExperience, setActiveExperience] = useState(0);
+
+  const experiencePosters = [
+    ['Restaurant', '/categories', 'Taste, discover and connect with restaurants.'],
+    ['Hotel', '/travel', 'Find stays and hospitality experiences.'],
+    ['Flights', '/travel', 'Explore flight and travel experiences.'],
+    ['School', '/education', 'Discover learning and education experiences.'],
+    ['Retail & Shopping', '/categories', 'Buy and discover real products.'],
+    ['Professional Services', '/categories', 'Connect with trusted service providers.'],
+    ['Transportation', '/categories', 'Find transportation and mobility services.'],
+    ['Real Estate', '/categories', 'Explore property and real-estate experiences.'],
+    ['Technology', '/categories', 'Discover technology products and services.'],
+    ['Health & Wellness', '/categories', 'Find health and wellness experiences.'],
+    ['Food & Dining', '/categories', 'Explore food and dining experiences.'],
+    ['Global Search', '/search', 'Search across the Unique ecosystem.'],
+    ['Near Me', '/near-me', 'Discover useful experiences around you.'],
+    ['Jobs', '/os/jobs', 'Find opportunities and career experiences.'],
+    ['Contributions', '/os/contributions', 'Connect with community contribution opportunities.'],
+    ['Education', '/os/education', 'Continue your education journey.'],
+    ['Travel', '/os/travel', 'Plan and explore your next journey.'],
+  ];
 
   const promotionalPosters = [
     {
@@ -91,6 +112,14 @@ export default function HomePage() {
 
     return () => window.clearInterval(timer);
   }, [promotionalPosters.length]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setActiveExperience((current) => (current + 1) % experiencePosters.length);
+    }, 10000);
+
+    return () => window.clearInterval(timer);
+  }, [experiencePosters.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -416,9 +445,9 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Promotional poster carousel: rotates automatically every 15 seconds and remains manually navigable. */}
-        <section aria-label="Unique promotional posters" className="relative mt-4 overflow-hidden rounded-2xl bg-slate-950 text-white shadow-sm sm:mt-6 sm:rounded-[2rem]">
-          <div className="relative min-h-[300px] sm:min-h-[470px]">
+        {/* Promotional poster carousel: compact, interactive and rotates automatically every 15 seconds. */}
+        <section aria-label="Unique promotional posters" className="relative mt-4 overflow-hidden rounded-2xl bg-slate-950 text-white shadow-sm sm:mt-6 sm:rounded-3xl">
+          <div className="relative min-h-[235px] sm:min-h-[285px] lg:min-h-[315px]">
             {promotionalPosters.map((poster, index) => {
               const PosterIcon = poster.icon;
               const isActive = index === activePromo;
@@ -435,14 +464,14 @@ export default function HomePage() {
                   <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-white/10 blur-2xl sm:-right-24 sm:-top-24 sm:h-72 sm:w-72" />
                   <div className="absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-black/10 blur-3xl sm:-bottom-32 sm:h-80 sm:w-80" />
 
-                  <div className="relative flex min-h-[300px] flex-col justify-between p-4 sm:min-h-[470px] sm:p-9 lg:p-12">
+                  <div className="relative flex min-h-[235px] flex-col justify-between p-3.5 sm:min-h-[285px] sm:p-6 lg:min-h-[315px] lg:p-7">
                     <div className="flex items-start justify-between gap-3 sm:gap-4">
                       <div className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-white/20 bg-black/10 px-2.5 py-1.5 text-[10px] font-black tracking-[0.1em] backdrop-blur sm:gap-2 sm:px-3 sm:text-xs sm:tracking-[0.14em]">
                         <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-white sm:h-2 sm:w-2" />
                         <span className="truncate">{poster.eyebrow}</span>
                       </div>
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 backdrop-blur sm:h-16 sm:w-16 sm:rounded-2xl">
-                        <PosterIcon className="h-5 w-5 sm:h-8 sm:w-8" />
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 backdrop-blur sm:h-12 sm:w-12 sm:rounded-2xl">
+                        <PosterIcon className="h-4 w-4 sm:h-6 sm:w-6" />
                       </div>
                     </div>
 
@@ -450,18 +479,18 @@ export default function HomePage() {
                       <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.16em] text-white/70 sm:mb-3 sm:text-xs sm:tracking-[0.2em]">
                         {poster.eyebrow === 'UNIQUE STORE' ? 'Buy • Sell • Hire • Book • Discover' : 'Promotional experience'}
                       </p>
-                      <h1 className="text-2xl font-black leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
+                      <h1 className="text-xl font-black leading-[1.08] tracking-tight sm:text-3xl lg:text-4xl">
                         {poster.title}
                       </h1>
-                      <p className="mt-2 max-w-2xl text-xs leading-5 text-white/80 sm:mt-5 sm:text-lg sm:leading-7">
+                      <p className="mt-1.5 max-w-2xl text-[11px] leading-4 text-white/80 sm:mt-3 sm:text-sm sm:leading-5">
                         {poster.description}
                       </p>
-                      <div className="mt-4 flex flex-wrap gap-2 sm:mt-7 sm:gap-3">
+                      <div className="mt-3 flex flex-wrap gap-2 sm:mt-4 sm:gap-2.5">
                         {poster.href.startsWith('#') ? (
                           <button
                             type="button"
                             onClick={() => document.getElementById('active-edge')?.scrollIntoView({ behavior: 'smooth' })}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2.5 text-xs font-black text-slate-950 shadow-lg transition hover:scale-[1.03] sm:gap-2 sm:px-5 sm:py-3 sm:text-sm"
+                            className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-[11px] font-black text-slate-950 shadow-lg transition hover:scale-[1.03] sm:gap-2 sm:px-4 sm:py-2.5 sm:text-xs"
                           >
                             {poster.action} <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           </button>
@@ -476,7 +505,7 @@ export default function HomePage() {
                         <button
                           type="button"
                           onClick={() => setActivePromo((current) => (current + 1) % promotionalPosters.length)}
-                          className="rounded-full border border-white/25 bg-white/10 px-4 py-2.5 text-xs font-bold backdrop-blur transition hover:bg-white/20 sm:px-5 sm:py-3 sm:text-sm"
+                          className="rounded-full border border-white/25 bg-white/10 px-3.5 py-2 text-[11px] font-bold backdrop-blur transition hover:bg-white/20 sm:px-4 sm:py-2.5 sm:text-xs"
                         >
                           Next poster
                         </button>
@@ -495,7 +524,7 @@ export default function HomePage() {
                           />
                         ))}
                       </div>
-                      <span className="text-[10px] font-semibold text-white/60 sm:text-xs">Changes every 15 seconds</span>
+                      <span className="text-[10px] font-semibold text-white/60 sm:text-xs">15s rotation</span>
                     </div>
                   </div>
                 </div>
@@ -504,6 +533,49 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* Professional experience directory poster: one experience at a time, rotating every 10 seconds. */}
+        <section aria-label="Professional experiences" className="relative mt-3 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm sm:mt-4 sm:rounded-3xl">
+          <div className="relative h-[92px] sm:h-[104px]">
+            {experiencePosters.map(([label, href, description], index) => {
+              const isActive = index === activeExperience;
+              return (
+                <Link
+                  key={label}
+                  to={href}
+                  aria-hidden={!isActive}
+                  tabIndex={isActive ? 0 : -1}
+                  className={`absolute inset-0 flex items-center gap-3 px-3.5 transition-all duration-500 sm:gap-4 sm:px-5 ${isActive ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-5 opacity-0"}`}
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 shadow-inner sm:h-14 sm:w-14">
+                    <Compass className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-sm font-black tracking-tight text-slate-950 sm:text-base">{label}</span>
+                      <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-[9px]">Explore</span>
+                    </span>
+                    <span className="mt-0.5 block truncate text-[10px] text-slate-500 sm:text-xs">{description}</span>
+                  </span>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-emerald-600" />
+                </Link>
+              );
+            })}
+          </div>
+          <div className="absolute bottom-2 left-3.5 right-3.5 flex items-center justify-between sm:left-5 sm:right-5">
+            <div className="flex items-center gap-1" aria-label={`Experience ${activeExperience + 1} of ${experiencePosters.length}`}>
+              {experiencePosters.map((_, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setActiveExperience(index)}
+                  aria-label={`Show ${experiencePosters[index][0]}`}
+                  className={`h-1 rounded-full transition-all ${index === activeExperience ? "w-5 bg-emerald-600" : "w-1 bg-slate-200"}`}
+                />
+              ))}
+            </div>
+            <span className="text-[8px] font-semibold text-slate-400 sm:text-[9px]">10s</span>
+          </div>
+        </section>
         {/* Active Edge: social stream + discovery collection */}
         <section id="active-edge" className="mt-8">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
