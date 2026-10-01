@@ -5,7 +5,6 @@ import {
   ShieldCheck, Activity, Settings, LogOut 
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import MobileBottomNav from '../components/MobileBottomNav';
 
 export default function AdminLayout() {
   const location = useLocation();
@@ -109,7 +108,6 @@ export default function AdminLayout() {
             <Outlet />
           </div>
         </main>
-        <MobileBottomNav variant="public" onMenu={() => setIsMobileMenuOpen(true)} />
       </div>
     </div>
   );
