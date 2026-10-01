@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import MobileBottomNav from '../components/MobileBottomNav';
 import { cn } from '../lib/utils';
@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export default function PublicLayout() {
   const { currentUser } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
 
   return (
@@ -46,7 +47,55 @@ export default function PublicLayout() {
         <Outlet />
       </main>
 
-      <MobileBottomNav variant="public" onMenu={() => {}} />
+      {isMobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="More Unique One">
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          <div className="absolute inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-h-[70dvh] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-600">Unique One</p>
+                <h2 className="text-lg font-black text-slate-900">More experiences</h2>
+              </div>
+              <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">Close</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                ['Categories', '/categories'],
+                ['Near Me', '/near-me'],
+                ['Store', '/store'],
+                ['Unique AI', '/ai'],
+                ['About', '/about'],
+                ['Support', '/support'],
+              ].map(([name, path]) => (
+                <Link
+                  key={path}
+                  to={path}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 active:scale-[0.98]"
+                >
+                  {name}
+                </Link>
+              ))}
+            </div>
+            <div className="mt-3">
+              {currentUser ? (
+                <Link to="/os/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Open UniqueOS</Link>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="rounded-2xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-slate-700">Log in</Link>
+                  <Link to="/register" onClick={() => setIsMobileMenuOpen(false)} className="rounded-2xl bg-slate-950 px-4 py-3 text-center text-sm font-bold text-white">Register</Link>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      <MobileBottomNav variant="public" onMenu={() => setIsMobileMenuOpen(true)} />
     </div>
   );
 }
