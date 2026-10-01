@@ -185,6 +185,7 @@ const TravelPage = lazy(() => import("./pages/TravelPage"));
 const CycleAjoPage = lazy(() => import("./pages/pay/CycleAjoPage"));
 const VerificationCenterPage = lazy(() => import("./pages/pay/VerificationCenterPage"));
 const MasterVisionPage = lazy(() => import("./pages/MasterVisionPage"));
+const UniqueMediaPage = lazy(() => import("./pages/UniqueMediaPage"));
 
 export default function App() {
   const [u1Booting, setU1Booting] = useState(true);
@@ -219,6 +220,8 @@ export default function App() {
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/ai" element={<UniqueAiPage />} />
+                <Route path="/media" element={<UniqueMediaPage />} />
+                <Route path="/unique-media" element={<UniqueMediaPage />} />
                 
                 {/* Unique Store Public Routes */}
                 <Route path="/store" element={<StorePage />} />
