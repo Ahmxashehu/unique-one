@@ -43,8 +43,7 @@ export default function HomePage() {
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState('');
   const [followingIds, setFollowingIds] = useState<string[]>([]);
-  const [activePromo, setActivePromo] = useState(0);
-  const [activeExperience, setActiveExperience] = useState(0);
+  const [activeMainPoster, setActiveMainPoster] = useState(0);
 
   const experiencePosters = [
     ['Restaurant', '/categories', 'Taste, discover and connect with restaurants.'],
@@ -105,21 +104,38 @@ export default function HomePage() {
     },
   ];
 
+  const mainPosterSlides = [
+    ...promotionalPosters.map((poster) => ({
+      type: 'promo' as const,
+      key: `promo-${poster.eyebrow}`,
+      title: poster.title,
+      description: poster.description,
+      href: poster.href,
+      action: poster.action,
+      icon: poster.icon,
+      tone: poster.tone,
+      eyebrow: poster.eyebrow,
+    })),
+    ...experiencePosters.map(([label, href, description]) => ({
+      type: 'experience' as const,
+      key: `experience-${label}`,
+      title: label,
+      description,
+      href,
+      action: 'Open experience',
+      icon: Compass,
+      tone: 'from-slate-950 via-emerald-950 to-emerald-800',
+      eyebrow: 'Professional experience',
+    })),
+  ];
+
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setActivePromo((current) => (current + 1) % promotionalPosters.length);
-    }, 15000);
-
-    return () => window.clearInterval(timer);
-  }, [promotionalPosters.length]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setActiveExperience((current) => (current + 1) % experiencePosters.length);
+      setActiveMainPoster((current) => (current + 1) % mainPosterSlides.length);
     }, 10000);
 
     return () => window.clearInterval(timer);
-  }, [experiencePosters.length]);
+  }, [mainPosterSlides.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -445,66 +461,69 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Main experience poster: promotional content and the 17 experience functions rotate in one place. */}
+        {/* Main experience poster: every promotional and professional experience is one 10-second sliding list. */}
         <section aria-label="Unique main experience posters" className="relative mt-4 overflow-hidden rounded-2xl bg-slate-950 text-white shadow-sm sm:mt-6 sm:rounded-3xl">
           <div className="relative min-h-[235px] sm:min-h-[285px] lg:min-h-[315px]">
-            {promotionalPosters.map((poster, index) => {
-              const PosterIcon = poster.icon;
-              const isActive = index === activePromo;
+            {mainPosterSlides.map((slide, index) => {
+              const SlideIcon = slide.icon;
+              const isActive = index === activeMainPoster;
+              const isPromo = slide.type === 'promo';
+
               return (
-                <div key={poster.eyebrow} aria-hidden={!isActive} className={`absolute inset-0 transition-all duration-700 ease-out ${isActive ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-8 opacity-0'}`}>
-                  <div className={`absolute inset-0 bg-gradient-to-br ${poster.tone}`} />
+                <div
+                  key={slide.key}
+                  aria-hidden={!isActive}
+                  className={`absolute inset-0 transition-all duration-700 ease-out ${isActive ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-8 opacity-0'}`}
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-br ${slide.tone}`} />
                   <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-white/10 blur-2xl sm:-right-24 sm:-top-24 sm:h-72 sm:w-72" />
                   <div className="relative flex min-h-[235px] flex-col justify-between p-3.5 sm:min-h-[285px] sm:p-6 lg:min-h-[315px] lg:p-7">
                     <div className="flex items-start justify-between gap-3">
                       <div className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-white/20 bg-black/10 px-2.5 py-1.5 text-[10px] font-black tracking-[0.1em] backdrop-blur">
-                        <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-white" />
-                        <span className="truncate">{poster.eyebrow}</span>
+                        <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-emerald-200" />
+                        <span className="truncate">{slide.eyebrow}</span>
                       </div>
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 backdrop-blur sm:h-12 sm:w-12 sm:rounded-2xl">
-                        <PosterIcon className="h-4 w-4 sm:h-6 sm:w-6" />
+                        <SlideIcon className="h-4 w-4 sm:h-6 sm:w-6" />
                       </div>
                     </div>
+
                     <div className="max-w-3xl">
-                      <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.16em] text-white/70">Promotional experience</p>
-                      <h1 className="text-xl font-black leading-[1.08] tracking-tight sm:text-3xl lg:text-4xl">{poster.title}</h1>
-                      <p className="mt-1.5 max-w-2xl text-[11px] leading-4 text-white/80 sm:text-sm sm:leading-5">{poster.description}</p>
+                      <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.16em] text-white/70">10-second experience</p>
+                      <h1 className="text-xl font-black leading-[1.08] tracking-tight sm:text-3xl lg:text-4xl">{slide.title}</h1>
+                      <p className="mt-1.5 max-w-2xl text-[11px] leading-4 text-white/80 sm:text-sm sm:leading-5">{slide.description}</p>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <Link to={poster.href.startsWith('#') ? '/discover' : poster.href} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-[11px] font-black text-slate-950 shadow-lg transition hover:scale-[1.03]">
-                          {poster.action} <ArrowRight className="h-3.5 w-3.5" />
+                        <Link to={slide.href.startsWith('#') ? '/discover' : slide.href} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-[11px] font-black text-slate-950 shadow-lg transition hover:scale-[1.03]">
+                          {slide.action} <ArrowRight className="h-3.5 w-3.5" />
                         </Link>
-                        <button type="button" onClick={() => setActivePromo((current) => (current + 1) % promotionalPosters.length)} className="rounded-full border border-white/25 bg-white/10 px-3.5 py-2 text-[11px] font-bold backdrop-blur transition hover:bg-white/20">Next</button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveMainPoster((current) => (current + 1) % mainPosterSlides.length)}
+                          className="rounded-full border border-white/25 bg-white/10 px-3.5 py-2 text-[11px] font-bold backdrop-blur transition hover:bg-white/20"
+                        >
+                          Next
+                        </button>
                       </div>
                     </div>
+
                     <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-1.5">{promotionalPosters.map((_, dotIndex) => <button key={dotIndex} type="button" onClick={() => setActivePromo(dotIndex)} aria-label={`Show promotional poster ${dotIndex + 1}`} className={`h-1.5 rounded-full transition-all ${dotIndex === activePromo ? 'w-7 bg-white' : 'w-1.5 bg-white/40'}`} />)}</div>
-                      <span className="text-[10px] font-semibold text-white/60">15s</span>
+                      <div className="flex max-w-[72%] items-center gap-1 overflow-hidden">
+                        {mainPosterSlides.map((_, dotIndex) => (
+                          <button
+                            key={dotIndex}
+                            type="button"
+                            onClick={() => setActiveMainPoster(dotIndex)}
+                            aria-label={`Show main poster ${dotIndex + 1}`}
+                            className={`h-1.5 shrink-0 rounded-full transition-all ${dotIndex === activeMainPoster ? 'w-7 bg-emerald-200' : 'w-1.5 bg-white/35'}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-[10px] font-semibold text-white/60">
+                        {isPromo ? 'Unique experience' : 'Professional experience'} · 10s
+                      </span>
                     </div>
                   </div>
                 </div>
-              );
-            })}
-            {experiencePosters.map(([label, href, description], index) => {
-              const isActive = index === activeExperience;
-              return (
-                <Link key={`experience-${label}`} to={href} aria-hidden={!isActive} tabIndex={isActive ? 0 : -1} className={`absolute inset-0 flex flex-col justify-between p-4 transition-all duration-500 sm:p-6 lg:p-7 ${isActive ? 'translate-x-0 opacity-100' : 'pointer-events-none -translate-x-5 opacity-0'}`}>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-100">Professional experience</span>
-                    <span className="text-[9px] font-bold text-white/60">10s</span>
-                  </div>
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-emerald-200/20 bg-white/10 text-emerald-100 backdrop-blur sm:h-14 sm:w-14"><Compass className="h-5 w-5 sm:h-6 sm:w-6" /></span>
-                    <div className="min-w-0 flex-1">
-                      <h2 className="truncate text-xl font-black tracking-tight sm:text-3xl">{label}</h2>
-                      <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-white/75 sm:text-sm">{description}</p>
-                    </div>
-                    <ArrowRight className="h-5 w-5 shrink-0 text-emerald-200" />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-1">{experiencePosters.map((_, dotIndex) => <button key={dotIndex} type="button" onClick={(event) => { event.preventDefault(); setActiveExperience(dotIndex); }} aria-label={`Show ${experiencePosters[dotIndex][0]}`} className={`h-1 rounded-full transition-all ${dotIndex === activeExperience ? 'w-5 bg-emerald-200' : 'w-1 bg-white/30'}`} />)}</div>
-                    <span className="text-[9px] font-semibold text-white/50">Experience {index + 1}/17</span>
-                  </div>
-                </Link>
               );
             })}
           </div>
