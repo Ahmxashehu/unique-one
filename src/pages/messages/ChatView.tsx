@@ -677,15 +677,15 @@ export default function ChatView() {
     <div className="flex flex-col h-full min-h-0 -m-4 md:-m-6 lg:-m-8 bg-slate-50 md:rounded-3xl overflow-hidden">
       <style>{`@media (prefers-reduced-motion: reduce) { .unique-chat-motion { scroll-behavior: auto !important; transition: none !important; } }`}</style>
       <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <button onClick={() => navigate('/os/messages')} className="p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-full md:hidden" aria-label="Back">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-slate-900 to-slate-600 text-white flex items-center justify-center font-bold shadow-sm">
             {(conversation?.title ?? 'U').charAt(0).toUpperCase()}
           </div>
-          <div>
-            <h2 className="font-bold text-slate-900 text-sm md:text-base">{conversation?.title ?? 'Messages'}</h2>
+          <div className="min-w-0">
+            <h2 className="font-bold text-slate-900 text-sm md:text-base truncate max-w-[52vw] md:max-w-none">{conversation?.title ?? 'Messages'}</h2>
             <p className="text-xs text-slate-500 flex items-center gap-1.5">
               {otherPresence?.status === 'online' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
               {otherPresence?.status === 'online' ? 'Online' : otherPresence?.lastSeenAt ? `Last seen ${new Date(otherPresence.lastSeenAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : conversation?.status ?? 'Loading...'}
@@ -693,7 +693,7 @@ export default function ChatView() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
           <button onClick={() => { setSearchOpen((current) => !current); if (searchOpen) setSearchQuery(''); }} className={`p-2 rounded-full hover:bg-slate-100 ${searchOpen ? 'text-slate-900 bg-slate-100' : 'text-slate-500'}`} aria-label="Search messages" title="Search messages"><Search className="w-5 h-5" /></button>
           <button disabled className="p-2 text-slate-300 rounded-full hidden sm:block cursor-not-allowed" aria-label="Voice calls coming soon" title="Voice calls coming soon"><Phone className="w-5 h-5" /></button>
           <button disabled className="p-2 text-slate-300 rounded-full hidden sm:block cursor-not-allowed" aria-label="Video calls coming soon" title="Video calls coming soon"><Video className="w-5 h-5" /></button>
@@ -735,7 +735,7 @@ export default function ChatView() {
               className="min-w-0 flex-1 bg-transparent border-none outline-none text-sm text-slate-800 placeholder:text-slate-400"
               aria-label="Search messages"
             />
-            {searchQuery.trim() && <span className="text-[10px] text-slate-500 whitespace-nowrap">{searchMatches.length ? `${searchMatchIndex + 1}/${searchMatches.length}` : 'No matches'}</span>}
+            {searchQuery.trim() && <span className="hidden xs:inline text-[10px] text-slate-500 whitespace-nowrap">{searchMatches.length ? `${searchMatchIndex + 1}/${searchMatches.length}` : 'No matches'}</span>}
             {searchQuery.trim() && searchMatches.length > 1 && (
               <>
                 <button onClick={() => goToSearchMatch(-1)} className="p-1 rounded hover:bg-slate-200 text-slate-500" aria-label="Previous match" title="Previous match">↑</button>
