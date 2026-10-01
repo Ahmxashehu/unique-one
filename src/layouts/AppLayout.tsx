@@ -7,6 +7,7 @@ import {
   Building2, Activity, PlusCircle, Menu, X, LogOut, Sparkles, GraduationCap, Plane, Landmark
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import MobileBottomNav from '../components/MobileBottomNav';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function AppLayout() {
@@ -72,6 +73,10 @@ export default function AppLayout() {
     ? businessNav
     : [{ name: 'Register Business', path: '/os/business/register', icon: Building2 }];
 
+  const mobilePrimaryPaths = new Set(['/os/dashboard', '/store', '/os/pay', '/os/orders']);
+  const mobileUserNav = userNav.filter((item) => !mobilePrimaryPaths.has(item.path));
+  const mobileBusinessNav = businessMenu.filter((item) => !mobilePrimaryPaths.has(item.path));
+
   const renderNavItems = (items: any[], isMobile = false) => (
     <div className="space-y-1">
       {items.map((item) => {
@@ -112,13 +117,13 @@ export default function AppLayout() {
             <div className="flex-1 px-4 py-6 overflow-y-auto">
               <div className="mb-6">
                 <p className="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">User Account</p>
-                {renderNavItems(userNav, true)}
+                {renderNavItems(mobileUserNav, true)}
               </div>
               <div className="mb-6">
                 <p className="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                   {hasBusinessAccess ? 'Business Tools' : 'Business'}
                 </p>
-                {renderNavItems(businessMenu, true)}
+                {renderNavItems(mobileBusinessNav, true)}
               </div>
               <div>
                 <p className="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">System</p>
@@ -188,50 +193,14 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 w-full pb-20 md:pb-8">
+        <main className="mobile-scroll-padding flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-8 w-full pb-20 md:pb-8">
           <div className="mx-auto max-w-5xl h-full w-full">
             <Outlet />
           </div>
         </main>
 
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 flex items-center justify-around px-2 pb-safe z-40 w-full">
-          {[
-            { name: 'Dashboard', path: '/os/dashboard', icon: LayoutDashboard },
-            { name: 'Store', path: '/store', icon: Store },
-            { name: 'Pay', path: '/os/pay', icon: Wallet },
-            { name: 'Orders', path: '/os/orders', icon: ShoppingCart },
-            { name: 'Menu', path: '#', icon: Menu, action: () => setIsMobileMenuOpen(true) },
-          ].map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname.includes(item.path) && item.path !== '#';
-            if (item.action) {
-              return (
-                <button
-                  key={item.name}
-                  onClick={item.action}
-                  className="flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors text-slate-500 hover:text-slate-900 touch-manipulation"
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">{item.name}</span>
-                </button>
-              );
-            }
-            return (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={cn(
-                  'flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors touch-manipulation',
-                  isActive ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'
-                )}
-              >
-                <Icon className={cn('w-5 h-5', isActive ? 'fill-slate-900 text-slate-900' : '')} />
-                <span className="text-[10px] font-medium">{item.name}</span>
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
+        <MobileBottomNav variant="app" onMenu={() => setIsMobileMenuOpen(true)} />
+ </div>
     </div>
   );
 }
