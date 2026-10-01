@@ -87,7 +87,7 @@ export default function HomePage() {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setActivePromo((current) => (current + 1) % promotionalPosters.length);
-    }, 60000);
+    }, 15000);
 
     return () => window.clearInterval(timer);
   }, [promotionalPosters.length]);
@@ -381,7 +381,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Promotional poster carousel: rotates automatically every minute and remains manually navigable. */}
+        {/* Promotional poster carousel: rotates automatically every 15 seconds and remains manually navigable. */}
         <section aria-label="Unique promotional posters" className="relative overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-sm">
           <div className="relative min-h-[430px] sm:min-h-[470px]">
             {promotionalPosters.map((poster, index) => {
