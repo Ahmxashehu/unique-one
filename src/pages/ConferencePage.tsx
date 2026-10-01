@@ -12,7 +12,8 @@ import {
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
-type Participant = { uid: string; displayName?: string; joinedAt?: unknown };
+type Participant = { uid: string; displayName?: string; joinedAt?: unknown; handRaised?: boolean; role?: string };
+type ChatMessage = { id: string; uid: string; displayName?: string; text: string; createdAt?: unknown };
 type Signal = { id: string; from: string; to: string; type: 'offer' | 'answer' | 'ice'; payload: unknown };
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
@@ -34,6 +35,9 @@ export default function ConferencePage() {
   const [hand, setHand] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatText, setChatText] = useState('');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const peers = useRef<Record<string, RTCPeerConnection>>({});
   const processedSignals = useRef(new Set<string>());
   const isHost = room?.hostUid === currentUser?.uid;
