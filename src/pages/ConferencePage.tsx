@@ -44,6 +44,8 @@ export default function ConferencePage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const peers = useRef<Record<string, RTCPeerConnection>>({});
   const processedSignals = useRef(new Set<string>());
+  const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
+  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
   const isHost = room?.hostUid === currentUser?.uid;
   const inviteToken = new URLSearchParams(window.location.search).get('invite') || '';
 
@@ -98,6 +100,7 @@ export default function ConferencePage() {
     navigator.mediaDevices?.getUserMedia({ video: true, audio: true })
       .then((localStream) => {
         if (!active) return localStream.getTracks().forEach((track) => track.stop());
+        cameraTrackRef.current = localStream.getVideoTracks()[0] || null;
         setStream(localStream);
       })
       .catch(() => setError('Camera or microphone permission was not granted. You can still join with audio/video disabled.'));
@@ -193,25 +196,33 @@ export default function ConferencePage() {
     setMic(next);
   };
 
+  const stopScreenShare = () => {
+    const cameraTrack = cameraTrackRef.current;
+    if (cameraTrack) Object.values(peers.current).forEach((peer) => {
+      const sender = peer.getSenders().find((item) => item.track?.kind === 'video');
+      if (sender) sender.replaceTrack(cameraTrack).catch(() => undefined);
+    });
+    screenTrackRef.current?.stop();
+    screenTrackRef.current = null;
+    setSharing(false);
+  };
+
   const toggleScreenShare = async () => {
     if (!stream) return;
     if (sharing) {
-      const cameraTrack = stream.getVideoTracks().find((track) => track.kind === 'video');
-      if (cameraTrack) Object.values(peers.current).forEach((peer) => {
-        const sender = peer.getSenders().find((item) => item.track?.kind === 'video');
-        if (sender) sender.replaceTrack(cameraTrack).catch(() => undefined);
-      });
-      setSharing(false);
+      stopScreenShare();
       return;
     }
     try {
       const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const screenTrack = displayStream.getVideoTracks()[0];
+      if (!screenTrack) throw new Error('No screen track was provided.');
+      screenTrackRef.current = screenTrack;
       Object.values(peers.current).forEach((peer) => {
         const sender = peer.getSenders().find((item) => item.track?.kind === 'video');
         if (sender) sender.replaceTrack(screenTrack).catch(() => undefined);
       });
-      screenTrack.onended = () => setSharing(false);
+      screenTrack.onended = () => stopScreenShare();
       setSharing(true);
     } catch {
       setError('Screen sharing was cancelled or is not available on this device.');
