@@ -41,6 +41,21 @@ export default function StorePage() {
   const [loading, setLoading] = useState(true);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [savingWishlist, setSavingWishlist] = useState<string | null>(null);
+  const [storePoster, setStorePoster] = useState(0);
+
+  const storePosters = [
+    { eyebrow: 'UNIQUE STORE', title: 'Buy • Sell • Hire • Book • Discover', body: 'One modern marketplace for real products, trusted services, local businesses and everyday needs.', icon: ShoppingBag },
+    { eyebrow: 'SHOP SMART', title: 'Find what you need. Discover what you love.', body: 'Explore live marketplace listings across products, services, agriculture, fashion, electronics and more.', icon: Sparkles },
+    { eyebrow: 'SELL & GROW', title: 'Put your business in front of real customers.', body: 'Publish your products and services through Unique Store and connect with customers across Nigeria.', icon: Tag },
+    { eyebrow: 'LOCAL TO GLOBAL', title: 'Your marketplace, wherever you are.', body: 'Discover nearby opportunities and marketplace experiences, built to grow from Nigeria to Africa and beyond.', icon: Globe2 },
+  ];
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setStorePoster(prev => (prev + 1) % storePosters.length);
+    }, 180000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -146,26 +161,58 @@ export default function StorePage() {
 
   return (
     <div className="min-h-full space-y-6 pb-8">
-      <section className="rounded-3xl bg-emerald-600 text-white p-4 sm:p-6 lg:p-8 overflow-hidden relative">
-        <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold">
-            <Sparkles className="w-4 h-4" /> Unique Store
+      <section className="relative overflow-hidden rounded-[2rem] border border-emerald-500/20 bg-slate-950 text-white shadow-xl">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(16,185,129,0.32),transparent_34%),radial-gradient(circle_at_10%_90%,rgba(34,197,94,0.18),transparent_30%)]" />
+        <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full border border-emerald-400/20 bg-emerald-400/10 blur-sm" />
+        <div className="absolute -bottom-24 left-1/3 h-48 w-48 rounded-full border border-white/10 bg-white/5 blur-sm" />
+
+        <div className="relative min-h-[360px] sm:min-h-[390px] lg:min-h-[410px] p-5 sm:p-8 lg:p-10 flex flex-col justify-between">
+          <div key={storePoster} className="animate-[fadeIn_.6s_ease-out]">
+            {(() => {
+              const poster = storePosters[storePoster];
+              const PosterIcon = poster.icon;
+              return (
+                <>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold tracking-[0.16em] backdrop-blur">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.9)]" />
+                      {poster.eyebrow}
+                    </div>
+                    <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-white/55">
+                      {storePosters.map((_, index) => (
+                        <span key={index} className={`h-1.5 rounded-full transition-all ${index === storePoster ? 'w-7 bg-emerald-400' : 'w-1.5 bg-white/25'}`} />
+                      ))}
+                      <span className="ml-2">Changes every 3 min</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-10 sm:mt-12 max-w-3xl">
+                    <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-400/10 text-emerald-300">
+                      <PosterIcon className="h-6 w-6" />
+                    </div>
+                    <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-[-0.04em] leading-[1.02]">
+                      {poster.title}
+                    </h1>
+                    <p className="mt-5 max-w-2xl text-sm sm:text-base lg:text-lg leading-7 text-white/70">
+                      {poster.body}
+                    </p>
+                  </div>
+                </>
+              );
+            })()}
           </div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mt-4">Buy • Sell • Hire • Book • Discover</h1>
-          <p className="text-slate-300 mt-3 max-w-2xl">
-            Discover real products and services available through the Unique One marketplace.
-          </p>
-          <form onSubmit={submitSearch} className="mt-6 flex gap-2 max-w-2xl">
+
+          <form onSubmit={submitSearch} className="relative mt-8 flex max-w-3xl gap-2 rounded-2xl border border-white/15 bg-white/10 p-2 backdrop-blur-xl">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-white/45" />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search products and services..."
-                className="w-full rounded-xl bg-white text-slate-900 pl-10 pr-4 py-4 text-sm outline-none focus:ring-2 focus:ring-white/60"
+                className="w-full rounded-xl bg-white/95 text-slate-900 pl-11 pr-4 py-3.5 sm:py-4 text-sm outline-none focus:ring-2 focus:ring-emerald-300/70"
               />
             </div>
-            <button type="submit" className="rounded-xl bg-slate-950 text-white px-5 py-3 font-bold text-sm hover:bg-slate-100">
+            <button type="submit" className="hidden sm:inline-flex items-center justify-center rounded-xl bg-emerald-500 px-6 py-3 font-bold text-sm text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400">
               Search
             </button>
           </form>
