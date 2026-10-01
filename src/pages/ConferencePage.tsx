@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { signInWithCustomToken, signOut } from 'firebase/auth';
+import { signInWithCustomToken } from 'firebase/auth';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Camera, CameraOff, Copy, Crown, Hand, Mic, MicOff, MonitorUp,
@@ -294,18 +294,17 @@ export default function ConferencePage() {
     const createConference = async () => {
       setCreating(true);
       try {
-        const conferenceRef = doc(collection(db, 'conferences'));
-        await setDoc(conferenceRef, {
-          title: newTitle.trim() || 'Unique Conference',
-          description: 'Online meeting, lecture or public conference.',
-          public: true,
-          hostUid: currentUser.uid,
-          status: 'live',
-          createdAt: serverTimestamp(),
+        const idToken = await currentUser.getIdToken();
+        const response = await fetch('/api/conference/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ title: newTitle.trim() || 'Unique Conference' }),
         });
-        navigate(`/conference/${conferenceRef.id}`);
-      } catch {
-        setError('Could not create the conference. Please try again.');
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || typeof payload.roomId !== 'string') throw new Error(payload?.error?.message || 'Could not create the conference.');
+        navigate(`/conference/${payload.roomId}`);
+      } catch (createError) {
+        setError(createError instanceof Error ? createError.message : 'Could not create the conference. Please try again.');
       } finally {
         setCreating(false);
       }
