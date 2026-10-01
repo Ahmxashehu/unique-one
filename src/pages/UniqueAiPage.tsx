@@ -187,7 +187,7 @@ export default function UniqueAiPage() {
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       setSuggestedIndex((current) => (current + 1) % QUICK_PROMPTS.length);
-    }, 1_000);
+    }, 2_000);
     return () => window.clearInterval(intervalId);
   }, []);
 
@@ -336,7 +336,7 @@ export default function UniqueAiPage() {
           <span
             key={suggestedIndex}
             className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-emerald-400/80"
-            style={{ animation: "uniqueAiSuggestionSweep 1s linear both" }}
+            style={{ animation: "uniqueAiSuggestionSweep 2s linear both" }}
           />
         </div>
         <div className="pointer-events-none absolute -left-8 top-1/2 h-14 w-14 -translate-y-1/2 rounded-full bg-emerald-300/20 blur-2xl" style={{ animation: "uniqueAiSuggestionGlow 2.8s ease-in-out infinite" }} aria-hidden="true" />
@@ -384,7 +384,7 @@ export default function UniqueAiPage() {
                   <div
                     className={`relative max-w-[88%] whitespace-pre-wrap rounded-[22px] px-4 py-3 text-sm leading-6 ${item.role === "user" ? "rounded-br-md bg-slate-900 text-white shadow-slate-900/10" : "rounded-bl-md border border-slate-200/80 bg-white text-slate-800 shadow-black/5"}`}
                   >
-                    {${item.role === "assistant"} && (
+                    {item.role === "assistant" && (
                       <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-600">
                         <span className="relative flex h-4 w-4 items-center justify-center rounded-full bg-slate-950 text-[7px] font-black text-emerald-300">
                           U1
@@ -393,7 +393,7 @@ export default function UniqueAiPage() {
                         Unique AI
                       </div>
                     )}
-                    {${item.text}}
+                    {item.text}
                   </div>
                 </div>
               ))}
