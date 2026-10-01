@@ -851,7 +851,7 @@ export default function HomePage() {
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 sm:h-10 sm:w-10 sm:rounded-2xl"><Building2 className="h-5 w-5" /></span>
                   <div className="min-w-0 flex-1">
                     <h3 className="break-words text-sm font-black sm:text-base">Unique Business Hub</h3>
-                    <p className="mt-0.5 text-[11px] leading-4 text-slate-500 sm:text-xs">Register, verify and manage your business in one place.</p>
+                    <div className="mt-0.5 h-8 overflow-hidden text-[11px] leading-4 text-slate-500 sm:h-6 sm:text-xs sm:leading-normal"><p className="animate-[uniqueMediaVertical_9s_linear_infinite] whitespace-normal break-words motion-reduce:animate-none">Register, verify and manage your business in one place.</p></div>
                   </div>
                 </div>
                 <details className="group mt-3">
