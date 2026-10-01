@@ -187,7 +187,7 @@ export default function UniqueAiPage() {
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       setSuggestedIndex((current) => (current + 1) % QUICK_PROMPTS.length);
-    }, 15_000);
+    }, 2_000);
     return () => window.clearInterval(intervalId);
   }, []);
 
@@ -322,7 +322,7 @@ export default function UniqueAiPage() {
           <span
             key={suggestedIndex}
             className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-emerald-400/80"
-            style={{ animation: "uniqueAiSuggestionSweep 15s linear both" }}
+            style={{ animation: "uniqueAiSuggestionSweep 2s linear both" }}
           />
         </div>
         <div className="pointer-events-none absolute -left-8 top-1/2 h-14 w-14 -translate-y-1/2 rounded-full bg-emerald-300/20 blur-2xl" style={{ animation: "uniqueAiSuggestionGlow 2.8s ease-in-out infinite" }} aria-hidden="true" />
