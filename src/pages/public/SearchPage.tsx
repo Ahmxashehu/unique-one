@@ -40,20 +40,9 @@ export default function SearchPage() {
       `}</style>
 
       <div className="max-w-3xl mx-auto text-center space-y-6">
-        <div className="flex items-center justify-center gap-3">
-          <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-[12px] font-black text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,.28)]">
-            U1
-            <span className="absolute inset-0 rounded-full border border-emerald-300/45" />
-            <span
-              className="absolute -inset-2 rounded-full bg-emerald-300/15 blur-md"
-              style={{ animation: 'globalSearchGlow 2.4s ease-in-out infinite' }}
-              aria-hidden="true"
-            />
-          </span>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-            Global Search
-          </h1>
-        </div>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+          Global Search
+        </h1>
 
         <div className="flex items-center gap-2">
           <div className="relative flex min-w-0 flex-1 overflow-hidden rounded-[26px] border border-slate-200 bg-slate-50/90 p-1.5 shadow-[0_8px_30px_rgba(15,23,42,.07)] transition-all focus-within:border-emerald-300 focus-within:bg-white focus-within:shadow-[0_8px_32px_rgba(16,185,129,.12)]">
