@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { FileText, Image as ImageIcon, Music2, Play, Search, Users, Upload, X, Share2, Cloud, Download, Smartphone } from 'lucide-react';
 import AuthActionGate from '../components/auth/AuthActionGate';
 
@@ -33,6 +33,7 @@ export default function UniqueMediaPage() {
   const [contactSearch, setContactSearch] = useState('');
   const [contactMessage, setContactMessage] = useState('');
   const [shareMessage, setShareMessage] = useState('');
+  const backupInputRef = useRef<HTMLInputElement | null>(null);
 
   const filteredMedia = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -86,6 +87,25 @@ export default function UniqueMediaPage() {
     }
     if (item.kind === 'image' || item.kind === 'video' || item.kind === 'audio') {
       window.open(item.url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const exportLocalBackup = () => {
+    const payload = media.map((item) => ({ name: item.file.name, type: item.file.type, size: item.file.size }));
+    const blob = new Blob([JSON.stringify({ version: 1, createdAt: new Date().toISOString(), media: payload }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a'); link.href = url; link.download = 'unique-media-backup.json'; link.click();
+    URL.revokeObjectURL(url);
+    setShareMessage('Backup manifest exported to your device. Your media files remain local.');
+  };
+
+  const restoreLocalBackup = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.media)) throw new Error('Invalid backup');
+      setShareMessage(`Backup verified: ${parsed.media.length} media record${parsed.media.length === 1 ? '' : 's'} found. Select the original files with Add media to restore their local content.`);
+    } catch {
+      setShareMessage('That backup file could not be verified.');
     }
   };
 
@@ -223,6 +243,22 @@ export default function UniqueMediaPage() {
             </button>
           </div>
           {contactMessage && <p className="mt-3 text-xs font-semibold text-emerald-700">{contactMessage}</p>}
+        </section>
+
+        <section className="mt-5 grid gap-4 md:grid-cols-2">
+          <div className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3"><Smartphone className="h-5 w-5 text-emerald-600" /><div><h2 className="font-black text-slate-900">UniqueShare</h2><p className="text-xs text-slate-500">Share media directly through supported device sharing.</p></div></div>
+            <button type="button" onClick={() => filteredMedia[0] && shareMedia(filteredMedia[0])} disabled={!filteredMedia[0]} className="mt-4 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Share selected media</button>
+            {shareMessage && <p className="mt-3 text-xs font-semibold text-emerald-700">{shareMessage}</p>}
+          </div>
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3"><Cloud className="h-5 w-5 text-emerald-600" /><div><h2 className="font-black text-slate-900">Backup & Restore</h2><p className="text-xs text-slate-500">Create or verify a local backup manifest without uploading your media.</p></div></div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button type="button" onClick={exportLocalBackup} className="rounded-2xl border border-slate-200 px-3 py-3 text-sm font-bold text-slate-800">Backup</button>
+              <button type="button" onClick={() => backupInputRef.current?.click()} className="rounded-2xl bg-slate-950 px-3 py-3 text-sm font-bold text-white">Restore</button>
+            </div>
+            <input ref={backupInputRef} type="file" accept="application/json,.json" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void restoreLocalBackup(file); event.currentTarget.value = ''; }} />
+          </div>
         </section>
 
         <p className="mt-5 text-center text-xs font-semibold text-slate-400">
