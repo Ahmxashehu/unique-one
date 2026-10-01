@@ -480,17 +480,26 @@ const app = express();
     try {
       const roomId = typeof req.body?.roomId === 'string' ? req.body.roomId.trim() : '';
       const inviteToken = typeof req.body?.inviteToken === 'string' ? req.body.inviteToken.trim() : '';
+      const uniqueOneId = typeof req.body?.uniqueOneId === 'string' ? req.body.uniqueOneId.trim() : '';
       if (!isSafeFirebaseUid(roomId) || !/^[A-Za-z0-9_-]{24,256}$/.test(inviteToken)) return errorResponse(res, 'FORBIDDEN', 'This conference invitation is invalid.');
+      if (!/^\d{11}$/.test(uniqueOneId)) return errorResponse(res, 'INVALID_REQUEST', 'Enter your 11-digit Unique ID to join this conference.');
       const inviteHash = createHash('sha256').update(inviteToken).digest('hex');
       const inviteRef = adminDb.collection('conferenceInvites').doc(inviteHash);
       const inviteSnap = await inviteRef.get();
       if (!inviteSnap.exists) return errorResponse(res, 'FORBIDDEN', 'This conference invitation is invalid or expired.');
       const invite = inviteSnap.data() || {};
       if (invite.conferenceId !== roomId || invite.status !== 'active' || !(invite.expiresAt instanceof Timestamp) || invite.expiresAt.toMillis() <= Date.now()) return errorResponse(res, 'FORBIDDEN', 'This conference invitation is invalid or expired.');
+      if (typeof invite.targetUniqueId === 'string' && invite.targetUniqueId && invite.targetUniqueId !== uniqueOneId) {
+        return errorResponse(res, 'FORBIDDEN', 'This invitation was issued to a different Unique ID.');
+      }
       const conferenceSnap = await adminDb.collection('conferences').doc(roomId).get();
       if (!conferenceSnap.exists || conferenceSnap.data()?.status !== 'live') return errorResponse(res, 'NOT_FOUND', 'This conference is no longer live.');
       const guestUid = `guest_${randomUUID().replace(/-/g, '')}`;
-      const customToken = await getAuth().createCustomToken(guestUid, { conferenceGuest: true, conferenceId: roomId });
+      const customToken = await getAuth().createCustomToken(guestUid, {
+        conferenceGuest: true,
+        conferenceId: roomId,
+        uniqueOneId,
+      });
       await inviteRef.update({ lastUsedAt: Timestamp.now(), useCount: Number(invite.useCount || 0) + 1 });
       return res.json({ customToken, guestUid });
     } catch (error) {
