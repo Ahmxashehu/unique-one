@@ -588,7 +588,7 @@ export default function HomePage() {
                       ].map(([label, Icon]) => (
                         <Link
                           key={String(label)}
-                          to="/os"
+                          to="/media"
                           className="flex min-w-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-2.5 transition hover:border-emerald-300 hover:bg-emerald-50 sm:gap-2 sm:rounded-2xl sm:p-3"
                         >
                           <Icon className="h-4 w-4 shrink-0 text-emerald-600" />
