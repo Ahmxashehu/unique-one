@@ -12,6 +12,8 @@ interface AuthContextType {
   currentUser: FirebaseUser | null;
   userData: UniqueUser | null;
   loading: boolean;
+  isAuthenticated: boolean;
+  isVerified: boolean;
   logout: () => Promise<void>;
   hasRole: (role: Role) => boolean;
   hasPermission: (permission: Permission) => boolean;
@@ -50,9 +52,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         userDocRef,
         (docSnap) => {
           if (docSnap.exists()) {
-            setUserData(docSnap.data() as UniqueUser);
+            const nextUser = docSnap.data() as UniqueUser;
+            if (nextUser.status === 'banned' || nextUser.status === 'suspended') {
+              setUserData(nextUser);
+              void firebaseSignOut(auth);
+              setLoading(false);
+              return;
+            }
+            setUserData(nextUser);
           } else {
             console.warn('User document not found in Firestore.');
+            setUserData(null);
           }
           setLoading(false);
         },
@@ -74,6 +84,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     await firebaseSignOut(auth);
+    setCurrentUser(null);
+    setUserData(null);
   };
 
   const hasRole = (role: Role) => {
@@ -88,8 +100,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return userData.permissions?.includes(permission) || false;
   };
 
+  const isAuthenticated = Boolean(currentUser);
+  const isVerified = Boolean(
+    userData &&
+      userData.status === 'active' &&
+      (userData.verificationStatus === 'phone_verified' || userData.verificationStatus === 'fully_verified'),
+  );
+
   return (
-    <AuthContext.Provider value={{ currentUser, userData, loading, logout, hasRole, hasPermission }}>
+    <AuthContext.Provider value={{ currentUser, userData, loading, isAuthenticated, isVerified, logout, hasRole, hasPermission }}>
       {!loading && children}
     </AuthContext.Provider>
   );
