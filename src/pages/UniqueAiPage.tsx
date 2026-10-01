@@ -190,14 +190,21 @@ export default function UniqueAiPage() {
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-x-hidden sm:gap-4">
       <div className="flex min-w-0 items-center justify-between gap-2 px-0.5 sm:gap-3">
-        <div>
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 sm:h-10 sm:w-10"><Sparkles className="h-5 w-5 text-emerald-600 sm:h-6 sm:w-6" /></div>
-            <h1 className="truncate text-lg font-bold tracking-tight text-slate-900 sm:text-2xl">Unique AI</h1>
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 shadow-[0_0_24px_rgba(52,211,153,0.35)] sm:h-12 sm:w-12">
+            <span className="absolute inset-0 rounded-full border border-emerald-300/50 animate-ping" />
+            <span className="absolute inset-1 rounded-full border border-emerald-400/30 animate-[spin_5s_linear_infinite]" />
+            <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-emerald-400 text-[10px] font-black tracking-tight text-slate-950 shadow-[0_0_16px_rgba(52,211,153,0.8)] sm:h-8 sm:w-8 sm:text-xs">
+              U1
+            </span>
           </div>
-          <p className="mt-0.5 hidden max-w-2xl text-[11px] leading-4 text-slate-500 sm:mt-1 sm:block sm:text-sm sm:leading-5">
-            Free AI for everyone. Sign in to let Unique AI use your authorized Unique One platform context.
-          </p>
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-bold tracking-tight text-slate-900 sm:text-2xl">Ask Unique AI anything.</h1>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium text-emerald-600 sm:text-xs">
+              <Sparkles className="h-3 w-3" />
+              <span>Unique AI</span>
+            </div>
+          </div>
         </div>
         <button
           type="button"
@@ -214,16 +221,14 @@ export default function UniqueAiPage() {
         <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain p-2.5 sm:p-6">
           {messages.length === 0 ? (
             <div className="mx-auto flex max-w-2xl flex-col items-center py-3 text-center sm:py-10">
-              <div className="mb-2.5 flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 sm:mb-4 sm:h-14 sm:w-14 sm:rounded-2xl">
-                <Bot className="h-5.5 w-5.5 text-emerald-600 sm:h-7 sm:w-7" />
+              <div className="relative mb-2.5 flex h-14 w-14 items-center justify-center rounded-full bg-slate-950 shadow-[0_0_30px_rgba(52,211,153,0.4)] sm:mb-4 sm:h-16 sm:w-16">
+                <span className="absolute inset-0 rounded-full border border-emerald-300/50 animate-ping" />
+                <span className="absolute inset-1.5 rounded-full border border-emerald-400/30 animate-[spin_5s_linear_infinite]" />
+                <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-emerald-400 text-xs font-black tracking-tight text-slate-950 shadow-[0_0_20px_rgba(52,211,153,0.85)] sm:h-10 sm:w-10 sm:text-sm">
+                  U1
+                </span>
               </div>
               <h2 className="text-lg font-black tracking-tight text-slate-900 sm:text-2xl">Ask Unique AI anything.</h2>
-              <p className="mt-1.5 max-w-xl text-xs leading-5 text-slate-500 sm:mt-2 sm:text-sm">
-                Ask questions, learn, plan, write, explore ideas, or ask about Unique One. Public questions are free; registered users can unlock personalized platform context.
-              </p>
-              <div className="mt-3 w-full rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-left text-[11px] leading-4.5 text-emerald-800 sm:mt-4 sm:px-4 sm:py-3 sm:text-xs sm:leading-5">
-                <strong>{currentUser ? "Registered experience:" : "Free public experience:"}</strong> {currentUser ? "Unique AI can read your authorized account, order, business, and product context. Platform mutations remain protected." : "You can ask general questions without registering. Register to unlock personalized Unique One context and the full platform experience."}
-              </div>
               <div className="mt-3 w-full sm:mt-6">
                 <div className="mb-2 flex items-center justify-between px-0.5">
                   <span className="text-xs font-bold text-slate-700">Suggested questions</span>
