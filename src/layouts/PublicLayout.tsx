@@ -22,7 +22,7 @@ export default function PublicLayout() {
               <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">UNIQUE ONE</span>
             </Link>
             <nav className="hidden md:flex gap-6 items-center">
-              <Link to="/discover" className="text-sm font-medium text-slate-600 hover:text-slate-900">Discover</Link>
+              <Link to="/discover" className="text-sm font-medium text-slate-600 hover:text-slate-900">Active Edge</Link>
               <Link to="/categories" className="text-sm font-medium text-slate-600 hover:text-slate-900">Categories</Link>
               <Link to="/near-me" className="text-sm font-medium text-slate-600 hover:text-slate-900">Near Me</Link>
               <Link to="/about" className="text-sm font-medium text-slate-600 hover:text-slate-900">About</Link>
