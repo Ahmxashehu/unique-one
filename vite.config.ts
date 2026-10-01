@@ -13,7 +13,17 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         injectRegister: 'auto',
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+          globPatterns: ['**/*.{css,html,ico,png,svg,webmanifest}'],
+          runtimeCaching: [
+            {
+              urlPattern: ({ request }) => request.destination === 'script' || request.destination === 'style',
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'unique-one-app-assets',
+                expiration: { maxEntries: 100, maxAgeSeconds: 2592000 },
+              },
+            },
+          ],
           navigateFallback: '/index.html',
           navigateFallbackAllowlist: [/^\/(?!api(?:\/|$)).*/],
           navigateFallbackDenylist: [/^\/api(?:\/|$)/],
