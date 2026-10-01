@@ -58,11 +58,11 @@ export default function HomePage() {
     {
       eyebrow: 'UNIQUE STORE',
       title: 'Discover products and services made for your world.',
-      description: 'Find real published products and services from businesses and providers on Unique.',
-      action: 'Open Store',
+      description: 'Buy, sell, hire, book, send and discover real products and services from Unique businesses and providers.',
+      action: 'Open Unique Store',
       href: '/store',
       icon: ShoppingBag,
-      tone: 'from-slate-900 via-slate-800 to-emerald-900',
+      tone: 'from-emerald-950 via-slate-950 to-emerald-700',
     },
     {
       eyebrow: 'UNIQUE AI',
@@ -418,6 +418,17 @@ export default function HomePage() {
                   className={`absolute inset-0 transition-all duration-700 ease-out ${isActive ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-8 opacity-0'}`}
                 >
                   <div className={`absolute inset-0 bg-gradient-to-br ${poster.tone}`} />
+                  {poster.eyebrow === 'UNIQUE STORE' && (
+                    <>
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_25%,rgba(52,211,153,0.28),transparent_28%),radial-gradient(circle_at_15%_85%,rgba(16,185,129,0.22),transparent_32%)]" />
+                      <div className="absolute right-5 top-24 grid grid-cols-2 gap-2 opacity-80 sm:right-12 sm:top-28 sm:gap-3">
+                        {['BUY', 'SELL', 'HIRE', 'BOOK'].map((label) => (
+                          <span key={label} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-[9px] font-black tracking-[0.16em] backdrop-blur sm:rounded-2xl sm:px-4 sm:py-3 sm:text-[10px]">{label}</span>
+                        ))}
+                      </div>
+                      <div className="absolute bottom-24 right-8 h-24 w-24 rounded-[2rem] border border-emerald-300/20 bg-emerald-300/10 blur-sm sm:bottom-28 sm:right-20 sm:h-36 sm:w-36" />
+                    </>
+                  )}
                   <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-white/10 blur-2xl sm:-right-24 sm:-top-24 sm:h-72 sm:w-72" />
                   <div className="absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-black/10 blur-3xl sm:-bottom-32 sm:h-80 sm:w-80" />
 
@@ -434,7 +445,7 @@ export default function HomePage() {
 
                     <div className="max-w-3xl">
                       <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.16em] text-white/70 sm:mb-3 sm:text-xs sm:tracking-[0.2em]">
-                        Promotional experience
+                        {poster.eyebrow === 'UNIQUE STORE' ? 'Buy • Sell • Hire • Book • Discover' : 'Promotional experience'}
                       </p>
                       <h1 className="text-2xl font-black leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
                         {poster.title}
@@ -442,6 +453,13 @@ export default function HomePage() {
                       <p className="mt-2 max-w-2xl text-xs leading-5 text-white/80 sm:mt-5 sm:text-lg sm:leading-7">
                         {poster.description}
                       </p>
+                      {poster.eyebrow === 'UNIQUE STORE' && (
+                        <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-4 sm:gap-2">
+                          {['Products', 'Services', 'Businesses', 'Bookings'].map((item) => (
+                            <span key={item} className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[9px] font-bold text-white/85 backdrop-blur sm:px-3 sm:py-1.5 sm:text-[10px]">{item}</span>
+                          ))}
+                        </div>
+                      )
                       <div className="mt-4 flex flex-wrap gap-2 sm:mt-7 sm:gap-3">
                         {poster.href.startsWith('#') ? (
                           <button
