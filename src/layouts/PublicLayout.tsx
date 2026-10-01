@@ -65,18 +65,28 @@ export default function PublicLayout() {
             </div>
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               {[
+                ['Restaurant', '/categories'],
+                ['Hotel', '/travel'],
+                ['Flights', '/travel'],
+                ['School', '/education'],
+                ['Active Edge', '/discover'],
+                ['Global Search', '/search'],
                 ['Categories', '/categories'],
                 ['Near Me', '/near-me'],
-                ['Store', '/store'],
                 ['Unique AI', '/ai'],
-                ['About', '/about'],
-                ['Support', '/support'],
+                ['Jobs', '/os/jobs'],
+                ['Contributions', '/os/contributions'],
+                ['Bookings', '/os/bookings'],
+                ['Orders', '/os/orders'],
+                ['Wishlist', '/os/wishlist'],
+                ['Requests', '/os/requests'],
+                ['Master Vision', '/os/master-vision'],
               ].map(([name, path]) => (
                 <Link
-                  key={path}
+                  key={path + name}
                   to={path}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] sm:px-4 sm:text-sm"
+                  className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm"
                 >
                   {name}
                 </Link>
