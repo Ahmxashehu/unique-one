@@ -429,6 +429,75 @@ const app = express();
     }
   };
 
+  app.post('/api/conference/create', authenticate, rateLimit({
+    windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false,
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conference creation attempts. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const hostUid = String((req as any).user?.uid || '');
+      const title = typeof req.body?.title === 'string' ? req.body.title.trim().slice(0, 120) : 'Unique Conference';
+      if (!isSafeFirebaseUid(hostUid) || !title) return errorResponse(res, 'INVALID_REQUEST', 'A valid conference title is required.');
+      const conferenceRef = adminDb.collection('conferences').doc();
+      const inviteToken = randomUUID() + randomUUID().replace(/-/g, '');
+      const inviteHash = createHash('sha256').update(inviteToken).digest('hex');
+      const now = Timestamp.now();
+      await conferenceRef.set({ title, description: 'Online meeting, lecture or public conference.', public: true, hostUid, status: 'live', createdAt: now });
+      await adminDb.collection('conferenceInvites').doc(inviteHash).set({ conferenceId: conferenceRef.id, hostUid, status: 'active', expiresAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000), createdAt: now });
+      return res.json({ roomId: conferenceRef.id, inviteUrl: `${req.protocol}://${req.get('host')}/conference/${conferenceRef.id}?invite=${encodeURIComponent(inviteToken)}` });
+    } catch (error) {
+      console.error('Conference creation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The conference could not be created.');
+    }
+  });
+  app.post('/api/conference/invite', authenticate, rateLimit({
+    windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false,
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conference invitation attempts. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const hostUid = String((req as any).user?.uid || '');
+      const roomId = typeof req.body?.roomId === 'string' ? req.body.roomId.trim() : '';
+      const targetUniqueId = typeof req.body?.targetUniqueId === 'string' ? req.body.targetUniqueId.trim().slice(0, 128) : '';
+      if (!isSafeFirebaseUid(hostUid) || !isSafeFirebaseUid(roomId)) return errorResponse(res, 'INVALID_REQUEST', 'A valid conference is required.');
+      const conferenceSnap = await adminDb.collection('conferences').doc(roomId).get();
+      if (!conferenceSnap.exists || conferenceSnap.data()?.hostUid !== hostUid || conferenceSnap.data()?.status !== 'live') return errorResponse(res, 'FORBIDDEN', 'Only the active conference host can create invitations.');
+      const inviteToken = randomUUID() + randomUUID().replace(/-/g, '');
+      const inviteHash = createHash('sha256').update(inviteToken).digest('hex');
+      const now = Timestamp.now();
+      await adminDb.collection('conferenceInvites').doc(inviteHash).set({ conferenceId: roomId, hostUid, targetUniqueId: targetUniqueId || null, status: 'active', expiresAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000), createdAt: now });
+      return res.json({ inviteUrl: `${req.protocol}://${req.get('host')}/conference/${roomId}?invite=${encodeURIComponent(inviteToken)}`, expiresInSeconds: 86400 });
+    } catch (error) {
+      console.error('Conference invitation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The conference invitation could not be created.');
+    }
+  });
+  app.post('/api/conference/guest-session', rateLimit({
+    windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false,
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many conference access attempts. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const roomId = typeof req.body?.roomId === 'string' ? req.body.roomId.trim() : '';
+      const inviteToken = typeof req.body?.inviteToken === 'string' ? req.body.inviteToken.trim() : '';
+      if (!isSafeFirebaseUid(roomId) || !/^[A-Za-z0-9_-]{24,256}$/.test(inviteToken)) return errorResponse(res, 'FORBIDDEN', 'This conference invitation is invalid.');
+      const inviteHash = createHash('sha256').update(inviteToken).digest('hex');
+      const inviteRef = adminDb.collection('conferenceInvites').doc(inviteHash);
+      const inviteSnap = await inviteRef.get();
+      if (!inviteSnap.exists) return errorResponse(res, 'FORBIDDEN', 'This conference invitation is invalid or expired.');
+      const invite = inviteSnap.data() || {};
+      if (invite.conferenceId !== roomId || invite.status !== 'active' || !(invite.expiresAt instanceof Timestamp) || invite.expiresAt.toMillis() <= Date.now()) return errorResponse(res, 'FORBIDDEN', 'This conference invitation is invalid or expired.');
+      const conferenceSnap = await adminDb.collection('conferences').doc(roomId).get();
+      if (!conferenceSnap.exists || conferenceSnap.data()?.status !== 'live') return errorResponse(res, 'NOT_FOUND', 'This conference is no longer live.');
+      const guestUid = `guest_${randomUUID().replace(/-/g, '')}`;
+      const customToken = await getAuth().createCustomToken(guestUid, { conferenceGuest: true, conferenceId: roomId });
+      await inviteRef.update({ lastUsedAt: Timestamp.now(), useCount: Number(invite.useCount || 0) + 1 });
+      return res.json({ customToken, guestUid });
+    } catch (error) {
+      console.error('Conference guest session failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Conference guest access is temporarily unavailable.');
+    }
+  });
   app.post('/api/auth/phone/register-password', rateLimit({
     windowMs: 10 * 60_000,
     limit: 5,
