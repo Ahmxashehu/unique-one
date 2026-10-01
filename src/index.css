@@ -363,3 +363,67 @@ a {
     top: 0.5rem;
   }
 }
+
+
+/* Subtle U1 identity mark for the top-right appearance control. It stays inside
+   the control footprint so the animated glow never changes page layout. */
+.unique-u1-orbit {
+  position: relative;
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  isolation: isolate;
+}
+.unique-u1-orbit-ring {
+  position: absolute;
+  inset: 0.05rem;
+  border-radius: 9999px;
+  border: 1px solid rgb(16 185 129 / 0.38);
+  box-shadow: 0 0 7px rgb(16 185 129 / 0.28), inset 0 0 6px rgb(16 185 129 / 0.16);
+  animation: uniqueU1Glow 2.6s ease-in-out infinite;
+}
+.unique-u1-orbit::after {
+  content: "";
+  position: absolute;
+  inset: -0.16rem;
+  border-radius: 9999px;
+  border: 1px solid rgb(16 185 129 / 0.18);
+  opacity: 0.65;
+  animation: uniqueU1Pulse 2.6s ease-in-out infinite;
+}
+.unique-u1-mark {
+  position: relative;
+  z-index: 1;
+  font-size: 0.58rem;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #059669;
+  text-shadow: 0 0 8px rgb(16 185 129 / 0.34);
+}
+@keyframes uniqueU1Glow {
+  0%, 100% { transform: scale(0.94); opacity: 0.72; }
+  50% { transform: scale(1.04); opacity: 1; }
+}
+@keyframes uniqueU1Pulse {
+  0%, 100% { transform: scale(0.88); opacity: 0.18; }
+  50% { transform: scale(1.08); opacity: 0.7; }
+}
+.unique-dark .unique-u1-orbit-ring {
+  border-color: rgb(52 211 153 / 0.48);
+  box-shadow: 0 0 9px rgb(52 211 153 / 0.34), inset 0 0 7px rgb(52 211 153 / 0.2);
+}
+.unique-dark .unique-u1-mark {
+  color: #34d399;
+  text-shadow: 0 0 9px rgb(52 211 153 / 0.45);
+}
+@media (prefers-reduced-motion: reduce) {
+  .unique-u1-orbit-ring,
+  .unique-u1-orbit::after {
+    animation: none;
+  }
+}
