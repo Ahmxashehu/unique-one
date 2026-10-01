@@ -237,3 +237,129 @@ a {
     min-width: 0;
   }
 }
+
+
+/* Compact global appearance controls. Dark mode is additive and preserves the
+   existing layout, routes and feature structure. */
+.unique-appearance-controls {
+  transform: translateZ(0);
+}
+
+.unique-dark {
+  color-scheme: dark;
+  background: #0b0f0d;
+}
+
+.unique-dark body {
+  background: #0b0f0d;
+  color: #e5e7eb;
+}
+
+.unique-dark .bg-white,
+.unique-dark .bg-white\/80,
+.unique-dark .bg-white\/90 {
+  background-color: #111714 !important;
+}
+
+.unique-dark .bg-slate-50 {
+  background-color: #0f1512 !important;
+}
+
+.unique-dark .bg-slate-100 {
+  background-color: #18201c !important;
+}
+
+.unique-dark .bg-slate-200 {
+  background-color: #253029 !important;
+}
+
+.unique-dark .text-slate-900 {
+  color: #f3f4f6 !important;
+}
+
+.unique-dark .text-slate-800 {
+  color: #e5e7eb !important;
+}
+
+.unique-dark .text-slate-700 {
+  color: #d1d5db !important;
+}
+
+.unique-dark .text-slate-600 {
+  color: #aeb8b2 !important;
+}
+
+.unique-dark .text-slate-500,
+.unique-dark .text-slate-400 {
+  color: #8d9a93 !important;
+}
+
+.unique-dark .border-slate-100 {
+  border-color: #202923 !important;
+}
+
+.unique-dark .border-slate-200 {
+  border-color: #2b3830 !important;
+}
+
+.unique-dark .border-slate-300 {
+  border-color: #3a4941 !important;
+}
+
+.unique-dark .hover\\:bg-slate-100:hover {
+  background-color: #1a241f !important;
+}
+
+.unique-dark .hover\\:text-slate-900:hover {
+  color: #ffffff !important;
+}
+
+.unique-dark .mobile-bottom-nav {
+  background: rgb(15 21 18 / 0.96);
+  border-top-color: #26332c;
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 0.28);
+}
+
+.unique-dark .mobile-nav-item {
+  color: #94a39a;
+}
+
+.unique-dark .mobile-nav-item-active {
+  color: #34d399;
+}
+
+.unique-dark .unique-appearance-controls {
+  border-color: #2b3830;
+  background: rgb(17 23 20 / 0.92);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.28);
+}
+
+.unique-dark .unique-appearance-controls button {
+  color: #cbd5d1;
+}
+
+.unique-dark .unique-appearance-controls button:hover {
+  background: #17231c;
+  color: #34d399;
+}
+
+.unique-dark .unique-appearance-controls [role="listbox"] {
+  border-color: #2b3830;
+  background: #111714;
+}
+
+.unique-dark .unique-appearance-controls [role="option"] {
+  color: #d1d5db;
+}
+
+.unique-dark .unique-appearance-controls [role="option"]:hover {
+  background: #17231c;
+  color: #6ee7b7;
+}
+
+@media (max-width: 639px) {
+  .unique-appearance-controls {
+    right: 0.75rem;
+    top: 0.5rem;
+  }
+}
