@@ -286,10 +286,10 @@ export default function HomePage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f7f9f8] text-slate-950">
+    <main className="min-h-screen min-w-0 overflow-x-hidden bg-[#f7f9f8] text-slate-950">
       {/* Sticky discovery header */}
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex min-w-0 max-w-7xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3 lg:px-8">
           <Link to="/os" className="flex shrink-0 items-center gap-2 font-black tracking-tight">
             <span className="hidden sm:block">UNIQUE</span>
           </Link>
@@ -299,7 +299,7 @@ export default function HomePage() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search people, businesses, products, places..."
+              placeholder="Search Unique..."
               className="h-10 w-full rounded-full border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition focus:border-emerald-400 focus:bg-white"
               aria-label="Search Unique"
             />
@@ -326,7 +326,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-4 pb-20 pt-5 sm:px-6 lg:px-8">
+      <div className="mx-auto min-w-0 max-w-7xl px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pb-20 sm:pt-5 lg:px-8">
         {/* Quick actions: direct paths into the existing Unique ecosystem */}
         <section aria-label="Quick actions" className="mt-5 hidden overflow-x-auto pb-1 md:block">
           <div className="flex min-w-max gap-2">
@@ -377,7 +377,7 @@ export default function HomePage() {
         </section>
 
         {/* Your Unique Day: entry points only; no fabricated activity counts */}
-        <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mt-6 sm:rounded-3xl sm:p-6">
+        <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:mt-6 sm:rounded-3xl sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-600 sm:text-xs sm:tracking-[0.16em]">Your Unique Day</p>
@@ -407,7 +407,7 @@ export default function HomePage() {
 
         {/* Promotional poster carousel: rotates automatically every 15 seconds and remains manually navigable. */}
         <section aria-label="Unique promotional posters" className="relative mt-4 overflow-hidden rounded-2xl bg-slate-950 text-white shadow-sm sm:mt-6 sm:rounded-[2rem]">
-          <div className="relative min-h-[330px] sm:min-h-[470px]">
+          <div className="relative min-h-[300px] sm:min-h-[470px]">
             {promotionalPosters.map((poster, index) => {
               const PosterIcon = poster.icon;
               const isActive = index === activePromo;
@@ -424,7 +424,7 @@ export default function HomePage() {
                   <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-white/10 blur-2xl sm:-right-24 sm:-top-24 sm:h-72 sm:w-72" />
                   <div className="absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-black/10 blur-3xl sm:-bottom-32 sm:h-80 sm:w-80" />
 
-                  <div className="relative flex min-h-[330px] flex-col justify-between p-4 sm:min-h-[470px] sm:p-9 lg:p-12">
+                  <div className="relative flex min-h-[300px] flex-col justify-between p-4 sm:min-h-[470px] sm:p-9 lg:p-12">
                     <div className="flex items-start justify-between gap-3 sm:gap-4">
                       <div className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-white/20 bg-black/10 px-2.5 py-1.5 text-[10px] font-black tracking-[0.1em] backdrop-blur sm:gap-2 sm:px-3 sm:text-xs sm:tracking-[0.14em]">
                         <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-white sm:h-2 sm:w-2" />
