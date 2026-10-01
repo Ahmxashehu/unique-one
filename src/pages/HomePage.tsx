@@ -849,8 +849,10 @@ export default function HomePage() {
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-semibold text-emerald-900">
                   <Link to="/store" className="rounded-2xl bg-white/80 p-3">Sell</Link>
-                  <Link to="/os/pay" className="rounded-2xl bg-white/80 p-3">Pay Logistics</Link>
-                  <Link to="/discover" className="rounded-2xl bg-white/80 p-3">Book Tickets</Link>
+                  <Link to="/os/travel" className="rounded-2xl bg-white/80 p-3">Travel</Link>
+                  <Link to="/categories" className="rounded-2xl bg-white/80 p-3">Food & Dining</Link>
+                  <Link to="/categories" className="rounded-2xl bg-white/80 p-3">Health & Wellness</Link>
+                  <Link to="/categories" className="rounded-2xl bg-white/80 p-3">Technology</Link>
                   <Link to="/os" className="rounded-2xl bg-white/80 p-3">UniqueCycle/Aju</Link>
                 </div>
               </div>
