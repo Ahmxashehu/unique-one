@@ -473,8 +473,9 @@ service cloud.firestore {
       }
 
       match /chat/{messageId} {
-        allow read: if isAuthenticated() && (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.public == true
-          || get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid);
+        allow read: if isAuthenticated() && (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid
+          || (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.public == true && request.auth.token.conferenceGuest != true)
+          || (request.auth.token.conferenceGuest == true && request.auth.token.conferenceId == conferenceId));
         allow create: if isAuthenticated()
           && exists(/databases/$(database)/documents/conferences/$(conferenceId)/participants/$(request.auth.uid))
           && request.resource.data.uid == request.auth.uid
@@ -488,6 +489,7 @@ service cloud.firestore {
       match /signals/{signalId} {
         allow read: if isAuthenticated() && resource.data.to == request.auth.uid;
         allow create: if isAuthenticated()
+          && (request.auth.token.conferenceGuest != true || request.auth.token.conferenceId == conferenceId)
           && request.resource.data.from == request.auth.uid
           && request.resource.data.to is string
           && request.resource.data.type in ['offer','answer','ice']
