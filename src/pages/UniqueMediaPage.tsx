@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { FileText, Image as ImageIcon, Music2, Play, Search, Users, Upload, X, Share2, Cloud, Download, Smartphone } from 'lucide-react';
-import { AuthActionGate } from '../components/auth/AuthActionGate';
+import AuthActionGate from '../components/auth/AuthActionGate';
 
 type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
 
