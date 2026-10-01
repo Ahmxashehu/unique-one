@@ -845,42 +845,69 @@ export default function HomePage() {
             </div>
 
             <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-              <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 sm:rounded-3xl sm:p-5">
-                <div className="flex items-center gap-2">
-                  <Compass className="h-5 w-5 text-emerald-600" />
-                  <h3 className="min-w-0 break-words text-sm font-black sm:text-base">Discover Collection</h3>
+              <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:rounded-3xl sm:p-5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 sm:h-10 sm:w-10 sm:rounded-2xl"><Building2 className="h-5 w-5" /></span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="break-words text-sm font-black sm:text-base">Unique Business Hub</h3>
+                    <p className="mt-0.5 text-[11px] leading-4 text-slate-500 sm:text-xs">Register, verify and manage your business in one place.</p>
+                  </div>
                 </div>
-                <p className="mt-2 break-words text-xs leading-5 text-slate-500 sm:text-sm sm:leading-6">
-                  Browse the real marketplace signal behind the Edge. Products appear from
-                  published seller inventory only.
-                </p>
-                <div className="mt-4 space-y-2">
-                  {filteredProducts.slice(0, 4).map((product) => (
-                    <Link
-                      key={product.id}
-                      to={`/store/product/${product.id}`}
-                      className="flex items-center gap-3 rounded-2xl p-2 hover:bg-slate-50"
-                    >
-                      <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100">
-                        {product.images?.[0] ? (
-                          <img src={product.images[0]} alt="" className="h-full w-full object-cover" />
-                        ) : null}
+                <details className="group mt-3">
+                  <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700 sm:rounded-2xl sm:px-4 sm:text-sm">
+                    <span className="min-w-0 break-words">Open Business Hub categories</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 rotate-90 transition-transform group-open:-rotate-90" />
+                  </summary>
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <p className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-xs">Start & verify</p>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {[
+                          ['Register your Business', '/os/business/register', 'Create your business profile.'],
+                          ['NIN / BVN Validation', '/os/pay/verification', 'Identity and account verification.'],
+                          ['NIN Modification', '/os/pay/verification', 'Open the verification centre for available guidance.'],
+                          ['CAC Registration', '/os/business/register', 'Start business registration and provide CAC details.'],
+                        ].map(([label, href, description]) => (
+                          <Link key={label} to={href} className="flex min-w-0 items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 transition hover:border-emerald-300 hover:bg-emerald-50 sm:rounded-2xl sm:p-3">
+                            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-700"><Building2 className="h-4 w-4" /></span>
+                            <span className="min-w-0"><span className="block break-words text-xs font-bold text-slate-800">{label}</span><span className="mt-1 block text-[10px] leading-4 text-slate-500 sm:text-[11px]">{description}</span></span>
+                          </Link>
+                        ))}
                       </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{product.name}</p>
-                        <p className="text-xs text-emerald-700">{formatPrice(product)}</p>
+                    </div>
+                    <div>
+                      <p className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-xs">Run & grow your business</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          ['Business Dashboard', '/os/business/dashboard'],
+                          ['Products & Catalog', '/os/business/catalog'],
+                          ['Orders', '/os/business/orders'],
+                          ['Inventory', '/os/business/inventory'],
+                          ['Customers', '/os/business/customers'],
+                          ['Suppliers', '/os/business/suppliers'],
+                          ['Invoices', '/os/business/invoices'],
+                          ['Finance', '/os/business/finance'],
+                          ['Reports & Analytics', '/os/business/reports'],
+                          ['Staff & Teams', '/os/business/staff'],
+                          ['Branches', '/os/business/branches'],
+                          ['Activity Logs', '/os/business/activity'],
+                          ['Business Settings', '/os/business/settings'],
+                          ['Messages', '/os/messages'],
+                          ['Unique Store', '/store'],
+                          ['UniquePay', '/os/pay'],
+                        ].map(([label, href]) => (
+                          <Link key={label} to={href} className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 sm:rounded-2xl sm:p-3">
+                            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                            <span className="min-w-0 break-words">{label}</span>
+                          </Link>
+                        ))}
                       </div>
-                    </Link>
-                  ))}
-                </div>
-                <Link
-                  to="/discover"
-                  className="mt-4 flex min-w-0 items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-3 text-center text-xs font-bold text-white sm:rounded-2xl sm:px-4 sm:text-sm"
-                >
-                  Explore everything <ArrowRight className="h-4 w-4" />
-                </Link>
+                    </div>
+                  </div>
+                </details>
+                <p className="mt-3 rounded-xl bg-emerald-50 px-2.5 py-2 text-[10px] leading-4 text-emerald-800 sm:text-xs">Some identity, NIN modification and CAC services require an authorized external provider; the links open the relevant existing platform areas.</p>
               </div>
-
+              
               <div className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50 p-3.5 sm:rounded-3xl sm:p-5">
                 <div className="flex min-w-0 items-start gap-2 font-black text-emerald-900">
                   <Sparkles className="mt-0.5 h-5 w-5 shrink-0" />
