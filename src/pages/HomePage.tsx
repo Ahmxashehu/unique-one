@@ -438,16 +438,14 @@ export default function HomePage() {
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-600 sm:text-xs sm:tracking-[0.16em]">Your Unique Day</p>
               <h2 className="mt-1 text-lg font-black leading-tight tracking-tight sm:text-xl">Pick up where you left off</h2>
-              <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 sm:text-sm">Jump into the parts of Unique One you use most.</p>
             </div>
-            <Link to="/os" className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 sm:bg-transparent sm:px-0 sm:py-0 sm:text-sm">Open OS <span className="hidden sm:inline">→</span></Link>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-2">
             {[
               ['UniqueStore', '/store'],
               ['UniquePay', '/os/pay'],
               ['Messages', '/os'],
-              ['UniqueValidation', '/os/validation'],
+              ['UniqueValidation', '/os/pay/verification'],
             ].map(([label, href]) => (
               <Link
                 key={label}
