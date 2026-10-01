@@ -10,7 +10,7 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import type { Conversation, ConversationMember, ConversationType, Message, MessageRequest } from "./src/lib/os/communication-types";
 import { validateMessageDraft, CommunicationValidationError } from "./communicationCore";
-import { generateUniqueAiResponse, UniqueAiValidationError } from "./src/lib/ai/uniqueAiService";
+import { generatePublicUniqueAiResponse, generateUniqueAiResponse, UniqueAiValidationError } from "./src/lib/ai/uniqueAiService";
 import { registerIdentityVerificationRoutes } from "./src/server/identityVerificationRoutes";
 import { registerAjoRoutes } from "./src/server/ajoRoutes";
 
@@ -645,6 +645,43 @@ const app = express();
   app.get("/api/health", (req, res) => res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" }));
   registerIdentityVerificationRoutes(app, authenticate);
   registerAjoRoutes(app, authenticate);
+
+  app.post("/api/ai/public-chat", rateLimit({
+    windowMs: 60_000,
+    limit: 12,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('publicAiRateLimits', 60_000),
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many public AI requests. Please try again shortly.'),
+  }), async (req, res) => {
+    const resolvedRequestId = resolveAiRequestId(req);
+    res.setHeader("X-Request-ID", resolvedRequestId);
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      if (!isPlainObject(req.body)) return errorResponse(res, 'INVALID_REQUEST', 'The AI request body must be a plain object.');
+      const payload = req.body as Record<string, unknown>;
+      const allowedKeys = new Set(['message', 'history']);
+      for (const key of Object.keys(payload)) {
+        if (!allowedKeys.has(key)) return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
+      }
+      const responseText = await generatePublicUniqueAiResponse({ message: payload.message, history: payload.history });
+      return res.status(200).json({
+        message: responseText,
+        public: true,
+        registerPrompt: true,
+        readOnly: true,
+        requestId: resolvedRequestId,
+        capabilities: { version: 1, readOnly: true, contexts: [], mutations: [] },
+      });
+    } catch (error) {
+      if (error instanceof UniqueAiValidationError) {
+        return res.status(400).json({ error: { code: "INVALID_REQUEST", message: error.message }, requestId: resolvedRequestId });
+      }
+      console.error('Public Unique AI request failed:', { requestId: resolvedRequestId, error });
+      return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Unique AI is temporarily unavailable. Please try again shortly." }, requestId: resolvedRequestId });
+    }
+  });
 
   app.post("/api/ai/chat", authenticate, rateLimit({
     windowMs: 60_000,
