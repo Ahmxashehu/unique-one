@@ -36,6 +36,7 @@ type EdgePost = {
 };
 
 type CommentItem = { id: string; authorName: string; authorPhotoUrl?: string; text: string; createdAt?: any };
+type EdgeStatus = { id: string; authorUid: string; authorName: string; authorPhotoUrl?: string; text: string; createdAt?: any };
 
 const toMillis = (value: any) => {
   if (!value) return 0;
@@ -56,9 +57,15 @@ const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map(part
 export default function DiscoverPage() {
   const { currentUser } = useAuth();
   const [posts, setPosts] = useState<EdgePost[]>([]);
+  const [statuses, setStatuses] = useState<EdgeStatus[]>([]);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [statusViewer, setStatusViewer] = useState<EdgeStatus | null>(null);
+  const [statusText, setStatusText] = useState('');
+  const [statusPosting, setStatusPosting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [postText, setPostText] = useState('');
   const [composerOpen, setComposerOpen] = useState(false);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [posting, setPosting] = useState(false);
   const [actorType, setActorType] = useState<ActorType>('user');
   const [actorOptions, setActorOptions] = useState<Array<{ id: string; name: string; photoUrl?: string; actionLabel?: 'pay' | 'visit' | 'chat'; actionUrl?: string }>>([]);
@@ -88,6 +95,16 @@ export default function DiscoverPage() {
       setError('Active Edge could not load right now.');
       setLoading(false);
     });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const statusesQuery = query(collection(db, 'edgeStatuses'), where('status', '==', 'published'), limit(30));
+    const unsubscribe = onSnapshot(statusesQuery, snapshot => {
+      const next = snapshot.docs.map(item => ({ id: item.id, ...(item.data() as Omit<EdgeStatus, 'id'>) }))
+        .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+      setStatuses(next);
+    }, err => console.error('Active Edge statuses failed:', err));
     return () => unsubscribe();
   }, []);
 
@@ -179,6 +196,34 @@ export default function DiscoverPage() {
     }
   };
 
+  const createStatus = async () => {
+    if (!currentUser) { setError('Sign in to post a status.'); return; }
+    const text = statusText.trim();
+    if (!text || text.length > 500) return;
+    setStatusPosting(true);
+    setError('');
+    try {
+      const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
+      const userData = userSnap.exists() ? userSnap.data() : {};
+      await addDoc(collection(db, 'edgeStatuses'), {
+        authorUid: currentUser.uid,
+        authorName: String(userData.fullName || currentUser.displayName || 'Unique user'),
+        authorPhotoUrl: String(userData.profilePhotoUrl || currentUser.photoURL || ''),
+        text,
+        status: 'published',
+        createdAt: serverTimestamp(),
+      });
+      setStatusText('');
+      setStatusOpen(false);
+      setCreateMenuOpen(false);
+    } catch (err) {
+      console.error('Active Edge status failed:', err);
+      setError(err instanceof Error ? err.message : 'Could not publish your status.');
+    } finally {
+      setStatusPosting(false);
+    }
+  };
+
   const toggleLike = async (post: EdgePost) => {
     if (!currentUser) { setError('Sign in to like posts.'); return; }
     const likeRef = doc(db, 'edgePosts', post.id, 'likes', currentUser.uid);
@@ -236,29 +281,53 @@ export default function DiscoverPage() {
 
   return (
     <main className="min-h-screen bg-[#f5f7f6] text-slate-950">
-      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-3 py-3 sm:px-6">
-          <div>
+      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-3 sm:px-6">
+          <div className="min-w-0 shrink-0">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Unique One</p>
             <h1 className="text-xl font-black tracking-tight sm:text-2xl">Active Edge</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setPreferencesOpen(true)} className="flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm"><Settings2 className="h-4 w-4" /><span className="hidden sm:inline">Preferences</span></button>
-            <button type="button" onClick={() => setComposerOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg transition hover:scale-105" aria-label="Create update"><Plus className="h-5 w-5" /></button>
+          <button type="button" onClick={() => { setCreateMenuOpen(false); setComposerOpen(true); }} className="mx-auto flex min-w-0 max-w-xl flex-1 items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-4 py-2.5 text-left text-sm text-slate-500 shadow-inner transition hover:bg-slate-50">
+            <Share2 className="h-4 w-4 shrink-0 text-emerald-600" />
+            <span className="truncate">Share an update with Unique One...</span>
+          </button>
+          <div className="relative shrink-0">
+            <button type="button" onClick={() => setCreateMenuOpen(open => !open)} className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg transition hover:scale-105" aria-label="Create post or status">
+              <Plus className="h-5 w-5" />
+            </button>
+            {createMenuOpen && (
+              <div className="absolute right-0 top-14 z-40 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                <button type="button" onClick={() => { setCreateMenuOpen(false); setComposerOpen(true); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold hover:bg-emerald-50"><Share2 className="h-4 w-4 text-emerald-600" /> Post update</button>
+                <button type="button" onClick={() => { setCreateMenuOpen(false); setStatusOpen(true); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold hover:bg-emerald-50"><Sparkles className="h-4 w-4 text-emerald-600" /> Status</button>
+              </div>
+            )}
           </div>
+          <button type="button" onClick={() => setPreferencesOpen(true)} className="hidden h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm lg:flex"><Settings2 className="h-4 w-4" /> Preferences</button>
         </div>
       </header>
 
-      <div className="mx-auto max-w-4xl px-3 pb-16 pt-4 sm:px-6 sm:pt-6">
+      <div className="mx-auto max-w-5xl px-3 pb-16 pt-3 sm:px-6 sm:pt-5">
         {error && <div className="mb-4 flex items-start justify-between gap-3 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-700"><span>{error}</span><button type="button" onClick={() => setError('')}><X className="h-4 w-4" /></button></div>}
 
-        <section className="mb-5 rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-50 font-black text-emerald-700">
-              {selectedActor?.photoUrl ? <img src={selectedActor.photoUrl} alt="" className="h-full w-full object-cover" /> : initials(selectedActor?.name || 'Unique')}
-            </div>
-            <button type="button" onClick={() => setComposerOpen(true)} className="flex-1 rounded-full bg-slate-100 px-4 py-3 text-left text-sm text-slate-500 transition hover:bg-slate-200">Share an update with Unique One...</button>
-            <button type="button" onClick={() => setComposerOpen(true)} className="rounded-full bg-emerald-50 p-3 text-emerald-700" aria-label="Add post"><Plus className="h-5 w-5" /></button>
+        <section className="mb-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex h-[104px] items-center gap-3 overflow-x-auto px-4 sm:h-[112px] sm:px-5">
+            <button type="button" onClick={() => currentUser ? setStatusOpen(true) : setError('Sign in to post a status.')} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+              <div className="relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-emerald-400 bg-emerald-50 text-emerald-700">
+                <Plus className="h-5 w-5" />
+              </div>
+              <span className="max-w-16 truncate text-[10px] font-bold text-slate-600">Your status</span>
+            </button>
+            {statuses.map(status => (
+              <button key={status.id} type="button" onClick={() => setStatusViewer(status)} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+                <div className="h-14 w-14 rounded-full bg-gradient-to-tr from-emerald-500 via-lime-400 to-slate-900 p-[2px]">
+                  <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-white bg-emerald-50 text-xs font-black text-emerald-700">
+                    {status.authorPhotoUrl ? <img src={status.authorPhotoUrl} alt="" className="h-full w-full object-cover" /> : initials(status.authorName)}
+                  </div>
+                </div>
+                <span className="max-w-16 truncate text-[10px] font-bold text-slate-600">{status.authorName}</span>
+              </button>
+            ))}
+            {!statuses.length && <div className="text-xs text-slate-400">Public status updates will appear here.</div>}
           </div>
         </section>
 
@@ -342,6 +411,30 @@ export default function DiscoverPage() {
               <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-3 text-xs font-bold"><input type="checkbox" checked={allowReshare} onChange={event => setAllowReshare(event.target.checked)} /> Resharing</label>
             </div>
             <button type="button" disabled={posting || !postText.trim() || !currentUser} onClick={() => void createPost()} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-black text-white disabled:opacity-50">{posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Publish update</button>
+          </div>
+        </div>
+      )}
+
+      {statusViewer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4" onClick={() => setStatusViewer(null)}>
+          <article className="relative w-full max-w-md overflow-hidden rounded-3xl bg-slate-950 p-5 text-white shadow-2xl" onClick={event => event.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 overflow-hidden rounded-full bg-emerald-500 p-[2px]"><div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-white text-xs font-black text-emerald-700">{statusViewer.authorPhotoUrl ? <img src={statusViewer.authorPhotoUrl} alt="" className="h-full w-full object-cover" /> : initials(statusViewer.authorName)}</div></div>
+              <div><p className="text-sm font-black">{statusViewer.authorName}</p><p className="text-[10px] text-slate-400">{formatDate(statusViewer.createdAt)}</p></div>
+              <button type="button" onClick={() => setStatusViewer(null)} className="ml-auto rounded-full p-2 hover:bg-white/10"><X className="h-5 w-5" /></button>
+            </div>
+            <p className="mt-10 min-h-40 whitespace-pre-wrap break-words text-lg leading-8">{statusViewer.text}</p>
+          </article>
+        </div>
+      )}
+
+      {statusOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4">
+          <div className="w-full max-w-lg rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6">
+            <div className="flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-600">Status</p><h2 className="text-xl font-black">Share a public status</h2></div><button type="button" onClick={() => setStatusOpen(false)} className="rounded-full p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
+            <textarea value={statusText} onChange={event => setStatusText(event.target.value)} maxLength={500} rows={5} placeholder="What is happening right now?" className="mt-5 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 outline-none focus:border-emerald-400 focus:bg-white" />
+            <div className="mt-2 flex justify-between text-xs text-slate-400"><span>Visible in the public status viewer</span><span>{statusText.length}/500</span></div>
+            <button type="button" disabled={statusPosting || !statusText.trim() || !currentUser} onClick={() => void createStatus()} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-black text-white disabled:opacity-50">{statusPosting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Publish status</button>
           </div>
         </div>
       )}
