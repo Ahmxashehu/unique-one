@@ -518,9 +518,7 @@ export default function HomePage() {
                           />
                         ))}
                       </div>
-                      <span className="text-[10px] font-semibold text-white/60">
-                        {isPromo ? 'Unique experience' : 'Professional experience'} · 10s
-                      </span>
+
                     </div>
                   </div>
                 </div>
