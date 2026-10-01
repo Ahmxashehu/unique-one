@@ -180,7 +180,7 @@ export default function StorePage() {
         <div className="flex gap-2 overflow-x-auto pb-1 snap-x">
           {categories.map(category => {
             const Icon = category.icon;
-            return <Link key={category.key} to={`/store/search?cat=${category.key}`} className="min-w-[108px] sm:min-w-[124px] snap-start rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 hover:border-emerald-300 hover:bg-emerald-50 transition-colors">
+            return <Link key={category.key} to={`/store/search?cat=${category.key}`} className="min-w-[96px] sm:min-w-[124px] snap-start rounded-xl" border border-slate-200 bg-slate-50 px-3 py-3 hover:border-emerald-300 hover:bg-emerald-50 transition-colors">
               <Icon className="w-5 h-5 text-emerald-700" />
               <p className="text-xs sm:text-sm font-semibold text-slate-800 mt-2 line-clamp-2">{category.label}</p>
             </Link>;
