@@ -188,14 +188,14 @@ export default function UniqueAiPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col gap-3 overflow-x-hidden sm:gap-4">
-      <div className="flex min-w-0 items-start justify-between gap-2 sm:items-center sm:gap-3">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-x-hidden sm:gap-4">
+      <div className="flex min-w-0 items-center justify-between gap-2 px-0.5 sm:gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-emerald-600" />
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Unique AI</h1>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 sm:h-10 sm:w-10"><Sparkles className="h-5 w-5 text-emerald-600 sm:h-6 sm:w-6" /></div>
+            <h1 className="truncate text-lg font-bold tracking-tight text-slate-900 sm:text-2xl">Unique AI</h1>
           </div>
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 sm:text-sm">
+          <p className="mt-0.5 hidden max-w-2xl text-[11px] leading-4 text-slate-500 sm:mt-1 sm:block sm:text-sm sm:leading-5">
             Free AI for everyone. Sign in to let Unique AI use your authorized Unique One platform context.
           </p>
         </div>
@@ -203,39 +203,45 @@ export default function UniqueAiPage() {
           type="button"
           onClick={clearConversation}
           disabled={messages.length === 0 || loading}
-          className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm"
+          className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:gap-2 sm:rounded-lg sm:px-3 sm:py-2 sm:text-sm"
         >
           <Trash2 className="h-4 w-4" />
           Clear
         </button>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <div className="min-w-0 flex-1 overflow-y-auto p-3 sm:p-6">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain p-2.5 sm:p-6">
           {messages.length === 0 ? (
-            <div className="mx-auto flex max-w-2xl flex-col items-center py-6 text-center sm:py-10">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
-                <Bot className="h-7 w-7 text-emerald-600" />
+            <div className="mx-auto flex max-w-2xl flex-col items-center py-3 text-center sm:py-10">
+              <div className="mb-2.5 flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 sm:mb-4 sm:h-14 sm:w-14 sm:rounded-2xl">
+                <Bot className="h-5.5 w-5.5 text-emerald-600 sm:h-7 sm:w-7" />
               </div>
-              <h2 className="text-xl font-black tracking-tight text-slate-900 sm:text-2xl">Ask Unique AI anything.</h2>
-              <p className="mt-2 text-sm text-slate-500">
-                Ask questions, learn, plan, write, explore ideas, or ask about Unique One. Public questions are free; registered users can unlock personalized platform context and the full Unique One experience.
+              <h2 className="text-lg font-black tracking-tight text-slate-900 sm:text-2xl">Ask Unique AI anything.</h2>
+              <p className="mt-1.5 max-w-xl text-xs leading-5 text-slate-500 sm:mt-2 sm:text-sm">
+                Ask questions, learn, plan, write, explore ideas, or ask about Unique One. Public questions are free; registered users can unlock personalized platform context.
               </p>
-              <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-left text-xs leading-5 text-emerald-800">
+              <div className="mt-3 w-full rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-left text-[11px] leading-4.5 text-emerald-800 sm:mt-4 sm:px-4 sm:py-3 sm:text-xs sm:leading-5">
                 <strong>{currentUser ? "Registered experience:" : "Free public experience:"}</strong> {currentUser ? "Unique AI can read your authorized account, order, business, and product context. Platform mutations remain protected." : "You can ask general questions without registering. Register to unlock personalized Unique One context and the full platform experience."}
               </div>
-              <div className="mt-5 grid w-full grid-cols-1 gap-2 sm:mt-6 sm:grid-cols-3">
+              <div className="mt-3 w-full sm:mt-6">
+                <div className="mb-2 flex items-center justify-between px-0.5">
+                  <span className="text-xs font-bold text-slate-700">Suggested questions</span>
+                  <span className="text-[10px] text-slate-400 sm:text-xs">Tap one to start</span>
+                </div>
+                <div className="grid max-h-44 grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain pr-0.5 sm:mt-0 sm:max-h-none sm:grid-cols-3 sm:gap-2">
                 {QUICK_PROMPTS.map((prompt) => (
                   <button
                     key={prompt}
                     type="button"
                     disabled={loading}
                     onClick={() => setMessage(prompt)}
-                    className="rounded-xl border border-slate-200 p-3 text-left text-sm text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
+                    className="min-w-0 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-left text-[11px] leading-4 text-slate-700 transition-colors hover:border-emerald-300 hover:bg-emerald-50 sm:p-3 sm:text-sm sm:leading-normal"
                   >
                     {prompt}
                   </button>
                 ))}
+                </div>
               </div>
             </div>
           ) : (
@@ -285,7 +291,7 @@ export default function UniqueAiPage() {
           </div>
         )}
 
-        <form onSubmit={sendMessage} className="border-t border-slate-200 p-2.5 sm:p-4">
+        <form onSubmit={sendMessage} className="shrink-0 border-t border-slate-200 bg-white p-2 sm:p-4">
           <div className="flex min-w-0 items-end gap-2">
             <textarea
               value={message}
@@ -301,25 +307,25 @@ export default function UniqueAiPage() {
               disabled={loading}
               aria-label="Message Unique AI"
               placeholder="Ask Unique AI…"
-              className="min-h-[48px] min-w-0 flex-1 resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50"
+              className="min-h-[46px] min-w-0 flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none sm:min-h-[48px] sm:px-4 sm:py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50"
             />
             <button
               type="submit"
               disabled={!message.trim() || loading}
-              className="inline-flex h-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 sm:gap-2 sm:px-4"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:w-auto sm:gap-2 sm:px-4"
             >
               <Send className="h-4 w-4" />
-              Send
+              <span className="hidden sm:inline">Send</span>
             </button>
           </div>
           {!currentUser && (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-              <span>Enjoying Unique AI? Register to unlock your full Unique One experience and personalized AI.</span>
-              <Link to="/register" className="rounded-full bg-slate-900 px-3 py-1.5 font-bold text-white">Register free</Link>
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 py-2 text-[10px] leading-4 text-emerald-800 sm:mt-3 sm:gap-3 sm:px-3 sm:text-xs">
+              <span className="min-w-0 line-clamp-2">Enjoying Unique AI? Register to unlock your full Unique One experience and personalized AI.</span>
+              <Link to="/register" className="shrink-0 rounded-full bg-slate-900 px-2.5 py-1.5 font-bold text-white sm:px-3">Register free</Link>
             </div>
           )}
-          <div className="mt-2 flex flex-col gap-1.5 px-1 text-[10px] leading-4 text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:text-xs">
-            <span>{currentUser ? "Registered mode: answers can use your authorized Unique One context; platform mutations remain protected." : "Public mode is free. Register to unlock personalized Unique One context and the full platform experience."}</span>
+          <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2 px-0.5 text-[9px] leading-3.5 text-slate-400 sm:mt-2 sm:gap-3 sm:text-xs sm:leading-4">
+            <span className="min-w-0 truncate">{currentUser ? "Registered mode: authorized Unique One context; mutations remain protected." : "Public mode is free. Register for personalized Unique One context."}</span>
             <span className="max-w-full truncate text-left sm:text-right" aria-live="polite">
               {lastRequestId ? `Request: ${lastRequestId}` : "Support request ID will appear after a response"} · {message.length}/4000
             </span>
