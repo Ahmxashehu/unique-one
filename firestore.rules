@@ -327,6 +327,66 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
     }
 
+    match /edgePosts/{postId} {
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.authorUid == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.status == 'published'
+        && request.resource.data.actorType in ['user','business','institution']
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 5000
+        && request.resource.data.audience in ['public','followers']
+        && request.resource.data.allowComments is bool
+        && request.resource.data.allowReshare is bool
+        && (
+          request.resource.data.actorType == 'user'
+          || (request.resource.data.actorType == 'business'
+            && exists(/databases/$(database)/documents/businesses/$(request.resource.data.actorId))
+            && get(/databases/$(database)/documents/businesses/$(request.resource.data.actorId)).data.ownerUid == request.auth.uid)
+          || (request.resource.data.actorType == 'institution'
+            && exists(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.actorId))
+            && get(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.actorId)).data.ownerUid == request.auth.uid)
+        );
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && resource.data.authorUid == request.auth.uid
+          && request.resource.data.authorUid == resource.data.authorUid
+          && request.resource.data.actorType == resource.data.actorType
+          && request.resource.data.actorId == resource.data.actorId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text','audience','allowComments','allowReshare','updatedAt']));
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
+
+      match /likes/{uid} {
+        allow read: if true;
+        allow create: if isAuthenticated() && uid == request.auth.uid;
+        allow delete: if isAuthenticated() && uid == request.auth.uid;
+        allow update: if false;
+      }
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuthenticated()
+          && request.resource.data.authorUid == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000;
+        allow update: if isAuthenticated()
+          && resource.data.authorUid == request.auth.uid
+          && request.resource.data.authorUid == resource.data.authorUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text','updatedAt'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000;
+        allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
+      }
+    }
+    match /edgePreferences/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['defaultAudience','allowComments','allowReshare','updatedAt']);
+      allow delete: if isAdmin() || isOwner(userId);
+    }
     match /conversations/{conversationId} { allow read: if isConversationMember(conversationId); allow create, update, delete: if false; }
     match /conversationMembers/{memberId} { allow read: if isAuthenticated() && resource.data.uid == request.auth.uid; allow create, update, delete: if false; }
     match /messages/{messageId} { allow read: if isConversationMember(resource.data.conversationId); allow create, update, delete: if false; }
