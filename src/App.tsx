@@ -107,6 +107,7 @@ import TravelPage from "./pages/TravelPage";
 import CycleAjoPage from "./pages/pay/CycleAjoPage";
 import VerificationCenterPage from "./pages/pay/VerificationCenterPage";
 import MasterVisionPage from "./pages/MasterVisionPage";
+import ConferencePage from "./pages/ConferencePage";
 
 
 
@@ -142,6 +143,8 @@ export default function App() {
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/ai" element={<UniqueAiPage />} />
+                <Route path="/conference" element={<ConferencePage />} />
+                <Route path="/conference/:roomId" element={<ConferencePage />} />
                 
                 {/* Unique Store Public Routes */}
                 <Route path="/store" element={<StorePage />} />
