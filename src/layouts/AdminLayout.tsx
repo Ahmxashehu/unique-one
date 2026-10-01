@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { 
   Users, Building2, Package, Inbox, BarChart3, 
   ShieldCheck, Activity, Settings, LogOut 
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import MobileBottomNav from '../components/MobileBottomNav';
 
 export default function AdminLayout() {
   const location = useLocation();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const adminNav = [
     { name: 'Users', path: '/admin/users', icon: Users },
@@ -66,18 +68,48 @@ export default function AdminLayout() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         {/* Mobile Header */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="Admin navigation">
+            <button type="button" aria-label="Close admin menu" className="absolute inset-0 bg-slate-950/60" onClick={() => setIsMobileMenuOpen(false)} />
+            <div className="absolute inset-y-0 left-0 w-[86%] max-w-sm overflow-y-auto bg-slate-900 p-4 text-slate-200 shadow-2xl">
+              <div className="mb-5 flex items-center justify-between">
+                <div className="font-bold text-lg flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-emerald-400" /> OS Admin</div>
+                <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded-xl bg-white/10 px-3 py-2 text-xs font-bold">Close</button>
+              </div>
+              <nav className="space-y-1">
+                {adminNav.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname.includes(item.path);
+                  return (
+                    <Link key={item.name} to={item.path} onClick={() => setIsMobileMenuOpen(false)} className={cn("flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium", isActive ? "bg-slate-800 text-white" : "hover:bg-slate-800/60")}>
+                      <Icon className={cn("h-5 w-5", isActive ? "text-emerald-400" : "text-slate-400")} />
+                      {item.name}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+          </div>
+        )}
         <header className="lg:hidden h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 shrink-0 text-white">
+          <button type="button" onClick={() => setIsMobileMenuOpen(true)} aria-label="Open admin menu" className="rounded-xl p-2 text-slate-300">
+            <span className="text-xl leading-none">☰</span>
+          </button>
           <div className="font-bold text-lg flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-emerald-400" />
             OS Admin
           </div>
+          <Link to="/" aria-label="Exit admin portal" className="rounded-xl p-2 text-slate-300">
+            <LogOut className="w-5 h-5" />
+          </Link>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+        <main className="mobile-scroll-padding flex-1 min-h-0 overflow-y-auto p-4 md:p-8 pb-20 lg:pb-8">
           <div className="mx-auto max-w-6xl h-full">
             <Outlet />
           </div>
         </main>
+        <MobileBottomNav variant="public" onMenu={() => setIsMobileMenuOpen(true)} />
       </div>
     </div>
   );
