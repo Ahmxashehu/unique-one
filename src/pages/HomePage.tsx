@@ -342,14 +342,14 @@ export default function HomePage() {
   };
 
   return (
-    <style>{`
-      @keyframes uniqueMediaVertical {
-        0%, 12% { transform: translateY(110%); opacity: 0; }
-        22%, 72% { transform: translateY(0); opacity: 1; }
-        84%, 100% { transform: translateY(-110%); opacity: 0; }
-      }
-    `}</style>
     <main className="min-h-screen min-w-0 overflow-x-hidden bg-[#f7f9f8] text-slate-950">
+      <style>{`
+        @keyframes uniqueMediaVertical {
+          0%, 12% { transform: translateY(110%); opacity: 0; }
+          22%, 72% { transform: translateY(0); opacity: 1; }
+          84%, 100% { transform: translateY(-110%); opacity: 0; }
+        }
+      `}</style>
       {/* Sticky discovery header */}
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex min-w-0 max-w-7xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3 lg:px-8">
