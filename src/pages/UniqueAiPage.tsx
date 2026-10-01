@@ -305,7 +305,7 @@ export default function UniqueAiPage() {
             />
             <button
               type="submit"
-              disabled={!message.trim() || loading || !currentUser}
+              disabled={!message.trim() || loading}
               className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Send className="h-4 w-4" />
