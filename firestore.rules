@@ -440,7 +440,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     match /conferences/{conferenceId} {
-      allow read: if isAuthenticated() && (resource.data.public == true || resource.data.hostUid == request.auth.uid);
+      allow read: if isAuthenticated() && (
+        resource.data.hostUid == request.auth.uid
+        || (resource.data.public == true && request.auth.token.conferenceGuest != true)
+        || (request.auth.token.conferenceGuest == true && request.auth.token.conferenceId == conferenceId)
+      );
       allow create: if isAuthenticated()
         && request.resource.data.hostUid == request.auth.uid
         && request.resource.data.title is string
@@ -457,12 +461,13 @@ service cloud.firestore {
 
       match /participants/{uid} {
         allow read: if isAuthenticated()
-          && (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.public == true
-            || get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid);
+          && (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid
+            || (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.public == true && request.auth.token.conferenceGuest != true)
+            || (request.auth.token.conferenceGuest == true && request.auth.token.conferenceId == conferenceId));
         allow create, update: if isAuthenticated()
           && uid == request.auth.uid
-          && (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.public == true
-            || get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid)
+          && (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid
+            || request.auth.token.conferenceGuest == true && request.auth.token.conferenceId == conferenceId)
           && request.resource.data.uid == request.auth.uid;
         allow delete: if isAuthenticated() && (uid == request.auth.uid || get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid);
       }
