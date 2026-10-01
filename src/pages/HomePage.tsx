@@ -391,30 +391,6 @@ export default function HomePage() {
       </header>
 
       <div className="mx-auto min-w-0 max-w-7xl px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pb-20 sm:pt-5 lg:px-8">
-        {/* Quick actions: direct paths into the existing Unique ecosystem */}
-        <section aria-label="Quick actions" className="mt-5 hidden overflow-x-auto pb-1 md:block">
-          <div className="flex min-w-max gap-2">
-            {[
-              ['Pay', '/os/pay'],
-              ['Buy', '/store'],
-              ['Sell', '/os/business/catalog/new-product'],
-              ['Send', '/os/pay'],
-              ['Book', '/discover'],
-              ['Hire', '/discover'],
-              ['Chat', '/os/messages'],
-              ['Discover', '/discover'],
-            ].map(([label, href]) => (
-              <Link
-                key={label}
-                to={href}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-300 hover:text-emerald-700"
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
-        </section>
-
         {/* Prominent Unique AI entry point: free public AI, with a clear path into the full registered experience. */}
         <section aria-label="Unique AI" className="relative mt-4 overflow-hidden rounded-2xl border border-emerald-200/70 bg-slate-950 text-white shadow-lg sm:mt-5 sm:rounded-[2rem]">
           <div className="absolute -left-16 -top-20 h-48 w-48 rounded-full bg-emerald-400/25 blur-3xl animate-pulse sm:h-72 sm:w-72" />
@@ -438,33 +414,6 @@ export default function HomePage() {
               </div>
             </div>
           </Link>
-        </section>
-
-        {/* Your Unique Day: entry points only; no fabricated activity counts */}
-        <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:mt-6 sm:rounded-3xl sm:p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-600 sm:text-xs sm:tracking-[0.16em]">Your Unique Day</p>
-              <h2 className="mt-1 text-lg font-black leading-tight tracking-tight sm:text-xl">Pick up where you left off</h2>
-            </div>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-2">
-            {[
-              ['UniqueStore', '/store'],
-              ['UniquePay', '/os/pay'],
-              ['Messages', '/os'],
-              ['UniqueValidation', '/os/pay/verification'],
-            ].map(([label, href]) => (
-              <Link
-                key={label}
-                to={href}
-                className="rounded-xl bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-800 sm:rounded-2xl sm:p-4 sm:text-sm"
-              >
-                {label}
-                <span className="mt-0.5 block text-[10px] font-medium text-slate-400 sm:mt-1 sm:text-xs">Open →</span>
-              </Link>
-            ))}
-          </div>
         </section>
 
         {/* Main experience poster: every promotional and professional experience is one 10-second sliding list. */}
@@ -915,12 +864,7 @@ export default function HomePage() {
                   <Sparkles className="mt-0.5 h-5 w-5 shrink-0" />
                   <span className="min-w-0 break-words text-sm leading-5 sm:text-base">One platform, many experiences</span>
                 </div>
-                <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 text-[11px] font-semibold text-emerald-900 sm:mt-4 sm:text-xs">
-                  <Link to="/store" className="min-w-0 break-words rounded-xl bg-white/80 p-2.5 leading-4 sm:rounded-2xl sm:p-3 sm:leading-normal">Sell</Link>
-                  <Link to="/os/travel" className="rounded-2xl bg-white/80 p-3">Travel</Link>
-                  <Link to="/categories" className="rounded-2xl bg-white/80 p-3">Food & Dining</Link>
-                  <Link to="/categories" className="rounded-2xl bg-white/80 p-3">Health & Wellness</Link>
-                  <Link to="/categories" className="rounded-2xl bg-white/80 p-3">Technology</Link>
+                <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 text-[11px] font-semibold text-emerald-900 sm:mt-4 sm:text-xs">
                   <Link to="/os" className="rounded-2xl bg-white/80 p-3">UniqueCycle/Aju</Link>
                 </div>
               </div>
