@@ -42,10 +42,10 @@ export default function DiscoverPage() {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-12">
+    <div className="min-w-0 max-w-7xl mx-auto overflow-x-hidden px-3 py-6 sm:px-6 md:py-12 lg:px-8 space-y-8 md:space-y-12">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Discover</h1>
-        <p className="text-slate-500 mt-2 text-lg">Explore real businesses, services, and products across Unique One.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Discover</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 sm:text-lg">Explore real businesses, services, and products across Unique One.</p>
       </div>
 
       <section>
@@ -69,13 +69,13 @@ export default function DiscoverPage() {
             <Link to="/store" className="inline-block mt-5 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium">Visit Store</Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
             {products.map(product => (
               <Link key={product.id} to={`/store/product/${product.id}`} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                <div className="h-48 bg-slate-100 flex items-center justify-center overflow-hidden">
+                <div className="h-40 bg-slate-100 flex items-center justify-center overflow-hidden sm:h-48">
                   {product.images?.length ? <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" /> : <StoreIcon className="w-8 h-8 text-slate-300" />}
                 </div>
-                <div className="p-5">
+                <div className="p-4 sm:p-5">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">{product.category?.replace('_', ' ') || 'Product'}</span>
                     <span className="text-sm font-semibold text-slate-700">{product.currency === 'NGN' ? '₦' : '$'}{Number(product.price).toLocaleString()}</span>
