@@ -572,43 +572,48 @@ export default function HomePage() {
                   <p className="mt-4 text-sm text-slate-500">Building your Unique experience...</p>
                 </div>
               ) : edgeProducts.length === 0 ? (
-                <div className="overflow-hidden rounded-3xl border border-emerald-200 bg-white p-5 text-left shadow-sm sm:p-7">
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                      <Play className="h-6 w-6" />
+                <div className="overflow-hidden rounded-3xl border border-emerald-200 bg-white p-4 text-left shadow-sm sm:p-5">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                      <Play className="h-5 w-5" />
                     </div>
-                    <div className="min-w-0">
-                      <span className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">New experience</span>
-                      <h3 className="mt-1 text-2xl font-black tracking-tight">UniqueMedia</h3>
-                      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                        Your personal media hub for videos, music and audio, images, PDFs and contacts — with access controlled by the permissions you grant on your device.
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-xl font-black tracking-tight">UniqueMedia</h3>
+                      <p className="mt-1 truncate text-xs text-slate-500 sm:text-sm">
+                        Your personal offline-first hub for videos, music, images, PDFs and contacts.
                       </p>
                     </div>
                   </div>
-                  <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-5">
-                    {[
-                      ['Videos', Play],
-                      ['Music & Audio', Play],
-                      ['Images', Compass],
-                      ['PDF Reader', Bookmark],
-                      ['Contacts', Users],
-                    ].map(([label, Icon]) => (
-                      <div key={String(label)} className="rounded-2xl bg-slate-50 p-3">
-                        <Icon className="h-4 w-4 text-emerald-600" />
-                        <p className="mt-2 text-xs font-bold text-slate-700">{label}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    <Link
-                      to="/os"
-                      className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white"
-                    >
-                      Open UniqueMedia <ArrowRight className="h-4 w-4" />
-                    </Link>
-                    <span className="inline-flex items-center rounded-full border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-500">
-                      Private by default
-                    </span>
+
+                  <details className="group mt-4">
+                    <summary className="flex cursor-pointer list-none items-center justify-between rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800">
+                      <span>Open UniqueMedia categories</span>
+                      <ArrowRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+                    </summary>
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                      {[
+                        ['Videos', Play],
+                        ['Music & Audio', Play],
+                        ['Images', Compass],
+                        ['PDF Reader', Bookmark],
+                        ['Contacts', Users],
+                      ].map(([label, Icon]) => (
+                        <Link
+                          key={String(label)}
+                          to="/os"
+                          className="flex min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-emerald-300 hover:bg-emerald-50"
+                        >
+                          <Icon className="h-4 w-4 shrink-0 text-emerald-600" />
+                          <span className="truncate text-xs font-bold text-slate-700">{label}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </details>
+
+                  <div className="mt-3 overflow-hidden rounded-full bg-emerald-50 px-3 py-1.5">
+                    <p className="animate-[bounce_2.4s_ease-in-out_infinite] whitespace-nowrap text-center text-[10px] font-bold text-emerald-700 sm:text-xs">
+                      Private by default • Works offline for local media • Device permissions stay under your control
+                    </p>
                   </div>
                 </div>
               ) : (
