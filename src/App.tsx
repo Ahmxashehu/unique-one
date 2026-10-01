@@ -87,7 +87,7 @@ import StoreQuoteRequestPage from "./pages/store/StoreQuoteRequestPage";
 import { OfflineQueueProvider } from "./contexts/OfflineQueueContext";
 import SyncOverlay from "./components/SyncOverlay";
 import U1Loader from "./components/U1Loader";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 import CreatePaymentRequestPage from "./pages/pay/CreatePaymentRequestPage";
 import CreateInvoicePage from "./pages/pay/CreateInvoicePage";
@@ -107,7 +107,7 @@ import TravelPage from "./pages/TravelPage";
 import CycleAjoPage from "./pages/pay/CycleAjoPage";
 import VerificationCenterPage from "./pages/pay/VerificationCenterPage";
 import MasterVisionPage from "./pages/MasterVisionPage";
-import ConferencePage from "./pages/ConferencePage";
+const ConferencePage = lazy(() => import("./pages/ConferencePage"));
 
 
 
@@ -157,8 +157,8 @@ export default function App() {
                 <Route path="/store/quote-request" element={<StoreQuoteRequestPage />} />
               </Route>
               
-              <Route path="/conference" element={<ConferencePage />} />
-              <Route path="/conference/:roomId" element={<ConferencePage />} />
+              <Route path="/conference" element={<Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm font-bold text-emerald-300">Loading Unique Conference…</div>}><ConferencePage /></Suspense>} />
+              <Route path="/conference/:roomId" element={<Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm font-bold text-emerald-300">Loading Unique Conference…</div>}><ConferencePage /></Suspense>} />
               
               {/* UniqueOS Internal Routes */}
               <Route path="/os" element={<AuthGuard><AppLayout /></AuthGuard>}>
