@@ -95,7 +95,7 @@ export default function CreateInvoicePage() {
           <div className="space-y-3">
             {items.map((item, idx) => (
               <div key={idx} className="flex flex-wrap md:flex-nowrap items-start gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <div className="flex-1 min-w-[200px]">
+                <div className="flex-1 min-w-0 w-full md:min-w-[200px]">
                   <input type="text" placeholder="Item description" value={item.desc} onChange={e => setItems(items.map((current, i) => i === idx ? {...current, desc: e.target.value} : current))} className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none" disabled={loading} />
                 </div>
                 <div className="w-24">
