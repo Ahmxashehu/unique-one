@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import MobileBottomNav from '../components/MobileBottomNav';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import AppearanceControls from '../components/AppearanceControls';
 
 export default function PublicLayout() {
   const { currentUser } = useAuth();
@@ -10,7 +11,7 @@ export default function PublicLayout() {
   const location = useLocation();
 
   return (
-    <div className="flex h-full min-h-0 w-full max-w-[100vw] flex-col bg-slate-50 overflow-hidden relative">
+    <div className="flex h-full min-h-0 w-full max-w-[100vw] flex-col bg-slate-50 overflow-hidden relative">\n      <AppearanceControls />
       {location.pathname !== '/' && (
         <header className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-100 shrink-0">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
