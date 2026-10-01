@@ -367,16 +367,17 @@ a {
 
 /* Subtle U1 identity mark for the top-right appearance control. It stays inside
    the control footprint so the animated glow never changes page layout. */
+.unique-u1-glow {
+  isolation: isolate;
+  filter: drop-shadow(0 0 6px rgb(16 185 129 / 0.18));
+}
 .unique-u1-orbit {
-  position: relative;
-  display: inline-flex;
-  width: 2rem;
-  height: 2rem;
-  flex: 0 0 2rem;
-  align-items: center;
-  justify-content: center;
+  position: absolute;
+  inset: 0;
+  display: block;
   border-radius: 9999px;
   isolation: isolate;
+  pointer-events: none;
 }
 .unique-u1-orbit-ring {
   position: absolute;
@@ -396,13 +397,6 @@ a {
   animation: uniqueU1Pulse 2.6s ease-in-out infinite;
 }
 .unique-u1-mark {
-  position: relative;
-  z-index: 1;
-  font-size: 0.58rem;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: -0.03em;
-  color: #059669;
   text-shadow: 0 0 8px rgb(16 185 129 / 0.34);
 }
 @keyframes uniqueU1Glow {
