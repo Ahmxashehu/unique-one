@@ -9,6 +9,7 @@ import {
 import { cn } from '../lib/utils';
 import MobileBottomNav from '../components/MobileBottomNav';
 import { useAuth } from '../contexts/AuthContext';
+import AppearanceControls from '../components/AppearanceControls';
 
 export default function AppLayout() {
   const location = useLocation();
