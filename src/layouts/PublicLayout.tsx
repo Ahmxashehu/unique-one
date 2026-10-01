@@ -55,7 +55,7 @@ export default function PublicLayout() {
             className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          <div className="absolute inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-h-[70dvh] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl">
+          <div className="absolute inset-x-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-h-[72dvh] overflow-y-auto overscroll-contain rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl sm:inset-x-3 sm:p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-600">Unique One</p>
@@ -63,7 +63,7 @@ export default function PublicLayout() {
               </div>
               <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">Close</button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
               {[
                 ['Categories', '/categories'],
                 ['Near Me', '/near-me'],
@@ -76,7 +76,7 @@ export default function PublicLayout() {
                   key={path}
                   to={path}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 active:scale-[0.98]"
+                  className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] sm:px-4 sm:text-sm"
                 >
                   {name}
                 </Link>
