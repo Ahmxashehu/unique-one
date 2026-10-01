@@ -315,6 +315,20 @@ export default function UniqueAiPage() {
           0%, 100% { opacity: .35; }
           50% { opacity: .95; }
         }
+        @keyframes uniqueAiTypingDot {
+          0%, 60%, 100% { transform: translateY(0) scale(.72); opacity: .35; }
+          30% { transform: translateY(-4px) scale(1); opacity: 1; }
+        }
+        @keyframes uniqueAiTypingGlow {
+          0%, 100% { opacity: .35; transform: scale(.92); }
+          50% { opacity: .9; transform: scale(1.08); }
+        }
+        @keyframes uniqueAiComposerShine {
+          0% { transform: translateX(-120%); opacity: 0; }
+          25% { opacity: .45; }
+          70% { opacity: .2; }
+          100% { transform: translateX(120%); opacity: 0; }
+        }
       `}</style>
       <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-x-hidden sm:gap-4">
       <div className="relative flex min-h-[58px] min-w-0 items-center overflow-hidden rounded-2xl border border-emerald-100 bg-white px-3 py-2.5 shadow-sm sm:min-h-[68px] sm:px-4">
@@ -368,21 +382,33 @@ export default function UniqueAiPage() {
                   className={`flex ${item.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${
-                      item.role === "user"
-                        ? "bg-slate-900 text-white"
-                        : "bg-slate-100 text-slate-800"
-                    }`}
+                    className={`relative max-w-[88%] whitespace-pre-wrap rounded-[22px] px-4 py-3 text-sm leading-6 ${item.role === "user" ? "rounded-br-md bg-slate-900 text-white shadow-slate-900/10" : "rounded-bl-md border border-slate-200/80 bg-white text-slate-800 shadow-black/5"}`}
                   >
-                    {item.text}
+                    {${item.role === "assistant"} && (
+                      <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-600">
+                        <span className="relative flex h-4 w-4 items-center justify-center rounded-full bg-slate-950 text-[7px] font-black text-emerald-300">
+                          U1
+                          <span className="absolute inset-0 rounded-full border border-emerald-300/40" />
+                        </span>
+                        Unique AI
+                      </div>
+                    )}
+                    {${item.text}}
                   </div>
                 </div>
               ))}
               <div ref={messagesEndRef} aria-hidden="true" />
               {loading && (
                 <div className="flex justify-start">
-                  <div className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-500">
-                    {requestState === "retrying" ? "Retrying Unique AI…" : "Unique AI is thinking…"}
+                  <div className="relative flex items-center gap-3 rounded-[22px] rounded-bl-md border border-emerald-100 bg-white px-4 py-3 shadow-sm">
+                    <span className="absolute -left-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full bg-emerald-300/25 blur-xl" style={{ animation: "uniqueAiTypingGlow 1.8s ease-in-out infinite" }} aria-hidden="true" />
+                    <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-slate-950 text-[8px] font-black text-emerald-300 shadow-[0_0_14px_rgba(52,211,153,.35)]">U1</span>
+                    <span className="flex items-center gap-1" aria-label={requestState === "retrying" ? "Retrying Unique AI" : "Unique AI is typing"}>
+                      {[0, 1, 2].map((delay) => (
+                        <span key={delay} className="h-1.5 w-1.5 rounded-full bg-emerald-500" style={{ animation: `uniqueAiTypingDot 1.1s ease-in-out ${delay * 140}ms infinite` }} />
+                      ))}
+                    </span>
+                    <span className="text-xs font-medium text-slate-500">{requestState === "retrying" ? "Retrying…" : "Typing…"}</span>
                   </div>
                 </div>
               )}
@@ -407,8 +433,9 @@ export default function UniqueAiPage() {
           </div>
         )}
 
-        <form onSubmit={sendMessage} className="shrink-0 border-t border-slate-200 bg-white p-2 sm:p-4">
-          <div className="flex min-w-0 items-end gap-2">
+        <form onSubmit={sendMessage} className="shrink-0 border-t border-slate-200/80 bg-white/95 px-2.5 pb-2.5 pt-2 backdrop-blur-xl sm:px-4 sm:pb-4 sm:pt-3">
+          <div className="relative mx-auto flex max-w-3xl items-end gap-2 overflow-hidden rounded-[26px] border border-slate-200 bg-slate-50/90 p-1.5 shadow-[0_8px_30px_rgba(15,23,42,.07)] transition-all focus-within:border-emerald-300 focus-within:bg-white focus-within:shadow-[0_8px_32px_rgba(16,185,129,.12)]">
+            <span className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -translate-x-full bg-gradient-to-r from-transparent via-emerald-200/35 to-transparent" style={{ animation: "uniqueAiComposerShine 3.8s ease-in-out infinite" }} aria-hidden="true" />
             <textarea
               value={message}
               onChange={(event) => setMessage(event.target.value)}
@@ -418,20 +445,15 @@ export default function UniqueAiPage() {
                   void sendMessage();
                 }
               }}
-              rows={2}
+              rows={1}
               maxLength={4000}
               disabled={loading}
               aria-label="Message Unique AI"
               placeholder="Ask Unique AI…"
-              className="min-h-[46px] min-w-0 flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none sm:min-h-[48px] sm:px-4 sm:py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50"
+              className="relative min-h-[42px] min-w-0 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm leading-5 text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-60 sm:min-h-[44px] sm:px-4 sm:py-3"
             />
-            <button
-              type="submit"
-              disabled={!message.trim() || loading}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:w-auto sm:gap-2 sm:px-4"
-            >
+            <button type="submit" disabled={!message.trim() || loading} aria-label="Send message" className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 text-white shadow-[0_4px_14px_rgba(15,23,42,.2)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-600 hover:shadow-[0_6px_18px_rgba(16,185,129,.25)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none sm:h-11 sm:w-11">
               <Send className="h-4 w-4" />
-              <span className="hidden sm:inline">Send</span>
             </button>
           </div>
           {!currentUser && (
