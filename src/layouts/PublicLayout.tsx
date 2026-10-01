@@ -11,7 +11,6 @@ export default function PublicLayout() {
 
   return (
     <div className="flex h-full min-h-0 w-full max-w-[100vw] flex-col bg-slate-50 overflow-hidden relative">
-      {/* Public shell: HomePage owns its modern home header; keep navigation only on non-home pages. */}
       {location.pathname !== '/' && (
         <header className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-100 shrink-0">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -42,7 +41,6 @@ export default function PublicLayout() {
         </header>
       )}
 
-      {/* Main Content Area */}
       <main className={cn("flex-1 overflow-y-auto pb-16 md:pb-0", location.pathname !== "/" && "pt-16")}>
         <Outlet />
       </main>
@@ -69,13 +67,20 @@ export default function PublicLayout() {
                 ['Hotel', '/travel'],
                 ['Flights', '/travel'],
                 ['School', '/education'],
+                ['Retail & Shopping', '/categories'],
+                ['Professional Services', '/categories'],
+                ['Transportation', '/categories'],
+                ['Real Estate', '/categories'],
+                ['Technology', '/categories'],
+                ['Health & Wellness', '/categories'],
+                ['Food & Dining', '/categories'],
                 ['Global Search', '/search'],
                 ['Near Me', '/near-me'],
                 ['Jobs', '/os/jobs'],
                 ['Contributions', '/os/contributions'],
                 ['Education', '/os/education'],
                 ['Travel', '/os/travel'],
-                            ].map(([name, path]) => (
+              ].map(([name, path]) => (
                 <Link
                   key={path + name}
                   to={path}
