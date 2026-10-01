@@ -69,19 +69,21 @@ export default function PublicLayout() {
                 ['Hotel', '/travel'],
                 ['Flights', '/travel'],
                 ['School', '/education'],
-                ['Active Edge', '/discover'],
+                ['Retail & Shopping', '/categories'],
+                ['Professional Services', '/categories'],
+                ['Transportation', '/categories'],
+                ['Real Estate', '/categories'],
+                ['Technology', '/categories'],
+                ['Health & Wellness', '/categories'],
+                ['Food & Dining', '/categories'],
+                ['More Categories', '/categories'],
                 ['Global Search', '/search'],
-                ['Categories', '/categories'],
                 ['Near Me', '/near-me'],
-                ['Unique AI', '/ai'],
                 ['Jobs', '/os/jobs'],
                 ['Contributions', '/os/contributions'],
-                ['Bookings', '/os/bookings'],
-                ['Orders', '/os/orders'],
-                ['Wishlist', '/os/wishlist'],
-                ['Requests', '/os/requests'],
-                ['Master Vision', '/os/master-vision'],
-              ].map(([name, path]) => (
+                ['Education', '/os/education'],
+                ['Travel', '/os/travel'],
+                            ].map(([name, path]) => (
                 <Link
                   key={path + name}
                   to={path}
