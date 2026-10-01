@@ -11,7 +11,12 @@ interface RoleGuardProps {
 }
 
 export default function RoleGuard({ children, requiredRole, requiredPermission, fallback }: RoleGuardProps) {
-  const { hasRole, hasPermission } = useAuth();
+  const { loading, isAuthenticated, userData, hasRole, hasPermission } = useAuth();
+
+  if (loading) return null;
+  if (!isAuthenticated || !userData || userData.status !== 'active') {
+    return <Navigate to="/login" replace />;
+  }
 
   let hasAccess = true;
 
