@@ -346,11 +346,11 @@ export default function UniqueAiPage() {
             type="button"
             disabled={loading}
             onClick={() => setMessage(QUICK_PROMPTS[suggestedIndex])}
-            className="group relative block w-full min-w-0 overflow-hidden pr-1 text-left"
+            className="relative block w-full min-w-0 overflow-hidden pr-1 text-left"
             aria-label={`Use suggested question: ${QUICK_PROMPTS[suggestedIndex]}`}
           >
             <span
-              className="block min-w-0 truncate text-sm font-semibold text-slate-800 transition-colors group-hover:text-emerald-700 sm:text-base"
+              className="block min-w-0 whitespace-normal break-words text-sm font-semibold leading-5 text-slate-800 transition-colors group-hover:text-emerald-700 sm:text-base sm:leading-6"
               style={{ animation: "uniqueAiSuggestedSlide 700ms cubic-bezier(.22,1,.36,1) both" }}
             >
               <Sparkles className="mr-1.5 inline-block h-3.5 w-3.5 text-emerald-500 sm:h-4 sm:w-4" aria-hidden="true" />
