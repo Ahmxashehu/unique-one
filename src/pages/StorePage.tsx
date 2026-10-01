@@ -42,6 +42,7 @@ export default function StorePage() {
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [savingWishlist, setSavingWishlist] = useState<string | null>(null);
   const [storePoster, setStorePoster] = useState(0);
+  const [posterProgress, setPosterProgress] = useState(0);
 
   const storePosters = [
     { eyebrow: 'UNIQUE STORE', title: 'Buy • Sell • Hire • Book • Discover', body: 'One modern marketplace for real products, trusted services, local businesses and everyday needs.', icon: ShoppingBag },
@@ -51,11 +52,26 @@ export default function StorePage() {
   ];
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
+    const slideDuration = 180000;
+    const startedAt = Date.now();
+    const progressTimer = window.setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      setPosterProgress((elapsed % slideDuration) / slideDuration);
+    }, 250);
+    const slideTimer = window.setInterval(() => {
       setStorePoster(prev => (prev + 1) % storePosters.length);
-    }, 180000);
-    return () => window.clearInterval(timer);
+      setPosterProgress(0);
+    }, slideDuration);
+    return () => {
+      window.clearInterval(progressTimer);
+      window.clearInterval(slideTimer);
+    };
   }, []);
+
+  const movePoster = (direction: 1 | -1) => {
+    setStorePoster(prev => (prev + direction + storePosters.length) % storePosters.length);
+    setPosterProgress(0);
+  };
 
   useEffect(() => {
     let active = true;
@@ -166,7 +182,7 @@ export default function StorePage() {
         <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full border border-emerald-400/20 bg-emerald-400/10 blur-sm" />
         <div className="absolute -bottom-24 left-1/3 h-48 w-48 rounded-full border border-white/10 bg-white/5 blur-sm" />
 
-        <div className="relative min-h-[360px] sm:min-h-[390px] lg:min-h-[410px] p-5 sm:p-8 lg:p-10 flex flex-col justify-between">
+        <div className="relative min-h-[270px] sm:min-h-[300px] lg:min-h-[320px] p-4 sm:p-6 lg:p-7 flex flex-col justify-between">
           <div key={storePoster} className="animate-[fadeIn_.6s_ease-out]">
             {(() => {
               const poster = storePosters[storePoster];
@@ -183,17 +199,20 @@ export default function StorePage() {
                         <span key={index} className={`h-1.5 rounded-full transition-all ${index === storePoster ? 'w-7 bg-emerald-400' : 'w-1.5 bg-white/25'}`} />
                       ))}
                       <span className="ml-2">Changes every 3 min</span>
+                      <div className="ml-3 h-1 w-16 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400 transition-[width] duration-200" style={{ width: `${Math.round(posterProgress * 100)}%` }} /></div>
+                      <button type="button" onClick={() => movePoster(-1)} aria-label="Previous poster" className="ml-2 rounded-full border border-white/10 px-2 py-1 text-[10px] text-white/60 hover:text-white">‹</button>
+                      <button type="button" onClick={() => movePoster(1)} aria-label="Next poster" className="rounded-full border border-white/10 px-2 py-1 text-[10px] text-white/60 hover:text-white">›</button>
                     </div>
                   </div>
 
-                  <div className="mt-10 sm:mt-12 max-w-3xl">
-                    <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-400/10 text-emerald-300">
+                  <div className="mt-6 sm:mt-7 max-w-3xl">
+                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-400/10 text-emerald-300">
                       <PosterIcon className="h-6 w-6" />
                     </div>
-                    <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-[-0.04em] leading-[1.02]">
+                    <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-[-0.04em] leading-[1.02]">
                       {poster.title}
                     </h1>
-                    <p className="mt-5 max-w-2xl text-sm sm:text-base lg:text-lg leading-7 text-white/70">
+                    <p className="mt-3 max-w-2xl text-xs sm:text-sm lg:text-base leading-6 text-white/70">
                       {poster.body}
                     </p>
                   </div>
@@ -202,14 +221,14 @@ export default function StorePage() {
             })()}
           </div>
 
-          <form onSubmit={submitSearch} className="relative mt-8 flex max-w-3xl gap-2 rounded-2xl border border-white/15 bg-white/10 p-2 backdrop-blur-xl">
+          <form onSubmit={submitSearch} className="relative mt-5 flex max-w-3xl gap-2 rounded-2xl border border-white/15 bg-white/10 p-2 backdrop-blur-xl">
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-white/45" />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search products and services..."
-                className="w-full rounded-xl bg-white/95 text-slate-900 pl-11 pr-4 py-3.5 sm:py-4 text-sm outline-none focus:ring-2 focus:ring-emerald-300/70"
+                className="w-full rounded-xl bg-white/95 text-slate-900 pl-11 pr-4 py-3 sm:py-3.5 text-sm outline-none focus:ring-2 focus:ring-emerald-300/70"
               />
             </div>
             <button type="submit" className="hidden sm:inline-flex items-center justify-center rounded-xl bg-emerald-500 px-6 py-3 font-bold text-sm text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400">
