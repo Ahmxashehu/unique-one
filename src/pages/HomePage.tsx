@@ -547,21 +547,19 @@ export default function HomePage() {
                   <p className="mt-4 text-sm text-slate-500">Building your Unique experience...</p>
                 </div>
               ) : edgeProducts.length === 0 ? (
-                <div className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <Link to="/media" className="group flex min-w-0 items-center gap-3">
-                      <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 transition group-hover:bg-emerald-100 sm:h-14 sm:w-14">
-                        <Play className="h-6 w-6 sm:h-7 sm:w-7" />
-                        <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">Your media</span>
-                        <span className="mt-0.5 block truncate text-lg font-black tracking-tight text-slate-950 sm:text-xl">UniqueMedia</span>
-                        <span className="mt-0.5 block truncate text-xs text-slate-500 sm:text-sm">Music, videos, images & PDFs</span>
-                      </span>
-                    </Link>
-                    <Link to="/media" className="shrink-0 rounded-full bg-slate-950 px-3.5 py-2 text-xs font-black text-white transition hover:bg-slate-800">
-                      Open
+                <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm sm:rounded-3xl sm:p-5">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                      <Play className="h-5 w-5" />
+                      <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-600">Your media</p>
+                      <h3 className="mt-0.5 truncate text-lg font-black tracking-tight text-slate-950 sm:text-xl">UniqueMedia</h3>
+                      <p className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">Music, videos, images &amp; PDFs</p>
+                    </div>
+                    <Link to="/media" className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-700">
+                      Open <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
                   </div>
 
@@ -579,9 +577,11 @@ export default function HomePage() {
                     ))}
                   </div>
 
-                  <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-emerald-50 px-3 py-2.5">
-                    <span className="min-w-0 truncate text-[10px] font-semibold text-emerald-800 sm:text-xs">Private by default · Local media stays on your device</span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-emerald-600" />
+                  <div className="mt-3 flex items-center gap-1.5 border-t border-slate-100 pt-3 text-[10px] font-semibold text-slate-500 sm:text-xs">
+                    <span>Private by default</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="truncate">Local media stays on your device</span>
+                    <ArrowRight className="ml-auto h-3.5 w-3.5 shrink-0 text-slate-400" />
                   </div>
                 </div>
               ) : (
@@ -888,3 +888,15 @@ export default function HomePage() {
               <div className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50 p-3.5 sm:rounded-3xl sm:p-5">
                 <div className="flex min-w-0 items-start gap-2 font-black text-emerald-900">
                   <Sparkles className="mt-0.5 h-5 w-5 shrink-0" />
+                  <span className="min-w-0 break-words text-sm leading-5 sm:text-base">One platform, many experiences</span>
+                </div>
+                <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 text-[11px] font-semibold text-emerald-900 sm:mt-4 sm:text-xs">
+                  <Link to="/os" className="rounded-2xl bg-white/80 p-3">UniqueCycle/Aju</Link>
+                </div>
+              </div>
+            </aside>
+          </div>        </section>
+      </div>
+    </main>
+  );
+}
