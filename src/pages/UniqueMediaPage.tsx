@@ -38,6 +38,7 @@ const uploadFile = (path: string, file: File, onProgress: (value: number) => voi
 export default function UniqueMediaPage() {
   const [media, setMedia] = useState<LocalMedia[]>([]);
   const [activeKind, setActiveKind] = useState<MediaKind>('all');
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [contactSearch, setContactSearch] = useState('');
   const [contactMessage, setContactMessage] = useState('');
@@ -423,25 +424,49 @@ export default function UniqueMediaPage() {
     <main className="min-h-full overflow-y-auto bg-slate-50 pb-24">
       <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
         <header className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm sm:p-7">
+          <input ref={phoneFileInputRef} type="file" multiple accept="video/*,audio/*,image/*,application/pdf" className="hidden" onChange={(event) => { importFromPhoneStorage(event.target.files); event.currentTarget.value = ''; }} />
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">UniquePlatform</p>
               <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">UniqueMedia</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">A free media workspace for videos, music, images and PDFs. Authorized device media loads automatically and opens directly in the built-in player.</p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Your local-first hub for videos, music, images and PDFs.</p>
             </div>
-            <div className="flex flex-wrap gap-2"><input ref={phoneFileInputRef} type="file" multiple accept="video/*,audio/*,image/*,application/pdf" className="hidden" onChange={(event) => { importFromPhoneStorage(event.target.files); event.currentTarget.value = ''; }} /><button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><FolderOpen className="h-4 w-4" /> Connect phone media</button><Link to="/os/unique-share" className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800"><Share2 className="h-4 w-4" /> Open UniqueShare</Link></div>
+            <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+              <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white sm:flex-none"><FolderOpen className="h-4 w-4" /> Connect phone</button>
+              <Link to="/os/unique-share" className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 sm:flex-none"><Share2 className="h-4 w-4" /> UniqueShare</Link>
+            </div>
           </div>
-          <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900"><strong>Phone access:</strong> On Android browsers that do not expose folder access, this button opens the phone's system file picker so you can select media directly. Supported folder access is remembered when available. Nothing is silently uploaded to the cloud.</div>
-          {deviceMessage && <p className="mt-3 text-xs font-semibold text-emerald-700">{deviceMessage}</p>}
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-            <label className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+            <label className="flex min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your local media" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your media" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
             </label>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {categories.map(([value, label]) => <button key={value} type="button" onClick={() => setActiveKind(value)} className={'shrink-0 rounded-full px-4 py-2 text-xs font-bold ' + (activeKind === value ? 'bg-emerald-600 text-white' : 'border border-slate-200 bg-white text-slate-600')}>{label}</button>)}
-            </div>
+            <button type="button" onClick={() => setCategoriesOpen((value) => !value)} aria-expanded={categoriesOpen} className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800">
+              <FolderOpen className="mr-2 h-4 w-4 text-emerald-600" /> {categoriesOpen ? 'Hide categories' : 'Open UniqueMedia categories'}
+            </button>
           </div>
+
+          {categoriesOpen && (
+            <nav aria-label="UniqueMedia categories" className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+              {categories.map(([value, label]) => (
+                <button key={value} type="button" onClick={() => { setActiveKind(value); setCategoriesOpen(false); }} className={'rounded-2xl px-3 py-3 text-xs font-bold transition ' + (activeKind === value ? 'bg-emerald-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50')}>
+                  {label}
+                </button>
+              ))}
+            </nav>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full bg-slate-100 px-3 py-1.5 font-bold text-slate-600">Library: {filteredMedia.length}</span>
+            <span className="rounded-full bg-emerald-50 px-3 py-1.5 font-bold text-emerald-700">View: {categories.find(([value]) => value === activeKind)?.[1] || 'All'}</span>
+            {selected.length > 0 && <span className="rounded-full bg-slate-950 px-3 py-1.5 font-bold text-white">{selected.length} selected</span>}
+          </div>
+
+          <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900">
+            <strong>Device access:</strong> Android permissions are used for phone media. When direct folder access is unavailable, the system file picker is used instead. Authorized access is remembered where supported; nothing is silently uploaded.
+          </div>
+          {deviceMessage && <p className="mt-3 text-xs font-semibold text-emerald-700">{deviceMessage}</p>}
         </header>
 
         <section className="mt-5">
