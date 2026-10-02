@@ -89,7 +89,7 @@ export default function ConferencePage() {
       unsubscribeSignals();
       unsubscribeChat();
       deleteDoc(participantRef).catch(() => undefined);
-      Object.values(peers.current).forEach((peer) => peer.close());
+      Object.keys(peers.current).forEach((uid) => peers.current[uid].close());
       peers.current = {};
     };
   }, [roomId, currentUser, displayName, isHost]);
@@ -198,8 +198,8 @@ export default function ConferencePage() {
 
   const stopScreenShare = () => {
     const cameraTrack = cameraTrackRef.current;
-    if (cameraTrack) Object.values(peers.current).forEach((peer) => {
-      const sender = peer.getSenders().find((item) => item.track?.kind === 'video');
+    if (cameraTrack) Object.keys(peers.current).forEach((uid) => {
+      const sender = peers.current[uid].getSenders().find((item) => item.track?.kind === 'video');
       if (sender) sender.replaceTrack(cameraTrack).catch(() => undefined);
     });
     screenTrackRef.current?.stop();
@@ -218,8 +218,8 @@ export default function ConferencePage() {
       const screenTrack = displayStream.getVideoTracks()[0];
       if (!screenTrack) throw new Error('No screen track was provided.');
       screenTrackRef.current = screenTrack;
-      Object.values(peers.current).forEach((peer) => {
-        const sender = peer.getSenders().find((item) => item.track?.kind === 'video');
+      Object.keys(peers.current).forEach((uid) => {
+        const sender = peers.current[uid].getSenders().find((item) => item.track?.kind === 'video');
         if (sender) sender.replaceTrack(screenTrack).catch(() => undefined);
       });
       screenTrack.onended = () => stopScreenShare();
