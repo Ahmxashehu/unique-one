@@ -459,13 +459,12 @@ export default function UniqueMediaPage() {
               <div className="text-center">
                   <h3 className="text-base font-black text-slate-900">No {categories.find(([value]) => value === activeKind)?.[1].toLowerCase()} yet</h3>
                   <p className="mx-auto mt-1 max-w-xl text-sm leading-6 text-slate-500">
-                    {activeKind === 'video' && 'Connect your phone to bring your videos into this library.'}
-                    {activeKind === 'audio' && 'Connect your phone to bring your audio files into this library.'}
-                    {activeKind === 'image' && 'Connect your phone to bring your photos and images into this library.'}
-                    {activeKind === 'pdf' && 'Connect your phone to bring PDF documents into this reader.'}
+                    {activeKind === 'video' && 'No videos are available in this library yet. Choose video files to add them.'}
+                    {activeKind === 'audio' && 'No audio is available in this library yet. Choose audio files to add them.'}
+                    {activeKind === 'image' && 'No images are available in this library yet. Choose image files to add them.'}
+                    {activeKind === 'pdf' && 'No PDF documents are available in this reader yet. Choose PDF files to add them.'}
                   </p>
                 </div>
-              </div>
               <div className="mt-4 flex justify-center">
                 {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700">Choose files</button>}
               </div>
