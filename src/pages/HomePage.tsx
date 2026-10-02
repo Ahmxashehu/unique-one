@@ -108,7 +108,6 @@ export default function HomePage() {
       type: 'promo' as const,
       key: `promo-${poster.eyebrow}`,
       title: poster.title,
-      description: poster.description,
       href: poster.href,
       action: poster.action,
       icon: poster.icon,
