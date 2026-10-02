@@ -25,6 +25,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private val nativeMedia = mutableMapOf<String, Pair<Uri, String>>()
     private val pendingSharedUris = mutableListOf<Uri>()
+    private lateinit var nearbyShare: NearbyShareManager
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -35,6 +36,11 @@ class MainActivity : ComponentActivity() {
             }.toString())
         }
 
+    private val nearbyPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+            notifyJs("localSharePermissionResult", JSONObject().apply { put("granted", nearbyShare.hasPermissions()) }.toString())
+        }
+
     private val filePicker =
         registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
             notifyJs("filesSelected", JSONArray().apply { uris.forEach { put(it.toString()) } }.toString())
@@ -43,6 +49,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         captureSharedIntent(intent)
+        nearbyShare = NearbyShareManager(this, ::notifyJsObject, nativeMedia)
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
@@ -193,6 +200,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun notifyJsObject(event: String, value: JSONObject) = notifyJs(event, value.toString())
+
     private fun notifyJs(event: String, value: String) {
         webView.post {
             webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('$event',{detail:$value}));", null)
@@ -245,6 +254,26 @@ class MainActivity : ComponentActivity() {
                 false
             }
         }
+
+        @JavascriptInterface fun requestLocalShareAccess() {
+            if (nearbyShare.hasPermissions()) { notifyJs("localSharePermissionResult", JSONObject().put("granted", true).toString()); return }
+            val permissions = mutableListOf<String>()
+            if (Build.VERSION.SDK_INT >= 31) {
+                permissions += Manifest.permission.BLUETOOTH_SCAN
+                permissions += Manifest.permission.BLUETOOTH_CONNECT
+                permissions += Manifest.permission.BLUETOOTH_ADVERTISE
+            }
+            if (Build.VERSION.SDK_INT >= 33) permissions += Manifest.permission.NEARBY_WIFI_DEVICES
+            nearbyPermissionLauncher.launch(permissions.distinct().toTypedArray())
+        }
+        @JavascriptInterface fun hasLocalShareAccess(): Boolean = nearbyShare.hasPermissions()
+        @JavascriptInterface fun startLocalShareAdvertising() = nearbyShare.startAdvertising()
+        @JavascriptInterface fun startLocalShareDiscovery() = nearbyShare.startDiscovery()
+        @JavascriptInterface fun connectLocalSharePeer(endpointId: String) = nearbyShare.requestConnection(endpointId)
+        @JavascriptInterface fun acceptLocalShareConnection(endpointId: String) = nearbyShare.acceptConnection(endpointId)
+        @JavascriptInterface fun rejectLocalShareConnection(endpointId: String) = nearbyShare.rejectConnection(endpointId)
+        @JavascriptInterface fun stopLocalShare() = nearbyShare.stop()
+        @JavascriptInterface fun sendLocalShareMedia(idsJson: String) = nearbyShare.sendMedia(idsJson)
 
         @JavascriptInterface fun openExternalShare(uri: String) {
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
