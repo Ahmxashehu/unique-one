@@ -321,13 +321,30 @@ export default function UniqueSharePage() {
         {!authenticated ? (
           <section className="mt-5 rounded-3xl border border-amber-400/20 bg-amber-950/30 p-6 text-sm text-amber-100">Sign in to use UniqueShare. Anonymous sharing is intentionally disabled.</section>
         ) : mode === "home" ? (
-          <section className="mt-5 grid gap-4 md:grid-cols-2">
-            <button type="button" disabled={busy} onClick={() => void startSend()} className="rounded-3xl border border-emerald-400/20 bg-white p-7 text-left text-slate-950 shadow-xl transition hover:-translate-y-0.5 disabled:opacity-50">
-              <Send className="h-8 w-8 text-emerald-600" /><h2 className="mt-5 text-xl font-black">Send</h2><p className="mt-2 text-sm leading-6 text-slate-500">Create a one-time authenticated connection and send any file type directly into the receiver's UniqueShare storage.</p>
-            </button>
-            <button type="button" onClick={() => { setMode("receive"); setMessage("Scan the sender's secure QR or enter the connection token."); }} className="rounded-3xl border border-emerald-400/20 bg-slate-900 p-7 text-left shadow-xl transition hover:-translate-y-0.5">
-              <ScanLine className="h-8 w-8 text-emerald-300" /><h2 className="mt-5 text-xl font-black">Receive</h2><p className="mt-2 text-sm leading-6 text-slate-300">Verify another authenticated Unique One user and accept the connection before receiving files.</p>
-            </button>
+          <section className="mt-5">
+            <div className="relative overflow-hidden rounded-[2rem] border border-emerald-400/20 bg-gradient-to-br from-white via-emerald-50 to-white p-5 text-slate-950 shadow-xl sm:p-7">
+              <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full border-[10px] border-emerald-200/60 bg-emerald-100/50" />
+              <div className="pointer-events-none absolute -bottom-10 left-1/3 h-20 w-20 rounded-full border-[7px] border-emerald-100 bg-white/70" />
+              <div className="relative">
+                <div className="flex items-center justify-between gap-3">
+                  <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">Smart transfer</p><h2 className="mt-1 text-2xl font-black tracking-tight">Share anything, receive safely.</h2><p className="mt-1 text-xs leading-5 text-slate-500">Choose a side. UniqueShare creates the connection automatically, then moves to the next transfer step.</p></div>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg ring-4 ring-emerald-100"><Share2 className="h-5 w-5" /></div>
+                </div>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <button type="button" disabled={busy} onClick={() => void startSend()} className="group rounded-3xl border border-emerald-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-400 disabled:opacity-50">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white"><Send className="h-5 w-5" /></span><h3 className="mt-4 font-black">Share</h3><p className="mt-1 text-xs leading-5 text-slate-500">Generate secure connection</p>
+                  </button>
+                  <button type="button" onClick={() => { setMode("receive"); setMessage("Scan the sender's secure QR or enter the connection token."); }} className="group rounded-3xl border border-slate-800 bg-slate-950 p-5 text-left text-white shadow-sm transition hover:-translate-y-0.5">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-white"><ScanLine className="h-5 w-5" /></span><h3 className="mt-4 font-black">Receive</h3><p className="mt-1 text-xs leading-5 text-slate-400">Connect to a sender</p>
+                  </button>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] font-bold text-slate-500">
+                  <div className="rounded-2xl bg-white/80 px-2 py-3"><span className="block text-emerald-700">01</span>Connect</div>
+                  <div className="rounded-2xl bg-white/80 px-2 py-3"><span className="block text-emerald-700">02</span>Choose</div>
+                  <div className="rounded-2xl bg-white/80 px-2 py-3"><span className="block text-emerald-700">03</span>Receive</div>
+                </div>
+              </div>
+            </div>
           </section>
         ) : mode === "send" ? (
           <section className="mt-5 space-y-4">
