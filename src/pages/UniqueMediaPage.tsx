@@ -226,7 +226,7 @@ export default function UniqueMediaPage() {
       setLocalShareMessage('Local Send is available in the Android app build.');
       return;
     }
-    const items = media.filter((item) => item.kind !== 'other' && !item.id.startsWith('shared:'));
+    const items = media.filter((item) => item.kind === activeKind && !item.id.startsWith('shared:'));
     if (!items.length) {
       setLocalShareMessage('No phone media is available to send yet. Connect phone media first.');
       return;
