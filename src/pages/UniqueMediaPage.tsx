@@ -116,8 +116,7 @@ export default function UniqueMediaPage() {
         return;
       }
       try {
-        const handle = await getStoredDeviceMediaDirectory();
-        if (!handle || cancelled) return;
+        const handle = await getStoredDeviceMediaDirectory();        if (!handle || cancelled) return;
         const permission = await handle.queryPermission?.({ mode: 'read' });
         if (permission !== 'granted' || cancelled) return;
         await loadAuthorizedDeviceMedia(handle);
@@ -127,11 +126,14 @@ export default function UniqueMediaPage() {
       }
     };
     void restoreAuthorizedMedia();
-    return (
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
     <main className="min-h-full overflow-y-auto bg-slate-50 pb-24">
       <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
         <header className="relative rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm sm:p-6">
-          <div className="flex flex-wrap items-center justify-center gap-3">
+          <div className="flex w-full items-center justify-center gap-3">
             <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="Open UniqueMedia" className="group inline-flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-5 py-3 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50">
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md ring-4 ring-emerald-100 transition group-hover:scale-105">
                 <FolderOpen className="h-6 w-6" />
@@ -186,8 +188,7 @@ export default function UniqueMediaPage() {
           ) : (
             <>
               {activeKind === 'image' && (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                  {filteredMedia.map((item) => {
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">                  {filteredMedia.map((item) => {
                     const isSelected = selected.includes(item.id);
                     return (
                       <article key={item.id} className={'group overflow-hidden rounded-2xl border bg-white shadow-sm ' + (isSelected ? 'border-emerald-500 ring-2 ring-emerald-100' : 'border-slate-200')}>
