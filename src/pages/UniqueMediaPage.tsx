@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Cloud, FileText, Image as ImageIcon, Music2, Pause, Play, Search, Share2, Smartphone, Trash2, Users, Volume2, X } from 'lucide-react';
+import { Cloud, FileText, Image as ImageIcon, ListMusic, Music2, Pause, Play, Search, Share2, Shuffle, Smartphone, SkipBack, SkipForward, Trash2, Users, Volume2, X, Repeat2, Maximize2, Download } from 'lucide-react';
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
@@ -65,7 +65,32 @@ export default function UniqueMediaPage() {
   const [playerLoop, setPlayerLoop] = useState(false);
   const [playerShuffle, setPlayerShuffle] = useState(false);
   const playerVideoRef = React.useRef<HTMLVideoElement | null>(null);
+  const playerAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const phoneFileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [shuffleEnabled, setShuffleEnabled] = useState(false);
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
+  const [backgroundMode, setBackgroundMode] = useState(false);
+
+  const nativeMediaBridge = () => (typeof window !== 'undefined' ? (window as any).UniqueNativeStorage : null);
+
+  const playbackQueue = useMemo(
+    () => filteredMedia.filter((item) => item.kind === 'audio' || item.kind === 'video'),
+    [filteredMedia],
+  );
+
+  const startNativeBackground = (item: LocalMedia, queue = playbackQueue) => {
+    const bridge = nativeMediaBridge();
+    if (!bridge?.playBackgroundQueue) return false;
+    const index = Math.max(0, queue.findIndex((entry) => entry.id === item.id));
+    const ok = Boolean(bridge.playBackgroundQueue(JSON.stringify(queue.map((entry) => entry.id)), index));
+    if (ok) setBackgroundMode(true);
+    return ok;
+  };
+
+  const stopNativeBackground = () => {
+    nativeMediaBridge()?.backgroundStop?.();
+    setBackgroundMode(false);
+  };
 
   const openMediaWithSeen = (item: LocalMedia) => {
     if (item.isNew) {
