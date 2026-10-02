@@ -4,7 +4,7 @@ import { Cloud, FileText, FolderOpen, Image as ImageIcon, Music2, Pause, Play, S
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
-import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker } from '../lib/media/deviceMedia';
+import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia } from '../lib/media/deviceMedia';
 import { stageMediaForDestination } from '../lib/media/shareBridge';
 
 type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
@@ -77,6 +77,30 @@ export default function UniqueMediaPage() {
   useEffect(() => {
     let cancelled = false;
     const restoreAuthorizedMedia = async () => {
+      if (supportsNativeAndroidStorage()) {
+        try {
+          setDeviceMessage('Preparing secure phone media access…');
+          const granted = await requestNativeMediaAccess();
+          if (!granted || cancelled) {
+            if (!cancelled) setDeviceMessage('Phone media permission was not granted. You can try again with Connect phone media.');
+            return;
+          }
+          const nativeItems = await loadNativeAndroidMedia();
+          if (!cancelled && nativeItems.length) {
+            setMedia((current) => {
+              const existing = new Set(current.map((item) => item.file.name + ':' + item.file.size));
+              return [...nativeItems.filter((item) => !existing.has(item.file.name + ':' + item.file.size)), ...current];
+            });
+            setDeviceMessage(nativeItems.length + ' phone media item' + (nativeItems.length === 1 ? '' : 's') + ' connected through Android MediaStore.');
+          } else if (!cancelled) {
+            setDeviceMessage('Phone access is granted, but no supported media was found.');
+          }
+          return;
+        } catch {
+          if (!cancelled) setDeviceMessage('Native phone media access could not be completed.');
+          return;
+        }
+      }
       if (!supportsDeviceDirectoryAccess()) {
         setDeviceMessage('Automatic device media access is available in supported browsers. Native Android MediaStore integration will provide deeper phone-wide access.');
         return;
@@ -111,6 +135,25 @@ export default function UniqueMediaPage() {
   };
 
   const connectDeviceMedia = async () => {
+    if (supportsNativeAndroidStorage()) {
+      try {
+        setDeviceMessage('Requesting Android media access…');
+        const granted = await requestNativeMediaAccess();
+        if (!granted) {
+          setDeviceMessage('Android media permission was not granted.');
+          return;
+        }
+        const nativeItems = await loadNativeAndroidMedia();
+        setMedia((current) => {
+          const existing = new Set(current.map((item) => item.file.name + ':' + item.file.size));
+          return [...nativeItems.filter((item) => !existing.has(item.file.name + ':' + item.file.size)), ...current];
+        });
+        setDeviceMessage(nativeItems.length + ' phone media item' + (nativeItems.length === 1 ? '' : 's') + ' loaded directly from Android storage.');
+      } catch {
+        setDeviceMessage('Android phone media access failed. Check the system permission and try again.');
+      }
+      return;
+    }
     if (!supportsDeviceDirectoryAccess()) {
       if (supportsPhoneFilePicker()) {
         phoneFileInputRef.current?.click();
