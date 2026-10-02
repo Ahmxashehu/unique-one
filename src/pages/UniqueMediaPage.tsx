@@ -65,6 +65,7 @@ export default function UniqueMediaPage() {
   const [playerLoop, setPlayerLoop] = useState(false);
   const [playerShuffle, setPlayerShuffle] = useState(false);
   const playerVideoRef = React.useRef<HTMLVideoElement | null>(null);
+  const playerAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const phoneFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const openMediaWithSeen = (item: LocalMedia) => {
