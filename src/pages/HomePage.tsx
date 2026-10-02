@@ -410,8 +410,7 @@ export default function HomePage() {
                 <span className="text-[10px] font-semibold text-white/50 sm:text-xs">Powered by Gemini</span>
               </div>
               <h2 className="mt-1.5 text-xl font-black leading-tight tracking-tight sm:mt-2 sm:text-4xl">Ask Unique AI anything.</h2>
-              <p className="mt-1.5 line-clamp-2 max-w-2xl text-xs leading-5 text-white/70 sm:mt-2 sm:text-base sm:leading-6">Ask questions, learn, plan, write, explore ideas and discover what Unique One can do.</p>
-              <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2.5 text-xs font-black text-slate-950 shadow-xl transition group-hover:translate-x-1 sm:mt-5 sm:px-5 sm:py-3 sm:text-sm">
+                            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2.5 text-xs font-black text-slate-950 shadow-xl transition group-hover:translate-x-1 sm:mt-5 sm:px-5 sm:py-3 sm:text-sm">
                 Start asking <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </div>
             </div>
@@ -446,8 +445,7 @@ export default function HomePage() {
                     </div>
 
                     <div className="max-w-3xl">
-                      <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.16em] text-white/70">10-second experience</p>
-                      <h1 className="text-xl font-black leading-[1.08] tracking-tight sm:text-3xl lg:text-4xl">{slide.title}</h1>
+                                            <h1 className="text-xl font-black leading-[1.08] tracking-tight sm:text-3xl lg:text-4xl">{slide.title}</h1>
                       <p className="mt-1.5 max-w-2xl text-[11px] leading-4 text-white/80 sm:text-sm sm:leading-5">{slide.description}</p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Link to={slide.href.startsWith('#') ? '/discover' : slide.href} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-[11px] font-black text-slate-950 shadow-lg transition hover:scale-[1.03]">
