@@ -13,6 +13,7 @@ import { validateMessageDraft, CommunicationValidationError } from "./communicat
 import { generatePublicUniqueAiResponse, generateUniqueAiResponse, UniqueAiValidationError } from "./src/lib/ai/uniqueAiService";
 import { registerIdentityVerificationRoutes } from "./src/server/identityVerificationRoutes";
 import { registerAjoRoutes } from "./src/server/ajoRoutes";
+import { registerUniqueShareRoutes } from "./src/server/uniqueShareRoutes";
 
 interface WalletDocument {
   uid: string;
@@ -723,6 +724,7 @@ const app = express();
   app.get("/api/health", (req, res) => res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" }));
   registerIdentityVerificationRoutes(app, authenticate);
   registerAjoRoutes(app, authenticate);
+  registerUniqueShareRoutes(app, authenticate);
 
   app.post("/api/ai/public-chat", rateLimit({
     windowMs: 60_000,
