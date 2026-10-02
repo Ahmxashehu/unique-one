@@ -47,6 +47,12 @@ export default function UniqueSharePage() {
   const [scanning, setScanning] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [localPeers, setLocalPeers] = useState<Array<{ endpointId: string; name: string }>>([]);
+  const [localConnected, setLocalConnected] = useState<string[]>([]);
+  const [localRequest, setLocalRequest] = useState<{ endpointId: string; name: string; authenticationDigits: string } | null>(null);
+  const [localMedia, setLocalMedia] = useState<Array<{ id: string; name: string; mime: string; size: number }>>([]);
+  const [localSelected, setLocalSelected] = useState<string[]>([]);
+  const [localMessage, setLocalMessage] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scanStreamRef = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<number | null>(null);
@@ -59,6 +65,60 @@ export default function UniqueSharePage() {
   };
 
   useEffect(() => () => stopScanner(), []);
+
+  useEffect(() => {
+    const onEvent = (name: string, handler: (detail: any) => void) => {
+      const listener = (event: Event) => handler((event as CustomEvent).detail || {});
+      window.addEventListener(name, listener);
+      return () => window.removeEventListener(name, listener);
+    };
+    const cleanups = [
+      onEvent("localSharePeerFound", detail => setLocalPeers(current => current.some(peer => peer.endpointId === detail.endpointId) ? current : [...current, detail])),
+      onEvent("localSharePeerLost", detail => setLocalPeers(current => current.filter(peer => peer.endpointId !== detail.endpointId))),
+      onEvent("localShareConnected", detail => { setLocalConnected(current => current.includes(detail.endpointId) ? current : [...current, detail.endpointId]); setLocalMessage("Nearby UniqueShare connection established."); }),
+      onEvent("localShareDisconnected", detail => setLocalConnected(current => current.filter(id => id !== detail.endpointId))),
+      onEvent("localShareConnectionRequest", detail => setLocalRequest(detail)),
+      onEvent("localShareFileReceived", detail => setLocalMessage("Received " + (detail.name || "a file") + " directly from the nearby device.")),
+      onEvent("localShareProgress", detail => {
+        if (detail.totalBytes > 0) setLocalMessage("Local transfer " + Math.round(detail.bytesTransferred / detail.totalBytes * 100) + "%");
+      }),
+      onEvent("localShareError", detail => setLocalMessage(detail.message || "Nearby sharing encountered an error."))
+    ];
+    return () => cleanups.forEach(cleanup => cleanup());
+  }, []);
+
+  const native = () => (window as any).UniqueNativeStorage || null;
+  const startNearby = async () => {
+    const bridge = native();
+    if (!bridge) { setLocalMessage("Native nearby sharing is available in the Android app build."); return; }
+    if (!bridge.hasLocalShareAccess?.()) {
+      bridge.requestLocalShareAccess?.();
+      setLocalMessage("Allow Nearby Devices access, then start nearby sharing again.");
+      return;
+    }
+    try {
+      bridge.startLocalShareAdvertising?.();
+      bridge.startLocalShareDiscovery?.();
+      const records = JSON.parse(bridge.listMediaPage?.(0, 50) || "[]");
+      setLocalMedia(records);
+      setLocalMessage("Nearby discovery and advertising started. Keep both phones close and visible.");
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : "Could not start nearby sharing.");
+    }
+  };
+
+  const connectNearby = (endpointId: string) => {
+    try { native()?.connectLocalSharePeer?.(endpointId); setLocalMessage("Connection request sent."); }
+    catch (error) { setLocalMessage(error instanceof Error ? error.message : "Could not connect."); }
+  };
+
+  const sendNearby = () => {
+    try {
+      if (!localSelected.length) { setLocalMessage("Select phone media first."); return; }
+      native()?.sendLocalShareMedia?.(JSON.stringify(localSelected));
+      setLocalMessage("Local transfer started.");
+    } catch (error) { setLocalMessage(error instanceof Error ? error.message : "Could not start local transfer."); }
+  };
 
   useEffect(() => {
     if (!session?.sessionId) return;
@@ -300,6 +360,17 @@ export default function UniqueSharePage() {
             )}
           </section>
         )}
+
+        <section className="mt-5 rounded-3xl border border-emerald-400/20 bg-slate-900 p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><div className="flex items-center gap-2"><Smartphone className="h-5 w-5 text-emerald-300" /><h2 className="font-black">Nearby A ↔ B transfer</h2></div><p className="mt-1 text-xs leading-5 text-slate-400">Native Android transport for nearby peer-to-peer sharing. Cloud UniqueShare remains the fallback.</p></div>
+            <button type="button" onClick={() => void startNearby()} className="rounded-2xl bg-emerald-600 px-4 py-3 text-xs font-black">Start nearby</button>
+          </div>
+          {localPeers.length > 0 && <div className="mt-4 space-y-2">{localPeers.map(peer => <div key={peer.endpointId} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 p-3"><div className="min-w-0 flex-1"><p className="font-bold">{peer.name || "Unique One device"}</p><p className="text-[11px] text-slate-500">{peer.endpointId}</p></div><button type="button" onClick={() => connectNearby(peer.endpointId)} className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950">Connect</button></div>)}</div>}
+          {localRequest && <div className="mt-4 rounded-2xl border border-emerald-400/30 bg-emerald-950/30 p-4"><p className="text-xs text-slate-300">Nearby device wants to connect. Verify the authentication code on both phones:</p><p className="mt-2 text-center font-mono text-2xl font-black text-emerald-300">{localRequest.authenticationDigits}</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => { native()?.acceptLocalShareConnection?.(localRequest.endpointId); setLocalRequest(null); }} className="flex-1 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black">Accept</button><button type="button" onClick={() => { native()?.rejectLocalShareConnection?.(localRequest.endpointId); setLocalRequest(null); }} className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold">Reject</button></div></div>}
+          {localConnected.length > 0 && <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-950/20 p-4"><p className="text-xs font-bold text-emerald-200">Connected nearby: {localConnected.length} peer</p>{localMedia.length > 0 && <div className="mt-3 grid gap-2 sm:grid-cols-2">{localMedia.map(item => <label key={item.id} className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-2 text-xs"><input type="checkbox" checked={localSelected.includes(item.id)} onChange={() => setLocalSelected(current => current.includes(item.id) ? current.filter(id => id !== item.id) : [...current, item.id])} /><span className="truncate">{item.name}</span></label>)}</div>}<button type="button" disabled={!localSelected.length} onClick={sendNearby} className="mt-3 w-full rounded-xl bg-emerald-600 px-3 py-3 text-xs font-black disabled:opacity-40">Send selected phone media directly</button></div>}
+          {localMessage && <p className="mt-3 text-xs font-semibold text-emerald-300">{localMessage}</p>}
+        </section>
 
         {message && <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-950/40 px-4 py-3 text-xs font-semibold leading-5 text-emerald-100">{message}</div>}
       </div>
