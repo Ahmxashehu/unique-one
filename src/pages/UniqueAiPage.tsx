@@ -374,11 +374,11 @@ export default function UniqueAiPage() {
         <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain p-2.5 sm:p-6">
           {messages.length === 0 ? (
             <div className="mx-auto flex max-w-2xl flex-col items-center py-3 text-center sm:py-10">
-              <div className="relative mb-2.5 flex h-14 w-14 items-center justify-center rounded-full bg-slate-950 shadow-[0_0_30px_rgba(52,211,153,0.4)] sm:mb-4 sm:h-16 sm:w-16">
-                <span className="absolute inset-0 rounded-full border border-emerald-300/50 animate-ping" />
-                <span className="absolute inset-1.5 rounded-full border border-emerald-400/30 animate-[spin_5s_linear_infinite]" />
-                <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-emerald-400 text-xs font-black tracking-tight text-slate-950 shadow-[0_0_20px_rgba(52,211,153,0.85)] sm:h-10 sm:w-10 sm:text-sm">
-                  U1
+              <div className="unique-ai-platform-mark relative mb-2.5 flex h-14 w-14 items-center justify-center sm:mb-4 sm:h-16 sm:w-16" aria-hidden="true">
+                <span className="unique-platform-orb relative flex h-full w-full items-center justify-center">
+                  <span className="unique-platform-orb-sphere absolute inset-0 rounded-full" />
+                  <span className="unique-platform-orb-ring absolute inset-[-1px] rounded-full" />
+                  <span className="unique-platform-orb-mark relative z-10 text-[10px] font-black tracking-[-0.08em] text-white sm:text-xs">UP</span>
                 </span>
               </div>
               <h2 className="text-lg font-black tracking-tight text-slate-900 sm:text-2xl">Ask Unique AI anything.</h2>
