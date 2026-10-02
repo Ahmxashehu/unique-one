@@ -456,13 +456,9 @@ export default function UniqueMediaPage() {
 
           {filteredMedia.length === 0 ? (
             <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start gap-4">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-                  {(() => { const Icon = iconForKind(activeKind as Exclude<MediaKind, 'all'>); return <Icon className="h-6 w-6" />; })()}
-                </span>
-                <div className="min-w-0">
+              <div className="text-center">
                   <h3 className="text-base font-black text-slate-900">No {categories.find(([value]) => value === activeKind)?.[1].toLowerCase()} yet</h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                  <p className="mx-auto mt-1 max-w-xl text-sm leading-6 text-slate-500">
                     {activeKind === 'video' && 'Connect your phone to bring your videos into this library.'}
                     {activeKind === 'audio' && 'Connect your phone to bring your audio files into this library.'}
                     {activeKind === 'image' && 'Connect your phone to bring your photos and images into this library.'}
@@ -470,11 +466,15 @@ export default function UniqueMediaPage() {
                   </p>
                 </div>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button type="button" onClick={() => void connectDeviceMedia()} className="rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white">Connect phone</button>
-                {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700">Choose files</button>}
+              <div className="mt-4 flex justify-center">
+                {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700">Choose files</button>}
               </div>
-              <p className="mt-3 text-[11px] leading-5 text-slate-400">Files stay on your device unless you explicitly choose a protected cloud or sharing action.</p>
+              <div className="mt-4 flex justify-center">
+                <Link to="/os/unique-share" className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm">
+                  <Share2 className="h-4 w-4" /> Share with another device
+                </Link>
+              </div>
+              <p className="mt-3 text-center text-[11px] leading-5 text-slate-400">Choose files for this library, or use UniqueShare to connect directly with another person as a guest—no login or registration required.</p>
             </div>
           ) : (
             <>
