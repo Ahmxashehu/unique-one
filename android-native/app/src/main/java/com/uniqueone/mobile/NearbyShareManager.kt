@@ -11,7 +11,11 @@ import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.DataInputStream
+import java.io.FilterInputStream
 import java.io.File
+import java.io.InputStream
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 class NearbyShareManager(private val context: Context, private val emit: (String, JSONObject) -> Unit, private val nativeMedia: MutableMap<String, Pair<Uri, String>>) {
@@ -20,7 +24,22 @@ class NearbyShareManager(private val context: Context, private val emit: (String
     private val serviceId = context.packageName + ".uniqueshare"
     private val discovered = linkedMapOf<String, String>()
     private val connected = linkedSetOf<String>()
-    private val outgoing = mutableMapOf<Long, java.io.InputStream>()
+    private val outgoing = mutableMapOf<Long, InputStream>()
+
+    private class HeaderInputStream(private val source: InputStream, private val header: ByteArray) : FilterInputStream(source) {
+        private var index = 0
+        override fun read(): Int {
+            if (index < header.size) return header[index++].toInt() and 0xFF
+            return source.read()
+        }
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+            if (index >= header.size) return source.read(buffer, offset, length)
+            val count = minOf(length, header.size - index)
+            System.arraycopy(header, index, buffer, offset, count)
+            index += count
+            return count
+        }
+    }
 
     private val lifecycle = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
@@ -54,23 +73,32 @@ class NearbyShareManager(private val context: Context, private val emit: (String
             if (payload.type != Payload.Type.STREAM) return
             val stream = payload.asStream()?.asInputStream() ?: return
             val fileId = UUID.randomUUID().toString()
-            val dir = File(context.filesDir, "unique-share-inbox").apply { mkdirs() }
-            val file = File(dir, "received-$fileId")
+            val dir = File(context.filesDir, "unique-media-received").apply { mkdirs() }
             try {
-                stream.use { input -> file.outputStream().use { output -> input.copyTo(output) } }
-                val key = "local:$fileId"
+                val input = DataInputStream(stream)
+                val headerLength = input.readInt()
+                if (headerLength !in 1..8192) throw IllegalStateException("Invalid UniqueShare file header.")
+                val header = ByteArray(headerLength)
+                input.readFully(header)
+                val metadata = JSONObject(String(header, StandardCharsets.UTF_8))
+                val originalName = metadata.optString("name").ifBlank { "Received-$fileId" }
+                val safeName = originalName.replace(Regex("[^A-Za-z0-9._ -]"), "_")
+                val mime = metadata.optString("mime").ifBlank { "application/octet-stream" }
+                val file = File(dir, fileId + "-" + safeName)
+                input.use { source -> file.outputStream().use { output -> source.copyTo(output) } }
+                val key = "received:" + file.name
                 val contentUri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
-                nativeMedia[key] = contentUri to "application/octet-stream"
+                nativeMedia[key] = contentUri to mime
                 emit("localShareFileReceived", JSONObject().apply {
                     put("endpointId", endpointId)
                     put("id", key)
-                    put("name", file.name)
+                    put("name", safeName)
                     put("size", file.length())
-                    put("mime", "application/octet-stream")
+                    put("mime", mime)
                     put("url", "https://unique.native/media/$key")
+                    put("isNew", true)
                 })
             } catch (error: Exception) {
-                file.delete()
                 emit("localShareError", JSONObject().put("message", error.message ?: "Could not save received file."))
             }
         }
@@ -128,8 +156,11 @@ class NearbyShareManager(private val context: Context, private val emit: (String
         for (index in 0 until ids.length()) {
             val key = ids.optString(index); val record = nativeMedia[key] ?: continue
             val stream = context.contentResolver.openInputStream(record.first) ?: throw IllegalStateException("Could not open media.")
-            val payload = Payload.fromStream(stream)
-            outgoing[payload.id] = stream
+            val metadata = JSONObject().apply { put("name", key.substringAfterLast(":")); put("mime", record.second) }.toString().toByteArray(StandardCharsets.UTF_8)
+            val header = java.nio.ByteBuffer.allocate(4).putInt(metadata.size).array()
+            val payloadStream = HeaderInputStream(stream, header + metadata)
+            val payload = Payload.fromStream(payloadStream)
+            outgoing[payload.id] = payloadStream
             client.sendPayload(targets, payload).addOnFailureListener {
                 outgoing.remove(payload.id)?.close()
                 emit("localShareError", JSONObject().put("message", it.message ?: "Local transfer failed."))
