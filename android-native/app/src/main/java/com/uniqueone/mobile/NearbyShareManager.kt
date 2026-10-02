@@ -94,7 +94,7 @@ class NearbyShareManager(private val context: Context, private val emit: (String
 
     fun startAdvertising() {
         if (!hasPermissions()) throw SecurityException("Nearby permissions are required.")
-        client.startAdvertising("Unique One", serviceId, lifecycle, AdvertisingOptions.Builder().setStrategy(strategy).build())
+        client.startAdvertising("UniquePlatform", serviceId, lifecycle, AdvertisingOptions.Builder().setStrategy(strategy).build())
             .addOnSuccessListener { emit("localShareAdvertising", JSONObject().put("active", true)) }
             .addOnFailureListener { emit("localShareError", JSONObject().put("message", it.message ?: "Could not start local sharing.")) }
     }
@@ -106,7 +106,7 @@ class NearbyShareManager(private val context: Context, private val emit: (String
     }
     fun requestConnection(endpointId: String) {
         if (!hasPermissions()) throw SecurityException("Nearby permissions are required.")
-        client.requestConnection("Unique One", endpointId, lifecycle)
+        client.requestConnection("UniquePlatform", endpointId, lifecycle)
             .addOnFailureListener { emit("localShareError", JSONObject().put("message", it.message ?: "Could not request connection.")) }
     }
     fun acceptConnection(endpointId: String) {
