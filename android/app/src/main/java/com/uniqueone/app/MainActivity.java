@@ -277,6 +277,42 @@ public class MainActivity extends Activity {
         @JavascriptInterface public String listMediaPage(int offset, int limit) { return listMediaPage(Math.max(0, offset), Math.min(300, Math.max(1, limit))).toString(); }
         @JavascriptInterface public String getSharedMedia() { return listReceivedMedia().toString(); }
         @JavascriptInterface public void markMediaSeen(String id) {}
+        @JavascriptInterface public boolean playBackgroundMedia(String idsJson, int index) {
+            try {
+                JSONArray ids = new JSONArray(idsJson);
+                JSONArray uris = new JSONArray();
+                JSONArray names = new JSONArray();
+                for (int i = 0; i < ids.length(); i++) {
+                    String id = ids.getString(i);
+                    Uri uri = mediaUris.get(id);
+                    if (uri == null) {
+                        File file = sharedFiles.get(id);
+                        if (file != null) uri = Uri.fromFile(file);
+                    }
+                    if (uri != null) { uris.put(uri.toString()); names.put(id); }
+                }
+                if (uris.length() == 0) return false;
+                Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
+                intent.setAction(MediaPlaybackService.ACTION_PLAY);
+                intent.putExtra(MediaPlaybackService.EXTRA_URIS, uris.toString());
+                intent.putExtra(MediaPlaybackService.EXTRA_NAMES, names.toString());
+                intent.putExtra(MediaPlaybackService.EXTRA_INDEX, Math.max(0, Math.min(index, uris.length() - 1)));
+                startService(intent);
+                return true;
+            } catch (Exception e) { return false; }
+        }
+        @JavascriptInterface public void pauseBackgroundMedia() {
+            Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
+            intent.setAction(MediaPlaybackService.ACTION_PAUSE); startService(intent);
+        }
+        @JavascriptInterface public void resumeBackgroundMedia() {
+            Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
+            intent.setAction(MediaPlaybackService.ACTION_RESUME); startService(intent);
+        }
+        @JavascriptInterface public void stopBackgroundMedia() {
+            Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
+            intent.setAction(MediaPlaybackService.ACTION_STOP); startService(intent);
+        }
         @JavascriptInterface public boolean shareNativeMedia(String idsJson) {
             try {
                 JSONArray ids = new JSONArray(idsJson);
