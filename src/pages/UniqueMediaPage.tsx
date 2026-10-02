@@ -416,7 +416,7 @@ export default function UniqueMediaPage() {
   };
 
   const categories: Array<[MediaKind, string]> = [
-    ['all', 'All'], ['video', 'Videos'], ['audio', 'Music & Audio'], ['image', 'Images'], ['pdf', 'PDF Reader'],
+    ['all', 'All'], ['video', 'Videos'], ['audio', 'Audio'], ['image', 'Images'], ['pdf', 'PDFs'],
   ];
 
   return (
@@ -444,16 +444,15 @@ export default function UniqueMediaPage() {
           </div>
         </header>
 
-        <section className="mt-5 grid gap-4 md:grid-cols-3">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-2">
-            <div className="flex items-center justify-between gap-3"><div><h2 className="font-black text-slate-900">Phone Storage Manager</h2><p className="text-xs text-slate-500">Storage statistics exposed by this app/browser. Android phone storage is accessed through the system picker when direct folder access is unavailable.</p></div><button type="button" onClick={() => void refreshStorageInfo()} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold">Refresh</button></div>
-            <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: (storageInfo?.quota ? Math.min(100, Math.round(((storageInfo.usage || 0) / storageInfo.quota) * 100)) : 0) + '%' }} /></div>
-            <div className="mt-2 flex justify-between text-xs font-bold text-slate-500"><span>{storageInfo ? formatBytes(storageInfo.usage) + ' used' : 'Storage not measured'}</span><span>{storageInfo ? formatBytes(storageInfo.quota) + ' app quota' : 'Tap refresh'}</span></div>
-          </div>
-          <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5"><Smartphone className="h-6 w-6 text-emerald-700" /><h2 className="mt-3 font-black text-emerald-950">Manage space</h2><p className="mt-2 text-xs leading-5 text-emerald-900">Review media, preview it, share it, or permanently delete items from folders where you granted write permission.</p></div>
-        </section>
-
         <section className="mt-5">
+          <div className="mb-3 flex items-end justify-between gap-3 px-1">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Library</p>
+              <h2 className="text-xl font-black text-slate-950">Your media</h2>
+              <p className="text-xs text-slate-500">Videos, audio, images and PDFs from your connected device.</p>
+            </div>
+            {selected.length > 0 && <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{selected.length} selected</span>}
+          </div>
           {filteredMedia.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
               <Play className="mx-auto h-10 w-10 text-emerald-500" />
@@ -490,16 +489,42 @@ export default function UniqueMediaPage() {
 
         {nativeHasMore && <div className="mt-4 text-center"><button type="button" onClick={() => void loadMoreNativeMedia()} disabled={nativeLoadingMore} className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{nativeLoadingMore ? 'Loading phone media…' : 'Load more phone media'}</button></div>}
 
-        <section className="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-3"><Users className="h-5 w-5 text-emerald-600" /><div><h2 className="font-black text-slate-900">Contacts</h2><p className="text-xs text-slate-500">Contact search remains permission-controlled by the device.</p></div></div>
+        <section className="mt-6">
+          <div className="mb-3 px-1">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Device management</p>
+            <h2 className="text-xl font-black text-slate-950">Storage & space</h2>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-2">
+              <div className="flex items-center justify-between gap-3"><div><h3 className="font-black text-slate-900">Phone Storage Manager</h3><p className="text-xs text-slate-500">Storage statistics exposed by this app/browser. Android phone storage is accessed through the system picker when direct folder access is unavailable.</p></div><button type="button" onClick={() => void refreshStorageInfo()} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold">Refresh</button></div>
+              <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: (storageInfo?.quota ? Math.min(100, Math.round(((storageInfo.usage || 0) / storageInfo.quota) * 100)) : 0) + '%' }} /></div>
+              <div className="mt-2 flex justify-between text-xs font-bold text-slate-500"><span>{storageInfo ? formatBytes(storageInfo.usage) + ' used' : 'Storage not measured'}</span><span>{storageInfo ? formatBytes(storageInfo.quota) + ' app quota' : 'Tap refresh'}</span></div>
+            </div>
+            <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5"><Smartphone className="h-6 w-6 text-emerald-700" /><h3 className="mt-3 font-black text-emerald-950">Manage space</h3><p className="mt-2 text-xs leading-5 text-emerald-900">Review media, preview it, share it, or permanently delete items from folders where you granted write permission.</p></div>
+          </div>
+        </section>
+
+        <section className="mt-6">
+          <div className="mb-3 px-1">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Personal data</p>
+            <h2 className="text-xl font-black text-slate-950">Contacts</h2>
+          </div>
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-3"><Users className="h-5 w-5 text-emerald-600" /><div><h3 className="font-black text-slate-900">Contact access</h3><p className="text-xs text-slate-500">Contact search remains permission-controlled by the device.</p></div></div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <input value={contactSearch} onChange={(event) => setContactSearch(event.target.value)} placeholder="Search contacts" className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none" />
             <button type="button" onClick={() => setContactMessage(contactSearch.trim() ? 'Ready to search permitted contacts for “' + contactSearch.trim() + '”.' : 'Enter a contact name or number to search.')} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Search</button>
           </div>
           {contactMessage && <p className="mt-3 text-xs font-semibold text-emerald-700">{contactMessage}</p>}
+          </div>
         </section>
 
-        <section className="mt-5 grid gap-4 md:grid-cols-2">
+        <section className="mt-6">
+          <div className="mb-3 px-1">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Actions</p>
+            <h2 className="text-xl font-black text-slate-950">Share & backup</h2>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-3"><Smartphone className="h-5 w-5 text-emerald-600" /><div><h2 className="font-black text-slate-900">UniqueShare</h2><p className="text-xs text-slate-500">Select one or many files and hand them to your device's secure sharing system.</p></div></div>
             <button type="button" disabled={!selected.length} onClick={() => void shareFiles(media.filter((item) => selected.includes(item.id)))} className="mt-4 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Share {selected.length ? selected.length + ' selected' : 'selected media'}</button>
@@ -517,6 +542,7 @@ export default function UniqueMediaPage() {
             </AuthActionGate>
             {cloudProgress > 0 && <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: cloudProgress + '%' }} /></div>}
             {cloudMessage && <p className="mt-3 text-xs font-semibold text-emerald-700">{cloudMessage}</p>}
+          </div>
           </div>
         </section>
 
