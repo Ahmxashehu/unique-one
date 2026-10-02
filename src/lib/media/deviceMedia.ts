@@ -11,7 +11,7 @@ export type DeviceMediaItem = {
 
 export type DeviceMediaScan = { items: DeviceMediaItem[]; rootName: string; handle: any };
 type NativeMediaRecord = { id: string; name: string; mime: string; size: number; url: string };
-type NativeBridge = { requestMediaAccess: () => void; hasMediaAccess: () => boolean; listMedia: () => string; listMediaPage?: (offset: number, limit: number) => string };
+type NativeBridge = { requestMediaAccess: () => void; hasMediaAccess: () => boolean; listMedia: () => string; listMediaPage?: (offset: number, limit: number) => string; getSharedMedia?: () => string };
 
 const nativeBridge = (): NativeBridge | null =>
   typeof window !== 'undefined' ? ((window as any).UniqueNativeStorage || null) as NativeBridge | null : null;
@@ -36,6 +36,22 @@ export const loadNativeAndroidMedia = async (offset = 0, limit = 100): Promise<D
   const bridge = nativeBridge();
   if (!bridge || !bridge.hasMediaAccess()) return [];
   const records = JSON.parse(bridge.listMediaPage ? bridge.listMediaPage(offset, limit) : bridge.listMedia()) as NativeMediaRecord[];
+  const items: DeviceMediaItem[] = [];
+  for (const record of records) {
+    const response = await fetch(record.url);
+    const blob = await response.blob();
+    const file = new File([blob], record.name, { type: record.mime });
+    const kind = kindForDeviceFile(file);
+    if (!kind) continue;
+    items.push({ id: record.id, file, kind, url: record.url });
+  }
+  return items;
+};
+
+export const loadNativeSharedMedia = async (): Promise<DeviceMediaItem[]> => {
+  const bridge = nativeBridge();
+  if (!bridge?.getSharedMedia) return [];
+  const records = JSON.parse(bridge.getSharedMedia()) as NativeMediaRecord[];
   const items: DeviceMediaItem[] = [];
   for (const record of records) {
     const response = await fetch(record.url);
