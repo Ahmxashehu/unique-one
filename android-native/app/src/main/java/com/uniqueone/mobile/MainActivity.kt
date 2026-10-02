@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
@@ -19,12 +20,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private val nativeMedia = mutableMapOf<String, Pair<Uri, String>>()
-    
+    private val pendingSharedUris = mutableListOf<Uri>()
+
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             val granted = mediaAccessGranted()
@@ -41,6 +42,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        captureSharedIntent(intent)
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
@@ -64,7 +66,28 @@ class MainActivity : ComponentActivity() {
             addJavascriptInterface(NativeBridge(), "UniqueNativeStorage")
         }
         setContentView(webView)
-        webView.loadUrl("https://unique-one-162s.onrender.com")
+        webView.loadUrl(if (pendingSharedUris.isNotEmpty()) "https://unique-one-162s.onrender.com/unique-media" else "https://unique-one-162s.onrender.com")
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingSharedUris.clear()
+        captureSharedIntent(intent)
+        if (pendingSharedUris.isNotEmpty()) {
+            webView.post { webView.loadUrl("https://unique-one-162s.onrender.com/unique-media") }
+        }
+    }
+
+    private fun captureSharedIntent(intent: Intent?) {
+        if (intent == null) return
+        when (intent.action) {
+            Intent.ACTION_SEND -> intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let { pendingSharedUris.add(it) }
+            Intent.ACTION_SEND_MULTIPLE -> {
+                val items = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+                items?.let { pendingSharedUris.addAll(it) }
+            }
+        }
     }
 
     private fun mediaPermissions(): Array<String> =
@@ -77,7 +100,7 @@ class MainActivity : ComponentActivity() {
     private fun mediaAccessGranted(): Boolean =
         mediaPermissions().all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
 
-    private fun scanMedia(): JSONArray {
+    private fun scanMedia(limit: Int = 100, offset: Int = 0): JSONArray {
         nativeMedia.clear()
         val result = JSONArray()
         if (!mediaAccessGranted()) return result
@@ -99,7 +122,15 @@ class MainActivity : ComponentActivity() {
                     val nameIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                     val mimeIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
                     val sizeIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
-                    var skipped = 0\n                    var added = 0\n                    while (cursor.moveToNext()) {\n                        if (skipped < offset) { skipped++; continue }\n                        if (added >= limit) break\n                        added++
+                    var skipped = 0
+                    var added = 0
+                    while (cursor.moveToNext()) {
+                        if (skipped < offset) {
+                            skipped++
+                            continue
+                        }
+                        if (added >= limit) break
+                        added++
                         val id = cursor.getLong(idIndex)
                         val mime = cursor.getString(mimeIndex) ?: "application/octet-stream"
                         val uri = Uri.withAppendedPath(source, id.toString())
@@ -119,15 +150,62 @@ class MainActivity : ComponentActivity() {
         return result
     }
 
+    private fun sharedMediaJson(): JSONArray {
+        val result = JSONArray()
+        val uris = pendingSharedUris.toList()
+        pendingSharedUris.clear()
+        uris.forEachIndexed { index, uri ->
+            val mime = contentResolver.getType(uri) ?: "application/octet-stream"
+            val key = "shared:" + index + ":" + uri.hashCode()
+            val name = queryDisplayName(uri) ?: "Shared file"
+            val size = querySize(uri)
+            nativeMedia[key] = uri to mime
+            result.put(JSONObject().apply {
+                put("id", key)
+                put("name", name)
+                put("mime", mime)
+                put("size", size)
+                put("url", "https://unique.native/media/$key")
+            })
+        }
+        return result
+    }
+
+    private fun queryDisplayName(uri: Uri): String? {
+        if (uri.scheme != "content") return uri.lastPathSegment
+        return try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun querySize(uri: Uri): Long {
+        if (uri.scheme != "content") return 0L
+        return try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else 0L
+            } ?: 0L
+        } catch (_: Exception) {
+            0L
+        }
+    }
+
     private fun notifyJs(event: String, value: String) {
-        webView.post { webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('$event',{detail:$value}));", null) }
+        webView.post {
+            webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('$event',{detail:$value}));", null)
+        }
     }
 
     inner class NativeBridge {
         @JavascriptInterface fun requestMediaAccess() { permissionLauncher.launch(mediaPermissions()) }
         @JavascriptInterface fun hasMediaAccess(): Boolean = mediaAccessGranted()
         @JavascriptInterface fun listMedia(): String = scanMedia().toString()
-        @JavascriptInterface fun refreshMediaIndex(): String { mediaCache = null; return scanMedia().toString() }
+        @JavascriptInterface fun listMediaPage(offset: Int, limit: Int): String = scanMedia(limit, offset).toString()
+        @JavascriptInterface fun refreshMediaIndex(): String = scanMedia().toString()
+        @JavascriptInterface fun getSharedMedia(): String = sharedMediaJson().toString()
         @JavascriptInterface fun openFilePicker() { filePicker.launch(arrayOf("*/*")) }
         @JavascriptInterface fun openStorageSettings() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
