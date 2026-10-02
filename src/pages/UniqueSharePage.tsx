@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Copy, Download, FileUp, QrCode, RefreshCw, ScanLine, Send, ShieldCheck, Smartphone, Users, X } from "lucide-react";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { auth, storage } from "../lib/firebase";
+import { signInAnonymously } from "firebase/auth";
 import {
   acceptUniqueShareSession,
   connectUniqueShareSession,
@@ -224,7 +225,24 @@ export default function UniqueSharePage() {
     setMessage("");
   };
 
-  const authenticated = Boolean(auth.currentUser);
+  const [guestReady, setGuestReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const ensureGuestAccess = async () => {
+      if (auth.currentUser) { if (!cancelled) setGuestReady(true); return; }
+      try {
+        await signInAnonymously(auth);
+        if (!cancelled) setGuestReady(true);
+      } catch {
+        if (!cancelled) setGuestReady(false);
+      }
+    };
+    void ensureGuestAccess();
+    return () => { cancelled = true; };
+  }, []);
+
+  const authenticated = Boolean(auth.currentUser) || guestReady;
 
   return (
     <main className="min-h-full overflow-y-auto bg-slate-950 pb-24 text-white">
