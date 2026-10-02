@@ -38,6 +38,9 @@ jobs:
       - name: Run whole-platform smoke verification
         run: npm test
 
+      - name: Audit user-facing localization coverage
+        run: npm run localization:audit
+
       - name: Verify production PWA service worker
         run: |
           test -f dist/sw.js
