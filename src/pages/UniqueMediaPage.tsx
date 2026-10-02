@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Cloud, FileText, FolderOpen, Image as ImageIcon, Music2, Pause, Play, Search, Share2, Smartphone, Trash2, Users, Volume2, X } from 'lucide-react';
+import { Cloud, FileText, Image as ImageIcon, Music2, Pause, Play, Search, Share2, Smartphone, Trash2, Users, Volume2, X } from 'lucide-react';
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
@@ -423,18 +423,10 @@ export default function UniqueMediaPage() {
       <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
         <header className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <input ref={phoneFileInputRef} type="file" multiple accept="video/*,audio/*,image/*,application/pdf" className="hidden" onChange={(event) => { importFromPhoneStorage(event.target.files); event.currentTarget.value = ''; }} />
-          <div className="flex min-w-0 flex-wrap items-center gap-3">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"><ImageIcon className="h-6 w-6" /></span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-600">Smart library</p>
-                <h1 className="truncate text-xl font-black tracking-tight text-slate-950">UniqueMedia</h1>
-              </div>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-3.5 py-2.5 text-xs font-black text-white"><FolderOpen className="h-4 w-4" /> Connect phone</button>
-              <Link to="/os/unique-share" className="relative inline-flex items-center gap-2 rounded-full border-2 border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-xs font-black text-emerald-800"><Share2 className="h-4 w-4" /> UniqueShare{newReceivedCount > 0 && <span className="min-w-5 rounded-full bg-emerald-600 px-1.5 py-0.5 text-center text-[10px] text-white">{newReceivedCount}</span>}</Link>
-            </div>
+          <div className="flex justify-center">
+            <Link to="/os/unique-share" className="relative inline-flex items-center justify-center gap-2 rounded-full border-2 border-emerald-300 bg-emerald-50 px-5 py-3 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100">
+              <Share2 className="h-4 w-4" /> Share{newReceivedCount > 0 && <span className="min-w-5 rounded-full bg-emerald-600 px-1.5 py-0.5 text-center text-[10px] text-white">{newReceivedCount}</span>}
+            </Link>
           </div>
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="UniqueMedia categories">
             {categories.map(([value, label]) => {
@@ -603,7 +595,7 @@ export default function UniqueMediaPage() {
           </div>
         </section>
 
-        <p className="mt-5 text-center text-xs font-semibold text-slate-400">Guest access is free. Login is only required when an action needs protected cloud/user data.</p>
+        <p className="mt-5 text-center text-xs font-semibold text-slate-400">Guest access is free. Sharing works without account registration or login.</p>
       </div>
 
       {player && (
