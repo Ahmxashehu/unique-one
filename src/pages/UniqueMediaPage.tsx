@@ -51,6 +51,9 @@ export default function UniqueMediaPage() {
   const [videoAudioMode, setVideoAudioMode] = useState(false);
   const [storageInfo, setStorageInfo] = useState<{ usage: number; quota: number } | null>(null);
   const [deleting, setDeleting] = useState<string[]>([]);
+  const [nativeOffset, setNativeOffset] = useState(0);
+  const [nativeHasMore, setNativeHasMore] = useState(false);
+  const [nativeLoadingMore, setNativeLoadingMore] = useState(false);
   const [playerRate, setPlayerRate] = useState(1);
   const [playerFit, setPlayerFit] = useState<'contain' | 'cover'>('contain');
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
@@ -85,12 +88,14 @@ export default function UniqueMediaPage() {
             if (!cancelled) setDeviceMessage('Phone media permission was not granted. You can try again with Connect phone media.');
             return;
           }
-          const nativeItems = await loadNativeAndroidMedia();
+          const nativeItems = await loadNativeAndroidMedia(0, 100);
           if (!cancelled && nativeItems.length) {
             setMedia((current) => {
               const existing = new Set(current.map((item) => item.file.name + ':' + item.file.size));
               return [...nativeItems.filter((item) => !existing.has(item.file.name + ':' + item.file.size)), ...current];
             });
+            setNativeOffset(nativeItems.length);
+            setNativeHasMore(nativeItems.length === 100);
             setDeviceMessage(nativeItems.length + ' phone media item' + (nativeItems.length === 1 ? '' : 's') + ' connected through Android MediaStore.');
           } else if (!cancelled) {
             setDeviceMessage('Phone access is granted, but no supported media was found.');
@@ -120,6 +125,25 @@ export default function UniqueMediaPage() {
     return () => { cancelled = true; };
   }, []);
 
+  const loadMoreNativeMedia = async () => {
+    if (!supportsNativeAndroidStorage() || !nativeHasMore || nativeLoadingMore) return;
+    try {
+      setNativeLoadingMore(true);
+      const next = await loadNativeAndroidMedia(nativeOffset, 100);
+      setMedia((current) => {
+        const existing = new Set(current.map((item) => item.file.name + ':' + item.file.size));
+        return [...next.filter((item) => !existing.has(item.file.name + ':' + item.file.size)), ...current];
+      });
+      setNativeOffset((value) => value + next.length);
+      setNativeHasMore(next.length === 100);
+      setDeviceMessage(next.length ? next.length + ' more phone media items loaded.' : 'You have reached the end of your phone media library.');
+    } catch {
+      setDeviceMessage('More phone media could not be loaded.');
+    } finally {
+      setNativeLoadingMore(false);
+    }
+  };
+
   const importFromPhoneStorage = (files: FileList | null) => {
     if (!files?.length) return;
     const picked = loadPickedDeviceMedia(files);
@@ -143,11 +167,13 @@ export default function UniqueMediaPage() {
           setDeviceMessage('Android media permission was not granted.');
           return;
         }
-        const nativeItems = await loadNativeAndroidMedia();
+        const nativeItems = await loadNativeAndroidMedia(0, 100);
         setMedia((current) => {
           const existing = new Set(current.map((item) => item.file.name + ':' + item.file.size));
           return [...nativeItems.filter((item) => !existing.has(item.file.name + ':' + item.file.size)), ...current];
         });
+        setNativeOffset(nativeItems.length);
+        setNativeHasMore(nativeItems.length === 100);
         setDeviceMessage(nativeItems.length + ' phone media item' + (nativeItems.length === 1 ? '' : 's') + ' loaded directly from Android storage.');
       } catch {
         setDeviceMessage('Android phone media access failed. Check the system permission and try again.');
@@ -452,6 +478,8 @@ export default function UniqueMediaPage() {
             </div>
           )}
         </section>
+
+        {nativeHasMore && <div className="mt-4 text-center"><button type="button" onClick={() => void loadMoreNativeMedia()} disabled={nativeLoadingMore} className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{nativeLoadingMore ? 'Loading phone media…' : 'Load more phone media'}</button></div>}
 
         <section className="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3"><Users className="h-5 w-5 text-emerald-600" /><div><h2 className="font-black text-slate-900">Contacts</h2><p className="text-xs text-slate-500">Contact search remains permission-controlled by the device.</p></div></div>
