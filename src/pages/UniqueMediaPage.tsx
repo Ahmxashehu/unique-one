@@ -4,7 +4,7 @@ import { Cloud, FileText, FolderOpen, Image as ImageIcon, Music2, Pause, Play, S
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
-import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess } from '../lib/media/deviceMedia';
+import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker } from '../lib/media/deviceMedia';
 import { stageMediaForDestination } from '../lib/media/shareBridge';
 
 type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
@@ -54,7 +54,7 @@ export default function UniqueMediaPage() {
   const [playerRate, setPlayerRate] = useState(1);
   const [playerFit, setPlayerFit] = useState<'contain' | 'cover'>('contain');
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
-  const playerVideoRef = React.useRef<HTMLVideoElement | null>(null);
+  const playerVideoRef = React.useRef<HTMLVideoElement | null>(null);\n  const phoneFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const filteredMedia = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -95,7 +95,21 @@ export default function UniqueMediaPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const connectDeviceMedia = async () => {
+  const importFromPhoneStorage = (files: FileList | null) => {
+    if (!files?.length) return;
+    const picked = loadPickedDeviceMedia(files);
+    if (!picked.length) {
+      setDeviceMessage('No supported video, audio, image or PDF files were selected.');
+      return;
+    }
+    setMedia((current) => {
+      const existing = new Set(current.map((item) => item.file.name + ':' + item.file.size));
+      return [...picked.filter((item) => !existing.has(item.file.name + ':' + item.file.size)), ...current];
+    });
+    setDeviceMessage(picked.length + ' media item' + (picked.length === 1 ? '' : 's') + ' imported from your phone storage.');
+  };
+
+  const connectDeviceMedia = async () =>
     if (!supportsDeviceDirectoryAccess()) {
       setDeviceMessage('This browser does not expose direct device-folder access. Native Android MediaStore integration is required for deeper phone-wide access.');
       return;
@@ -332,9 +346,9 @@ export default function UniqueMediaPage() {
               <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">UniqueMedia</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">A free media workspace for videos, music, images and PDFs. Authorized device media loads automatically and opens directly in the built-in player.</p>
             </div>
-            <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><FolderOpen className="h-4 w-4" /> Connect media once</button><Link to="/os/unique-share" className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800"><Share2 className="h-4 w-4" /> Open UniqueShare</Link></div>
+            <div className="flex flex-wrap gap-2"><input ref={phoneFileInputRef} type="file" multiple accept="video/*,audio/*,image/*,application/pdf" className="hidden" onChange={(event) => { importFromPhoneStorage(event.target.files); event.currentTarget.value = ''; }} /><button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><FolderOpen className="h-4 w-4" /> Connect phone media</button><Link to="/os/unique-share" className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800"><Share2 className="h-4 w-4" /> Open UniqueShare</Link></div>
           </div>
-          <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900"><strong>Automatic access:</strong> After you authorize a media folder once, UniqueMedia remembers that authorization and loads your videos, music, images and PDFs automatically when the browser permits it. Nothing is silently uploaded to the cloud. Full phone-wide Android MediaStore access belongs in the native build.</div>
+          <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900"><strong>Phone access:</strong> On Android browsers that do not expose folder access, this button opens the phone's system file picker so you can select media directly. Supported folder access is remembered when available. Nothing is silently uploaded to the cloud.</div>
           {deviceMessage && <p className="mt-3 text-xs font-semibold text-emerald-700">{deviceMessage}</p>}
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
             <label className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
@@ -349,7 +363,7 @@ export default function UniqueMediaPage() {
 
         <section className="mt-5 grid gap-4 md:grid-cols-3">
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-2">
-            <div className="flex items-center justify-between gap-3"><div><h2 className="font-black text-slate-900">Phone Storage Manager</h2><p className="text-xs text-slate-500">Storage statistics exposed by this app/browser.</p></div><button type="button" onClick={() => void refreshStorageInfo()} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold">Refresh</button></div>
+            <div className="flex items-center justify-between gap-3"><div><h2 className="font-black text-slate-900">Phone Storage Manager</h2><p className="text-xs text-slate-500">Storage statistics exposed by this app/browser. Android phone storage is accessed through the system picker when direct folder access is unavailable.</p></div><button type="button" onClick={() => void refreshStorageInfo()} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold">Refresh</button></div>
             <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: (storageInfo?.quota ? Math.min(100, Math.round(((storageInfo.usage || 0) / storageInfo.quota) * 100)) : 0) + '%' }} /></div>
             <div className="mt-2 flex justify-between text-xs font-bold text-slate-500"><span>{storageInfo ? formatBytes(storageInfo.usage) + ' used' : 'Storage not measured'}</span><span>{storageInfo ? formatBytes(storageInfo.quota) + ' app quota' : 'Tap refresh'}</span></div>
           </div>
