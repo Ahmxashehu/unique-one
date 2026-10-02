@@ -12,7 +12,7 @@ export type DeviceMediaItem = {
 
 export type DeviceMediaScan = { items: DeviceMediaItem[]; rootName: string; handle: any };
 type NativeMediaRecord = { id: string; name: string; mime: string; size: number; url: string; isNew?: boolean };
-type NativeBridge = { requestMediaAccess: () => void; hasMediaAccess: () => boolean; listMedia: () => string; listMediaPage?: (offset: number, limit: number) => string; getSharedMedia?: () => string; shareNativeMedia?: (idsJson: string) => boolean; markMediaSeen?: (id: string) => void };
+type NativeBridge = { requestMediaAccess: () => void; hasMediaAccess: () => boolean; listMedia: () => string; listMediaPage?: (offset: number, limit: number) => string; getSharedMedia?: () => string; shareNativeMedia?: (idsJson: string) => boolean; markMediaSeen?: (id: string) => void; playBackgroundMedia?: (idsJson: string, index: number) => boolean; pauseBackgroundMedia?: () => void; resumeBackgroundMedia?: () => void; stopBackgroundMedia?: () => void };
 
 const nativeBridge = (): NativeBridge | null =>
   typeof window !== 'undefined' ? ((window as any).UniqueNativeStorage || null) as NativeBridge | null : null;
@@ -53,6 +53,11 @@ export const markNativeMediaSeen = (item: DeviceMediaItem): void => {
   nativeBridge()?.markMediaSeen?.(item.id);
   item.isNew = false;
 };
+
+export const playNativeBackgroundMedia = (items: DeviceMediaItem[], index: number): boolean => { const bridge = nativeBridge(); if (!bridge?.playBackgroundMedia || !items.length) return false; return Boolean(bridge.playBackgroundMedia(JSON.stringify(items.map((item) => item.id)), Math.max(0, Math.min(index, items.length - 1)))); };
+export const pauseNativeBackgroundMedia = (): void => { nativeBridge()?.pauseBackgroundMedia?.(); };
+export const resumeNativeBackgroundMedia = (): void => { nativeBridge()?.resumeBackgroundMedia?.(); };
+export const stopNativeBackgroundMedia = (): void => { nativeBridge()?.stopBackgroundMedia?.(); };
 
 export const shareNativeMedia = (items: DeviceMediaItem[]): boolean => {
   const bridge = nativeBridge();
