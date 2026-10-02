@@ -15,8 +15,8 @@ export default defineConfig(() => ({
         globPatterns: ['**/*.{css,html,ico,png,svg,webmanifest,js}'],
         runtimeCaching: [{
           urlPattern: ({ request }) => request.destination === 'script' || request.destination === 'style',
-          handler: 'StaleWhileRevalidate',
-          options: { cacheName: 'unique-one-app-assets-v2', expiration: { maxEntries: 100, maxAgeSeconds: 604800 } },
+          handler: 'NetworkFirst',
+          options: { cacheName: 'unique-one-app-assets-v3', expiration: { maxEntries: 100, maxAgeSeconds: 604800 } },
         }],
         navigateFallback: '/index.html',
         navigateFallbackAllowlist: [/^\/(?!api(?:\/|$)).*/],
