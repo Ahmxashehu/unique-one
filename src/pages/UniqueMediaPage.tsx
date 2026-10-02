@@ -255,6 +255,7 @@ export default function UniqueMediaPage() {
               <Upload className="h-4 w-4" /> Add media
               <input type="file" multiple accept="video/*,audio/*,image/*,application/pdf" className="hidden" onChange={(event) => { addFiles(event.target.files); event.currentTarget.value = ''; }} />
             </label></div>
+          </div>
           <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900"><strong>Permission control:</strong> UniqueMedia only reads folders you explicitly authorize. Supported browsers can request write access for permanent deletion. Full phone-wide Android MediaStore access belongs in the native build.</div>
           {deviceMessage && <p className="mt-3 text-xs font-semibold text-emerald-700">{deviceMessage}</p>}
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
