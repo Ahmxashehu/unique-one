@@ -172,6 +172,18 @@ export default function UniqueMediaPage() {
   }, []);
 
   useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('uniqueShareLocalConnected') || 'null');
+      if (saved?.endpointId) {
+        setLocalShareConnected(true);
+        setLocalSharePeerName(saved.name || 'Nearby device');
+        const savedMode = sessionStorage.getItem('uniqueShareLocalMode');
+        if (savedMode === 'send' || savedMode === 'receive') setLocalShareMode(savedMode);
+        setLocalShareMessage('Nearby connection is active. Choose Send or Receive without leaving Media.');
+      }
+    } catch {
+      // Ignore stale session state and wait for the native connection event.
+    }
     const onEvent = (name: string, handler: (detail: any) => void) => {
       const listener = (event: Event) => handler((event as CustomEvent).detail || {});
       window.addEventListener(name, listener);
@@ -198,11 +210,15 @@ export default function UniqueMediaPage() {
         setLocalShareConnected(true);
         setLocalSharePeerName(detail.name || detail.endpointName || 'Nearby device');
         setLocalShareMode(null);
+        sessionStorage.setItem('uniqueShareLocalConnected', JSON.stringify({ endpointId: detail.endpointId, name: detail.name || detail.endpointName || 'Nearby device' }));
+        sessionStorage.removeItem('uniqueShareLocalMode');
         setLocalShareMessage('Connected. Choose Send to pick media, or Receive to accept incoming files automatically.');
       }),
       onEvent('localShareDisconnected', () => {
         setLocalShareConnected(false);
         setLocalShareMode(null);
+        sessionStorage.removeItem('uniqueShareLocalConnected');
+        sessionStorage.removeItem('uniqueShareLocalMode');
         setLocalShareMessage('Nearby connection ended. Your received files remain in Media.');
       }),
       onEvent('localShareFileReceived', (detail) => {
@@ -650,10 +666,10 @@ export default function UniqueMediaPage() {
                 <span className="h-3 w-3 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_0_5px_rgba(52,211,153,0.12)]" aria-label="Connected" />
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => { setLocalShareMode('send'); setLocalShareMessage('Select a category below, choose media, then tap Send.'); }} className={'rounded-2xl px-4 py-3 text-sm font-black transition ' + (localShareMode === 'send' ? 'bg-emerald-400 text-slate-950' : 'bg-white/10 text-white hover:bg-white/15')}>
+                <button type="button" onClick={() => { setLocalShareMode('send'); sessionStorage.setItem('uniqueShareLocalMode', 'send'); setLocalShareMessage('Select a category below, choose media, then tap Send.'); }} className={'rounded-2xl px-4 py-3 text-sm font-black transition ' + (localShareMode === 'send' ? 'bg-emerald-400 text-slate-950' : 'bg-white/10 text-white hover:bg-white/15')}>
                   <Share2 className="mr-2 inline h-4 w-4" /> Send
                 </button>
-                <button type="button" onClick={() => { setLocalShareMode('receive'); setLocalShareMessage('Receive mode is automatic. Incoming files appear in the latest Media updates.'); }} className={'rounded-2xl px-4 py-3 text-sm font-black transition ' + (localShareMode === 'receive' ? 'bg-emerald-400 text-slate-950' : 'bg-white/10 text-white hover:bg-white/15')}>
+                <button type="button" onClick={() => { setLocalShareMode('receive'); sessionStorage.setItem('uniqueShareLocalMode', 'receive'); setLocalShareMessage('Receive mode is automatic. Incoming files appear in the latest Media updates.'); }} className={'rounded-2xl px-4 py-3 text-sm font-black transition ' + (localShareMode === 'receive' ? 'bg-emerald-400 text-slate-950' : 'bg-white/10 text-white hover:bg-white/15')}>
                   <Smartphone className="mr-2 inline h-4 w-4" /> Receive
                 </button>
               </div>
