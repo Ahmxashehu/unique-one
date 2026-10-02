@@ -53,12 +53,6 @@ export default function AppearanceControls() {
 
   return (
     <div className="fixed right-3 top-3 z-[80] flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 p-1 shadow-lg shadow-slate-900/5 backdrop-blur-xl transition-all unique-appearance-controls sm:right-4 sm:top-3">
-      <div className="unique-u1-glow relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full" aria-label="UniquePlatform">
-        <span className="unique-u1-orbit unique-u1-orbit-ring absolute inset-0 rounded-full" aria-hidden="true" />
-        <span className="unique-u1-mark relative z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/90 bg-white text-[11px] font-black tracking-[-0.08em] text-emerald-700 shadow-sm">
-          UP
-        </span>
-      </div>
       <button
         type="button"
         onClick={toggleTheme}
