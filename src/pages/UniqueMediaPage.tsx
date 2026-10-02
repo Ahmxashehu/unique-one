@@ -94,6 +94,26 @@ export default function UniqueMediaPage() {
   };
 
   useEffect(() => {
+    const handler = async (event: Event) => {
+      const detail = (event as CustomEvent<{ id?: string; name?: string }>).detail || {};
+      if (!supportsNativeAndroidStorage()) return;
+      try {
+        const fresh = await loadNativeAndroidMedia(0, 100);
+        setMedia(current => {
+          const existing = new Set(current.map(item => item.id));
+          return [...fresh.filter(item => !existing.has(item.id)), ...current];
+        });
+        setNewReceivedCount(current => Math.max(current, fresh.filter(item => item.isNew).length));
+        if (detail.name) setDeviceMessage("Received " + detail.name + " — added to UniqueMedia.");
+      } catch {
+        if (detail.name) setDeviceMessage("Received " + detail.name + ". Refreshing the media library is temporarily unavailable.");
+      }
+    };
+    window.addEventListener("localShareFileReceived", handler);
+    return () => window.removeEventListener("localShareFileReceived", handler);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     const restoreAuthorizedMedia = async () => {
       if (supportsNativeAndroidStorage()) {
