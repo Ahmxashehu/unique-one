@@ -52,6 +52,7 @@ export default function UniqueSharePage() {
   const [localRequest, setLocalRequest] = useState<{ endpointId: string; name: string; authenticationDigits: string } | null>(null);
   const [localMedia, setLocalMedia] = useState<Array<{ id: string; name: string; mime: string; size: number }>>([]);
   const [localSelected, setLocalSelected] = useState<string[]>([]);
+  const [localCategory, setLocalCategory] = useState<"all" | "video" | "audio" | "image" | "pdf">("all");
   const [localMessage, setLocalMessage] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scanStreamRef = useRef<MediaStream | null>(null);
@@ -78,7 +79,13 @@ export default function UniqueSharePage() {
       onEvent("localShareConnected", detail => { setLocalConnected(current => current.includes(detail.endpointId) ? current : [...current, detail.endpointId]); setLocalMessage("Nearby UniqueShare connection established."); }),
       onEvent("localShareDisconnected", detail => setLocalConnected(current => current.filter(id => id !== detail.endpointId))),
       onEvent("localShareConnectionRequest", detail => setLocalRequest(detail)),
-      onEvent("localShareFileReceived", detail => setLocalMessage("Received " + (detail.name || "a file") + " directly from the nearby device.")),
+      onEvent("localShareFileReceived", detail => {
+        setLocalMessage("Received " + (detail.name || "a file") + " directly from the nearby device. It is now available in UniqueMedia.");
+        try {
+          const record = { id: detail.id || crypto.randomUUID(), name: detail.name || "Received file", mime: detail.mime || detail.contentType || "application/octet-stream", size: Number(detail.size || 0) };
+          setLocalMedia(current => current.some(item => item.id === record.id) ? current : [record, ...current]);
+        } catch {}
+      }),
       onEvent("localShareProgress", detail => {
         if (detail.totalBytes > 0) setLocalMessage("Local transfer " + Math.round(detail.bytesTransferred / detail.totalBytes * 100) + "%");
       }),
@@ -114,11 +121,30 @@ export default function UniqueSharePage() {
 
   const sendNearby = () => {
     try {
-      if (!localSelected.length) { setLocalMessage("Select phone media first."); return; }
+      if (!localSelected.length) { setLocalMessage("Select media first."); return; }
       native()?.sendLocalShareMedia?.(JSON.stringify(localSelected));
-      setLocalMessage("Local transfer started.");
+      setLocalMessage(localSelected.length + " media item" + (localSelected.length === 1 ? "" : "s") + " sent. Receiving devices get them automatically in UniqueMedia.");
     } catch (error) { setLocalMessage(error instanceof Error ? error.message : "Could not start local transfer."); }
   };
+
+  const localKind = (item: { mime: string; name: string }) => {
+    const mime = (item.mime || "").toLowerCase();
+    const name = item.name.toLowerCase();
+    if (mime.startsWith("video/")) return "video" as const;
+    if (mime.startsWith("audio/")) return "audio" as const;
+    if (mime.startsWith("image/")) return "image" as const;
+    if (mime === "application/pdf" || name.endsWith(".pdf")) return "pdf" as const;
+    return "other" as const;
+  };
+
+  const localVisibleMedia = localMedia.filter(item => localCategory === "all" || localKind(item) === localCategory);
+  const localCategories = [
+    ["all", "All media"],
+    ["video", "Videos"],
+    ["audio", "Audio"],
+    ["image", "Images"],
+    ["pdf", "PDF Reader"],
+  ] as const;
 
   useEffect(() => {
     if (!session?.sessionId) return;
@@ -396,7 +422,17 @@ export default function UniqueSharePage() {
           </div>
           {localPeers.length > 0 && <div className="mt-4 space-y-2">{localPeers.map(peer => <div key={peer.endpointId} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 p-3"><div className="min-w-0 flex-1"><p className="font-bold">{peer.name || "UniquePlatform device"}</p><p className="text-[11px] text-slate-500">{peer.endpointId}</p></div><button type="button" onClick={() => connectNearby(peer.endpointId)} className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950">Connect</button></div>)}</div>}
           {localRequest && <div className="mt-4 rounded-2xl border border-emerald-400/30 bg-emerald-950/30 p-4"><p className="text-xs text-slate-300">Nearby device wants to connect. Verify the authentication code on both phones:</p><p className="mt-2 text-center font-mono text-2xl font-black text-emerald-300">{localRequest.authenticationDigits}</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => { native()?.acceptLocalShareConnection?.(localRequest.endpointId); setLocalRequest(null); }} className="flex-1 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black">Accept</button><button type="button" onClick={() => { native()?.rejectLocalShareConnection?.(localRequest.endpointId); setLocalRequest(null); }} className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold">Reject</button></div></div>}
-          {localConnected.length > 0 && <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-950/20 p-4"><p className="text-xs font-bold text-emerald-200">Connected nearby: {localConnected.length} peer</p>{localMedia.length > 0 && <div className="mt-3 grid gap-2 sm:grid-cols-2">{localMedia.map(item => <label key={item.id} className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-2 text-xs"><input type="checkbox" checked={localSelected.includes(item.id)} onChange={() => setLocalSelected(current => current.includes(item.id) ? current.filter(id => id !== item.id) : [...current, item.id])} /><span className="truncate">{item.name}</span></label>)}</div>}<button type="button" disabled={!localSelected.length} onClick={sendNearby} className="mt-3 w-full rounded-xl bg-emerald-600 px-3 py-3 text-xs font-black disabled:opacity-40">Send selected phone media directly</button></div>}
+          {localConnected.length > 0 && <div className="mt-4 overflow-hidden rounded-3xl border border-emerald-400/20 bg-emerald-950/20">
+            <div className="p-4">
+              <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black text-emerald-200">Connected nearby</p><p className="mt-1 text-[11px] text-slate-400">{localConnected.length} peer · choose from your media library to send</p></div><span className="rounded-full bg-emerald-400/10 px-2.5 py-1 text-[10px] font-black text-emerald-300">LIVE</span></div>
+              <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+                {localCategories.map(([value, label]) => <button key={value} type="button" onClick={() => setLocalCategory(value)} className={"shrink-0 rounded-full px-3 py-2 text-[11px] font-black " + (localCategory === value ? "bg-emerald-500 text-slate-950" : "bg-white/5 text-slate-300")}>{label}</button>)}
+              </div>
+              {localVisibleMedia.length > 0 ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{localVisibleMedia.map(item => <label key={item.id} className={"flex cursor-pointer items-center gap-3 rounded-2xl border p-3 text-xs " + (localSelected.includes(item.id) ? "border-emerald-400/50 bg-emerald-400/10" : "border-white/10 bg-black/20")}><input type="checkbox" checked={localSelected.includes(item.id)} onChange={() => setLocalSelected(current => current.includes(item.id) ? current.filter(id => id !== item.id) : [...current, item.id])} /><span className="min-w-0 flex-1"><span className="block truncate font-bold text-white">{item.name}</span><span className="text-[10px] text-slate-500">{localKind(item)} · {formatBytes(item.size)}</span></span></label>)}</div> : <div className="mt-3 rounded-2xl border border-dashed border-white/10 p-4 text-center text-xs text-slate-500">No media in this category on the connected phone.</div>}
+              <div className="mt-4 flex gap-2"><button type="button" disabled={!localSelected.length} onClick={sendNearby} className="flex-1 rounded-2xl bg-emerald-600 px-3 py-3 text-xs font-black disabled:opacity-40"><Send className="mr-1 inline h-4 w-4" />Send {localSelected.length ? localSelected.length + " selected" : "selected media"}</button><button type="button" onClick={() => { setLocalSelected([]); setLocalCategory("all"); }} className="rounded-2xl border border-white/10 px-3 py-3 text-xs font-bold text-slate-300">Clear</button></div>
+              <p className="mt-3 text-[10px] leading-5 text-slate-500">Receive mode is automatic: accepted files are written to the device's UniqueMedia library and appear with a NEW indicator.</p>
+            </div>
+          </div>}
           {localMessage && <p className="mt-3 text-xs font-semibold text-emerald-300">{localMessage}</p>}
         </section>
 
