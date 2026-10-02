@@ -512,7 +512,6 @@ export default function HomePage() {
                 <h2 className="text-2xl font-black tracking-tight">Active Edge</h2>
               </div>
               <p className="mt-2 text-sm text-slate-500">
-                A living stream of what is relevant, active and discoverable on Unique.
               </p>
             </div>
             <Link to="/discover" className="text-sm font-bold text-emerald-700">
@@ -558,7 +557,7 @@ export default function HomePage() {
                       <h3 className="text-xl font-black tracking-tight">UniqueMedia</h3>
                       <div className="mt-1 min-w-0 h-9 overflow-hidden text-xs leading-4 text-slate-500 sm:h-6 sm:text-sm sm:leading-normal">
                         <p className="animate-[uniqueMediaVertical_9s_linear_infinite] whitespace-normal break-words motion-reduce:animate-none">
-                          Your personal offline-first hub for videos, music, images, PDFs and contacts.
+                          
                         </p>
                       </div>
                     </div>
@@ -824,7 +823,7 @@ export default function HomePage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">New experience</p>
                     <h3 className="mt-1 text-lg font-black tracking-tight">Online Conference</h3>
-                    <p className="mt-1 text-xs leading-5 text-white/65">Meet, teach, present and connect with video, audio and screen sharing.</p>
+                    
                   </div>
                 </div>
                 <div className="relative mt-3 grid grid-cols-2 gap-2">
@@ -839,7 +838,7 @@ export default function HomePage() {
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 sm:h-10 sm:w-10 sm:rounded-2xl"><Building2 className="h-5 w-5" /></span>
                   <div className="min-w-0 flex-1">
                     <h3 className="break-words text-sm font-black sm:text-base">Unique Business Hub</h3>
-                    <div className="mt-0.5 h-8 overflow-hidden text-[11px] leading-4 text-slate-500 sm:h-6 sm:text-xs sm:leading-normal"><p className="animate-[uniqueMediaVertical_9s_linear_infinite] whitespace-normal break-words motion-reduce:animate-none">Register, verify and manage your business in one place.</p></div>
+                    <div className="mt-0.5 h-8 overflow-hidden text-[11px] leading-4 text-slate-500 sm:h-6 sm:text-xs sm:leading-normal"><p className="animate-[uniqueMediaVertical_9s_linear_infinite] whitespace-normal break-words motion-reduce:animate-none"></p></div>
                   </div>
                 </div>
                 <details className="group mt-3">
