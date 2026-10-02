@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Send, Sparkles } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { getLanguage, type SupportedLanguage } from "../lib/i18n";
 
 type UniqueAiCapabilities = {
   version: 1;
@@ -182,6 +183,15 @@ export default function UniqueAiPage() {
   const [requestState, setRequestState] = useState<"idle" | "sending" | "retrying">("idle");
   const [lastRequestId, setLastRequestId] = useState<string | null>(null);
   const [suggestedIndex, setSuggestedIndex] = useState(0);
+  const [language, setLanguage] = useState<SupportedLanguage>(getLanguage());
+
+  useEffect(() => {
+    const handleLanguageChange = (event: Event) => {
+      setLanguage((event as CustomEvent<SupportedLanguage>).detail);
+    };
+    window.addEventListener("unique-language-change", handleLanguageChange);
+    return () => window.removeEventListener("unique-language-change", handleLanguageChange);
+  }, []);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -229,7 +239,7 @@ export default function UniqueAiPage() {
       const response = await fetch(currentUser ? "/api/ai/chat" : "/api/ai/public-chat", {
         method: "POST",
         headers,
-        body: JSON.stringify({ message: trimmed, history }),
+        body: JSON.stringify({ message: trimmed, history, preferredLanguage: language }),
         signal: controller.signal,
       });
 
