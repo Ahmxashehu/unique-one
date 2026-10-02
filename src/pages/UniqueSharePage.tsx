@@ -321,15 +321,15 @@ export default function UniqueSharePage() {
   return (
     <main className="min-h-full overflow-y-auto bg-slate-950 pb-24 text-white">
       <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
-        <header className="rounded-[2rem] border border-emerald-500/20 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/50 p-6 shadow-2xl sm:p-8">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-emerald-300"><ShieldCheck className="h-4 w-4" /> UniquePlatform secure sharing</div>
-              <h1 className="mt-2 text-4xl font-black tracking-tight">UniqueShare</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">A secure cycle-share environment: once A ↔ B connect, both users can send and receive at the same time, with separate transfer progress and authenticated storage boundaries.</p>
+        <header className="relative rounded-[2rem] border border-emerald-400/20 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/60 p-5 shadow-2xl sm:p-7">
+          <div className="absolute -right-5 -top-5 h-24 w-24 rounded-full border-8 border-emerald-400/20 bg-emerald-400/5" />
+          <div className="relative flex items-center justify-center">
+            <div className="inline-flex items-center gap-3 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-5 py-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg ring-4 ring-emerald-500/10"><Share2 className="h-5 w-5" /></span>
+              <div className="text-left"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">Smart Share</p><h1 className="text-xl font-black tracking-tight text-white">UniqueShare</h1></div>
             </div>
-            <Smartphone className="h-9 w-9 text-emerald-300" />
           </div>
+          <p className="relative mt-3 text-center text-xs text-slate-400">Connect → choose files → send or receive. Your transfer state stays visible.</p>
         </header>
 
         {!authenticated ? (
