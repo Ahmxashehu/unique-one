@@ -119,7 +119,7 @@ const EXTRA: Record<SupportedLanguage, Record<string,string>> = {
     "Updating...":"Ana sabuntawa...", "Message Seller":"Tura saƙo ga mai sayarwa", "Go to Dashboard":"Je zuwa Dashboard", "Open Store":"Buɗe Shago",
     "Institution":"Cibiyar ilimi", "Course":"Darasi", "Enroll":"Yi rajista", "Invite Member":"Gayyaci memba", "Upload Documents":"Loda takardu",
     "Search messages":"Bincika saƙonni", "Voice calls coming soon":"Kiran murya zai zo nan ba da jimawa ba", "Reshare to chat":"Sake rabawa zuwa hira", "Copy link":"Kwafi hanyar haɗi",
-    "Remove":"Cire", "Publishing...":"Ana wallafawa...", "Publish Service":"Wallafa aiki", "Save Draft":"Ajiye daftari", "Enable biometric security":"Kunna tsaron biometric",
+    "Remove":"Cire", "Publishing...":"Ana wallafawa...", "Publish Service":"Wallafa aiki", "Enable biometric security":"Kunna tsaron biometric",
     "Allow media access":"Bada damar kafofin watsa labarai", "Next":"Na gaba", "Previous":"Na baya", "Close menu":"Rufe menu", "More UniquePlatform":"Ƙarin UniquePlatform"
   },
   fr: {
