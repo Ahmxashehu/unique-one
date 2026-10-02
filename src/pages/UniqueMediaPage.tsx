@@ -37,7 +37,7 @@ const uploadFile = (path: string, file: File, onProgress: (value: number) => voi
 
 export default function UniqueMediaPage() {
   const [media, setMedia] = useState<LocalMedia[]>([]);
-  const [activeKind, setActiveKind] = useState<MediaKind>('all');
+  const [activeKind, setActiveKind] = useState<MediaKind>('audio');
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [contactSearch, setContactSearch] = useState('');
@@ -50,7 +50,6 @@ export default function UniqueMediaPage() {
   const [player, setPlayer] = useState<LocalMedia | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoAudioMode, setVideoAudioMode] = useState(false);
-  const [storageInfo, setStorageInfo] = useState<{ usage: number; quota: number } | null>(null);
   const [deleting, setDeleting] = useState<string[]>([]);
   const [nativeOffset, setNativeOffset] = useState(0);
   const [nativeHasMore, setNativeHasMore] = useState(false);
@@ -205,20 +204,6 @@ export default function UniqueMediaPage() {
     }
   };
 
-  const refreshStorageInfo = async () => {
-    try {
-      if (!navigator.storage?.estimate) {
-        setDeviceMessage('Storage statistics are not exposed by this browser.');
-        return;
-      }
-      const estimate = await navigator.storage.estimate();
-      setStorageInfo({ usage: estimate.usage || 0, quota: estimate.quota || 0 });
-      setDeviceMessage('Browser storage information refreshed. Phone-wide storage requires the native Android build.');
-    } catch {
-      setDeviceMessage('Storage information could not be read on this device.');
-    }
-  };
-
   const permanentDelete = async (item: LocalMedia) => {
     if (!item.parentHandle || !item.entryName) {
       setDeviceMessage('This item was added through a file picker and cannot be permanently deleted by the web app. Remove it from UniqueMedia instead.');
@@ -336,7 +321,7 @@ export default function UniqueMediaPage() {
       const manifestFile = new File([JSON.stringify(manifest)], 'manifest.json', { type: 'application/json' });
       await uploadFile(root + '/manifest.json', manifestFile, () => {});
       setCloudProgress(100);
-      setCloudMessage('Cloud backup complete. Your media bytes and manifest are stored in your protected UniqueMedia backup.');
+      setCloudMessage('Contact backup completed.');
     } catch {
       setCloudMessage('Cloud backup failed. Check your connection and try again; local files were not changed.');
     }
@@ -371,7 +356,7 @@ export default function UniqueMediaPage() {
         if (kind) restored.push({ id: crypto.randomUUID(), file, kind, url: URL.createObjectURL(file) });
       }
       setMedia((current) => [...restored, ...current]);
-      setCloudMessage(restored.length + ' media file' + (restored.length === 1 ? '' : 's') + ' restored from your latest cloud backup.');
+      setCloudMessage(restored.length + ' backed-up item' + (restored.length === 1 ? '' : 's') + ' restored.');
     } catch {
       setCloudMessage('Restore could not complete. Check Storage access and your connection.');
     }
@@ -416,8 +401,8 @@ export default function UniqueMediaPage() {
     }
   };
 
-  const categories: Array<[MediaKind, string]> = [
-    ['all', 'All'], ['video', 'Videos'], ['audio', 'Audio'], ['image', 'Images'], ['pdf', 'PDFs'],
+  const categories: Array<[Exclude<MediaKind, 'all'>, string]> = [
+    ['audio', 'Music'], ['video', 'Videos'], ['image', 'Images'], ['pdf', 'PDF Reader'],
   ];
 
   return (
@@ -458,8 +443,7 @@ export default function UniqueMediaPage() {
           )}
 
           <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full bg-slate-100 px-3 py-1.5 font-bold text-slate-600">Library: {filteredMedia.length}</span>
-            <span className="rounded-full bg-emerald-50 px-3 py-1.5 font-bold text-emerald-700">View: {categories.find(([value]) => value === activeKind)?.[1] || 'All'}</span>
+            <span className="rounded-full bg-emerald-50 px-3 py-1.5 font-bold text-emerald-700">{categories.find(([value]) => value === activeKind)?.[1] || 'Music'}</span>
             {selected.length > 0 && <span className="rounded-full bg-slate-950 px-3 py-1.5 font-bold text-white">{selected.length} selected</span>}
           </div>
 
@@ -516,21 +500,6 @@ export default function UniqueMediaPage() {
 
         <section className="mt-6">
           <div className="mb-3 px-1">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Device management</p>
-            <h2 className="text-xl font-black text-slate-950">Storage & space</h2>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-2">
-              <div className="flex items-center justify-between gap-3"><div><h3 className="font-black text-slate-900">Phone Storage Manager</h3><p className="text-xs text-slate-500">Storage statistics exposed by this app/browser. Android phone storage is accessed through the system picker when direct folder access is unavailable.</p></div><button type="button" onClick={() => void refreshStorageInfo()} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold">Refresh</button></div>
-              <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: (storageInfo?.quota ? Math.min(100, Math.round(((storageInfo.usage || 0) / storageInfo.quota) * 100)) : 0) + '%' }} /></div>
-              <div className="mt-2 flex justify-between text-xs font-bold text-slate-500"><span>{storageInfo ? formatBytes(storageInfo.usage) + ' used' : 'Storage not measured'}</span><span>{storageInfo ? formatBytes(storageInfo.quota) + ' app quota' : 'Tap refresh'}</span></div>
-            </div>
-            <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5"><Smartphone className="h-6 w-6 text-emerald-700" /><h3 className="mt-3 font-black text-emerald-950">Manage space</h3><p className="mt-2 text-xs leading-5 text-emerald-900">Review media, preview it, share it, or permanently delete items from folders where you granted write permission.</p></div>
-          </div>
-        </section>
-
-        <section className="mt-6">
-          <div className="mb-3 px-1">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Personal data</p>
             <h2 className="text-xl font-black text-slate-950">Contacts</h2>
           </div>
@@ -541,15 +510,27 @@ export default function UniqueMediaPage() {
             <button type="button" onClick={() => setContactMessage(contactSearch.trim() ? 'Ready to search permitted contacts for “' + contactSearch.trim() + '”.' : 'Enter a contact name or number to search.')} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Search</button>
           </div>
           {contactMessage && <p className="mt-3 text-xs font-semibold text-emerald-700">{contactMessage}</p>}
+          <div className="mt-5 rounded-3xl border border-emerald-100 bg-emerald-50 p-4">
+            <div className="flex items-center gap-3"><Cloud className="h-5 w-5 text-emerald-700" /><div><h3 className="font-black text-emerald-950">Contact Backup & Auto-Sync</h3><p className="text-xs text-emerald-900">Register and explicitly enable contact backup to keep your contacts synchronized across your signed-in devices.</p></div></div>
+            <AuthActionGate>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => void backupToCloud()} className="rounded-2xl bg-white px-3 py-3 text-sm font-bold text-emerald-900">Back up contacts</button>
+                <button type="button" onClick={() => void restoreLatestCloudBackup()} className="rounded-2xl bg-emerald-700 px-3 py-3 text-sm font-bold text-white">Restore contacts</button>
+              </div>
+            </AuthActionGate>
+            {cloudProgress > 0 && <div className="mt-3 h-2 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-emerald-500" style={{ width: cloudProgress + '%' }} /></div>}
+            {cloudMessage && <p className="mt-3 text-xs font-semibold text-emerald-700">{cloudMessage}</p>}
+            <p className="mt-3 text-[11px] leading-5 text-emerald-800/70">Automatic synchronization should only run after the user enables backup and grants contact permission.</p>
+          </div>
           </div>
         </section>
 
         <section className="mt-6">
           <div className="mb-3 px-1">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Actions</p>
-            <h2 className="text-xl font-black text-slate-950">Share & backup</h2>
+            <h2 className="text-xl font-black text-slate-950">Sharing</h2>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div>
           <div className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-3"><Smartphone className="h-5 w-5 text-emerald-600" /><div><h2 className="font-black text-slate-900">UniqueShare</h2><p className="text-xs text-slate-500">Select one or many files and hand them to your device's secure sharing system.</p></div></div>
             <button type="button" disabled={!selected.length} onClick={() => void shareFiles(media.filter((item) => selected.includes(item.id)))} className="mt-4 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Share {selected.length ? selected.length + ' selected' : 'selected media'}</button>
@@ -557,17 +538,7 @@ export default function UniqueMediaPage() {
             <p className="mt-3 text-[11px] leading-5 text-slate-400">This release uses the supported Web Share/File Share capability. A dedicated Unique ID-to-Unique ID transfer channel can be added next without replacing this path.</p>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-3"><Cloud className="h-5 w-5 text-emerald-600" /><div><h2 className="font-black text-slate-900">Cloud Backup & Restore</h2><p className="text-xs text-slate-500">Real media-byte backup to your protected Firebase Storage space.</p></div></div>
-            <AuthActionGate>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => void backupToCloud()} className="rounded-2xl border border-slate-200 px-3 py-3 text-sm font-bold text-slate-800">Backup</button>
-                <button type="button" onClick={() => void restoreLatestCloudBackup()} className="rounded-2xl bg-slate-950 px-3 py-3 text-sm font-bold text-white">Restore latest</button>
-              </div>
-            </AuthActionGate>
-            {cloudProgress > 0 && <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: cloudProgress + '%' }} /></div>}
-            {cloudMessage && <p className="mt-3 text-xs font-semibold text-emerald-700">{cloudMessage}</p>}
-          </div>
+                    </div>
           </div>
         </section>
 
