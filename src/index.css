@@ -423,6 +423,71 @@ a {
 }
 
 
+
+/* Global UniquePlatform wordmark: compact 3D globe/orb with restrained motion. */
+.unique-platform-orb {
+  perspective: 80px;
+  filter: drop-shadow(0 2px 7px rgb(16 185 129 / 0.24));
+}
+.unique-platform-orb-sphere {
+  background:
+    radial-gradient(circle at 30% 25%, rgb(255 255 255 / 0.92) 0 7%, transparent 18%),
+    radial-gradient(circle at 35% 30%, #34d399 0, #059669 38%, #047857 68%, #064e3b 100%);
+  box-shadow:
+    inset -5px -6px 10px rgb(0 0 0 / 0.22),
+    inset 4px 4px 8px rgb(255 255 255 / 0.22),
+    0 0 0 1px rgb(255 255 255 / 0.65);
+  animation: uniquePlatformOrbFloat 3.8s ease-in-out infinite;
+}
+.unique-platform-orb-sphere::before {
+  content: "";
+  position: absolute;
+  inset: 14%;
+  border-radius: 9999px;
+  border: 1px solid rgb(255 255 255 / 0.38);
+  border-left-color: transparent;
+  border-right-color: transparent;
+  transform: rotateX(62deg) rotateZ(18deg);
+  animation: uniquePlatformOrbRotate 4.8s linear infinite;
+}
+.unique-platform-orb-sphere::after {
+  content: "";
+  position: absolute;
+  inset: 7%;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 70% 30%, rgb(255 255 255 / 0.3), transparent 45%);
+}
+.unique-platform-orb-ring {
+  border: 1px solid rgb(16 185 129 / 0.48);
+  box-shadow: 0 0 10px rgb(16 185 129 / 0.18);
+  animation: uniquePlatformOrbRing 5.6s linear infinite;
+}
+.unique-platform-orb-mark {
+  text-shadow: 0 1px 4px rgb(0 0 0 / 0.4);
+}
+.unique-platform-wordmark {
+  transition: letter-spacing 180ms ease, transform 180ms ease;
+}
+.group:hover .unique-platform-wordmark {
+  letter-spacing: -0.02em;
+}
+@keyframes uniquePlatformOrbFloat {
+  0%, 100% { transform: translateY(0) rotateY(-3deg); }
+  50% { transform: translateY(-1px) rotateY(5deg); }
+}
+@keyframes uniquePlatformOrbRotate {
+  to { transform: rotateX(62deg) rotateZ(378deg); }
+}
+@keyframes uniquePlatformOrbRing {
+  to { transform: rotate(360deg); }
+}
+.unique-dark .unique-platform-wordmark { color: #f8fafc; }
+@media (prefers-reduced-motion: reduce) {
+  .unique-platform-orb-sphere,
+  .unique-platform-orb-sphere::before,
+  .unique-platform-orb-ring { animation: none; }
+}
+
 /* UniquePlatform typography + authentication form normalization.
    Keeps text readable, balanced and consistent across phones, tablets and desktop. */
 :root {
