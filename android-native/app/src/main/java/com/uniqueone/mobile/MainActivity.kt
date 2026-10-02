@@ -98,14 +98,28 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun mediaPermissions(): Array<String> =
-        if (Build.VERSION.SDK_INT >= 33) arrayOf(
+        if (Build.VERSION.SDK_INT >= 34) arrayOf(
+            Manifest.permission.READ_MEDIA_IMAGES,
+            Manifest.permission.READ_MEDIA_VIDEO,
+            Manifest.permission.READ_MEDIA_AUDIO,
+            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+        ) else if (Build.VERSION.SDK_INT >= 33) arrayOf(
             Manifest.permission.READ_MEDIA_IMAGES,
             Manifest.permission.READ_MEDIA_VIDEO,
             Manifest.permission.READ_MEDIA_AUDIO
         ) else arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
 
-    private fun mediaAccessGranted(): Boolean =
-        mediaPermissions().all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
+    private fun mediaAccessGranted(): Boolean {
+        if (Build.VERSION.SDK_INT < 33) {
+            return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+        val image = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+        val video = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+        val audio = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val selected = Build.VERSION.SDK_INT >= 34 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED
+        return image || video || audio || selected
+    }
 
     private fun scanMedia(limit: Int = 100, offset: Int = 0): JSONArray {
         nativeMedia.clear()
