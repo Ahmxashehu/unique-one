@@ -1,4 +1,5 @@
 import { auth } from "./firebase";
+import { signInAnonymously } from "firebase/auth";
 
 export type UniqueShareSession = {
   sessionId: string;
