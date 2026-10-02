@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import androidx.core.content.ContextCompat
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
@@ -311,6 +312,47 @@ class MainActivity : ComponentActivity() {
     }
 
     inner class NativeBridge {
+        @JavascriptInterface fun playBackgroundQueue(idsJson: String, index: Int): Boolean {
+            return try {
+                val ids = JSONArray(idsJson)
+                val uris = ArrayList<String>()
+                val titles = ArrayList<String>()
+                for (i in 0 until ids.length()) {
+                    val key = ids.optString(i)
+                    val record = nativeMedia[key] ?: return false
+                    uris.add(record.first.toString())
+                    titles.add(queryDisplayName(record.first) ?: key.substringAfterLast(':'))
+                }
+                if (uris.isEmpty()) return false
+                val intent = Intent(this@MainActivity, MediaPlaybackService::class.java).apply {
+                    action = MediaPlaybackService.ACTION_PLAY_QUEUE
+                    putStringArrayListExtra(MediaPlaybackService.EXTRA_URIS, uris)
+                    putStringArrayListExtra(MediaPlaybackService.EXTRA_TITLES, titles)
+                    putExtra(MediaPlaybackService.EXTRA_INDEX, index.coerceIn(0, uris.lastIndex))
+                }
+                ContextCompat.startForegroundService(this@MainActivity, intent)
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
+
+        @JavascriptInterface fun backgroundPlay() {
+            startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_PLAY))
+        }
+        @JavascriptInterface fun backgroundPause() {
+            startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_PAUSE))
+        }
+        @JavascriptInterface fun backgroundNext() {
+            startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_NEXT))
+        }
+        @JavascriptInterface fun backgroundPrevious() {
+            startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_PREVIOUS))
+        }
+        @JavascriptInterface fun backgroundStop() {
+            startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_STOP))
+        }
+
         @JavascriptInterface fun requestMediaAccess() { permissionLauncher.launch(mediaPermissions()) }
         @JavascriptInterface fun hasMediaAccess(): Boolean = mediaAccessGranted()
         @JavascriptInterface fun listMedia(): String = scanMedia().toString()
