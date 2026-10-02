@@ -153,7 +153,7 @@ export default function UniqueMediaPage() {
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
             <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><FolderOpen className="h-4 w-4" /> Connect phone</button>
-            <Link to="/os/unique-share" className="relative inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800"><Share2 className="h-4 w-4" /> UniqueShare{newReceivedCount > 0 && <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-emerald-600 px-1.5 py-0.5 text-center text-[10px] font-black text-white">{newReceivedCount}</span>}</Link>
+            <Link to="/os/unique-share" className="relative inline-flex items-center gap-2 rounded-2xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800 shadow-sm"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white"><Share2 className="h-4 w-4" /></span> UniqueShare<span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Smart</span>{newReceivedCount > 0 && <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-emerald-600 px-1.5 py-0.5 text-center text-[10px] font-black text-white">{newReceivedCount}</span>}</Link>
           </div>
         </header>
 
