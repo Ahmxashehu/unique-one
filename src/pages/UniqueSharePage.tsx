@@ -329,7 +329,7 @@ export default function UniqueSharePage() {
               <div className="text-left"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">Smart Share</p><h1 className="text-xl font-black tracking-tight text-white">UniqueShare</h1></div>
             </div>
           </div>
-          <p className="relative mt-3 text-center text-xs text-slate-400">Connect → choose files → send or receive. Your transfer state stays visible.</p>
+          <p className="relative mt-3 text-center text-xs text-slate-400">Guest sharing · no login or registration · connect → choose files → send or receive.</p>
         </header>
 
         {!authenticated ? (
