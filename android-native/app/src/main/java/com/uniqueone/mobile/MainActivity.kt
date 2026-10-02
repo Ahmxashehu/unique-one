@@ -29,6 +29,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private val nativeMedia = mutableMapOf<String, Pair<Uri, String>>()
     private val pendingSharedUris = mutableListOf<Uri>()
+    private val receivedMediaDir by lazy { File(filesDir, "unique-media-received").apply { mkdirs() } }
+    private val receivedSeenPrefs by lazy { getSharedPreferences("unique_media_received", MODE_PRIVATE) }
     private lateinit var nearbyShare: NearbyShareManager
     private var appLoaded = false
 
@@ -169,7 +171,31 @@ class MainActivity : ComponentActivity() {
         return image && video && audio
     }
 
-    private fun scanMedia(limit: Int = 100, offset: Int = 0): JSONArray {
+    private fun receivedMime(name: String): String {
+        return when (name.substringAfterLast('.', "").lowercase(Locale.US)) {
+            "jpg", "jpeg" -> "image/jpeg"
+            "png" -> "image/png"
+            "gif" -> "image/gif"
+            "webp" -> "image/webp"
+            "heic" -> "image/heic"
+            "mp4" -> "video/mp4"
+            "mkv" -> "video/x-matroska"
+            "webm" -> "video/webm"
+            "mov" -> "video/quicktime"
+            "mp3" -> "audio/mpeg"
+            "m4a" -> "audio/mp4"
+            "aac" -> "audio/aac"
+            "wav" -> "audio/wav"
+            "flac" -> "audio/flac"
+            "pdf" -> "application/pdf"
+            "txt" -> "text/plain"
+            "json" -> "application/json"
+            "zip" -> "application/zip"
+            else -> "application/octet-stream"
+        }
+    }
+
+    private fun scanMedia(limit: Int = 100, offset: Int = 0) {
         nativeMedia.clear()
         val result = JSONArray()
         if (!mediaAccessGranted()) return result
@@ -215,6 +241,20 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             } catch (_: SecurityException) {}
+        }
+        receivedMediaDir.listFiles()?.sortedByDescending { it.lastModified() }?.forEach { file ->
+            val mime = receivedMime(file.name)
+            val key = "received:" + file.name
+            val uri = FileProvider.getUriForFile(this, packageName + ".fileprovider", file)
+            nativeMedia[key] = uri to mime
+            result.put(JSONObject().apply {
+                put("id", key)
+                put("name", file.name)
+                put("mime", mime)
+                put("size", file.length())
+                put("url", "https://unique.native/media/$key")
+                put("isNew", !receivedSeenPrefs.getBoolean(key, false))
+            })
         }
         return result
     }
@@ -276,6 +316,7 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface fun listMedia(): String = scanMedia().toString()
         @JavascriptInterface fun listMediaPage(offset: Int, limit: Int): String = scanMedia(limit, offset).toString()
         @JavascriptInterface fun refreshMediaIndex(): String = scanMedia().toString()
+        @JavascriptInterface fun markMediaSeen(id: String) { if (id.startsWith("received:")) receivedSeenPrefs.edit().putBoolean(id, true).apply() }
         @JavascriptInterface fun getSharedMedia(): String = sharedMediaJson().toString()
         @JavascriptInterface fun openFilePicker() { filePicker.launch(arrayOf("*/*")) }
         @JavascriptInterface fun openStorageSettings() {
