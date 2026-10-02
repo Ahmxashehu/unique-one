@@ -54,7 +54,8 @@ export default function UniqueMediaPage() {
   const [playerRate, setPlayerRate] = useState(1);
   const [playerFit, setPlayerFit] = useState<'contain' | 'cover'>('contain');
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
-  const playerVideoRef = React.useRef<HTMLVideoElement | null>(null);\n  const phoneFileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const playerVideoRef = React.useRef<HTMLVideoElement | null>(null);
+  const phoneFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const filteredMedia = useMemo(() => {
     const term = search.trim().toLowerCase();
