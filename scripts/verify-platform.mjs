@@ -49,7 +49,7 @@ for (const forbidden of ["demo rice order", "featured providers"]) {
   const matches = [];
   const scan = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (["node_modules", ".git", "dist"].includes(entry.name)) continue;
+      if (["node_modules", ".git", "dist", "scripts"].includes(entry.name)) continue;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) scan(full);
       else if (/\.(ts|tsx|js|jsx|json|md)$/.test(entry.name)) {
