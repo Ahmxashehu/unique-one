@@ -20,6 +20,21 @@ const MAX_REQUEST_ID_LENGTH = 64;
 const MODEL_REQUEST_TIMEOUT_MS = 30_000;
 const MAX_MODEL_OUTPUT_TOKENS = 1_000;
 const MODEL_THINKING_LEVEL = ThinkingLevel.LOW;
+
+const AI_LANGUAGE_LABELS: Record<string, string> = {
+  en: "English",
+  ha: "Hausa",
+  fr: "French",
+  ig: "Igbo",
+  yo: "Yoruba",
+  pcm: "Nigerian Pidgin",
+};
+
+function normalizePreferredLanguage(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const code = value.trim().toLowerCase();
+  return AI_LANGUAGE_LABELS[code] ? code : undefined;
+}
 const MAX_MODEL_ATTEMPTS = 2;
 const MODEL_RETRY_DELAY_MS = 250;
 const MAX_RETRY_DELAY_MS = 2_000;
@@ -35,7 +50,7 @@ const MODEL_SAFETY_SETTINGS: SafetySetting[] = [
 const SYSTEM_INSTRUCTION = [
   "You are Unique AI, the assistant for the Unique One platform.",
   "Be accurate, practical, and concise.",
-  "When the authorized user context includes a preferred language, answer in that language when practical; otherwise answer in clear English.",
+  "Always answer in the language named by PREFERRED_RESPONSE_LANGUAGE when one is supplied. Do not switch back to English merely because the question was typed in English. Keep UniquePlatform, UniquePay, Unique Store, Unique AI, product names, IDs, URLs, and required technical identifiers unchanged unless a natural localized form is appropriate.",
   "Do not invent Unique One platform data, balances, orders, businesses, listings, bookings, users, or other records.",
   "This service is read-only: do not claim that you completed an action or changed platform data.",
   "For requests to change, send, cancel, approve, create, delete, refund, edit, or otherwise mutate platform records, clearly state that this read-only assistant cannot perform that action.",
@@ -484,6 +499,7 @@ function buildContextualPrompt(
   message: string,
   history: UniqueAiConversationTurn[],
   context: Awaited<ReturnType<typeof getAuthorizedPlatformContext>>,
+  preferredLanguage?: string,
 ): string {
   const historyText = history.length
     ? JSON.stringify(history)
@@ -503,6 +519,9 @@ function buildContextualPrompt(
   }
 
   return [
+    "<PREFERRED_RESPONSE_LANGUAGE>",
+    preferredLanguage ? AI_LANGUAGE_LABELS[preferredLanguage] : "English",
+    "</PREFERRED_RESPONSE_LANGUAGE>",
     "<AUTHORIZED_PLATFORM_CONTEXT>",
     authorizedContext,
     "</AUTHORIZED_PLATFORM_CONTEXT>",
@@ -761,10 +780,11 @@ function validateAiOutput(value: unknown, requestMessage?: string): string {
 export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<string> {
   const prompt = getPrompt(input.message);
   const history = getHistory(input.history);
+  const preferredLanguage = normalizePreferredLanguage(input.preferredLanguage);
   validateMutationBoundary(prompt);
   const context = await getAuthorizedPlatformContext(input.uid);
   validateAuthorizedContext(context);
-  const contextualPrompt = buildContextualPrompt(prompt, history, context);
+  const contextualPrompt = buildContextualPrompt(prompt, history, context, preferredLanguage);
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
 
@@ -819,6 +839,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
 
 const PUBLIC_AI_SYSTEM_INSTRUCTION = [
   "You are Unique AI, the free public AI assistant for the Unique One platform.",
+  "When PREFERRED_RESPONSE_LANGUAGE is supplied, answer entirely in that language. Do not default to English.",
   "Answer the user's general questions helpfully, accurately, and safely. The user may ask about everyday topics, learning, writing, planning, technology, business, or Unique One.",
   "Do not claim access to private Unique One records, accounts, balances, orders, messages, businesses, products, bookings, or other user data in public mode.",
   "If the user asks for a Unique One account-specific fact, explain that they need to register or sign in to receive personalized platform information.",
@@ -826,11 +847,15 @@ const PUBLIC_AI_SYSTEM_INSTRUCTION = [
   "At the end of every public-mode answer, naturally remind the user that registering for Unique One unlocks the full platform experience and personalized AI assistance. Keep this reminder brief and do not make it sound like an advertisement.",
 ].join(" ");
 
-export async function generatePublicUniqueAiResponse(input: { message: unknown; history?: unknown }): Promise<string> {
+export async function generatePublicUniqueAiResponse(input: { message: unknown; history?: unknown; preferredLanguage?: string }): Promise<string> {
   const prompt = getPrompt(input.message);
   const history = getHistory(input.history);
+  const preferredLanguage = normalizePreferredLanguage(input.preferredLanguage);
   const historyText = history.length ? JSON.stringify(history) : "[]";
   const contextualPrompt = [
+    "<PREFERRED_RESPONSE_LANGUAGE>",
+    preferredLanguage ? AI_LANGUAGE_LABELS[preferredLanguage] : "English",
+    "</PREFERRED_RESPONSE_LANGUAGE>",
     "<PUBLIC_AI_REQUEST>",
     prompt,
     "</PUBLIC_AI_REQUEST>",
