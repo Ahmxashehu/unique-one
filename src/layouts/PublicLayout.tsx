@@ -18,9 +18,9 @@ export default function PublicLayout() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
               <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">U1</span>
+                <span className="text-white font-bold text-sm">UP</span>
               </div>
-              <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">UNIQUE ONE</span>
+              <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">UNIQUEPLATFORM</span>
             </Link>
             <nav className="hidden md:flex gap-6 items-center">
               <Link to="/discover" className="text-sm font-medium text-slate-600 hover:text-slate-900">Active Edge</Link>
@@ -48,7 +48,7 @@ export default function PublicLayout() {
       </main>
 
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="More Unique One">
+        <div className="md:hidden fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="More UniquePlatform">
           <button
             type="button"
             aria-label="Close menu"
@@ -58,7 +58,7 @@ export default function PublicLayout() {
           <div className="absolute inset-x-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-h-[72dvh] overflow-y-auto overscroll-contain rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl sm:inset-x-3 sm:p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-600">Unique One</p>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-600">UniquePlatform</p>
                 <h2 className="text-lg font-black text-slate-900">More experiences</h2>
               </div>
               <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">Close</button>
