@@ -72,8 +72,7 @@ export default function HomePage() {
     {
       eyebrow: 'UNIQUE ONE',
       title: 'Everything happening around you, in one Unique experience.',
-      description: 'Discover, connect, buy, book, pay and grow in one intelligent environment.',
-      action: 'Explore Unique',
+            action: 'Explore Unique',
       href: '/discover',
       icon: Compass,
       tone: 'from-emerald-500 via-emerald-400 to-teal-300',
@@ -81,8 +80,7 @@ export default function HomePage() {
     {
       eyebrow: 'UNIQUE STORE',
       title: 'Discover products and services made for your world.',
-      description: 'Buy, sell, hire, book, send and discover real products and services from Unique businesses and providers.',
-      action: 'Open Unique Store',
+            action: 'Open Unique Store',
       href: '/store',
       icon: ShoppingBag,
       tone: 'from-emerald-950 via-slate-950 to-emerald-700',
@@ -90,8 +88,7 @@ export default function HomePage() {
     {
       eyebrow: 'UNIQUE AI',
       title: 'Meet the AI that understands your Unique world.',
-      description: 'Ask, discover, navigate and get help across your authorized Unique experience.',
-      action: 'Try Unique AI',
+            action: 'Try Unique AI',
       href: '/os/ai',
       icon: Sparkles,
       tone: 'from-emerald-700 via-teal-700 to-slate-900',
@@ -99,8 +96,7 @@ export default function HomePage() {
     {
       eyebrow: 'ACTIVE EDGE',
       title: 'See what is happening now.',
-      description: 'Live products, businesses, services and opportunities come together in one active stream.',
-      action: 'Open Active Edge',
+            action: 'Open Active Edge',
       href: '#active-edge',
       icon: Zap,
       tone: 'from-slate-950 via-emerald-950 to-emerald-700',
@@ -123,7 +119,6 @@ export default function HomePage() {
       type: 'experience' as const,
       key: `experience-${label}`,
       title: label,
-      description,
       href,
       action: 'Open experience',
       icon: Compass,
@@ -446,8 +441,7 @@ export default function HomePage() {
 
                     <div className="max-w-3xl">
                                             <h1 className="text-xl font-black leading-[1.08] tracking-tight sm:text-3xl lg:text-4xl">{slide.title}</h1>
-                      <p className="mt-1.5 max-w-2xl text-[11px] leading-4 text-white/80 sm:text-sm sm:leading-5">{slide.description}</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
+                                            <div className="mt-3 flex flex-wrap gap-2">
                         <Link to={slide.href.startsWith('#') ? '/discover' : slide.href} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-[11px] font-black text-slate-950 shadow-lg transition hover:scale-[1.03]">
                           {slide.action} <ArrowRight className="h-3.5 w-3.5" />
                         </Link>
