@@ -27,37 +27,37 @@ export default function U1Loader({
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black"
       role="status"
-      aria-label="U1 loading"
+      aria-label="UniquePlatform loading"
     >
       <style>{`
-        @keyframes u1-pulse {
+        @keyframes up-pulse {
           0%, 100% { transform: scale(0.94); opacity: 0.82; }
           50% { transform: scale(1.06); opacity: 1; }
         }
-        @keyframes u1-spin {
+        @keyframes up-spin {
           to { transform: rotate(360deg); }
         }
-        @keyframes u1-glow {
+        @keyframes up-glow {
           0%, 100% { opacity: 0.25; transform: scale(0.9); }
           50% { opacity: 0.75; transform: scale(1.08); }
         }
         @media (prefers-reduced-motion: reduce) {
-          .u1-motion { animation-duration: 3s !important; }
+          .up-motion { animation-duration: 3s !important; }
         }
       `}</style>
 
       <div className="relative flex h-32 w-32 items-center justify-center">
         <div
-          className="u1-motion absolute inset-0 rounded-full border border-emerald-400/30"
-          style={{ animation: "u1-glow 1.35s ease-in-out infinite" }}
+          className="up-motion absolute inset-0 rounded-full border border-emerald-400/30"
+          style={{ animation: "up-glow 1.35s ease-in-out infinite" }}
         />
         <div
-          className="u1-motion absolute inset-3 rounded-full border border-emerald-400/25 border-t-emerald-400"
-          style={{ animation: "u1-spin 1.15s linear infinite" }}
+          className="up-motion absolute inset-3 rounded-full border border-emerald-400/25 border-t-emerald-400"
+          style={{ animation: "up-spin 1.15s linear infinite" }}
         />
         <div
-          className="u1-motion relative flex h-20 w-20 items-center justify-center rounded-3xl bg-white shadow-2xl"
-          style={{ animation: "u1-pulse 1.15s ease-in-out infinite" }}
+          className="up-motion relative flex h-20 w-20 items-center justify-center rounded-3xl bg-white shadow-2xl"
+          style={{ animation: "up-pulse 1.15s ease-in-out infinite" }}
         >
           <span className="text-4xl font-black tracking-[-0.08em] text-black">
             U1
