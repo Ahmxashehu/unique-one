@@ -4,7 +4,7 @@ import { Cloud, FileText, Image as ImageIcon, Music2, Pause, Play, Search, Share
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
-import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia, loadNativeSharedMedia, shareNativeMedia, markNativeMediaSeen } from '../lib/media/deviceMedia';
+import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia, loadNativeSharedMedia, shareNativeMedia, markNativeMediaSeen, playNativeBackgroundMedia, pauseNativeBackgroundMedia, resumeNativeBackgroundMedia, stopNativeBackgroundMedia } from '../lib/media/deviceMedia';
 import { stageMediaForDestination } from '../lib/media/shareBridge';
 
 type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
@@ -61,6 +61,9 @@ export default function UniqueMediaPage() {
   const [playerRate, setPlayerRate] = useState(1);
   const [playerFit, setPlayerFit] = useState<'contain' | 'cover'>('contain');
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
+  const [playerQueueIndex, setPlayerQueueIndex] = useState(0);
+  const [playerLoop, setPlayerLoop] = useState(false);
+  const [playerShuffle, setPlayerShuffle] = useState(false);
   const playerVideoRef = React.useRef<HTMLVideoElement | null>(null);
   const phoneFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
@@ -293,15 +296,54 @@ export default function UniqueMediaPage() {
     setSelected((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
   };
 
+  const playableQueue = useMemo(() => media.filter((item) => item.kind === 'audio' || item.kind === 'video'), [media]);
   const openMedia = (item: LocalMedia) => {
     setPlayer(item);
     setVideoAudioMode(false);
+    const queueIndex = playableQueue.findIndex((entry) => entry.id === item.id);
+    setPlayerQueueIndex(queueIndex >= 0 ? queueIndex : 0);
     setIsPlaying(item.kind === 'video' || item.kind === 'audio');
+  };
+  const playQueueItem = (index: number) => {
+    if (!playableQueue.length) return;
+    let nextIndex = index;
+    if (playerShuffle && playableQueue.length > 1) nextIndex = Math.floor(Math.random() * playableQueue.length);
+    if (nextIndex < 0 || nextIndex >= playableQueue.length) {
+      if (playerLoop) nextIndex = (nextIndex + playableQueue.length) % playableQueue.length;
+      else return;
+    }
+    const item = playableQueue[nextIndex];
+    setPlayer(item);
+    setPlayerQueueIndex(nextIndex);
+    setVideoAudioMode(false);
+    setIsPlaying(true);
+    if (supportsNativeAndroidStorage()) playNativeBackgroundMedia(playableQueue, nextIndex);
+  };
+  const toggleBackgroundPlayback = () => {
+    if (!player || (player.kind !== 'audio' && player.kind !== 'video')) return;
+    if (isPlaying) {
+      pauseNativeBackgroundMedia();
+      playerVideoRef.current?.pause();
+      setIsPlaying(false);
+      return;
+    }
+    const started = supportsNativeAndroidStorage() && playNativeBackgroundMedia(playableQueue, playerQueueIndex);
+    if (!started) void playerVideoRef.current?.play();
+    setIsPlaying(true);
+  };
+  const deleteCurrentMedia = async () => {
+    if (!player) return;
+    const current = player;
+    await permanentDelete(current);
+    if (!current.parentHandle || !current.entryName) removeMedia(current.id);
+    setPlayer(null);
+    stopNativeBackgroundMedia();
   };
 
   const toggleVideoAudioMode = () => {
     setVideoAudioMode((current) => !current);
     setIsPlaying(true);
+    if (player?.kind === 'video') playNativeBackgroundMedia(playableQueue, playerQueueIndex);
   };
 
   const backupToCloud = async () => {
@@ -597,14 +639,43 @@ export default function UniqueMediaPage() {
       </div>
 
       {player && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-3 sm:p-8" role="dialog" aria-modal="true" aria-label="UniqueMedia player">
-          <button type="button" onClick={() => setPlayer(null)} className="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-3 text-white backdrop-blur hover:bg-white/20" aria-label="Close player"><X className="h-5 w-5" /></button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/98 p-3 sm:p-8" role="dialog" aria-modal="true" aria-label="UniqueMedia player">
+          <button type="button" onClick={() => { stopNativeBackgroundMedia(); setPlayer(null); }} className="absolute right-4 top-4 z-20 rounded-full bg-white/10 p-3 text-white backdrop-blur hover:bg-white/20" aria-label="Close player"><X className="h-5 w-5" /></button>
           <div className="flex h-full w-full max-w-6xl flex-col justify-center">
-            <div className="mb-3 flex items-center justify-between gap-3 px-1 text-white"><div className="min-w-0"><p className="truncate text-sm font-black">{player.file.name}</p><p className="text-xs text-white/50">{player.kind} · {formatBytes(player.file.size)}</p></div><Volume2 className="h-4 w-4 text-white/70" /></div>
-            <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-3xl bg-black">
-              {player.kind === 'image' ? <img src={player.url} alt={player.file.name} className={'max-h-full max-w-full rounded-2xl object-' + playerFit} /> : player.kind === 'video' && !videoAudioMode ? <div className="relative flex h-full w-full items-center justify-center"><video ref={playerVideoRef} key={player.id + '-video'} src={player.url} controls autoPlay={isPlaying} playsInline className={'max-h-full max-w-full rounded-2xl object-' + playerFit} style={{ maxHeight: 'calc(100vh - 150px)' }} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = playerRate; }} /></div> : player.kind === 'video' && videoAudioMode ? <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-white/10 p-8 text-white shadow-2xl"><div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500/15"><Music2 className="h-12 w-12 text-emerald-400" /></div><p className="mt-6 text-center text-lg font-black">Playing video as audio</p><p className="mt-1 text-center text-xs text-white/50">Keep UniqueMedia in the background while the audio continues when your browser/OS permits background media playback.</p><audio key={player.id + '-audio'} src={player.url} controls autoPlay={isPlaying} className="mt-8 w-full" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} /></div> : player.kind === 'audio' ? <div className="w-full max-w-2xl rounded-3xl bg-white/10 p-8 text-white"><Music2 className="mx-auto h-20 w-20 text-emerald-400" /><p className="mt-6 text-center text-lg font-black">{player.file.name}</p><audio src={player.url} controls autoPlay={isPlaying} className="mt-8 w-full" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} /></div> : <div className="h-[78vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white"><iframe title={player.file.name} src={player.url} className="h-full w-full" /></div>}
+            <div className="mb-3 flex items-center justify-between gap-3 px-1 text-white">
+              <div className="min-w-0"><p className="truncate text-sm font-black">{player.file.name}</p><p className="text-xs text-white/50">{player.kind === 'audio' ? 'Audio' : 'Video'} · {formatBytes(player.file.size)}</p></div>
+              <div className="flex items-center gap-2"><button type="button" onClick={() => setPlayerLoop(v => !v)} className={`rounded-full px-3 py-2 text-xs font-bold ${playerLoop ? 'bg-emerald-500 text-slate-950' : 'bg-white/10 text-white'}`}>Loop</button><button type="button" onClick={() => setPlayerShuffle(v => !v)} className={`rounded-full px-3 py-2 text-xs font-bold ${playerShuffle ? 'bg-emerald-500 text-slate-950' : 'bg-white/10 text-white'}`}>Shuffle</button></div>
             </div>
-            {(player.kind === 'video' || player.kind === 'audio') && <div className="mt-3 flex flex-wrap items-center justify-center gap-2"><button type="button" onClick={() => setIsPlaying((value) => !value)} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-black text-black">{isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}{isPlaying ? 'Pause' : 'Play'}</button>{player.kind === 'video' && <><button type="button" onClick={() => seekPlayer(-10)} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white backdrop-blur">↶ 10s</button><button type="button" onClick={() => seekPlayer(10)} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white backdrop-blur">10s ↷</button><button type="button" onClick={changePlayerRate} className="rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white">{playerRate}×</button><button type="button" onClick={() => setPlayerFit(value => value === 'contain' ? 'cover' : 'contain')} className="rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white">{playerFit === 'contain' ? 'Fit' : 'Fill'}</button><button type="button" onClick={() => void pictureInPicture()} className="rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white">PiP</button><button type="button" onClick={() => void togglePlayerFullscreen()} className="rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white">{playerFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</button><button type="button" onClick={toggleVideoAudioMode} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur hover:bg-white/15">{videoAudioMode ? <Play className="h-4 w-4" /> : <Music2 className="h-4 w-4" />}{videoAudioMode ? 'Return to video' : 'Play as audio'}</button></>}</div>}
+            <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[2rem] bg-black shadow-2xl">
+              {player.kind === 'image' ? <img src={player.url} alt={player.file.name} className={`max-h-full max-w-full rounded-2xl object-${playerFit}`} /> :
+               player.kind === 'pdf' ? <div className="h-[78vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white"><iframe title={player.file.name} src={player.url} className="h-full w-full" /></div> :
+               player.kind === 'video' && !videoAudioMode ? <video ref={playerVideoRef} key={player.id + '-video'} src={player.url} controls autoPlay playsInline className={`max-h-full max-w-full rounded-2xl object-${playerFit}`} style={{maxHeight:'calc(100vh - 210px)'}} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = playerRate; }} /> :
+               <div className="w-full max-w-2xl px-5 py-8 text-white sm:px-10">
+                 <div className="mx-auto flex aspect-square max-h-[42vh] max-w-[42vh] items-center justify-center rounded-[2rem] bg-gradient-to-br from-emerald-400/30 via-teal-300/10 to-white/5 shadow-2xl ring-1 ring-white/10"><Music2 className="h-24 w-24 text-emerald-300 drop-shadow-2xl" /></div>
+                 <div className="mx-auto mt-7 max-w-xl text-center">
+                   <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-300">UniqueMedia · Audio</p>
+                   <h2 className="mt-2 truncate text-2xl font-black sm:text-3xl">{player.file.name}</h2>
+                   <p className="mt-2 text-xs text-white/45">{playerQueueIndex + 1} of {playableQueue.length} · {formatBytes(player.file.size)}</p>
+                   <div className="mt-6 flex h-10 items-center justify-center gap-1 overflow-hidden">{Array.from({length:36},(_,i)=><span key={i} className="w-1 rounded-full bg-emerald-300/60" style={{height:(10 + ((i*17)%26))+'px'}} />)}</div>
+                   <audio key={player.id + '-audio'} src={player.url} controls autoPlay={isPlaying} className="mt-5 w-full opacity-90" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} />
+                 </div>
+               </div>}
+            </div>
+            {(player.kind === 'video' || player.kind === 'audio') && <div className="mt-4 rounded-[2rem] border border-white/10 bg-white/5 p-3 backdrop-blur-xl">
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button type="button" onClick={() => playQueueItem(playerQueueIndex - 1)} className="rounded-full bg-white/10 p-3 text-white hover:bg-white/15" aria-label="Previous">↶</button>
+                <button type="button" onClick={toggleBackgroundPlayback} className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-400/20">{isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}</button>
+                <button type="button" onClick={() => playQueueItem(playerQueueIndex + 1)} className="rounded-full bg-white/10 p-3 text-white hover:bg-white/15" aria-label="Next">↷</button>
+                <button type="button" onClick={() => void seekPlayer(-10)} className="rounded-full bg-white/10 px-4 py-3 text-xs font-bold text-white">10s back</button>
+                <button type="button" onClick={() => void seekPlayer(10)} className="rounded-full bg-white/10 px-4 py-3 text-xs font-bold text-white">10s forward</button>
+                <button type="button" onClick={deleteCurrentMedia} className="rounded-full bg-rose-500/15 p-3 text-rose-300 hover:bg-rose-500/25" aria-label="Delete current media"><Trash2 className="h-4 w-4" /></button>
+                {player.kind === 'video' && <button type="button" onClick={toggleVideoAudioMode} className="rounded-full bg-white/10 px-4 py-3 text-xs font-bold text-white">{videoAudioMode ? 'Return to video' : 'Background audio'}</button>}
+                {player.kind === 'video' && <button type="button" onClick={() => void pictureInPicture()} className="rounded-full bg-white/10 px-4 py-3 text-xs font-bold text-white">PiP</button>}
+                <button type="button" onClick={changePlayerRate} className="rounded-full bg-white/10 px-4 py-3 text-xs font-bold text-white">{playerRate}×</button>
+                <button type="button" onClick={() => void togglePlayerFullscreen()} className="rounded-full bg-white/10 px-4 py-3 text-xs font-bold text-white">{playerFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</button>
+              </div>
+              <p className="mt-2 text-center text-[10px] font-semibold text-white/35">Android uses the native media service for lock-screen/background playback. Browser playback follows device and browser background-media rules.</p>
+            </div>}
           </div>
         </div>
       )}
