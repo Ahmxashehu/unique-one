@@ -425,7 +425,7 @@ export default function UniqueMediaPage() {
         <header className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm sm:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Unique One</p>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">UniquePlatform</p>
               <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">UniqueMedia</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">A free media workspace for videos, music, images and PDFs. Authorized device media loads automatically and opens directly in the built-in player.</p>
             </div>
