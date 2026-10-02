@@ -6,6 +6,10 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.view.View
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.provider.Settings
@@ -26,14 +30,19 @@ class MainActivity : ComponentActivity() {
     private val nativeMedia = mutableMapOf<String, Pair<Uri, String>>()
     private val pendingSharedUris = mutableListOf<Uri>()
     private lateinit var nearbyShare: NearbyShareManager
+    private var appLoaded = false
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             val granted = mediaAccessGranted()
-            notifyJs("mediaAccessResult", JSONObject().apply {
-                put("granted", granted)
-                put("items", if (granted) scanMedia() else JSONArray())
-            }.toString())
+            if (granted && !appLoaded) loadApp()
+            if (!granted && !appLoaded) showPermissionGate()
+            if (appLoaded) {
+                notifyJs("mediaAccessResult", JSONObject().apply {
+                    put("granted", granted)
+                    put("items", if (granted) scanMedia() else JSONArray())
+                }.toString())
+            }
         }
 
     private val nearbyPermissionLauncher =
@@ -73,7 +82,48 @@ class MainActivity : ComponentActivity() {
             addJavascriptInterface(NativeBridge(), "UniqueNativeStorage")
         }
         setContentView(webView)
+        ensureMediaAccessAndLoad()
+    }
+
+    private fun ensureMediaAccessAndLoad() {
+        if (mediaAccessGranted()) loadApp()
+        else permissionLauncher.launch(mediaPermissions())
+    }
+
+    private fun loadApp() {
+        if (appLoaded) return
+        appLoaded = true
         webView.loadUrl(if (pendingSharedUris.isNotEmpty()) "https://unique-one-162s.onrender.com/unique-media" else "https://unique-one-162s.onrender.com")
+    }
+
+    private fun showPermissionGate() {
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 64, 48, 48)
+        }
+        val title = TextView(this).apply {
+            text = "UniquePlatform needs media access"
+            textSize = 24f
+            setTextColor(0xFF0F172A.toInt())
+        }
+        val message = TextView(this).apply {
+            text = "Allow access to your photos, videos and music so UniqueMedia can automatically show your phone media. Your files are not silently uploaded to the cloud."
+            textSize = 16f
+            setTextColor(0xFF475569.toInt())
+        }
+        val button = Button(this).apply {
+            text = "Allow media access"
+            setOnClickListener { permissionLauncher.launch(mediaPermissions()) }
+        }
+        layout.addView(title)
+        layout.addView(message)
+        layout.addView(button)
+        setContentView(layout)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!appLoaded && ::webView.isInitialized && mediaAccessGranted()) loadApp()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -116,9 +166,7 @@ class MainActivity : ComponentActivity() {
         val image = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
         val video = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
         val audio = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
-        val selected = Build.VERSION.SDK_INT >= 34 &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED
-        return image || video || audio || selected
+        return image && video && audio
     }
 
     private fun scanMedia(limit: Int = 100, offset: Int = 0): JSONArray {
