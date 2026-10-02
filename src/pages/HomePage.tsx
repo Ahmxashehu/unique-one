@@ -49,23 +49,23 @@ export default function HomePage() {
   const [activeMainPoster, setActiveMainPoster] = useState(0);
 
   const experiencePosters = [
-    ['Restaurant', '/categories', 'Taste, discover and connect with restaurants.'],
-    ['Hotel', '/travel', 'Find stays and hospitality experiences.'],
-    ['Flights', '/travel', 'Explore flight and travel experiences.'],
-    ['School', '/education', 'Discover learning and education experiences.'],
-    ['Retail & Shopping', '/categories', 'Buy and discover real products.'],
-    ['Professional Services', '/categories', 'Connect with trusted service providers.'],
-    ['Transportation', '/categories', 'Find transportation and mobility services.'],
-    ['Real Estate', '/categories', 'Explore property and real-estate experiences.'],
-    ['Technology', '/categories', 'Discover technology products and services.'],
-    ['Health & Wellness', '/categories', 'Find health and wellness experiences.'],
-    ['Food & Dining', '/categories', 'Explore food and dining experiences.'],
-    ['Global Search', '/search', 'Search across the Unique ecosystem.'],
-    ['Near Me', '/near-me', 'Discover useful experiences around you.'],
-    ['Jobs', '/os/jobs', 'Find opportunities and career experiences.'],
-    ['Contributions', '/os/contributions', 'Connect with community contribution opportunities.'],
-    ['Education', '/os/education', 'Continue your education journey.'],
-    ['Travel', '/os/travel', 'Plan and explore your next journey.'],
+    ['Restaurant', '/categories'],
+    ['Hotel', '/travel'],
+    ['Flights', '/travel'],
+    ['School', '/education'],
+    ['Retail & Shopping', '/categories'],
+    ['Professional Services', '/categories'],
+    ['Transportation', '/categories'],
+    ['Real Estate', '/categories'],
+    ['Technology', '/categories'],
+    ['Health & Wellness', '/categories'],
+    ['Food & Dining', '/categories'],
+    ['Global Search', '/search'],
+    ['Near Me', '/near-me'],
+    ['Jobs', '/os/jobs'],
+    ['Contributions', '/os/contributions'],
+    ['Education', '/os/education'],
+    ['Travel', '/os/travel'],
   ];
 
   const promotionalPosters = [
@@ -115,7 +115,7 @@ export default function HomePage() {
       tone: poster.tone,
       eyebrow: poster.eyebrow,
     })),
-    ...experiencePosters.map(([label, href, description]) => ({
+    ...experiencePosters.map(([label, href]) => ({
       type: 'experience' as const,
       key: `experience-${label}`,
       title: label,
@@ -838,7 +838,7 @@ export default function HomePage() {
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 sm:h-10 sm:w-10 sm:rounded-2xl"><Building2 className="h-5 w-5" /></span>
                   <div className="min-w-0 flex-1">
                     <h3 className="break-words text-sm font-black sm:text-base">Unique Business Hub</h3>
-                    <div className="mt-0.5 h-8 overflow-hidden text-[11px] leading-4 text-slate-500 sm:h-6 sm:text-xs sm:leading-normal"><p className="animate-[uniqueMediaVertical_9s_linear_infinite] whitespace-normal break-words motion-reduce:animate-none"></p></div>
+
                   </div>
                 </div>
                 <details className="group mt-3">
