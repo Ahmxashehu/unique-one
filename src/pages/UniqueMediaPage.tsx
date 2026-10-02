@@ -58,6 +58,10 @@ export default function UniqueMediaPage() {
   const [nativeHasMore, setNativeHasMore] = useState(false);
   const [nativeLoadingMore, setNativeLoadingMore] = useState(false);
   const [newReceivedCount, setNewReceivedCount] = useState(0);
+  const [localShareConnected, setLocalShareConnected] = useState(false);
+  const [localSharePeerName, setLocalSharePeerName] = useState('Nearby device');
+  const [localShareMode, setLocalShareMode] = useState<'send' | 'receive' | null>(null);
+  const [localShareMessage, setLocalShareMessage] = useState('');
   const [playerRate, setPlayerRate] = useState(1);
   const [playerFit, setPlayerFit] = useState<'contain' | 'cover'>('contain');
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
@@ -166,6 +170,77 @@ export default function UniqueMediaPage() {
     void restoreAuthorizedMedia();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    const onEvent = (name: string, handler: (detail: any) => void) => {
+      const listener = (event: Event) => handler((event as CustomEvent).detail || {});
+      window.addEventListener(name, listener);
+      return () => window.removeEventListener(name, listener);
+    };
+    const refreshAfterLocalReceive = async () => {
+      if (!supportsNativeAndroidStorage()) return;
+      try {
+        const items = await loadNativeAndroidMedia(0, 100);
+        setMedia((current) => {
+          const existing = new Set(current.map((item) => item.file.name + ':' + item.file.size));
+          const incoming = items.filter((item) => !existing.has(item.file.name + ':' + item.file.size));
+          return incoming.length ? [...incoming, ...current] : current;
+        });
+        setNewReceivedCount(items.filter((item) => item.isNew).length);
+        setNativeOffset(items.length);
+        setNativeHasMore(items.length === 100);
+      } catch {
+        // The next normal media refresh can recover if Android is temporarily busy.
+      }
+    };
+    const cleanups = [
+      onEvent('localShareConnected', (detail) => {
+        setLocalShareConnected(true);
+        setLocalSharePeerName(detail.name || detail.endpointName || 'Nearby device');
+        setLocalShareMode(null);
+        setLocalShareMessage('Connected. Choose Send to pick media, or Receive to accept incoming files automatically.');
+      }),
+      onEvent('localShareDisconnected', () => {
+        setLocalShareConnected(false);
+        setLocalShareMode(null);
+        setLocalShareMessage('Nearby connection ended. Your received files remain in Media.');
+      }),
+      onEvent('localShareFileReceived', (detail) => {
+        setLocalShareMode('receive');
+        setLocalShareMessage('Received ' + (detail.name || 'a file') + '. It is being added to Media now.');
+        void refreshAfterLocalReceive();
+      }),
+      onEvent('localShareProgress', (detail) => {
+        if (detail.totalBytes > 0) {
+          setLocalShareMessage('Local transfer ' + Math.round(detail.bytesTransferred / detail.totalBytes * 100) + '%');
+        }
+      }),
+      onEvent('localShareError', (detail) => setLocalShareMessage(detail.message || 'Nearby sharing encountered an error.')),
+    ];
+    return () => cleanups.forEach((cleanup) => cleanup());
+  }, []);
+
+  const sendLocalMedia = () => {
+    const bridge = (window as any).UniqueNativeStorage;
+    if (!bridge?.sendLocalShareMedia) {
+      setLocalShareMessage('Local Send is available in the Android app build.');
+      return;
+    }
+    const items = media.filter((item) => item.kind !== 'other' && !item.id.startsWith('shared:'));
+    if (!items.length) {
+      setLocalShareMessage('No phone media is available to send yet. Connect phone media first.');
+      return;
+    }
+    const selectedItems = items.filter((item) => selected.includes(item.id));
+    const ids = selectedItems.length ? selectedItems : items;
+    try {
+      bridge.sendLocalShareMedia(JSON.stringify(ids.map((item) => item.id)));
+      setLocalShareMode('send');
+      setLocalShareMessage(ids.length + ' media item' + (ids.length === 1 ? '' : 's') + ' queued for local transfer.');
+    } catch {
+      setLocalShareMessage('Local Send could not be started. Keep both phones nearby and connected.');
+    }
+  };
 
   const loadMoreNativeMedia = async () => {
     if (!supportsNativeAndroidStorage() || !nativeHasMore || nativeLoadingMore) return;
@@ -563,6 +638,66 @@ export default function UniqueMediaPage() {
           {deviceMessage && <p className="mt-3 rounded-2xl bg-emerald-50 px-3 py-2.5 text-xs font-semibold text-emerald-800">{deviceMessage}</p>}
         </header>
 
+        {localShareConnected && (
+          <section className="mt-4 overflow-hidden rounded-3xl border border-emerald-200 bg-white shadow-sm">
+            <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 p-4 text-white sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">UniqueShare · Connected</p>
+                  <h2 className="mt-1 truncate text-lg font-black">Connected to {localSharePeerName}</h2>
+                  <p className="mt-1 text-xs text-white/60">One cycle: connect once, then Send or Receive without leaving Media.</p>
+                </div>
+                <span className="h-3 w-3 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_0_5px_rgba(52,211,153,0.12)]" aria-label="Connected" />
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => { setLocalShareMode('send'); setLocalShareMessage('Select a category below, choose media, then tap Send.'); }} className={'rounded-2xl px-4 py-3 text-sm font-black transition ' + (localShareMode === 'send' ? 'bg-emerald-400 text-slate-950' : 'bg-white/10 text-white hover:bg-white/15')}>
+                  <Share2 className="mr-2 inline h-4 w-4" /> Send
+                </button>
+                <button type="button" onClick={() => { setLocalShareMode('receive'); setLocalShareMessage('Receive mode is automatic. Incoming files appear in the latest Media updates.'); }} className={'rounded-2xl px-4 py-3 text-sm font-black transition ' + (localShareMode === 'receive' ? 'bg-emerald-400 text-slate-950' : 'bg-white/10 text-white hover:bg-white/15')}>
+                  <Smartphone className="mr-2 inline h-4 w-4" /> Receive
+                </button>
+              </div>
+            </div>
+
+            {localShareMode === 'send' && (
+              <div className="p-4 sm:p-5">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {categories.map(([value, label]) => {
+                    const count = media.filter((item) => item.kind === value).length;
+                    return (
+                      <button key={value} type="button" onClick={() => setActiveKind(value)} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50">
+                        <span className="text-xs font-black text-slate-900">{label}</span>
+                        <span className="mt-1 block text-[11px] font-semibold text-slate-500">{count} available</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 rounded-2xl bg-slate-50 p-3">
+                  <p className="text-xs font-black text-slate-800">Send {selected.length ? selected.length + ' selected' : 'from ' + (categories.find(([value]) => value === activeKind)?.[1] || 'Media')}</p>
+                  <p className="mt-1 text-[11px] leading-5 text-slate-500">If nothing is selected, Send uses the current phone category.</p>
+                  <button type="button" onClick={sendLocalMedia} className="mt-3 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-700">Send now</button>
+                </div>
+              </div>
+            )}
+
+            {localShareMode === 'receive' && (
+              <div className="p-4 sm:p-5">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                  <p className="text-sm font-black text-emerald-950">Receiving automatically</p>
+                  <p className="mt-1 text-xs leading-5 text-emerald-900/75">New videos, Audio, images and supported documents are written to the device receive library and appear here with a NEW indicator.</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => setActiveKind('video')} className="rounded-full bg-white px-3 py-2 text-xs font-bold text-slate-700">Videos</button>
+                    <button type="button" onClick={() => setActiveKind('audio')} className="rounded-full bg-white px-3 py-2 text-xs font-bold text-slate-700">Audio</button>
+                    <button type="button" onClick={() => setActiveKind('image')} className="rounded-full bg-white px-3 py-2 text-xs font-bold text-slate-700">Images</button>
+                    <button type="button" onClick={() => setActiveKind('pdf')} className="rounded-full bg-white px-3 py-2 text-xs font-bold text-slate-700">PDF Reader</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {localShareMessage && <p className="border-t border-slate-100 px-4 py-3 text-xs font-semibold text-emerald-700">{localShareMessage}</p>}
+          </section>
+        )}
+
         <section className="mt-5">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -584,12 +719,12 @@ export default function UniqueMediaPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300">Your {categories.find(([value]) => value === activeKind)?.[1] || 'media'}}</p>
-                    <h3 className="mt-1 text-2xl font-black tracking-tight">Your library is ready.</h3>
+                    <h3 className="mt-1 text-2xl font-black tracking-tight">This category is ready for you.</h3>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">
-                      {activeKind === 'video' && 'Connect your phone or add videos to build a clean watch library with background audio, picture-in-picture and queue controls.'}
-                      {activeKind === 'audio' && 'Connect your phone or add audio to build a personal player with background playback, lock-screen controls, queue, next, previous and replay.'}
-                      {activeKind === 'image' && 'Connect your phone or add images to build a private photo library with fast previews and full-screen viewing.'}
-                      {activeKind === 'pdf' && 'Connect your phone or add PDF files to build a focused reader with full-screen document viewing.'}
+                      {activeKind === 'video' && 'Connect phone media to watch with queue controls, PiP and background audio on supported devices.'}
+                      {activeKind === 'audio' && 'Connect phone media to enjoy a full Audio player with background playback, lock-screen controls, queue, next, previous and replay.'}
+                      {activeKind === 'image' && 'Connect phone media to browse a private photo library with fast previews and full-screen viewing.'}
+                      {activeKind === 'pdf' && 'Connect phone media to open a focused PDF Reader with full-screen document viewing.'}
                     </p>
                   </div>
                 </div>
