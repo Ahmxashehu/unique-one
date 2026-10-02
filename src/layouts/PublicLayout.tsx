@@ -4,11 +4,19 @@ import MobileBottomNav from '../components/MobileBottomNav';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import AppearanceControls from '../components/AppearanceControls';
+import { getLanguage, t, type {t('support', language)}edLanguage } from '../lib/i18n';
 
 export default function PublicLayout() {
   const { currentUser } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const [language, setLanguage] = useState<{t('support', language)}edLanguage>(getLanguage());
+
+  React.useEffect(() => {
+    const handleLanguageChange = (event: Event) => setLanguage((event as CustomEvent<{t('support', language)}edLanguage>).detail);
+    window.addEventListener('unique-language-change', handleLanguageChange);
+    return () => window.removeEventListener('unique-language-change', handleLanguageChange);
+  }, []);
 
   return (
     <div className="flex h-full min-h-0 w-full max-w-[100vw] flex-col bg-slate-50 overflow-hidden relative">
@@ -26,19 +34,19 @@ export default function PublicLayout() {
               <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">UNIQUEPLATFORM</span>
             </Link>
             <nav className="hidden md:flex gap-6 items-center">
-              <Link to="/discover" className="text-sm font-medium text-slate-600 hover:text-slate-900">Active Edge</Link>
-              <Link to="/categories" className="text-sm font-medium text-slate-600 hover:text-slate-900">Categories</Link>
-              <Link to="/near-me" className="text-sm font-medium text-slate-600 hover:text-slate-900">Near Me</Link>
-              <Link to="/about" className="text-sm font-medium text-slate-600 hover:text-slate-900">About</Link>
-              <Link to="/support" className="text-sm font-medium text-slate-600 hover:text-slate-900">Support</Link>
+              <Link to="/discover" className="text-sm font-medium text-slate-600 hover:text-slate-900">{t('activeEdge', language)}</Link>
+              <Link to="/categories" className="text-sm font-medium text-slate-600 hover:text-slate-900">{t('categories', language)}</Link>
+              <Link to="/near-me" className="text-sm font-medium text-slate-600 hover:text-slate-900">{t('nearMe', language)}</Link>
+              <Link to="/about" className="text-sm font-medium text-slate-600 hover:text-slate-900">{t('about', language)}</Link>
+              <Link to="/support" className="text-sm font-medium text-slate-600 hover:text-slate-900">{t('support', language)}</Link>
             </nav>
             <div className="flex items-center gap-3">
               {currentUser ? (
-                <Link to="/os/dashboard" className="bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-slate-800 transition-colors">Dashboard</Link>
+                <Link to="/os/dashboard" className="bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-slate-800 transition-colors">{t('dashboard', language)}</Link>
               ) : (
                 <>
-                  <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">Log in</Link>
-                  <Link to="/register" className="bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-slate-800 transition-colors">Sign Up</Link>
+                  <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">{t('login', language)}</Link>
+                  <Link to="/register" className="bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-slate-800 transition-colors">{t('signUp', language)}</Link>
                 </>
               )}
             </div>
@@ -62,9 +70,9 @@ export default function PublicLayout() {
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-600">UniquePlatform</p>
-                <h2 className="text-lg font-black text-slate-900">More experiences</h2>
+                <h2 className="text-lg font-black text-slate-900">{t('moreExperiences', language)}</h2>
               </div>
-              <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">Close</button>
+              <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">{t('close', language)}</button>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               {[
@@ -75,7 +83,7 @@ export default function PublicLayout() {
                 ['Transportation', '/categories'],
                 ['Real Estate', '/categories'],
                 ['Global Search', '/search'],
-                ['Near Me', '/near-me'],
+                ['{t('nearMe', language)}', '/near-me'],
                 ['Jobs', '/os/jobs'],
                 ['Contributions', '/os/contributions'],
                 ['Education', '/os/education'],
@@ -93,11 +101,11 @@ export default function PublicLayout() {
             </div>
             <div className="mt-3">
               {currentUser ? (
-                <Link to="/os/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Open UniqueOS</Link>
+                <Link to="/os/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">{t('openUniqueOS', language)}</Link>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
-                  <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="rounded-2xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-slate-700">Log in</Link>
-                  <Link to="/register" onClick={() => setIsMobileMenuOpen(false)} className="rounded-2xl bg-slate-950 px-4 py-3 text-center text-sm font-bold text-white">Register</Link>
+                  <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="rounded-2xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-slate-700">{t('login', language)}</Link>
+                  <Link to="/register" onClick={() => setIsMobileMenuOpen(false)} className="rounded-2xl bg-slate-950 px-4 py-3 text-center text-sm font-bold text-white">{t('register', language)}</Link>
                 </div>
               )}
             </div>
