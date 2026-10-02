@@ -130,17 +130,21 @@ export default function UniqueMediaPage() {
     return (
     <main className="min-h-full overflow-y-auto bg-slate-50 pb-24">
       <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-        <header className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm sm:p-7">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">UniquePlatform</p>
-              <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">UniqueMedia</h1>
-              <p className="mt-2 text-sm text-slate-500">Choose a media type to open its smart library.</p>
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><FolderOpen className="h-4 w-4" /> Connect phone</button>
-              <Link to="/os/unique-share" className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800"><Share2 className="h-4 w-4" /> UniqueShare</Link>
-            </div>
+        <header className="relative rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm sm:p-6">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="Open UniqueMedia" className="group inline-flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-5 py-3 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md ring-4 ring-emerald-100 transition group-hover:scale-105">
+                <FolderOpen className="h-6 w-6" />
+              </span>
+              <span className="text-left">
+                <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">UniquePlatform</span>
+                <span className="block text-xl font-black tracking-tight text-slate-950">UniqueMedia</span>
+              </span>
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><FolderOpen className="h-4 w-4" /> Connect phone</button>
+            <Link to="/os/unique-share" className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800"><Share2 className="h-4 w-4" /> UniqueShare</Link>
           </div>
         </header>
 
