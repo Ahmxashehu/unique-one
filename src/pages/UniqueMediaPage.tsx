@@ -4,7 +4,7 @@ import { Cloud, FileText, Image as ImageIcon, Music2, Pause, Play, Search, Share
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
-import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia, loadNativeSharedMedia, shareNativeMedia, markNativeMediaSeen, deleteNativeMedia, playNativeBackgroundMedia, pauseNativeBackgroundMedia, resumeNativeBackgroundMedia, stopNativeBackgroundMedia } from '../lib/media/deviceMedia';
+import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia, loadNativeSharedMedia, shareNativeMedia, markNativeMediaSeen, deleteNativeMedia, playNativeBackgroundMedia, pauseNativeBackgroundMedia, resumeNativeBackgroundMedia, stopNativeBackgroundMedia, toggleNativeBackgroundRepeat, toggleNativeBackgroundShuffle } from '../lib/media/deviceMedia';
 import { stageMediaForDestination } from '../lib/media/shareBridge';
 
 type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
@@ -897,7 +897,7 @@ export default function UniqueMediaPage() {
           <div className="flex h-full w-full max-w-6xl flex-col justify-center">
             <div className="mb-3 flex items-center justify-between gap-3 px-1 text-white">
               <div className="min-w-0"><p className="truncate text-sm font-black">{player.file.name}</p><p className="text-xs text-white/50">{player.kind === 'audio' ? 'Audio' : 'Video'} · {formatBytes(player.file.size)}</p></div>
-              <div className="flex items-center gap-2"><button type="button" onClick={() => setPlayerLoop(v => !v)} className={`rounded-full px-3 py-2 text-xs font-bold ${playerLoop ? 'bg-emerald-500 text-slate-950' : 'bg-white/10 text-white'}`}>Loop</button><button type="button" onClick={() => setPlayerShuffle(v => !v)} className={`rounded-full px-3 py-2 text-xs font-bold ${playerShuffle ? 'bg-emerald-500 text-slate-950' : 'bg-white/10 text-white'}`}>Shuffle</button></div>
+              <div className="flex items-center gap-2"><button type="button" onClick={() => { setPlayerLoop(v => !v); if (supportsNativeAndroidStorage()) toggleNativeBackgroundRepeat(); }} className={`rounded-full px-3 py-2 text-xs font-bold ${playerLoop ? 'bg-emerald-500 text-slate-950' : 'bg-white/10 text-white'}`}>Loop</button><button type="button" onClick={() => { setPlayerShuffle(v => !v); if (supportsNativeAndroidStorage()) toggleNativeBackgroundShuffle(); }} className={`rounded-full px-3 py-2 text-xs font-bold ${playerShuffle ? 'bg-emerald-500 text-slate-950' : 'bg-white/10 text-white'}`}>Shuffle</button></div>
             </div>
             <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[2rem] bg-black shadow-2xl">
               {player.kind === 'image' ? <img src={player.url} alt={player.file.name} className={`max-h-full max-w-full rounded-2xl object-${playerFit}`} /> :
@@ -933,8 +933,8 @@ export default function UniqueMediaPage() {
                 {player.kind === 'video' && <button type="button" onClick={() => void pictureInPicture()} className="rounded-full bg-white/10 px-3 py-2.5 text-xs font-bold text-white">PiP</button>}
                 <button type="button" onClick={changePlayerRate} className="rounded-full bg-white/10 px-3 py-2.5 text-xs font-bold text-white">{playerRate}×</button>
                 <button type="button" onClick={() => void togglePlayerFullscreen()} className="rounded-full bg-white/10 px-3 py-2.5 text-xs font-bold text-white">{playerFullscreen ? 'Exit' : 'Fullscreen'}</button>
-                <button type="button" onClick={() => setPlayerLoop(v => !v)} className={`rounded-full px-3 py-2.5 text-xs font-bold ${playerLoop ? 'bg-emerald-500 text-slate-950' : 'bg-white/10 text-white'}`}>Loop</button>
-                <button type="button" onClick={() => setPlayerShuffle(v => !v)} className={`rounded-full px-3 py-2.5 text-xs font-bold ${playerShuffle ? 'bg-emerald-500 text-slate-950' : 'bg-white/10 text-white'}`}>Shuffle</button>
+                <button type="button" onClick={() => { setPlayerLoop(v => !v); if (supportsNativeAndroidStorage()) toggleNativeBackgroundRepeat(); }} className={`rounded-full px-3 py-2.5 text-xs font-bold ${playerLoop ? 'bg-emerald-500 text-slate-950' : 'bg-white/10 text-white'}`}>Loop</button>
+                <button type="button" onClick={() => { setPlayerShuffle(v => !v); if (supportsNativeAndroidStorage()) toggleNativeBackgroundShuffle(); }} className={`rounded-full px-3 py-2.5 text-xs font-bold ${playerShuffle ? 'bg-emerald-500 text-slate-950' : 'bg-white/10 text-white'}`}>Shuffle</button>
               </div>
               <p className="mt-3 text-center text-[10px] font-semibold text-white/40">On the Android build, Audio continues through screen lock with lock-screen controls. Video can switch to background audio; browser background playback depends on the device and browser.</p>
             </div>}
