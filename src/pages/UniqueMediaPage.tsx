@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Cloud, FileText, Image as ImageIcon , ListMusic, Music2, Pause, Play, Search, Share2, Shuffle, Smartphone, SkipBack, SkipForward, Trash2, Users, Volume2, X, Repeat2, Maximize2, Download } from 'lucide-react';
+import { Cloud, FileText, Image as ImageIcon, Music2, Pause, Play, Search, Share2, Smartphone, Trash2, Users, X } from 'lucide-react';
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
@@ -65,7 +65,6 @@ export default function UniqueMediaPage() {
   const [playerLoop, setPlayerLoop] = useState(false);
   const [playerShuffle, setPlayerShuffle] = useState(false);
   const playerVideoRef = React.useRef<HTMLVideoElement | null>(null);
-  const playerAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const phoneFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const openMediaWithSeen = (item: LocalMedia) => {
@@ -320,6 +319,43 @@ export default function UniqueMediaPage() {
     setIsPlaying(true);
     if (supportsNativeAndroidStorage()) playNativeBackgroundMedia(playableQueue, nextIndex);
   };
+  useEffect(() => {
+    const session = (navigator as any).mediaSession;
+    if (!session || !player || (player.kind !== 'audio' && player.kind !== 'video')) return;
+    try {
+      session.metadata = new (window as any).MediaMetadata({
+        title: player.file.name,
+        artist: 'UniqueMedia',
+        album: 'UniqueMedia',
+      });
+      session.playbackState = isPlaying ? 'playing' : 'paused';
+      const handlers: Record<string, (details?: any) => void> = {
+        play: () => {
+          if (supportsNativeAndroidStorage()) resumeNativeBackgroundMedia();
+          else if (playerVideoRef.current) void playerVideoRef.current.play();
+          setIsPlaying(true);
+        },
+        pause: () => {
+          if (supportsNativeAndroidStorage()) pauseNativeBackgroundMedia();
+          else playerVideoRef.current?.pause();
+          setIsPlaying(false);
+        },
+        nexttrack: () => playQueueItem(playerQueueIndex + 1),
+        previoustrack: () => playQueueItem(playerQueueIndex - 1),
+        seekbackward: (details) => seekPlayer(-(details?.seekOffset || 10)),
+        seekforward: (details) => seekPlayer(details?.seekOffset || 10),
+      };
+      Object.entries(handlers).forEach(([action, handler]) => {
+        try { session.setActionHandler(action, handler); } catch { /* optional action */ }
+      });
+    } catch { /* optional Media Session API */ }
+    return () => {
+      ['play', 'pause', 'nexttrack', 'previoustrack', 'seekbackward', 'seekforward'].forEach((action) => {
+        try { session.setActionHandler(action, null); } catch { /* optional action */ }
+      });
+    };
+  }, [player, isPlaying, playerQueueIndex, playerLoop, playerShuffle, playableQueue]);
+
   const toggleBackgroundPlayback = () => {
     if (!player || (player.kind !== 'audio' && player.kind !== 'video')) return;
     if (player.kind === 'video' && !videoAudioMode) {
@@ -645,7 +681,7 @@ export default function UniqueMediaPage() {
 
       {player && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/98 p-3 sm:p-8" role="dialog" aria-modal="true" aria-label="UniqueMedia player">
-          <button type="button" onClick={() => { stopNativeBackgroundMedia(); setPlayer(null); }} className="absolute right-4 top-4 z-20 rounded-full bg-white/10 p-3 text-white backdrop-blur hover:bg-white/20" aria-label="Close player"><X className="h-5 w-5" /></button>
+          <button type="button" onClick={() => { setPlayer(null); }} className="absolute right-4 top-4 z-20 rounded-full bg-white/10 p-3 text-white backdrop-blur hover:bg-white/20" aria-label="Close player"><X className="h-5 w-5" /></button>
           <div className="flex h-full w-full max-w-6xl flex-col justify-center">
             <div className="mb-3 flex items-center justify-between gap-3 px-1 text-white">
               <div className="min-w-0"><p className="truncate text-sm font-black">{player.file.name}</p><p className="text-xs text-white/50">{player.kind === 'audio' ? 'Audio' : 'Video'} · {formatBytes(player.file.size)}</p></div>
@@ -662,7 +698,7 @@ export default function UniqueMediaPage() {
                    <h2 className="mt-2 truncate text-2xl font-black sm:text-3xl">{player.file.name}</h2>
                    <p className="mt-2 text-xs text-white/45">{playerQueueIndex + 1} of {playableQueue.length} · {formatBytes(player.file.size)}</p>
                    <div className="mt-6 flex h-10 items-center justify-center gap-1 overflow-hidden">{Array.from({length:36},(_,i)=><span key={i} className="w-1 rounded-full bg-emerald-300/60" style={{height:(10 + ((i*17)%26))+'px'}} />)}</div>
-                   <audio key={player.id + '-audio'} src={player.url} controls autoPlay={isPlaying && !supportsNativeAndroidStorage()} className="mt-5 w-full opacity-90" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} />
+                   <audio ref={playerAudioRef} key={player.id + '-audio'} src={player.url} controls autoPlay={isPlaying && !supportsNativeAndroidStorage()} className="mt-5 w-full opacity-90" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => playQueueItem(playerQueueIndex + 1)} />
                  </div>
                </div>}
             </div>
