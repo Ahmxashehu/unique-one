@@ -120,7 +120,7 @@ const EXTRA: Record<SupportedLanguage, Record<string,string>> = {
     "Institution":"Cibiyar ilimi", "Course":"Darasi", "Enroll":"Yi rajista", "Invite Member":"Gayyaci memba", "Upload Documents":"Loda takardu",
     "Search messages":"Bincika saƙonni", "Voice calls coming soon":"Kiran murya zai zo nan ba da jimawa ba", "Reshare to chat":"Sake rabawa zuwa hira", "Copy link":"Kwafi hanyar haɗi",
     "Remove":"Cire", "Publishing...":"Ana wallafawa...", "Publish Service":"Wallafa aiki", "Enable biometric security":"Kunna tsaron biometric",
-    "Allow media access":"Bada damar kafofin watsa labarai", "Next":"Na gaba", "Previous":"Na baya", "Close menu":"Rufe menu", "More UniquePlatform":"Ƙarin UniquePlatform"
+    "Allow media access":"Bada damar kafofin watsa labarai", "Next":"Na gaba", "Previous":"Na baya", "Close menu":"Rufe menu", "More UniquePlatform":"Ƙarin UniquePlatform", "Add Customer":"Ƙara abokin ciniki", "Back to History":"Koma tarihin", "Print / Save PDF":"Buga / Ajiye PDF", "Video calls coming soon":"Kiran bidiyo zai zo nan ba da jimawa ba", "Unmute conversation":"Cire shiru na hira", "Mute conversation":"Yi shiru na hira", "Search messages...":"Bincika saƙonni..."
   },
   fr: {
     "Refresh":"Actualiser", "View":"Voir", "Apply":"Postuler", "Post a job":"Publier une offre", "All categories":"Toutes les catégories",
@@ -131,7 +131,7 @@ const EXTRA: Record<SupportedLanguage, Record<string,string>> = {
     "Institution":"Établissement", "Course":"Cours", "Enroll":"S’inscrire", "Invite Member":"Inviter un membre", "Upload Documents":"Téléverser les documents",
     "Search messages":"Rechercher des messages", "Voice calls coming soon":"Appels vocaux bientôt disponibles", "Reshare to chat":"Partager dans le chat", "Copy link":"Copier le lien",
     "Remove":"Supprimer", "Publishing...":"Publication...", "Publish Service":"Publier le service", "Enable biometric security":"Activer la sécurité biométrique",
-    "Allow media access":"Autoriser l’accès aux médias", "Previous":"Précédent", "Close menu":"Fermer le menu", "More UniquePlatform":"Plus de UniquePlatform"
+    "Allow media access":"Autoriser l’accès aux médias", "Previous":"Précédent", "Close menu":"Fermer le menu", "More UniquePlatform":"Plus de UniquePlatform", "Add Customer":"Ajouter un client", "Back to History":"Retour à l’historique", "Print / Save PDF":"Imprimer / Enregistrer en PDF", "Video calls coming soon":"Appels vidéo bientôt disponibles", "Unmute conversation":"Réactiver le son de la conversation", "Mute conversation":"Mettre la conversation en sourdine", "Search messages...":"Rechercher des messages..."
   },
   ig: {
     "Refresh":"Melite", "View":"Lee", "Apply":"Tinye akwụkwọ", "Post a job":"Bipute ọrụ", "All categories":"Ụdị niile",
@@ -142,7 +142,7 @@ const EXTRA: Record<SupportedLanguage, Record<string,string>> = {
     "Institution":"Ụlọ akwụkwọ", "Course":"Nkuzi", "Enroll":"Debanye aha", "Invite Member":"Kpọọ onye otu", "Upload Documents":"Bulite akwụkwọ",
     "Search messages":"Chọọ ozi", "Voice calls coming soon":"Oku olu ga-abịa n'oge na-adịghị anya", "Reshare to chat":"Kesaa ọzọ na nkata", "Copy link":"Detuo njikọ",
     "Publishing...":"Na-ebipụta...", "Publish Service":"Bipụta ọrụ", "Enable biometric security":"Kpoo nchekwa biometric", "Allow media access":"Kwe ka mgbasa ozi nweta ohere",
-    "Previous":"Nke gara aga", "Close menu":"Mechie nchịkọta", "More UniquePlatform":"Ọzọ UniquePlatform"
+    "Previous":"Nke gara aga", "Close menu":"Mechie nchịkọta", "More UniquePlatform":"Ọzọ UniquePlatform", "Add Customer":"Tinye onye ahịa", "Back to History":"Laghachi na akụkọ", "Print / Save PDF":"Bipụta / Chekwaa PDF", "Video calls coming soon":"Oku vidiyo ga-abịa n’oge na-adịghị anya", "Unmute conversation":"Wepụ ogbi na nkata", "Mute conversation":"Mee ka nkata daa ogbi", "Search messages...":"Chọọ ozi..."
   },
   yo: {
     "Refresh":"Túnṣe", "View":"Wo", "Apply":"Waye", "Post a job":"Fi iṣẹ́ sílẹ̀", "All categories":"Gbogbo ẹ̀ka",
@@ -153,7 +153,7 @@ const EXTRA: Record<SupportedLanguage, Record<string,string>> = {
     "Institution":"Ilé ẹ̀kọ́", "Course":"Ẹ̀kọ́", "Enroll":"Forúkọsílẹ̀", "Invite Member":"Pe ọmọ ẹgbẹ́", "Upload Documents":"Gbé àwọn ìwé sókè",
     "Search messages":"Wá àwọn ifiranṣẹ́", "Voice calls coming soon":"Àwọn ìpè ohùn ń bọ̀ láìpẹ́", "Reshare to chat":"Pín sí iwiregbe", "Copy link":"Da ọna asopọ̀ kọ",
     "Publishing...":"Ń tẹ̀ jáde...", "Publish Service":"Tẹ iṣẹ́ jáde", "Enable biometric security":"Mú ààbò biometric ṣiṣẹ́", "Allow media access":"Gba àyè sí media",
-    "Previous":"Tẹ́lẹ̀", "Close menu":"Pa àkójọ", "More UniquePlatform":"Àwọn míì UniquePlatform"
+    "Previous":"Tẹ́lẹ̀", "Close menu":"Pa àkójọ", "More UniquePlatform":"Àwọn míì UniquePlatform", "Add Customer":"Fi oníbàárà kún", "Back to History":"Padà sí ìtàn", "Print / Save PDF":"Tẹ̀wé / Fipamọ́ PDF", "Video calls coming soon":"Àwọn ìpè fídíò ń bọ̀ láìpẹ́", "Unmute conversation":"Mú ohùn iwiregbe padà", "Mute conversation":"Dákẹ́ iwiregbe", "Search messages...":"Wá àwọn ifiranṣẹ́..."
   },
   pcm: {
     "Refresh":"Refresh", "View":"See", "Apply":"Apply", "Post a job":"Post job", "All categories":"All categories",
@@ -164,7 +164,7 @@ const EXTRA: Record<SupportedLanguage, Record<string,string>> = {
     "Institution":"School", "Course":"Course", "Enroll":"Register", "Invite Member":"Invite member", "Upload Documents":"Upload documents",
     "Search messages":"Find messages", "Voice calls coming soon":"Voice call dey come soon", "Reshare to chat":"Share am for chat", "Copy link":"Copy link",
     "Publishing...":"E dey publish...", "Publish Service":"Publish service", "Enable biometric security":"Turn on biometric security", "Allow media access":"Allow media access",
-    "Previous":"Previous", "Close menu":"Close menu", "More UniquePlatform":"More UniquePlatform"
+    "Previous":"Previous", "Close menu":"Close menu", "More UniquePlatform":"More UniquePlatform", "Add Customer":"Add customer", "Back to History":"Back to history", "Print / Save PDF":"Print / Save PDF", "Video calls coming soon":"Video call dey come soon", "Unmute conversation":"Unmute chat", "Mute conversation":"Mute chat", "Search messages...":"Find messages..."
   }
 };
 Object.entries(EXTRA).forEach(([language, values]) => Object.assign(UI[language as SupportedLanguage], values));
