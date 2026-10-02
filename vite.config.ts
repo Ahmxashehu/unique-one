@@ -27,8 +27,8 @@ export default defineConfig(() => ({
       },
       devOptions: { enabled: true, type: 'module', navigateFallbackAllowlist: [/^\/(?!api(?:\/|$)).*/] },
       manifest: {
-        id: '/', start_url: '/', scope: '/', name: 'Unique One', short_name: 'Unique One',
-        description: 'The public ecosystem powered by UniqueOS.', theme_color: '#ffffff', background_color: '#ffffff', display: 'standalone',
+        id: '/', start_url: '/', scope: '/', name: 'UniquePlatform', short_name: 'UniquePlatform',
+        description: 'The public ecosystem powered by UniquePlatform and UniqueOS.', theme_color: '#ffffff', background_color: '#ffffff', display: 'standalone',
         icons: [
           { src: 'unique-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
           { src: 'pwa-192x192.svg', sizes: '192x192', type: 'image/svg+xml', purpose: 'any' },
