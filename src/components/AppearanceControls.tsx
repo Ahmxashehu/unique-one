@@ -65,7 +65,7 @@ export default function AppearanceControls() {
       <div className="unique-u1-glow relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full" aria-label="UniquePlatform">
         <span className="unique-u1-orbit unique-u1-orbit-ring absolute inset-0 rounded-full" aria-hidden="true" />
         <span className="unique-u1-mark relative z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/90 bg-white text-[11px] font-black tracking-[-0.08em] text-emerald-700 shadow-sm">
-          U1
+          UP
         </span>
       </div>
       <button
