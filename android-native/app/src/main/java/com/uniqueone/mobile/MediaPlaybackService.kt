@@ -2,6 +2,8 @@ package com.uniqueone.mobile
 
 import android.content.Intent
 import android.net.Uri
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.exoplayer.ExoPlayer
@@ -14,7 +16,16 @@ class MediaPlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        val exoPlayer = ExoPlayer.Builder(this).setHandleAudioBecomingNoisy(true).build()
+        val exoPlayer = ExoPlayer.Builder(this)
+            .setHandleAudioBecomingNoisy(true)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .setUsage(C.USAGE_MEDIA)
+                    .build(),
+                true
+            )
+            .build()
         player = exoPlayer
         session = MediaSession.Builder(this, exoPlayer).build()
     }
@@ -49,6 +60,8 @@ class MediaPlaybackService : MediaSessionService() {
             ACTION_PAUSE -> player?.pause()
             ACTION_NEXT -> player?.seekToNextMediaItem()
             ACTION_PREVIOUS -> player?.seekToPreviousMediaItem()
+            ACTION_TOGGLE_REPEAT -> player?.let { it.repeatMode = if (it.repeatMode == ExoPlayer.REPEAT_MODE_ALL) ExoPlayer.REPEAT_MODE_OFF else ExoPlayer.REPEAT_MODE_ALL }
+            ACTION_TOGGLE_SHUFFLE -> player?.let { it.shuffleModeEnabled = !it.shuffleModeEnabled }
             ACTION_STOP -> {
                 player?.stop()
                 stopSelf()
@@ -71,6 +84,8 @@ class MediaPlaybackService : MediaSessionService() {
         const val ACTION_PAUSE = "com.uniqueone.mobile.PAUSE"
         const val ACTION_NEXT = "com.uniqueone.mobile.NEXT"
         const val ACTION_PREVIOUS = "com.uniqueone.mobile.PREVIOUS"
+        const val ACTION_TOGGLE_REPEAT = "com.uniqueone.mobile.TOGGLE_REPEAT"
+        const val ACTION_TOGGLE_SHUFFLE = "com.uniqueone.mobile.TOGGLE_SHUFFLE"
         const val ACTION_STOP = "com.uniqueone.mobile.STOP"
         const val EXTRA_URIS = "uris"
         const val EXTRA_TITLES = "titles"
