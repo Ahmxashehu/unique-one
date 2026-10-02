@@ -39,7 +39,7 @@ export function registerUniqueShareRoutes(app: Express, authenticate: any) {
 
   app.post("/api/unique-share/sessions", authenticate, sessionLimiter, async (req: AuthenticatedRequest, res) => {
     const senderUid = uidOf(req);
-    if (!senderUid) return error(res, 401, "UNAUTHENTICATED", "Sign in is required.");
+    if (!senderUid) return error(res, 401, "UNAUTHENTICATED", "A secure guest session is required.");
     const sessionId = randomBytes(18).toString("base64url");
     const connectionSecret = randomBytes(24).toString("base64url");
     const expiresAt = Timestamp.fromMillis(Date.now() + 5 * 60_000);
