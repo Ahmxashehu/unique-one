@@ -21,27 +21,27 @@ for (const dir of sourceRoots) walk(path.join(root, dir));
 
 const findings = new Map();
 const add = (file, line, text, kind) => {
-  const value = text.replace(/\\s+/g, " ").trim();
+  const value = text.replace(/\s+/g, " ").trim();
   if (!value || value.length < 2 || technical.test(value)) return;
   if (!/[A-Za-zÀ-ÿ]/.test(value)) return;
-  if (/^[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*$/.test(value)) return;
+  if (/^[A-Za-z_$][\w$]*(\\.[A-Za-z_$][\w$]*)*$/.test(value)) return;
   const key = path.relative(root, file);
   if (!findings.has(key)) findings.set(key, []);
   findings.get(key).push({ line, kind, value });
 };
 
 for (const file of files) {
-  const lines = fs.readFileSync(file, "utf8").split(/\\r?\\n/);
+  const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
   lines.forEach((line, index) => {
     const lineNo = index + 1;
     // JSX/HTML attributes that are commonly visible to users.
-    for (const m of line.matchAll(/\\b(placeholder|title|aria-label|alt)\\s*=\\s*["']([^"']+)["']/g)) add(file, lineNo, m[2], m[1]);
+    for (const m of line.matchAll(/\b(placeholder|title|aria-label|alt)\s*=\s*["']([^"']+)["']/g)) add(file, lineNo, m[2], m[1]);
     // JSX text nodes: conservative, ignores tags and expressions.
-    const stripped = line.replace(/<[^>]*>/g, " ").replace(/\\{[^{}]*\\}/g, " ");
+    const stripped = line.replace(/<[^>]*>/g, " ").replace(/\{[^{}]*\}/g, " ");
     for (const m of stripped.matchAll(/(?:^|>)[ \\t]*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 ,.'!?&/()_:+-]{2,})[ \\t]*(?:<|$)/g)) add(file, lineNo, m[1], "jsx-text");
     // User-visible prompt/error/toast/confirm strings and common string props.
-    for (const m of line.matchAll(/\\b(?:prompt|confirm|alert)\\s*\\(\\s*["']([^"']+)["']/g)) add(file, lineNo, m[1], "dialog");
-    for (const m of line.matchAll(/(?:setError|setMessage|setStatus|setNotice)\\(\\s*["']([^"']+)["']/g)) add(file, lineNo, m[1], "state-message");
+    for (const m of line.matchAll(/\b(?:prompt|confirm|alert)\s*\(\s*["']([^"']+)["']/g)) add(file, lineNo, m[1], "dialog");
+    for (const m of line.matchAll(/(?:setError|setMessage|setStatus|setNotice)\(\s*["']([^"']+)["']/g)) add(file, lineNo, m[1], "state-message");
   });
 }
 
