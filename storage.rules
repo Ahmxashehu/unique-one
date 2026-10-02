@@ -94,6 +94,24 @@ service firebase.storage {
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 
+    // UniqueShare transfer storage: authenticated sender may upload only after the
+    // server has paired and the receiver has explicitly accepted the session. The
+    // receiver owns the resulting files under their own UID.
+    match /uniqueShare/{sessionId}/{receiverUid}/{fileId}/{fileName} {
+      allow read: if signedIn()
+        && request.auth.uid == receiverUid
+        && firestore.exists(/databases/(default)/documents/uniqueShareSessions/$(sessionId))
+        && firestore.get(/databases/(default)/documents/uniqueShareSessions/$(sessionId)).data.status == 'accepted'
+        && firestore.get(/databases/(default)/documents/uniqueShareSessions/$(sessionId)).data.receiverUid == receiverUid;
+      allow create, update: if signedIn()
+        && firestore.exists(/databases/(default)/documents/uniqueShareSessions/$(sessionId))
+        && firestore.get(/databases/(default)/documents/uniqueShareSessions/$(sessionId)).data.status == 'accepted'
+        && firestore.get(/databases/(default)/documents/uniqueShareSessions/$(sessionId)).data.senderUid == request.auth.uid
+        && firestore.get(/databases/(default)/documents/uniqueShareSessions/$(sessionId)).data.receiverUid == receiverUid
+        && request.resource.size <= 2 * 1024 * 1024 * 1024;
+      allow delete: if signedIn() && request.auth.uid == receiverUid;
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }
