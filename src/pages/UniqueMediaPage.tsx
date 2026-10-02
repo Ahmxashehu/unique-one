@@ -512,7 +512,7 @@ export default function UniqueMediaPage() {
                   <div className="border-b border-slate-100 bg-slate-950 p-5 text-white">
                     <div className="flex items-center gap-3">
                       <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300"><Music2 className="h-6 w-6" /></span>
-                      <div><p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-300">Music library</p><h3 className="text-lg font-black">Your audio</h3></div>
+                      <div><p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-300">Audio library</p><h3 className="text-lg font-black">Your audio</h3></div>
                     </div>
                   </div>
                   <div className="divide-y divide-slate-100">
