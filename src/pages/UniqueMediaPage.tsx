@@ -470,10 +470,15 @@ export default function UniqueMediaPage() {
       <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
         <header className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <input ref={phoneFileInputRef} type="file" multiple accept="video/*,audio/*,image/*,application/pdf" className="hidden" onChange={(event) => { importFromPhoneStorage(event.target.files); event.currentTarget.value = ''; }} />
-          <div className="flex justify-center">
-            <Link to="/os/unique-share" className="relative inline-flex items-center justify-center gap-2 rounded-full border-2 border-emerald-300 bg-emerald-50 px-5 py-3 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100">
-              <Share2 className="h-4 w-4" /> Share{newReceivedCount > 0 && <span className="min-w-5 rounded-full bg-emerald-600 px-1.5 py-0.5 text-center text-[10px] text-white">{newReceivedCount}</span>}
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">UniqueMedia</p><h1 className="truncate text-xl font-black text-slate-950">Smart library</h1></div>
+            <Link to="/os/unique-share" className="relative inline-flex shrink-0 items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700">
+              <Share2 className="h-4 w-4" /> Share{newReceivedCount > 0 && <span className="min-w-5 rounded-full bg-white px-1.5 py-0.5 text-center text-[10px] text-emerald-700">{newReceivedCount}</span>}
             </Link>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-3 py-2.5 text-xs font-black text-white"><Smartphone className="h-4 w-4" /> Connect phone</button>
+            {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-black text-slate-700"><Cloud className="h-4 w-4" /> Add files</button>}
           </div>
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="UniqueMedia categories">
             {categories.map(([value, label]) => {
@@ -514,12 +519,7 @@ export default function UniqueMediaPage() {
               <div className="mt-4 flex justify-center">
                 {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700">Add files</button>}
               </div>
-              <div className="mt-4 flex justify-center">
-                <Link to="/os/unique-share" className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm">
-                  <Share2 className="h-4 w-4" /> Share with another device
-                </Link>
-              </div>
-              <p className="mt-3 text-center text-[11px] leading-5 text-slate-400">Choose files for this library, or use UniqueShare to connect directly with another person as a guest—no login or registration required.</p>
+              <p className="mt-4 text-center text-[11px] leading-5 text-slate-400">Use Connect phone for your device library, Add files for selected files, or Share for UniqueShare transfer. Your local media stays on the device unless you explicitly choose a protected sharing or cloud action.</p>
             </div>
           ) : (
             <>
