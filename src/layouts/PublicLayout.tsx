@@ -24,18 +24,7 @@ export default function PublicLayout() {
       {location.pathname !== '/' && (
         <header className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-100 shrink-0">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <Link
-              to="/"
-              className="group flex min-w-0 items-center gap-2.5"
-              aria-label="UniquePlatform"
-            >
-              <span className="unique-platform-orb relative flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden="true">
-                <span className="unique-platform-orb-sphere absolute inset-0 rounded-full" />
-                <span className="unique-platform-orb-ring absolute inset-[-1px] rounded-full" />
-                <span className="unique-platform-orb-mark relative z-10 text-[10px] font-black tracking-[-0.08em] text-white">
-                  UP
-                </span>
-              </span>
+            <Link to="/" className="group flex min-w-0 items-center" aria-label="UniquePlatform">
               <span className="unique-platform-wordmark truncate text-[1.05rem] font-extrabold tracking-[-0.035em] text-slate-950 sm:text-xl">
                 UniquePlatform
               </span>
@@ -67,12 +56,7 @@ export default function PublicLayout() {
 
       {isMobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="More UniquePlatform">
-          <button
-            type="button"
-            aria-label="Close menu"
-            className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
+          <button type="button" aria-label="Close menu" className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
           <div className="absolute inset-x-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-h-[72dvh] overflow-y-auto overscroll-contain rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl sm:inset-x-3 sm:p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
@@ -96,12 +80,7 @@ export default function PublicLayout() {
                 ['Education', '/os/education'],
                 ['Travel', '/os/travel'],
               ].map(([name, path]) => (
-                <Link
-                  key={path + name}
-                  to={path}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm"
-                >
+                <Link key={path + name} to={path} onClick={() => setIsMobileMenuOpen(false)} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm">
                   {name}
                 </Link>
               ))}
