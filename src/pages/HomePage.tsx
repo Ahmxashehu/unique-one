@@ -547,51 +547,41 @@ export default function HomePage() {
                   <p className="mt-4 text-sm text-slate-500">Building your Unique experience...</p>
                 </div>
               ) : edgeProducts.length === 0 ? (
-                <div className="min-w-0 overflow-hidden rounded-2xl border border-emerald-200 bg-white p-3 text-left shadow-sm sm:rounded-3xl sm:p-5">
-                  <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                      <Play className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-xl font-black tracking-tight">UniqueMedia</h3>
-                      <div className="mt-1 min-w-0 h-9 overflow-hidden text-xs leading-4 text-slate-500 sm:h-6 sm:text-sm sm:leading-normal">
-                        <p className="animate-[uniqueMediaVertical_9s_linear_infinite] whitespace-normal break-words motion-reduce:animate-none">
-                          
-                        </p>
-                      </div>
-                    </div>
+                <div className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <Link to="/media" className="group flex min-w-0 items-center gap-3">
+                      <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 transition group-hover:bg-emerald-100 sm:h-14 sm:w-14">
+                        <Play className="h-6 w-6 sm:h-7 sm:w-7" />
+                        <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">Your media</span>
+                        <span className="mt-0.5 block truncate text-lg font-black tracking-tight text-slate-950 sm:text-xl">UniqueMedia</span>
+                        <span className="mt-0.5 block truncate text-xs text-slate-500 sm:text-sm">Music, videos, images & PDFs</span>
+                      </span>
+                    </Link>
+                    <Link to="/media" className="shrink-0 rounded-full bg-slate-950 px-3.5 py-2 text-xs font-black text-white transition hover:bg-slate-800">
+                      Open
+                    </Link>
                   </div>
 
-                  <details className="group mt-3 sm:mt-4">
-                    <summary className="flex min-w-0 cursor-pointer list-none items-center justify-between gap-2 rounded-xl bg-slate-950 px-3 py-3 text-xs font-bold text-white transition hover:bg-slate-800 sm:rounded-2xl sm:px-4 sm:text-sm">
-                      <span className="min-w-0 flex-1">Open UniqueMedia categories</span>
-                      <ArrowRight className="h-4 w-4 transition-transform group-open:rotate-90" />
-                    </summary>
-                    <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-5">
-                      {[
-                        ['Videos', Play],
-                        ['Music & Audio', Play],
-                        ['Images', Compass],
-                        ['PDF Reader', Bookmark],
-                        ['Contacts', Users],
-                        ['Status Saver', Bookmark],
-                      ].map(([label, Icon]) => (
-                        <Link
-                          key={String(label)}
-                          to="/media"
-                          className="flex min-w-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-2.5 transition hover:border-emerald-300 hover:bg-emerald-50 sm:gap-2 sm:rounded-2xl sm:p-3"
-                        >
-                          <Icon className="h-4 w-4 shrink-0 text-emerald-600" />
-                          <span className="truncate text-xs font-bold text-slate-700">{label}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  </details>
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {[
+                      ['Videos', Play],
+                      ['Music', Play],
+                      ['Images', Compass],
+                      ['PDFs', Bookmark],
+                    ].map(([label, Icon]) => (
+                      <Link key={String(label)} to="/media" className="flex min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 transition hover:border-emerald-300 hover:bg-emerald-50">
+                        <Icon className="h-4 w-4 shrink-0 text-emerald-600" />
+                        <span className="truncate text-xs font-bold text-slate-700">{label}</span>
+                      </Link>
+                    ))}
+                  </div>
 
-                  <div className="mt-3 overflow-hidden rounded-xl bg-emerald-50 px-2 py-2 sm:rounded-full sm:px-3 sm:py-1.5">
-                    <p className="animate-[bounce_2.4s_ease-in-out_infinite] text-center text-[10px] leading-4 font-bold text-emerald-700 sm:whitespace-nowrap sm:text-xs sm:leading-normal">
-                      Private by default • Works offline for local media • Device permissions stay under your control
-                    </p>
+                  <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-emerald-50 px-3 py-2.5">
+                    <span className="min-w-0 truncate text-[10px] font-semibold text-emerald-800 sm:text-xs">Private by default · Local media stays on your device</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-emerald-600" />
                   </div>
                 </div>
               ) : (
@@ -898,15 +888,3 @@ export default function HomePage() {
               <div className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50 p-3.5 sm:rounded-3xl sm:p-5">
                 <div className="flex min-w-0 items-start gap-2 font-black text-emerald-900">
                   <Sparkles className="mt-0.5 h-5 w-5 shrink-0" />
-                  <span className="min-w-0 break-words text-sm leading-5 sm:text-base">One platform, many experiences</span>
-                </div>
-                <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 text-[11px] font-semibold text-emerald-900 sm:mt-4 sm:text-xs">
-                  <Link to="/os" className="rounded-2xl bg-white/80 p-3">UniqueCycle/Aju</Link>
-                </div>
-              </div>
-            </aside>
-          </div>        </section>
-      </div>
-    </main>
-  );
-}
