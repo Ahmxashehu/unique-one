@@ -46,6 +46,7 @@ export default function UniqueMediaPage() {
   const [deviceMessage, setDeviceMessage] = useState('');
   const [player, setPlayer] = useState<LocalMedia | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [videoAudioMode, setVideoAudioMode] = useState(false);
   const [storageInfo, setStorageInfo] = useState<{ usage: number; quota: number } | null>(null);
   const [deleting, setDeleting] = useState<string[]>([]);
 
@@ -163,7 +164,13 @@ export default function UniqueMediaPage() {
 
   const openMedia = (item: LocalMedia) => {
     setPlayer(item);
+    setVideoAudioMode(false);
     setIsPlaying(item.kind === 'video' || item.kind === 'audio');
+  };
+
+  const toggleVideoAudioMode = () => {
+    setVideoAudioMode((current) => !current);
+    setIsPlaying(true);
   };
 
   const backupToCloud = async () => {
@@ -351,9 +358,9 @@ export default function UniqueMediaPage() {
           <div className="flex h-full w-full max-w-6xl flex-col justify-center">
             <div className="mb-3 flex items-center justify-between gap-3 px-1 text-white"><div className="min-w-0"><p className="truncate text-sm font-black">{player.file.name}</p><p className="text-xs text-white/50">{player.kind} · {formatBytes(player.file.size)}</p></div><Volume2 className="h-4 w-4 text-white/70" /></div>
             <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-3xl bg-black">
-              {player.kind === 'image' ? <img src={player.url} alt={player.file.name} className="max-h-full max-w-full object-contain" /> : player.kind === 'video' ? <video src={player.url} controls autoPlay={isPlaying} playsInline className="max-h-full max-w-full rounded-2xl" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} /> : player.kind === 'audio' ? <div className="w-full max-w-2xl rounded-3xl bg-white/10 p-8 text-white"><Music2 className="mx-auto h-20 w-20 text-emerald-400" /><p className="mt-6 text-center text-lg font-black">{player.file.name}</p><audio src={player.url} controls autoPlay={isPlaying} className="mt-8 w-full" /></div> : <div className="text-center text-white"><FileText className="mx-auto h-20 w-20 text-emerald-400" /><p className="mt-4 font-black">{player.file.name}</p></div>}
+              {player.kind === 'image' ? <img src={player.url} alt={player.file.name} className="max-h-full max-w-full object-contain" /> : player.kind === 'video' && !videoAudioMode ? <video key={player.id + '-video'} src={player.url} controls autoPlay={isPlaying} playsInline className="max-h-full max-w-full rounded-2xl" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} /> : player.kind === 'video' && videoAudioMode ? <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-white/10 p-8 text-white shadow-2xl"><div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500/15"><Music2 className="h-12 w-12 text-emerald-400" /></div><p className="mt-6 text-center text-lg font-black">Playing video as audio</p><p className="mt-1 text-center text-xs text-white/50">Keep UniqueMedia in the background while the audio continues when your browser/OS permits background media playback.</p><audio key={player.id + '-audio'} src={player.url} controls autoPlay={isPlaying} className="mt-8 w-full" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} /></div> : player.kind === 'audio' ? <div className="w-full max-w-2xl rounded-3xl bg-white/10 p-8 text-white"><Music2 className="mx-auto h-20 w-20 text-emerald-400" /><p className="mt-6 text-center text-lg font-black">{player.file.name}</p><audio src={player.url} controls autoPlay={isPlaying} className="mt-8 w-full" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} /></div> : <div className="text-center text-white"><FileText className="mx-auto h-20 w-20 text-emerald-400" /><p className="mt-4 font-black">{player.file.name}</p></div>}
             </div>
-            {(player.kind === 'video' || player.kind === 'audio') && <div className="mt-3 flex items-center justify-center"><button type="button" onClick={() => setIsPlaying((value) => !value)} className="rounded-full bg-white px-5 py-3 text-sm font-black text-black">{isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button></div>}
+            {(player.kind === 'video' || player.kind === 'audio') && <div className="mt-3 flex flex-wrap items-center justify-center gap-2"><button type="button" onClick={() => setIsPlaying((value) => !value)} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-black text-black">{isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}{isPlaying ? 'Pause' : 'Play'}</button>{player.kind === 'video' && <button type="button" onClick={toggleVideoAudioMode} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur hover:bg-white/15">{videoAudioMode ? <Play className="h-4 w-4" /> : <Music2 className="h-4 w-4" />}{videoAudioMode ? 'Return to video' : 'Play as audio'}</button>}</div>}
           </div>
         </div>
       )}
