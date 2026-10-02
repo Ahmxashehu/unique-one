@@ -24,8 +24,7 @@ import java.util.UUID
 class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private val nativeMedia = mutableMapOf<String, Pair<Uri, String>>()
-    private var mediaCache: JSONArray? = null
-
+    
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             val granted = mediaAccessGranted()
@@ -100,7 +99,7 @@ class MainActivity : ComponentActivity() {
                     val nameIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                     val mimeIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
                     val sizeIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
-                    while (cursor.moveToNext()) {
+                    var skipped = 0\n                    var added = 0\n                    while (cursor.moveToNext()) {\n                        if (skipped < offset) { skipped++; continue }\n                        if (added >= limit) break\n                        added++
                         val id = cursor.getLong(idIndex)
                         val mime = cursor.getString(mimeIndex) ?: "application/octet-stream"
                         val uri = Uri.withAppendedPath(source, id.toString())
