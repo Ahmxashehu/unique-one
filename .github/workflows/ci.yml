@@ -35,6 +35,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Run whole-platform smoke verification
+        run: npm test
+
       - name: Verify production PWA service worker
         run: |
           test -f dist/sw.js
