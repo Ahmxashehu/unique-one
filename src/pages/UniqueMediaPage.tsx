@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Cloud, FileText, FolderOpen, Image as ImageIcon, Music2, Pause, Play, Search, Share2, Smartphone, Trash2, Users, Volume2, X } from 'lucide-react';
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
@@ -274,7 +275,7 @@ export default function UniqueMediaPage() {
               <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">UniqueMedia</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">A free media workspace for videos, music, images and PDFs. Authorized device media loads automatically and opens directly in the built-in player.</p>
             </div>
-            <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><FolderOpen className="h-4 w-4" /> Connect media once</button></div>
+            <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><FolderOpen className="h-4 w-4" /> Connect media once</button><Link to="/os/unique-share" className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800"><Share2 className="h-4 w-4" /> Open UniqueShare</Link></div>
           </div>
           <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900"><strong>Automatic access:</strong> After you authorize a media folder once, UniqueMedia remembers that authorization and loads your videos, music, images and PDFs automatically when the browser permits it. Nothing is silently uploaded to the cloud. Full phone-wide Android MediaStore access belongs in the native build.</div>
           {deviceMessage && <p className="mt-3 text-xs font-semibold text-emerald-700">{deviceMessage}</p>}
