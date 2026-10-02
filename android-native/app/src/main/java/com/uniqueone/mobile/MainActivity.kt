@@ -353,6 +353,12 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface fun backgroundPrevious() {
             startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_PREVIOUS))
         }
+        @JavascriptInterface fun backgroundToggleRepeat() {
+            startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_TOGGLE_REPEAT))
+        }
+        @JavascriptInterface fun backgroundToggleShuffle() {
+            startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_TOGGLE_SHUFFLE))
+        }
         @JavascriptInterface fun backgroundStop() {
             startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_STOP))
         }
