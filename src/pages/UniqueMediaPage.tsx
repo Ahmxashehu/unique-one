@@ -346,14 +346,18 @@ export default function UniqueMediaPage() {
   };
   const toggleBackgroundPlayback = () => {
     if (!player || (player.kind !== 'audio' && player.kind !== 'video')) return;
+    if (player.kind === 'video' && !videoAudioMode) {
+      if (isPlaying) { playerVideoRef.current?.pause(); setIsPlaying(false); }
+      else { void playerVideoRef.current?.play(); setIsPlaying(true); }
+      return;
+    }
     if (isPlaying) {
       pauseNativeBackgroundMedia();
-      playerVideoRef.current?.pause();
       setIsPlaying(false);
       return;
     }
     const started = supportsNativeAndroidStorage() && playNativeBackgroundMedia(playableQueue, playerQueueIndex);
-    if (!started) void playerVideoRef.current?.play();
+    if (!started && playerVideoRef.current) void playerVideoRef.current.play();
     setIsPlaying(true);
   };
   const deleteCurrentMedia = async () => {
@@ -682,7 +686,7 @@ export default function UniqueMediaPage() {
                    <h2 className="mt-2 truncate text-2xl font-black sm:text-3xl">{player.file.name}</h2>
                    <p className="mt-2 text-xs text-white/45">{playerQueueIndex + 1} of {playableQueue.length} · {formatBytes(player.file.size)}</p>
                    <div className="mt-6 flex h-10 items-center justify-center gap-1 overflow-hidden">{Array.from({length:36},(_,i)=><span key={i} className="w-1 rounded-full bg-emerald-300/60" style={{height:(10 + ((i*17)%26))+'px'}} />)}</div>
-                   <audio key={player.id + '-audio'} src={player.url} controls autoPlay={isPlaying} className="mt-5 w-full opacity-90" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} />
+                   <audio key={player.id + '-audio'} src={player.url} controls autoPlay={isPlaying && !supportsNativeAndroidStorage()} className="mt-5 w-full opacity-90" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} />
                  </div>
                </div>}
             </div>
