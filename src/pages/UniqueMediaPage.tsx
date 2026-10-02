@@ -4,7 +4,7 @@ import { Cloud, FileText, FolderOpen, Image as ImageIcon, Music2, Pause, Play, S
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
-import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia } from '../lib/media/deviceMedia';
+import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia, loadNativeSharedMedia } from '../lib/media/deviceMedia';
 import { stageMediaForDestination } from '../lib/media/shareBridge';
 
 type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
@@ -89,14 +89,19 @@ export default function UniqueMediaPage() {
             return;
           }
           const nativeItems = await loadNativeAndroidMedia(0, 100);
-          if (!cancelled && nativeItems.length) {
+          const sharedItems = await loadNativeSharedMedia();
+          const importedCount = nativeItems.length + sharedItems.length;
+          if (!cancelled && (nativeItems.length || sharedItems.length)) {
             setMedia((current) => {
               const existing = new Set(current.map((item) => item.file.name + ':' + item.file.size));
-              return [...nativeItems.filter((item) => !existing.has(item.file.name + ':' + item.file.size)), ...current];
+              const incoming = [...sharedItems, ...nativeItems];
+              return [...incoming.filter((item) => !existing.has(item.file.name + ':' + item.file.size)), ...current];
             });
             setNativeOffset(nativeItems.length);
             setNativeHasMore(nativeItems.length === 100);
-            setDeviceMessage(nativeItems.length + ' phone media item' + (nativeItems.length === 1 ? '' : 's') + ' connected through Android MediaStore.');
+            setDeviceMessage(sharedItems.length
+              ? sharedItems.length + ' shared file' + (sharedItems.length === 1 ? '' : 's') + ' received from Android and ' + nativeItems.length + ' phone media item' + (nativeItems.length === 1 ? '' : 's') + ' connected.'
+              : importedCount + ' phone media item' + (importedCount === 1 ? '' : 's') + ' connected through Android MediaStore.');
           } else if (!cancelled) {
             setDeviceMessage('Phone access is granted, but no supported media was found.');
           }
