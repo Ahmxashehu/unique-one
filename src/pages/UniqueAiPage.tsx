@@ -396,9 +396,9 @@ export default function UniqueAiPage() {
                   >
                     {item.role === "assistant" && (
                       <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-600">
-                        <span className="relative flex h-4 w-4 items-center justify-center rounded-full bg-slate-950 text-[7px] font-black text-emerald-300">
-                          U1
-                          <span className="absolute inset-0 rounded-full border border-emerald-300/40" />
+                        <span className="unique-ai-mini-mark relative flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[6px] font-black text-white shadow-[0_0_10px_rgba(52,211,153,.45)]">
+                          UP
+                          <span className="absolute inset-0 rounded-full border border-emerald-200/60" />
                         </span>
                         Unique AI
                       </div>
