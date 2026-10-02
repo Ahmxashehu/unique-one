@@ -444,7 +444,6 @@ export default function UniqueMediaPage() {
         <section className="mt-5">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Smart library</p>
               <h2 className="text-2xl font-black text-slate-950">{categories.find(([value]) => value === activeKind)?.[1]}</h2>
               <p className="mt-1 text-sm text-slate-500">{filteredMedia.length} item{filteredMedia.length === 1 ? '' : 's'} available on this device.</p>
             </div>
@@ -466,7 +465,7 @@ export default function UniqueMediaPage() {
                   </p>
                 </div>
               <div className="mt-4 flex justify-center">
-                {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700">Choose files</button>}
+                {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700">Add files</button>}
               </div>
               <div className="mt-4 flex justify-center">
                 <Link to="/os/unique-share" className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm">
