@@ -60,7 +60,13 @@ export function t(key: string, language: SupportedLanguage = getLanguage()): str
 
 export function setLanguage(language: SupportedLanguage) {
   if (typeof window === 'undefined') return;
+  // English remains the default; this setting is a user preference persisted across the app.
   window.localStorage.setItem('unique-one-language', language);
+  document.documentElement.lang = language;
   document.documentElement.dataset.language = language;
   window.dispatchEvent(new CustomEvent('unique-language-change', { detail: language }));
+
+  // Reload once so every React route/component initializes from the same saved preference.
+  // This avoids individual pages retaining stale English state after a language switch.
+  window.setTimeout(() => window.location.reload(), 0);
 }
