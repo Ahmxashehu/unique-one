@@ -11,7 +11,7 @@ export type DeviceMediaItem = {
 
 export type DeviceMediaScan = { items: DeviceMediaItem[]; rootName: string; handle: any };
 type NativeMediaRecord = { id: string; name: string; mime: string; size: number; url: string };
-type NativeBridge = { requestMediaAccess: () => void; hasMediaAccess: () => boolean; listMedia: () => string; listMediaPage?: (offset: number, limit: number) => string; getSharedMedia?: () => string };
+type NativeBridge = { requestMediaAccess: () => void; hasMediaAccess: () => boolean; listMedia: () => string; listMediaPage?: (offset: number, limit: number) => string; getSharedMedia?: () => string; shareNativeMedia?: (idsJson: string) => boolean };
 
 const nativeBridge = (): NativeBridge | null =>
   typeof window !== 'undefined' ? ((window as any).UniqueNativeStorage || null) as NativeBridge | null : null;
@@ -46,6 +46,12 @@ export const loadNativeAndroidMedia = async (offset = 0, limit = 100): Promise<D
     items.push({ id: record.id, file, kind, url: record.url });
   }
   return items;
+};
+
+export const shareNativeMedia = (items: DeviceMediaItem[]): boolean => {
+  const bridge = nativeBridge();
+  if (!bridge?.shareNativeMedia || !items.length) return false;
+  return Boolean(bridge.shareNativeMedia(JSON.stringify(items.map((item) => item.id))));
 };
 
 export const loadNativeSharedMedia = async (): Promise<DeviceMediaItem[]> => {
