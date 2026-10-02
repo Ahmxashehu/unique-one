@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -149,6 +150,17 @@ class NearbyShareManager(private val context: Context, private val emit: (String
         outgoing.clear(); connected.clear(); discovered.clear()
         emit("localShareStopped", JSONObject())
     }
+    private fun displayName(uri: Uri, fallback: String): String {
+        if (uri.scheme != "content") return uri.lastPathSegment ?: fallback
+        return try {
+            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) ?: fallback else fallback
+            } ?: fallback
+        } catch (_: Exception) {
+            fallback
+        }
+    }
+
     fun sendMedia(idsJson: String) {
         if (!hasPermissions()) throw SecurityException("Nearby permissions are required.")
         val ids = JSONArray(idsJson); val targets = connected.toList()
@@ -156,7 +168,7 @@ class NearbyShareManager(private val context: Context, private val emit: (String
         for (index in 0 until ids.length()) {
             val key = ids.optString(index); val record = nativeMedia[key] ?: continue
             val stream = context.contentResolver.openInputStream(record.first) ?: throw IllegalStateException("Could not open media.")
-            val metadata = JSONObject().apply { put("name", key.substringAfterLast(":")); put("mime", record.second) }.toString().toByteArray(StandardCharsets.UTF_8)
+            val metadata = JSONObject().apply { put("name", displayName(record.first, key)); put("mime", record.second) }.toString().toByteArray(StandardCharsets.UTF_8)
             val header = java.nio.ByteBuffer.allocate(4).putInt(metadata.size).array()
             val payloadStream = HeaderInputStream(stream, header + metadata)
             val payload = Payload.fromStream(payloadStream)
