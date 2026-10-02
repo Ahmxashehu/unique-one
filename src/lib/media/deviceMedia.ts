@@ -7,11 +7,12 @@ export type DeviceMediaItem = {
   url: string;
   parentHandle?: any;
   entryName?: string;
+  isNew?: boolean;
 };
 
 export type DeviceMediaScan = { items: DeviceMediaItem[]; rootName: string; handle: any };
-type NativeMediaRecord = { id: string; name: string; mime: string; size: number; url: string };
-type NativeBridge = { requestMediaAccess: () => void; hasMediaAccess: () => boolean; listMedia: () => string; listMediaPage?: (offset: number, limit: number) => string; getSharedMedia?: () => string; shareNativeMedia?: (idsJson: string) => boolean };
+type NativeMediaRecord = { id: string; name: string; mime: string; size: number; url: string; isNew?: boolean };
+type NativeBridge = { requestMediaAccess: () => void; hasMediaAccess: () => boolean; listMedia: () => string; listMediaPage?: (offset: number, limit: number) => string; getSharedMedia?: () => string; shareNativeMedia?: (idsJson: string) => boolean; markMediaSeen?: (id: string) => void };
 
 const nativeBridge = (): NativeBridge | null =>
   typeof window !== 'undefined' ? ((window as any).UniqueNativeStorage || null) as NativeBridge | null : null;
@@ -43,9 +44,14 @@ export const loadNativeAndroidMedia = async (offset = 0, limit = 100): Promise<D
     const file = new File([blob], record.name, { type: record.mime });
     const kind = kindForDeviceFile(file);
     if (!kind) continue;
-    items.push({ id: record.id, file, kind, url: record.url });
+    items.push({ id: record.id, file, kind, url: record.url, isNew: Boolean(record.isNew) });
   }
   return items;
+};
+
+export const markNativeMediaSeen = (item: DeviceMediaItem): void => {
+  nativeBridge()?.markMediaSeen?.(item.id);
+  item.isNew = false;
 };
 
 export const shareNativeMedia = (items: DeviceMediaItem[]): boolean => {
