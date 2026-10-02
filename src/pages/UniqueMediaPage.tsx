@@ -333,11 +333,13 @@ export default function UniqueMediaPage() {
       const handlers: Record<string, (details?: any) => void> = {
         play: () => {
           if (supportsNativeAndroidStorage()) resumeNativeBackgroundMedia();
+          else if (player.kind === 'audio') void playerAudioRef.current?.play();
           else if (playerVideoRef.current) void playerVideoRef.current.play();
           setIsPlaying(true);
         },
         pause: () => {
           if (supportsNativeAndroidStorage()) pauseNativeBackgroundMedia();
+          else if (player.kind === 'audio') playerAudioRef.current?.pause();
           else playerVideoRef.current?.pause();
           setIsPlaying(false);
         },
