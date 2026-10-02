@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from 'react';
-import { Cloud, FileText, FolderOpen, Image as ImageIcon, Music2, Pause, Play, Search, Share2, Smartphone, Trash2, Upload, Users, Volume2, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Cloud, FileText, FolderOpen, Image as ImageIcon, Music2, Pause, Play, Search, Share2, Smartphone, Trash2, Users, Volume2, X } from 'lucide-react';
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
-import { DeviceMediaItem, formatBytes, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, supportsDeviceDirectoryAccess } from '../lib/media/deviceMedia';
+import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess } from '../lib/media/deviceMedia';
 
 type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
 type LocalMedia = DeviceMediaItem;
@@ -58,32 +58,48 @@ export default function UniqueMediaPage() {
     });
   }, [activeKind, media, search]);
 
-  const addFiles = (files: FileList | null) => {
-    if (!files?.length) return;
-    const next: LocalMedia[] = [];
-    Array.from(files).forEach((file) => {
-      const kind = kindForFile(file);
-      if (kind) next.push({ id: crypto.randomUUID(), file, kind, url: URL.createObjectURL(file) });
+  const loadAuthorizedDeviceMedia = async (handle: any, announce = false) => {
+    const result = await scanDeviceMediaDirectory(handle);
+    setMedia((current) => {
+      const existing = new Set(current.map((item) => item.file.name + ':' + item.file.size));
+      return [...result.items.filter((item) => !existing.has(item.file.name + ':' + item.file.size)), ...current];
     });
-    if (next.length) setMedia((current) => [...next, ...current]);
+    if (announce) setDeviceMessage(result.items.length + ' authorized media item' + (result.items.length === 1 ? '' : 's') + ' loaded from ' + result.rootName + '.');
   };
 
-
+  useEffect(() => {
+    let cancelled = false;
+    const restoreAuthorizedMedia = async () => {
+      if (!supportsDeviceDirectoryAccess()) {
+        setDeviceMessage('Automatic device media access is available in supported browsers. Native Android MediaStore integration will provide deeper phone-wide access.');
+        return;
+      }
+      try {
+        const handle = await getStoredDeviceMediaDirectory();
+        if (!handle || cancelled) return;
+        const permission = await handle.queryPermission?.({ mode: 'read' });
+        if (permission !== 'granted' || cancelled) return;
+        await loadAuthorizedDeviceMedia(handle);
+        if (!cancelled) setDeviceMessage('Your authorized device media is connected automatically.');
+      } catch {
+        if (!cancelled) setDeviceMessage('Automatic media access is unavailable. Re-authorize the device media folder when needed.');
+      }
+    };
+    void restoreAuthorizedMedia();
+    return () => { cancelled = true; };
+  }, []);
 
   const connectDeviceMedia = async () => {
     if (!supportsDeviceDirectoryAccess()) {
-      setDeviceMessage('This browser does not expose direct device-folder access. Use Add media or the native Android build for deeper MediaStore integration.');
+      setDeviceMessage('This browser does not expose direct device-folder access. Native Android MediaStore integration is required for deeper phone-wide access.');
       return;
     }
     try {
-      setDeviceMessage('Choose a phone media folder. UniqueMedia will scan only the folder you authorize.');
+      setDeviceMessage('Choose your media folder once. UniqueMedia will remember this authorization and load it automatically on future visits.');
       const result = await pickDeviceMediaDirectory();
       if (!result) return;
-      setMedia((current) => {
-        const existing = new Set(current.map((item) => item.file.name + ':' + item.file.size));
-        return [...result.items.filter((item) => !existing.has(item.file.name + ':' + item.file.size)), ...current];
-      });
-      setDeviceMessage(result.items.length + ' authorized media item' + (result.items.length === 1 ? '' : 's') + ' loaded from ' + result.rootName + '.');
+      await rememberDeviceMediaDirectory(result.handle);
+      await loadAuthorizedDeviceMedia(result.handle, true);
     } catch (error) {
       if ((error as DOMException)?.name !== 'AbortError') setDeviceMessage('Device media access was not completed. Check the permission prompt and try again.');
     }
@@ -256,14 +272,11 @@ export default function UniqueMediaPage() {
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Unique One</p>
               <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">UniqueMedia</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">A free media workspace for videos, music, images and PDFs. Local media stays on this device until you explicitly share or back it up.</p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">A free media workspace for videos, music, images and PDFs. Authorized device media loads automatically and opens directly in the built-in player.</p>
             </div>
-            <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><FolderOpen className="h-4 w-4" /> Connect device media</button><label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white">
-              <Upload className="h-4 w-4" /> Add media
-              <input type="file" multiple accept="video/*,audio/*,image/*,application/pdf" className="hidden" onChange={(event) => { addFiles(event.target.files); event.currentTarget.value = ''; }} />
-            </label></div>
+            <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><FolderOpen className="h-4 w-4" /> Connect media once</button></div>
           </div>
-          <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900"><strong>Permission control:</strong> UniqueMedia only reads folders you explicitly authorize. Supported browsers can request write access for permanent deletion. Full phone-wide Android MediaStore access belongs in the native build.</div>
+          <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900"><strong>Automatic access:</strong> After you authorize a media folder once, UniqueMedia remembers that authorization and loads your videos, music, images and PDFs automatically when the browser permits it. Nothing is silently uploaded to the cloud. Full phone-wide Android MediaStore access belongs in the native build.</div>
           {deviceMessage && <p className="mt-3 text-xs font-semibold text-emerald-700">{deviceMessage}</p>}
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
             <label className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
@@ -290,7 +303,7 @@ export default function UniqueMediaPage() {
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
               <Play className="mx-auto h-10 w-10 text-emerald-500" />
               <h2 className="mt-4 text-lg font-black text-slate-900">Your media space is ready</h2>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Add local videos, audio, images or PDFs. Nothing is uploaded automatically.</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Your authorized device media will appear here automatically. Nothing is silently uploaded to the cloud.</p>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
