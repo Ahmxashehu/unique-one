@@ -352,6 +352,19 @@ class MainActivity : ComponentActivity() {
             startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_STOP))
         }
 
+        @JavascriptInterface fun playBackgroundMedia(idsJson: String, index: Int): Boolean {
+            return playBackgroundQueue(idsJson, index)
+        }
+        @JavascriptInterface fun pauseBackgroundMedia() {
+            startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_PAUSE))
+        }
+        @JavascriptInterface fun resumeBackgroundMedia() {
+            startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_PLAY))
+        }
+        @JavascriptInterface fun stopBackgroundMedia() {
+            startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_STOP))
+        }
+
         @JavascriptInterface fun requestMediaAccess() { permissionLauncher.launch(mediaPermissions()) }
         @JavascriptInterface fun hasMediaAccess(): Boolean = mediaAccessGranted()
         @JavascriptInterface fun listMedia(): String = scanMedia().toString()
