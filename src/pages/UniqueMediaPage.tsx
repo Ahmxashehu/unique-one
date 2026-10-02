@@ -269,6 +269,10 @@ export default function UniqueMediaPage() {
       return;
     }
     try {
+      if (supportsNativeAndroidStorage() && shareNativeMedia(items)) {
+        setShareMessage(items.length + ' file' + (items.length === 1 ? '' : 's') + ' opened in the Android Share Sheet.');
+        return;
+      }
       const files = items.map((item) => item.file);
       if (navigator.share && navigator.canShare?.({ files })) {
         await navigator.share({ title: 'UniqueShare', text: 'Shared from UniqueMedia', files });
