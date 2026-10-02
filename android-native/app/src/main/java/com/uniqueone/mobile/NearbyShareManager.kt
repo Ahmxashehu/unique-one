@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.*
 import org.json.JSONArray
@@ -58,8 +59,16 @@ class NearbyShareManager(private val context: Context, private val emit: (String
             try {
                 stream.use { input -> file.outputStream().use { output -> input.copyTo(output) } }
                 val key = "local:$fileId"
-                nativeMedia[key] = Uri.fromFile(file) to "application/octet-stream"
-                emit("localShareFileReceived", JSONObject().apply { put("endpointId", endpointId); put("id", key); put("name", file.name); put("size", file.length()); put("url", "https://unique.native/media/$key") })
+                val contentUri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+                nativeMedia[key] = contentUri to "application/octet-stream"
+                emit("localShareFileReceived", JSONObject().apply {
+                    put("endpointId", endpointId)
+                    put("id", key)
+                    put("name", file.name)
+                    put("size", file.length())
+                    put("mime", "application/octet-stream")
+                    put("url", "https://unique.native/media/$key")
+                })
             } catch (error: Exception) {
                 file.delete()
                 emit("localShareError", JSONObject().put("message", error.message ?: "Could not save received file."))
