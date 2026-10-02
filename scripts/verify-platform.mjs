@@ -26,9 +26,12 @@ for (const phrase of ["Home", "Search", "Log in", "Sign Up", "Checkout", "Wallet
 assert(globalLanguage.includes("MutationObserver"), "dynamic UI text is observed for translation");
 assert(globalLanguage.includes("placeholder"), "form placeholders are included in translation handling");
 
-const server = read("server.ts");
+const backendSources = [
+  ["server.ts", read("server.ts")],
+  ["src/server/uniqueShareRoutes.ts", read("src/server/uniqueShareRoutes.ts")],
+];
 for (const route of ["/api/health", "/api/communication", "/api/unique-share", "/api/ajo", "/api/verification", "/api/auth/unique-otp"]) {
-  assert(server.includes(route), `backend route surface includes: ${route}`);
+  assert(backendSources.some(([, source]) => source.includes(route)), `backend route surface includes: ${route}`);
 }
 
 for (const required of [
@@ -53,8 +56,8 @@ for (const forbidden of ["demo rice order", "featured providers"]) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) scan(full);
       else if (/\.(ts|tsx|js|jsx|json|md)$/.test(entry.name)) {
-        const content = fs.readFileSync(full, "utf8").toLowerCase();
-        if (content.includes(forbidden)) matches.push(path.relative(root, full));
+        const source = fs.readFileSync(full, "utf8").toLowerCase();
+        if (source.includes(forbidden)) matches.push(path.relative(root, full));
       }
     }
   };
