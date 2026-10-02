@@ -110,9 +110,13 @@ export default function UniqueMediaPage() {
     setDeviceMessage(picked.length + ' media item' + (picked.length === 1 ? '' : 's') + ' imported from your phone storage.');
   };
 
-  const connectDeviceMedia = async () =>
+  const connectDeviceMedia = async () => {
     if (!supportsDeviceDirectoryAccess()) {
-      setDeviceMessage('This browser does not expose direct device-folder access. Native Android MediaStore integration is required for deeper phone-wide access.');
+      if (supportsPhoneFilePicker()) {
+        phoneFileInputRef.current?.click();
+        return;
+      }
+      setDeviceMessage('This browser does not expose device-folder or phone file-picker access. Use a supported Android browser or the native Android build for deeper phone-wide access.');
       return;
     }
     try {
