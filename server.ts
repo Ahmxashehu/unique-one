@@ -812,7 +812,15 @@ const app = express();
           capabilities: UNIQUE_AI_CAPABILITIES,
         });
       }
-      const responseText = await generateUniqueAiResponse({ uid, message, history, requestId: resolvedRequestId });
+      const preferredLanguage =
+        typeof req.body?.preferredLanguage === "string" ? req.body.preferredLanguage.trim().toLowerCase() : undefined;
+      const responseText = await generateUniqueAiResponse({
+        uid,
+        message,
+        history,
+        requestId: resolvedRequestId,
+        preferredLanguage,
+      });
       return res.status(200).json({
         message: responseText,
         readOnly: true,
