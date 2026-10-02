@@ -147,8 +147,8 @@ export function registerUniqueShareRoutes(app: Express, authenticate: any) {
     const snap = await ref.get();
     if (!snap.exists) return error(res, 404, "SESSION_NOT_FOUND", "The UniqueShare connection was not found.");
     const session = snap.data() as Record<string, any>;
-    if (session.senderUid !== uid) return error(res, 403, "FORBIDDEN", "Only the authenticated sender can add files.");
-    if (session.status !== "accepted") return error(res, 409, "SESSION_NOT_ACCEPTED", "The receiver must accept the UniqueShare connection first.");
+    if (session.senderUid !== uid && session.receiverUid !== uid) return error(res, 403, "FORBIDDEN", "Only an authenticated member of this UniqueShare connection can add files.");
+    if (session.status !== "accepted") return error(res, 409, "SESSION_NOT_ACCEPTED", "Both users must accept the UniqueShare connection first.");
     const name = normalizeFileName(req.body?.name);
     const contentType = normalizeContentType(req.body?.contentType);
     const sizeBytes = Number(req.body?.sizeBytes);
@@ -156,9 +156,11 @@ export function registerUniqueShareRoutes(app: Express, authenticate: any) {
       return error(res, 400, "INVALID_FILE_SIZE", "Each UniqueShare file must be 2 GB or smaller in this web build.");
     }
     const fileId = randomBytes(16).toString("hex");
-    const storagePath = "uniqueShare/" + sessionId + "/" + session.receiverUid + "/" + fileId + "/" + name;
+    const receiverUid = uid === session.senderUid ? session.receiverUid : session.senderUid;
+    if (!safeUid(receiverUid)) return error(res, 409, "SESSION_INCOMPLETE", "The UniqueShare connection does not have two authenticated members.");
+    const storagePath = "uniqueShare/" + sessionId + "/" + receiverUid + "/" + fileId + "/" + name;
     await db.collection("uniqueShareFiles").doc(sessionId + "_" + fileId).set({
-      fileId, sessionId, senderUid: session.senderUid, receiverUid: session.receiverUid,
+      fileId, sessionId, senderUid: uid, receiverUid,
       name, contentType, sizeBytes, storagePath, status: "pending",
       createdAt: Timestamp.now(), uploadedAt: null,
     });
