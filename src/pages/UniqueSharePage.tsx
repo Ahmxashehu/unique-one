@@ -316,13 +316,12 @@ export default function UniqueSharePage() {
     return () => { cancelled = true; };
   }, []);
 
-  const authenticated = Boolean(auth.currentUser) || guestReady;
+  const guestAccessReady = Boolean(auth.currentUser) || guestReady;
 
   return (
     <main className="min-h-full overflow-y-auto bg-slate-950 pb-24 text-white">
       <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
         <header className="relative rounded-[2rem] border border-emerald-400/20 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/60 p-5 shadow-2xl sm:p-7">
-          <div className="absolute -right-5 -top-5 h-24 w-24 rounded-full border-8 border-emerald-400/20 bg-emerald-400/5" />
           <div className="relative flex items-center justify-center">
             <div className="inline-flex items-center gap-3 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-5 py-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg ring-4 ring-emerald-500/10"><Share2 className="h-5 w-5" /></span>
@@ -337,8 +336,6 @@ export default function UniqueSharePage() {
         ) : mode === "home" ? (
           <section className="mt-5">
             <div className="relative overflow-hidden rounded-[2rem] border border-emerald-400/20 bg-gradient-to-br from-white via-emerald-50 to-white p-5 text-slate-950 shadow-xl sm:p-7">
-              <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full border-[10px] border-emerald-200/60 bg-emerald-100/50" />
-              <div className="pointer-events-none absolute -bottom-10 left-1/3 h-20 w-20 rounded-full border-[7px] border-emerald-100 bg-white/70" />
               <div className="relative">
                 <div className="flex items-center justify-between gap-3">
                   <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">Smart transfer</p><h2 className="mt-1 text-2xl font-black tracking-tight">Share anything, receive safely.</h2><p className="mt-1 text-xs leading-5 text-slate-500">Choose a side. UniqueShare creates the connection automatically, then moves to the next transfer step.</p></div>
