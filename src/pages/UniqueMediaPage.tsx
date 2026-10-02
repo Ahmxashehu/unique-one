@@ -5,6 +5,7 @@ import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
 import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess } from '../lib/media/deviceMedia';
+import { stageMediaForDestination } from '../lib/media/shareBridge';
 
 type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
 type LocalMedia = DeviceMediaItem;
@@ -154,6 +155,19 @@ export default function UniqueMediaPage() {
       return current.filter((entry) => entry.id !== id);
     });
     setSelected((current) => current.filter((value) => value !== id));
+  };
+
+  const postImageToStore = async (item: LocalMedia) => {
+    if (item.kind !== 'image') {
+      setShareMessage('Unique Store product media currently accepts images here. Videos can still be shared through UniqueShare or other apps.');
+      return;
+    }
+    try {
+      const id = await stageMediaForDestination(item.file);
+      window.location.assign('/os/business/catalog/new-product?media=' + encodeURIComponent(id));
+    } catch {
+      setShareMessage('The file could not be prepared for Unique Store.');
+    }
   };
 
   const shareFiles = async (items: LocalMedia[]) => {
@@ -327,6 +341,7 @@ export default function UniqueMediaPage() {
                       <label className="flex items-center gap-2 text-xs font-bold text-slate-500"><input type="checkbox" checked={isSelected} onChange={() => toggleSelected(item.id)} /> Select</label>
                       <div className="flex items-center gap-1">
                         <button type="button" onClick={() => void shareFiles([item])} className="rounded-full p-2 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600" aria-label={'Share ' + item.file.name}><Share2 className="h-4 w-4" /></button>
+                        {item.kind === 'image' && <button type="button" onClick={() => void postImageToStore(item)} className="rounded-full px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50" title="Use this image in Unique Store">Store</button>}
                         {item.parentHandle ? <button type="button" disabled={deleting.includes(item.id)} onClick={() => void permanentDelete(item)} className="rounded-full p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40" aria-label={"Permanently delete " + item.file.name}><Trash2 className="h-4 w-4" /></button> : <button type="button" onClick={() => removeMedia(item.id)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-red-500" aria-label="Remove from UniqueMedia"><X className="h-4 w-4" /></button>}
                       </div>
                     </div>
