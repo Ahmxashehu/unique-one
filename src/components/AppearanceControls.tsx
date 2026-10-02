@@ -1,29 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Languages, Moon, Sun } from 'lucide-react';
-
-const LANGUAGES = [
-  { code: 'en', label: 'English' },
-  { code: 'ha', label: 'Hausa' },
-  { code: 'fr', label: 'Français' },
-  { code: 'ig', label: 'Igbo' },
-  { code: 'yo', label: 'Yorùbá' },
-  { code: 'pcm', label: 'Nigerian Pidgin' },
-] as const;
+import { getLanguage, setLanguage, SUPPORTED_LANGUAGES, t, type SupportedLanguage } from '../lib/i18n';
 
 export default function AppearanceControls() {
   const [dark, setDark] = useState(false);
-  const [language, setLanguage] = useState('en');
+  const [language, setSelectedLanguage] = useState<SupportedLanguage>('en');
   const [languageOpen, setLanguageOpen] = useState(false);
   const languageMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('unique-one-theme');
-    const savedLanguage = localStorage.getItem('unique-one-language');
+    const savedLanguage = getLanguage();
     const initialDark = savedTheme === 'dark';
     setDark(initialDark);
-    setLanguage(savedLanguage || 'en');
+    setSelectedLanguage(savedLanguage);
     document.documentElement.classList.toggle('unique-dark', initialDark);
-    document.documentElement.dataset.language = savedLanguage || 'en';
+    document.documentElement.dataset.language = savedLanguage;
     document.documentElement.style.colorScheme = initialDark ? 'dark' : 'light';
   }, []);
 
@@ -52,13 +44,12 @@ export default function AppearanceControls() {
   };
 
   const changeLanguage = (code: string) => {
-    setLanguage(code);
-    localStorage.setItem('unique-one-language', code);
-    document.documentElement.dataset.language = code;
+    setSelectedLanguage(code as SupportedLanguage);
+    setLanguage(code as SupportedLanguage);
     setLanguageOpen(false);
   };
 
-  const currentLanguage = LANGUAGES.find((item) => item.code === language) || LANGUAGES[0];
+  const currentLanguage = SUPPORTED_LANGUAGES.find((item) => item.code === language) || SUPPORTED_LANGUAGES[0];
 
   return (
     <div className="fixed right-3 top-3 z-[80] flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 p-1 shadow-lg shadow-slate-900/5 backdrop-blur-xl transition-all unique-appearance-controls sm:right-4 sm:top-3">
@@ -71,8 +62,8 @@ export default function AppearanceControls() {
       <button
         type="button"
         onClick={toggleTheme}
-        aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-        title={dark ? 'Light mode' : 'Dark mode'}
+        aria-label={dark ? t('lightMode', language) : t('darkMode', language)}
+        title={dark ? t('lightMode', language) : t('darkMode', language)}
         className="group flex h-9 w-9 items-center justify-center rounded-full text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700 active:scale-95"
       >
         {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -84,8 +75,8 @@ export default function AppearanceControls() {
           onClick={() => setLanguageOpen((open) => !open)}
           aria-expanded={languageOpen}
           aria-haspopup="listbox"
-          aria-label="Change language"
-          title="Language"
+          aria-label={t('language', language)}
+          title={t('language', language)}
           className="flex h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700 active:scale-95"
         >
           <Languages className="h-4 w-4" />
@@ -96,13 +87,13 @@ export default function AppearanceControls() {
         {languageOpen && (
           <div
             role="listbox"
-            aria-label="Select language"
+            aria-label={t('language', language)}
             className="absolute right-0 top-11 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl shadow-slate-900/15"
           >
             <div className="px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
               Language
             </div>
-            {LANGUAGES.map((item) => (
+            {SUPPORTED_LANGUAGES.map((item) => (
               <button
                 key={item.code}
                 type="button"
