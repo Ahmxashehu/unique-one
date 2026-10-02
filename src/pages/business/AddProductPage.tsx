@@ -7,6 +7,7 @@ import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { uploadMedia } from '../../lib/media/upload';
 import { useNavigate } from 'react-router-dom';
 import { ProductCategory, ProductCondition, ProductStatus, Product } from '../../lib/os/types';
+import { takeStagedMedia } from '../../lib/media/shareBridge';
 
 const CATEGORIES: { value: ProductCategory; label: string }[] = [
   { value: 'electronics', label: 'Electronics' }, { value: 'phones_accessories', label: 'Phones and Accessories' },
@@ -45,6 +46,24 @@ export default function AddProductPage() {
   const [hasVideo, setHasVideo] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+
+  React.useEffect(() => {
+    const mediaId = new URLSearchParams(window.location.search).get('media');
+    if (!mediaId || imageFiles.length >= MAX_IMAGES) return;
+    let active = true;
+    void takeStagedMedia(mediaId).then((file) => {
+      if (!active || !file) return;
+      if (!file.type.startsWith('image/') || file.size > MAX_IMAGE_SIZE) {
+        setError('The selected UniqueMedia file is not a supported Store image or is larger than 5 MB.');
+        return;
+      }
+      setImageFiles((current) => current.length < MAX_IMAGES ? [...current, file] : current);
+      setImagePreviews((current) => current.length < MAX_IMAGES ? [...current, URL.createObjectURL(file)] : current);
+    }).catch(() => {
+      if (active) setError('The selected UniqueMedia file could not be loaded into the Store listing.');
+    });
+    return () => { active = false; };
+  }, []);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError('');
