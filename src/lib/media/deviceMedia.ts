@@ -107,7 +107,25 @@ export const permanentlyDeleteDeviceMedia = async (item: DeviceMediaItem): Promi
 };
 
 export const supportsDeviceDirectoryAccess = () =>
-  typeof (window as any).showDirectoryPicker === 'function';
+  typeof window !== 'undefined' && typeof (window as any).showDirectoryPicker === 'function';
+
+export const supportsPhoneFilePicker = () =>
+  typeof document !== 'undefined' && typeof document.createElement === 'function';
+
+export const loadPickedDeviceMedia = (files: FileList | File[]): DeviceMediaItem[] => {
+  const items: DeviceMediaItem[] = [];
+  for (const file of Array.from(files)) {
+    const kind = kindForDeviceFile(file);
+    if (!kind) continue;
+    items.push({
+      id: crypto.randomUUID(),
+      file,
+      kind,
+      url: URL.createObjectURL(file),
+    });
+  }
+  return items;
+};
 
 export const formatBytes = (bytes: number): string => {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
