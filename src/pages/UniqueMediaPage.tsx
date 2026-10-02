@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Cloud, FileText, Image as ImageIcon, Music2, Pause, Play, Search, Share2, Smartphone, Trash2, Users, X } from 'lucide-react';
+import { Cloud, FileText, Image as ImageIcon, Music2, Pause, Play, Search, Share2, Smartphone, Trash2, Users, X, SkipBack, SkipForward, ListMusic } from 'lucide-react';
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
-import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia, loadNativeSharedMedia, shareNativeMedia, markNativeMediaSeen, playNativeBackgroundMedia, pauseNativeBackgroundMedia, resumeNativeBackgroundMedia, stopNativeBackgroundMedia } from '../lib/media/deviceMedia';
+import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia, loadNativeSharedMedia, shareNativeMedia, markNativeMediaSeen, deleteNativeMedia, playNativeBackgroundMedia, pauseNativeBackgroundMedia, resumeNativeBackgroundMedia, stopNativeBackgroundMedia } from '../lib/media/deviceMedia';
 import { stageMediaForDestination } from '../lib/media/shareBridge';
 
 type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
@@ -223,6 +223,17 @@ export default function UniqueMediaPage() {
 
   const permanentDelete = async (item: LocalMedia) => {
     if (!item.parentHandle || !item.entryName) {
+      if (supportsNativeAndroidStorage()) {
+        const deleted = deleteNativeMedia(item);
+        if (deleted) {
+          removeMedia(item.id);
+          setDeviceMessage(item.file.name + ' was deleted from your device media library.');
+          if (player?.id === item.id) setPlayer(null);
+        } else {
+          setDeviceMessage('Android could not delete this protected media item. The system may require a confirmation step.');
+        }
+        return;
+      }
       setDeviceMessage('This item was added through a file picker and cannot be permanently deleted by the web app. Remove it from UniqueMedia instead.');
       return;
     }
@@ -545,20 +556,47 @@ export default function UniqueMediaPage() {
           </div>
 
           {filteredMedia.length === 0 ? (
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="text-center">
-                  <h3 className="text-base font-black text-slate-900">No {categories.find(([value]) => value === activeKind)?.[1].toLowerCase()} yet</h3>
-                  <p className="mx-auto mt-1 max-w-xl text-sm leading-6 text-slate-500">
-                    {activeKind === 'video' && 'No videos are available in this library yet. Choose video files to add them.'}
-                    {activeKind === 'audio' && 'No audio is available in this library yet. Choose audio files to add them.'}
-                    {activeKind === 'image' && 'No images are available in this library yet. Choose image files to add them.'}
-                    {activeKind === 'pdf' && 'No PDF documents are available in this reader yet. Choose PDF files to add them.'}
-                  </p>
+            <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+              <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 px-5 py-7 text-white sm:px-8">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-300/20">
+                    {React.createElement(iconForKind(activeKind), { className: 'h-6 w-6' })}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300">Your {categories.find(([value]) => value === activeKind)?.[1] || 'media'}}</p>
+                    <h3 className="mt-1 text-2xl font-black tracking-tight">Your library is ready.</h3>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">
+                      {activeKind === 'video' && 'Connect your phone or add videos to build a clean watch library with background audio, picture-in-picture and queue controls.'}
+                      {activeKind === 'audio' && 'Connect your phone or add audio to build a personal player with background playback, lock-screen controls, queue, next, previous and replay.'}
+                      {activeKind === 'image' && 'Connect your phone or add images to build a private photo library with fast previews and full-screen viewing.'}
+                      {activeKind === 'pdf' && 'Connect your phone or add PDF files to build a focused reader with full-screen document viewing.'}
+                    </p>
+                  </div>
                 </div>
-              <div className="mt-4 flex justify-center">
-                {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700">Add files</button>}
+                <div className="mt-6 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-full bg-emerald-400 px-4 py-2.5 text-xs font-black text-slate-950 shadow-lg shadow-emerald-400/10">
+                    <Smartphone className="h-4 w-4" /> Connect phone
+                  </button>
+                  {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2.5 text-xs font-black text-white ring-1 ring-white/10">
+                    Add {activeKind === 'pdf' ? 'PDFs' : activeKind === 'audio' ? 'Audio' : categories.find(([value]) => value === activeKind)?.[1] || 'files'}
+                  </button>}
+                  <Link to="/os/unique-share" className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2.5 text-xs font-black text-white ring-1 ring-white/10">
+                    <Share2 className="h-4 w-4" /> Receive with UniqueShare
+                  </Link>
+                </div>
               </div>
-              <p className="mt-4 text-center text-[11px] leading-5 text-slate-400">Use Connect phone for your device library, Add files for selected files, or Share for UniqueShare transfer. Your local media stays on the device unless you explicitly choose a protected sharing or cloud action.</p>
+              <div className="grid gap-2 p-3 sm:grid-cols-3 sm:p-4">
+                {[
+                  ['Private by default', 'Your local files stay on the device unless you choose a sharing or cloud action.'],
+                  ['Built for the device', 'Android MediaStore can load phone media directly when permission is granted.'],
+                  ['Ready to grow', activeKind === 'audio' ? 'Background playback continues with the screen locked on the native Android build.' : 'Use the player, viewer and sharing tools without leaving your media library.'],
+                ].map(([title, copy]) => (
+                  <div key={title} className="rounded-2xl bg-slate-50 p-3.5">
+                    <p className="text-xs font-black text-slate-800">{title}</p>
+                    <p className="mt-1 text-[11px] leading-5 text-slate-500">{copy}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <>
@@ -705,20 +743,29 @@ export default function UniqueMediaPage() {
                  </div>
                </div>}
             </div>
-            {(player.kind === 'video' || player.kind === 'audio') && <div className="mt-4 rounded-[2rem] border border-white/10 bg-white/5 p-3 backdrop-blur-xl">
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <button type="button" onClick={() => playQueueItem(playerQueueIndex - 1)} className="rounded-full bg-white/10 p-3 text-white hover:bg-white/15" aria-label="Previous">↶</button>
-                <button type="button" onClick={toggleBackgroundPlayback} className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-400/20">{isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}</button>
-                <button type="button" onClick={() => playQueueItem(playerQueueIndex + 1)} className="rounded-full bg-white/10 p-3 text-white hover:bg-white/15" aria-label="Next">↷</button>
-                <button type="button" onClick={() => void seekPlayer(-10)} className="rounded-full bg-white/10 px-4 py-3 text-xs font-bold text-white">10s back</button>
-                <button type="button" onClick={() => void seekPlayer(10)} className="rounded-full bg-white/10 px-4 py-3 text-xs font-bold text-white">10s forward</button>
-                <button type="button" onClick={deleteCurrentMedia} className="rounded-full bg-rose-500/15 p-3 text-rose-300 hover:bg-rose-500/25" aria-label="Delete current media"><Trash2 className="h-4 w-4" /></button>
-                {player.kind === 'video' && <button type="button" onClick={toggleVideoAudioMode} className="rounded-full bg-white/10 px-4 py-3 text-xs font-bold text-white">{videoAudioMode ? 'Return to video' : 'Background audio'}</button>}
-                {player.kind === 'video' && <button type="button" onClick={() => void pictureInPicture()} className="rounded-full bg-white/10 px-4 py-3 text-xs font-bold text-white">PiP</button>}
-                <button type="button" onClick={changePlayerRate} className="rounded-full bg-white/10 px-4 py-3 text-xs font-bold text-white">{playerRate}×</button>
-                <button type="button" onClick={() => void togglePlayerFullscreen()} className="rounded-full bg-white/10 px-4 py-3 text-xs font-bold text-white">{playerFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</button>
+            {(player.kind === 'video' || player.kind === 'audio') && <div className="mt-4 rounded-[2rem] border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl">
+              <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-black text-white">{player.file.name}</p>
+                  <p className="mt-1 text-[10px] font-semibold text-emerald-300">{player.kind === 'audio' ? 'Audio experience' : videoAudioMode ? 'Background audio' : 'Video experience'} · {playerQueueIndex + 1}/{playableQueue.length}</p>
+                </div>
+                <ListMusic className="h-5 w-5 shrink-0 text-white/40" />
               </div>
-              <p className="mt-2 text-center text-[10px] font-semibold text-white/35">Android uses the native media service for lock-screen/background playback. Browser playback follows device and browser background-media rules.</p>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <button type="button" onClick={() => playQueueItem(playerQueueIndex - 1)} className="rounded-full bg-white/10 p-3 text-white hover:bg-white/15" aria-label="Previous"><SkipBack className="h-5 w-5" /></button>
+                <button type="button" onClick={toggleBackgroundPlayback} className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-400/20">{isPlaying ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7" />}</button>
+                <button type="button" onClick={() => playQueueItem(playerQueueIndex + 1)} className="rounded-full bg-white/10 p-3 text-white hover:bg-white/15" aria-label="Next"><SkipForward className="h-5 w-5" /></button>
+                <button type="button" onClick={() => void seekPlayer(-10)} className="rounded-full bg-white/10 px-3 py-2.5 text-xs font-bold text-white">−10s</button>
+                <button type="button" onClick={() => void seekPlayer(10)} className="rounded-full bg-white/10 px-3 py-2.5 text-xs font-bold text-white">+10s</button>
+                <button type="button" onClick={deleteCurrentMedia} className="rounded-full bg-rose-500/15 p-3 text-rose-300 hover:bg-rose-500/25" aria-label="Delete current media"><Trash2 className="h-4 w-4" /></button>
+                {player.kind === 'video' && <button type="button" onClick={toggleVideoAudioMode} className="rounded-full bg-white/10 px-3 py-2.5 text-xs font-bold text-white">{videoAudioMode ? 'Video' : 'Background audio'}</button>}
+                {player.kind === 'video' && <button type="button" onClick={() => void pictureInPicture()} className="rounded-full bg-white/10 px-3 py-2.5 text-xs font-bold text-white">PiP</button>}
+                <button type="button" onClick={changePlayerRate} className="rounded-full bg-white/10 px-3 py-2.5 text-xs font-bold text-white">{playerRate}×</button>
+                <button type="button" onClick={() => void togglePlayerFullscreen()} className="rounded-full bg-white/10 px-3 py-2.5 text-xs font-bold text-white">{playerFullscreen ? 'Exit' : 'Fullscreen'}</button>
+                <button type="button" onClick={() => setPlayerLoop(v => !v)} className={`rounded-full px-3 py-2.5 text-xs font-bold ${playerLoop ? 'bg-emerald-500 text-slate-950' : 'bg-white/10 text-white'}`}>Loop</button>
+                <button type="button" onClick={() => setPlayerShuffle(v => !v)} className={`rounded-full px-3 py-2.5 text-xs font-bold ${playerShuffle ? 'bg-emerald-500 text-slate-950' : 'bg-white/10 text-white'}`}>Shuffle</button>
+              </div>
+              <p className="mt-3 text-center text-[10px] font-semibold text-white/40">On the Android build, Audio continues through screen lock with lock-screen controls. Video can switch to background audio; browser background playback depends on the device and browser.</p>
             </div>}
           </div>
         </div>
