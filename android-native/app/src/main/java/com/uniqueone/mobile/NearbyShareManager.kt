@@ -19,6 +19,7 @@ class NearbyShareManager(private val context: Context, private val emit: (String
     private val serviceId = context.packageName + ".uniqueshare"
     private val discovered = linkedMapOf<String, String>()
     private val connected = linkedSetOf<String>()
+    private val outgoing = mutableMapOf<Long, java.io.InputStream>()
 
     private val lifecycle = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
@@ -52,14 +53,22 @@ class NearbyShareManager(private val context: Context, private val emit: (String
             if (payload.type != Payload.Type.STREAM) return
             val stream = payload.asStream()?.asInputStream() ?: return
             val fileId = UUID.randomUUID().toString()
-            val dir = File(context.cacheDir, "unique-share-inbox").apply { mkdirs() }
+            val dir = File(context.filesDir, "unique-share-inbox").apply { mkdirs() }
             val file = File(dir, "received-$fileId")
-            stream.use { input -> file.outputStream().use { output -> input.copyTo(output) } }
-            val key = "local:$fileId"
-            nativeMedia[key] = Uri.fromFile(file) to "application/octet-stream"
-            emit("localShareFileReceived", JSONObject().apply { put("endpointId", endpointId); put("id", key); put("name", file.name); put("size", file.length()); put("url", "https://unique.native/media/$key") })
+            try {
+                stream.use { input -> file.outputStream().use { output -> input.copyTo(output) } }
+                val key = "local:$fileId"
+                nativeMedia[key] = Uri.fromFile(file) to "application/octet-stream"
+                emit("localShareFileReceived", JSONObject().apply { put("endpointId", endpointId); put("id", key); put("name", file.name); put("size", file.length()); put("url", "https://unique.native/media/$key") })
+            } catch (error: Exception) {
+                file.delete()
+                emit("localShareError", JSONObject().put("message", error.message ?: "Could not save received file."))
+            }
         }
         override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {
+            if (update.status == PayloadTransferUpdate.Status.SUCCESS || update.status == PayloadTransferUpdate.Status.FAILURE || update.status == PayloadTransferUpdate.Status.CANCELED) {
+                outgoing.remove(update.payloadId)?.close()
+            }
             emit("localShareProgress", JSONObject().apply { put("endpointId", endpointId); put("payloadId", update.payloadId); put("status", update.status); put("bytesTransferred", update.bytesTransferred); put("totalBytes", update.totalBytes) })
         }
     }
@@ -97,7 +106,12 @@ class NearbyShareManager(private val context: Context, private val emit: (String
             .addOnFailureListener { emit("localShareError", JSONObject().put("message", it.message ?: "Could not accept connection.")) }
     }
     fun rejectConnection(endpointId: String) { client.rejectConnection(endpointId) }
-    fun stop() { client.stopAdvertising(); client.stopDiscovery(); client.stopAllEndpoints(); connected.clear(); discovered.clear(); emit("localShareStopped", JSONObject()) }
+    fun stop() {
+        client.stopAdvertising(); client.stopDiscovery(); client.stopAllEndpoints()
+        outgoing.values.forEach { runCatching { it.close() } }
+        outgoing.clear(); connected.clear(); discovered.clear()
+        emit("localShareStopped", JSONObject())
+    }
     fun sendMedia(idsJson: String) {
         if (!hasPermissions()) throw SecurityException("Nearby permissions are required.")
         val ids = JSONArray(idsJson); val targets = connected.toList()
@@ -106,7 +120,11 @@ class NearbyShareManager(private val context: Context, private val emit: (String
             val key = ids.optString(index); val record = nativeMedia[key] ?: continue
             val stream = context.contentResolver.openInputStream(record.first) ?: throw IllegalStateException("Could not open media.")
             val payload = Payload.fromStream(stream)
-            client.sendPayload(targets, payload).addOnFailureListener { emit("localShareError", JSONObject().put("message", it.message ?: "Local transfer failed.")) }
+            outgoing[payload.id] = stream
+            client.sendPayload(targets, payload).addOnFailureListener {
+                outgoing.remove(payload.id)?.close()
+                emit("localShareError", JSONObject().put("message", it.message ?: "Local transfer failed."))
+            }
             emit("localShareSending", JSONObject().apply { put("id", key); put("name", key); put("payloadId", payload.id) })
         }
     }
