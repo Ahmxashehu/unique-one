@@ -186,6 +186,7 @@ const CycleAjoPage = lazy(() => import("./pages/pay/CycleAjoPage"));
 const VerificationCenterPage = lazy(() => import("./pages/pay/VerificationCenterPage"));
 const MasterVisionPage = lazy(() => import("./pages/MasterVisionPage"));
 const UniqueMediaPage = lazy(() => import("./pages/UniqueMediaPage"));
+const UniqueSharePage = lazy(() => import("./pages/UniqueSharePage"));
 
 export default function App() {
   const [u1Booting, setU1Booting] = useState(true);
@@ -254,6 +255,7 @@ export default function App() {
               <Route path="store" element={<StorePage />} />
               <Route path="ai" element={<UniqueAiPage />} />
               <Route path="master-vision" element={<MasterVisionPage />} />
+              <Route path="unique-share" element={<UniqueSharePage />} />
               <Route path="jobs" element={<JobsPage />} />
               <Route path="contributions" element={<ContributionNetworkPage />} />
               <Route path="education" element={<EducationPage />} />
