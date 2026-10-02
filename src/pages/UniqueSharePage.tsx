@@ -333,7 +333,7 @@ export default function UniqueSharePage() {
         </header>
 
         {!authenticated ? (
-          <section className="mt-5 rounded-3xl border border-amber-400/20 bg-amber-950/30 p-6 text-sm text-amber-100">Sign in to use UniqueShare. Anonymous sharing is intentionally disabled.</section>
+          <section className="mt-5 rounded-3xl border border-amber-400/20 bg-amber-950/30 p-6 text-sm text-amber-100">Guest sharing is available. No registration or login is required.</section>
         ) : mode === "home" ? (
           <section className="mt-5">
             <div className="relative overflow-hidden rounded-[2rem] border border-emerald-400/20 bg-gradient-to-br from-white via-emerald-50 to-white p-5 text-slate-950 shadow-xl sm:p-7">
@@ -366,7 +366,7 @@ export default function UniqueSharePage() {
               <div className="flex items-center gap-3"><QrCode className="h-6 w-6 text-emerald-300" /><div><h2 className="font-black">Secure connection</h2><p className="text-xs text-slate-400">One-time session · expires in 5 minutes</p></div></div>
               <div className="mt-5 break-all rounded-2xl border border-emerald-400/20 bg-black/30 p-5 text-center font-mono text-sm text-emerald-200">{connectionToken}</div>
               <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => void shareConnection()} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black"><Share2 className="mr-2 inline h-4 w-4" />Share</button><button type="button" onClick={() => void copyToken()} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black"><Copy className="mr-2 inline h-4 w-4" />Copy</button></div><button type="button" onClick={() => void reset()} className="mt-2 w-full rounded-2xl border border-white/10 px-4 py-2 text-xs font-bold text-slate-400">Cancel connection</button>
-              <p className="mt-3 text-xs text-slate-400">QR scanning is available on supported browsers. The camera preview is shown while scanning, and the authenticated token remains the pairing credential.</p>
+              <p className="mt-3 text-xs text-slate-400">QR scanning is available on supported browsers. The camera preview is shown while scanning, and the secure token remains the pairing credential.</p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-slate-900 p-6"><div className="flex items-center gap-3"><CheckCircle2 className={session?.status === "accepted" ? "h-6 w-6 text-emerald-300" : "h-6 w-6 text-slate-500"} /><p className="font-bold">{session?.status === "accepted" ? "Receiver accepted — ready to send." : "Waiting for receiver to connect and accept…"}</p></div></div>
             {session?.status === "accepted" && <CyclePanel files={files} selectedFiles={selectedFiles} setSelectedFiles={setSelectedFiles} uploadProgress={uploadProgress} busy={busy} onUpload={() => void uploadSelected()} onDownload={downloadFile} />}
@@ -384,7 +384,7 @@ export default function UniqueSharePage() {
               </div>
             ) : (
               <div className="rounded-3xl border border-emerald-400/20 bg-slate-900 p-6">
-                <div className="flex items-center gap-3"><ShieldCheck className="h-6 w-6 text-emerald-300" /><div><h2 className="font-black">Authenticated connection</h2><p className="text-xs text-slate-400">Sender: {session.senderUid}</p></div></div>
+                <div className="flex items-center gap-3"><ShieldCheck className="h-6 w-6 text-emerald-300" /><div><h2 className="font-black">Secure connection</h2><p className="text-xs text-slate-400">Connected to sender</p></div></div>
                 {session.status === "connected" && <button type="button" disabled={busy} onClick={() => void acceptReceive()} className="mt-5 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black disabled:opacity-40"><CheckCircle2 className="mr-2 inline h-4 w-4" />Accept and receive</button>}
                 {session.status === "accepted" && <CyclePanel files={files} selectedFiles={selectedFiles} setSelectedFiles={setSelectedFiles} uploadProgress={uploadProgress} busy={busy} onUpload={() => void uploadSelected()} onDownload={downloadFile} />}
               </div>
@@ -421,13 +421,13 @@ function CyclePanel({ files, selectedFiles, setSelectedFiles, uploadProgress, bu
   const available = files.filter(file => file.status === "available");
   return <div className="mt-5 grid gap-4 lg:grid-cols-2">
     <div className="rounded-3xl border border-emerald-400/20 bg-white p-6 text-slate-950">
-      <div className="flex items-center gap-3"><FileUp className="h-6 w-6 text-emerald-600" /><div><h2 className="font-black">Send to connected peer</h2><p className="text-xs text-slate-500">The same authenticated connection can send in either direction.</p></div></div>
+      <div className="flex items-center gap-3"><FileUp className="h-6 w-6 text-emerald-600" /><div><h2 className="font-black">Send to connected peer</h2><p className="text-xs text-slate-500">The same secure connection can send in either direction.</p></div></div>
       <input type="file" multiple onChange={e => setSelectedFiles(Array.from(e.target.files || []))} className="mt-5 block w-full rounded-2xl border border-slate-200 p-3 text-sm" />
       {selectedFiles.map(file => <div key={file.name + file.size} className="mt-2 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs"><span className="truncate">{file.name}</span><span>{formatBytes(file.size)} {uploadProgress[file.name] !== undefined ? "· " + uploadProgress[file.name] + "%" : ""}</span></div>)}
       <button type="button" disabled={busy || !selectedFiles.length} onClick={onUpload} className="mt-4 w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:opacity-40">Send now</button>
     </div>
     <div className="rounded-3xl border border-emerald-400/20 bg-slate-900 p-6">
-      <div className="flex items-center gap-3"><Users className="h-6 w-6 text-emerald-300" /><div><h2 className="font-black">Receive from connected peer</h2><p className="text-xs text-slate-400">Incoming files remain inside your authenticated UniqueShare boundary.</p></div></div>
+      <div className="flex items-center gap-3"><Users className="h-6 w-6 text-emerald-300" /><div><h2 className="font-black">Receive from connected peer</h2><p className="text-xs text-slate-400">Incoming files remain inside this secure UniqueShare connection.</p></div></div>
       {!available.length ? <p className="mt-5 text-sm text-slate-400">Waiting for incoming files…</p> : <div className="mt-4 space-y-2">{available.map(file => <div key={file.fileId} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 p-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{file.name}</p><p className="text-xs text-slate-500">{file.contentType} · {formatBytes(file.sizeBytes)}</p></div><button type="button" onClick={() => onDownload(file)} className="rounded-xl bg-emerald-600 p-2" aria-label={"Download " + file.name}><Download className="h-4 w-4" /></button></div>)}</div>}
     </div>
   </div>;
