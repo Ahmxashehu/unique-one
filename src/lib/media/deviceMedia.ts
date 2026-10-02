@@ -60,6 +60,8 @@ export const playNativeBackgroundMedia = (items: DeviceMediaItem[], index: numbe
 export const pauseNativeBackgroundMedia = (): void => { nativeBridge()?.pauseBackgroundMedia?.(); };
 export const resumeNativeBackgroundMedia = (): void => { nativeBridge()?.resumeBackgroundMedia?.(); };
 export const stopNativeBackgroundMedia = (): void => { nativeBridge()?.stopBackgroundMedia?.(); };
+export const toggleNativeBackgroundRepeat = (): void => { nativeBridge()?.backgroundToggleRepeat?.(); };
+export const toggleNativeBackgroundShuffle = (): void => { nativeBridge()?.backgroundToggleShuffle?.(); };
 
 export const shareNativeMedia = (items: DeviceMediaItem[]): boolean => {
   const bridge = nativeBridge();
