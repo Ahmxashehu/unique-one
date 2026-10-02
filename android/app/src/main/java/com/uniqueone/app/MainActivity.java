@@ -270,13 +270,35 @@ public class MainActivity extends Activity {
         return result;
     }
 
+    private boolean deleteMediaItem(String id) {
+        try {
+            Uri uri = mediaUris.get(id);
+            if (uri != null) {
+                int deleted = getContentResolver().delete(uri, null, null);
+                if (deleted > 0) {
+                    mediaUris.remove(id);
+                    return true;
+                }
+            }
+            File file = sharedFiles.get(id);
+            if (file != null && file.exists()) {
+                boolean deleted = file.delete();
+                if (deleted) sharedFiles.remove(id);
+                return deleted;
+            }
+        } catch (SecurityException ignored) {
+            // Android may require a user-confirmed recoverable security flow for protected media.
+        } catch (Exception ignored) {}
+        return false;
+    }
+
     private class NativeStorageBridge {
         @JavascriptInterface public boolean hasMediaAccess() { return MainActivity.this.hasMediaAccess(); }
         @JavascriptInterface public void requestMediaAccess() { MainActivity.this.requestMediaAccessInternal(); }
         @JavascriptInterface public String listMedia() { return listMediaPage(0, 300); }
         @JavascriptInterface public String listMediaPage(int offset, int limit) { return listMediaPage(Math.max(0, offset), Math.min(300, Math.max(1, limit))).toString(); }
         @JavascriptInterface public String getSharedMedia() { return listReceivedMedia().toString(); }
-        @JavascriptInterface public void markMediaSeen(String id) {}
+        @JavascriptInterface public void markMediaSeen(String id) {}\n        @JavascriptInterface public boolean deleteMedia(String id) { return MainActivity.this.deleteMediaItem(id); }
         @JavascriptInterface public boolean playBackgroundMedia(String idsJson, int index) {
             try {
                 JSONArray ids = new JSONArray(idsJson);
