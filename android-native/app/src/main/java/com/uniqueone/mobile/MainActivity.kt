@@ -24,6 +24,7 @@ import java.util.UUID
 class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private val nativeMedia = mutableMapOf<String, Pair<Uri, String>>()
+    private var mediaCache: JSONArray? = null
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -103,7 +104,7 @@ class MainActivity : ComponentActivity() {
                         val id = cursor.getLong(idIndex)
                         val mime = cursor.getString(mimeIndex) ?: "application/octet-stream"
                         val uri = Uri.withAppendedPath(source, id.toString())
-                        val key = UUID.randomUUID().toString()
+                        val key = source.toString().substringAfterLast("/") + ":" + id
                         nativeMedia[key] = uri to mime
                         result.put(JSONObject().apply {
                             put("id", key)
@@ -127,6 +128,7 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface fun requestMediaAccess() { permissionLauncher.launch(mediaPermissions()) }
         @JavascriptInterface fun hasMediaAccess(): Boolean = mediaAccessGranted()
         @JavascriptInterface fun listMedia(): String = scanMedia().toString()
+        @JavascriptInterface fun refreshMediaIndex(): String { mediaCache = null; return scanMedia().toString() }
         @JavascriptInterface fun openFilePicker() { filePicker.launch(arrayOf("*/*")) }
         @JavascriptInterface fun openStorageSettings() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
