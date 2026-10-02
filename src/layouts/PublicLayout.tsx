@@ -4,16 +4,16 @@ import MobileBottomNav from '../components/MobileBottomNav';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import AppearanceControls from '../components/AppearanceControls';
-import { getLanguage, t, type {t('support', language)}edLanguage } from '../lib/i18n';
+import { getLanguage, t, type SupportedLanguage } from '../lib/i18n';
 
 export default function PublicLayout() {
   const { currentUser } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const [language, setLanguage] = useState<{t('support', language)}edLanguage>(getLanguage());
+  const [language, setLanguage] = useState<SupportedLanguage>(getLanguage());
 
   React.useEffect(() => {
-    const handleLanguageChange = (event: Event) => setLanguage((event as CustomEvent<{t('support', language)}edLanguage>).detail);
+    const handleLanguageChange = (event: Event) => setLanguage((event as CustomEvent<SupportedLanguage>).detail);
     window.addEventListener('unique-language-change', handleLanguageChange);
     return () => window.removeEventListener('unique-language-change', handleLanguageChange);
   }, []);
@@ -83,7 +83,7 @@ export default function PublicLayout() {
                 ['Transportation', '/categories'],
                 ['Real Estate', '/categories'],
                 ['Global Search', '/search'],
-                ['{t('nearMe', language)}', '/near-me'],
+                [t('nearMe', language), '/near-me'],
                 ['Jobs', '/os/jobs'],
                 ['Contributions', '/os/contributions'],
                 ['Education', '/os/education'],
