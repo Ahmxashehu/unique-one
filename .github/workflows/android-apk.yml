@@ -1,4 +1,4 @@
-name: Build Unique One Android APK
+name: Build UniquePlatform Android APK
 on:
   workflow_dispatch:
   push:
@@ -9,7 +9,7 @@ on:
       - 'package-lock.json'
       - 'vite.config.*'
       - 'index.html'
-      - 'android/**'
+      - 'android-native/**'
       - '.github/workflows/android-apk.yml'
 
 jobs:
@@ -23,11 +23,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Prepare web assets
-        run: |
-          rm -rf android/app/src/main/assets
-          mkdir -p android/app/src/main/assets
-          cp -R dist/. android/app/src/main/assets/
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -35,16 +30,16 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Build debug APK
-        working-directory: android
-        run: gradle --no-daemon assembleDebug
+      - name: Build UniquePlatform debug APK
+        working-directory: android-native
+        run: gradle --no-daemon :app:assembleDebug
       - name: Verify APK
         run: |
-          test -s android/app/build/outputs/apk/debug/app-debug.apk
-          file android/app/build/outputs/apk/debug/app-debug.apk
+          test -s android-native/app/build/outputs/apk/debug/app-debug.apk
+          file android-native/app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: unique-one-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: uniqueplatform-debug-apk
+          path: android-native/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
