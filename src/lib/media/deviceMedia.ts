@@ -12,6 +12,39 @@ export type DeviceMediaItem = {
 export type DeviceMediaScan = {
   items: DeviceMediaItem[];
   rootName: string;
+  handle: any;
+};
+
+const MEDIA_HANDLE_DB = 'unique-media-device-access';
+const MEDIA_HANDLE_STORE = 'handles';
+
+const openMediaHandleDb = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
+  const request = indexedDB.open(MEDIA_HANDLE_DB, 1);
+  request.onupgradeneeded = () => request.result.createObjectStore(MEDIA_HANDLE_STORE);
+  request.onsuccess = () => resolve(request.result);
+  request.onerror = () => reject(request.error);
+});
+
+export const rememberDeviceMediaDirectory = async (handle: any): Promise<void> => {
+  const db = await openMediaHandleDb();
+  await new Promise<void>((resolve, reject) => {
+    const request = db.transaction(MEDIA_HANDLE_STORE, 'readwrite').objectStore(MEDIA_HANDLE_STORE).put(handle, 'root');
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+  db.close();
+};
+
+export const getStoredDeviceMediaDirectory = async (): Promise<any | null> => {
+  if (typeof indexedDB === 'undefined') return null;
+  const db = await openMediaHandleDb();
+  const handle = await new Promise<any | null>((resolve, reject) => {
+    const request = db.transaction(MEDIA_HANDLE_STORE, 'readonly').objectStore(MEDIA_HANDLE_STORE).get('root');
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+  db.close();
+  return handle;
 };
 
 export const kindForDeviceFile = (file: File): DeviceMediaKind | null => {
@@ -44,13 +77,17 @@ const walkDirectory = async (directoryHandle: any, output: DeviceMediaItem[], de
   }
 };
 
+export const scanDeviceMediaDirectory = async (root: any): Promise<DeviceMediaScan> => {
+  const items: DeviceMediaItem[] = [];
+  await walkDirectory(root, items);
+  return { items, rootName: root.name || 'Device folder', handle: root };
+};
+
 export const pickDeviceMediaDirectory = async (): Promise<DeviceMediaScan | null> => {
   const picker = (window as any).showDirectoryPicker;
   if (typeof picker !== 'function') return null;
   const root = await picker({ mode: 'readwrite' });
-  const items: DeviceMediaItem[] = [];
-  await walkDirectory(root, items);
-  return { items, rootName: root.name || 'Device folder' };
+  return scanDeviceMediaDirectory(root);
 };
 
 export const ensureWritePermission = async (handle: any): Promise<boolean> => {
