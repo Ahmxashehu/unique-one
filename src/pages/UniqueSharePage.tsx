@@ -232,7 +232,7 @@ export default function UniqueSharePage() {
             <div>
               <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-emerald-300"><ShieldCheck className="h-4 w-4" /> Unique One secure sharing</div>
               <h1 className="mt-2 text-4xl font-black tracking-tight">UniqueShare</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Send any file type between authenticated Unique One users. The receiver explicitly accepts the connection before files enter their own UniqueShare storage.</p>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">A secure cycle-share environment: once A ↔ B connect, both users can send and receive at the same time, with separate transfer progress and authenticated storage boundaries.</p>
             </div>
             <Smartphone className="h-9 w-9 text-emerald-300" />
           </div>
@@ -275,7 +275,7 @@ export default function UniqueSharePage() {
               <div className="rounded-3xl border border-emerald-400/20 bg-slate-900 p-6">
                 <div className="flex items-center gap-3"><ShieldCheck className="h-6 w-6 text-emerald-300" /><div><h2 className="font-black">Authenticated connection</h2><p className="text-xs text-slate-400">Sender: {session.senderUid}</p></div></div>
                 {session.status === "connected" && <button type="button" disabled={busy} onClick={() => void acceptReceive()} className="mt-5 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black disabled:opacity-40"><CheckCircle2 className="mr-2 inline h-4 w-4" />Accept and receive</button>}
-                {session.status === "accepted" && <ReceivedFiles files={files} onDownload={downloadFile} />}
+                {session.status === "accepted" && <CyclePanel files={files} selectedFiles={selectedFiles} setSelectedFiles={setSelectedFiles} uploadProgress={uploadProgress} busy={busy} onUpload={() => void uploadSelected()} onDownload={downloadFile} />}
               </div>
             )}
           </section>
@@ -287,25 +287,26 @@ export default function UniqueSharePage() {
   );
 }
 
-function TransferPanel({ selectedFiles, setSelectedFiles, uploadProgress, busy, onUpload }: {
+function CyclePanel({ files, selectedFiles, setSelectedFiles, uploadProgress, busy, onUpload, onDownload }: {
   files: UniqueShareFile[];
   selectedFiles: File[];
   setSelectedFiles: React.Dispatch<React.SetStateAction<File[]>>;
   uploadProgress: Record<string, number>;
   busy: boolean;
   onUpload: () => void;
+  onDownload: (file: UniqueShareFile) => void;
 }) {
-  return <div className="rounded-3xl border border-emerald-400/20 bg-white p-6 text-slate-950">
-    <div className="flex items-center gap-3"><FileUp className="h-6 w-6 text-emerald-600" /><div><h2 className="font-black">Choose anything</h2><p className="text-xs text-slate-500">Images, videos, audio, PDFs, documents, archives or other file types.</p></div></div>
-    <input type="file" multiple onChange={e => setSelectedFiles(Array.from(e.target.files || []))} className="mt-5 block w-full rounded-2xl border border-slate-200 p-3 text-sm" />
-    {selectedFiles.map(file => <div key={file.name + file.size} className="mt-2 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs"><span className="truncate">{file.name}</span><span>{formatBytes(file.size)} {uploadProgress[file.name] !== undefined ? "· " + uploadProgress[file.name] + "%" : ""}</span></div>)}
-    <button type="button" disabled={busy || !selectedFiles.length} onClick={onUpload} className="mt-4 w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:opacity-40">Send selected files</button>
-  </div>;
-}
-
-function ReceivedFiles({ files, onDownload }: { files: UniqueShareFile[]; onDownload: (file: UniqueShareFile) => void }) {
   const available = files.filter(file => file.status === "available");
-  return <div className="mt-5"><div className="flex items-center justify-between"><h3 className="font-black">Your UniqueShare storage</h3><Users className="h-5 w-5 text-emerald-300" /></div>
-    {!available.length ? <p className="mt-3 text-sm text-slate-400">Waiting for files…</p> : <div className="mt-3 space-y-2">{available.map(file => <div key={file.fileId} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 p-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{file.name}</p><p className="text-xs text-slate-500">{file.contentType} · {formatBytes(file.sizeBytes)}</p></div><button type="button" onClick={() => onDownload(file)} className="rounded-xl bg-emerald-600 p-2" aria-label={"Download " + file.name}><Download className="h-4 w-4" /></button></div>)}</div>}
+  return <div className="mt-5 grid gap-4 lg:grid-cols-2">
+    <div className="rounded-3xl border border-emerald-400/20 bg-white p-6 text-slate-950">
+      <div className="flex items-center gap-3"><FileUp className="h-6 w-6 text-emerald-600" /><div><h2 className="font-black">Send to connected peer</h2><p className="text-xs text-slate-500">The same authenticated connection can send in either direction.</p></div></div>
+      <input type="file" multiple onChange={e => setSelectedFiles(Array.from(e.target.files || []))} className="mt-5 block w-full rounded-2xl border border-slate-200 p-3 text-sm" />
+      {selectedFiles.map(file => <div key={file.name + file.size} className="mt-2 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs"><span className="truncate">{file.name}</span><span>{formatBytes(file.size)} {uploadProgress[file.name] !== undefined ? "· " + uploadProgress[file.name] + "%" : ""}</span></div>)}
+      <button type="button" disabled={busy || !selectedFiles.length} onClick={onUpload} className="mt-4 w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:opacity-40">Send now</button>
+    </div>
+    <div className="rounded-3xl border border-emerald-400/20 bg-slate-900 p-6">
+      <div className="flex items-center gap-3"><Users className="h-6 w-6 text-emerald-300" /><div><h2 className="font-black">Receive from connected peer</h2><p className="text-xs text-slate-400">Incoming files remain inside your authenticated UniqueShare boundary.</p></div></div>
+      {!available.length ? <p className="mt-5 text-sm text-slate-400">Waiting for incoming files…</p> : <div className="mt-4 space-y-2">{available.map(file => <div key={file.fileId} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 p-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{file.name}</p><p className="text-xs text-slate-500">{file.contentType} · {formatBytes(file.sizeBytes)}</p></div><button type="button" onClick={() => onDownload(file)} className="rounded-xl bg-emerald-600 p-2" aria-label={"Download " + file.name}><Download className="h-4 w-4" /></button></div>)}</div>}
+    </div>
   </div>;
 }
