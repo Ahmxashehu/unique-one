@@ -60,7 +60,7 @@ export default function U1Loader({
           style={{ animation: "up-pulse 1.15s ease-in-out infinite" }}
         >
           <span className="text-4xl font-black tracking-[-0.08em] text-black">
-            U1
+            UP
           </span>
         </div>
       </div>
