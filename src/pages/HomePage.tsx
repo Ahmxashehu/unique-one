@@ -556,7 +556,7 @@ export default function HomePage() {
                     <div className="min-w-0 flex-1">
                       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-600">Your media</p>
                       <h3 className="mt-0.5 truncate text-lg font-black tracking-tight text-slate-950 sm:text-xl">UniqueMedia</h3>
-                      <p className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">Music, videos, images &amp; PDFs</p>
+                      <p className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">Audio, videos, images &amp; PDFs</p>
                     </div>
                     <Link to="/media" className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-700">
                       Open <ArrowRight className="h-3.5 w-3.5" />
@@ -566,7 +566,7 @@ export default function HomePage() {
                   <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {[
                       ['Videos', Play, 'video'],
-                      ['Music', Play, 'audio'],
+                      ['Audio', Play, 'audio'],
                       ['Images', Compass, 'image'],
                       ['PDFs', Bookmark, 'pdf'],
                     ].map(([label, Icon, kind]) => (
