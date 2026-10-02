@@ -415,7 +415,7 @@ export default function UniqueMediaPage() {
   };
 
   const categories: Array<[Exclude<MediaKind, 'all'>, string]> = [
-    ['audio', 'Music'], ['video', 'Videos'], ['image', 'Images'], ['pdf', 'PDF Reader'],
+    ['video', 'Videos'], ['audio', 'Audio'], ['image', 'Images'], ['pdf', 'PDF Reader'],
   ];
 
   return (
@@ -462,14 +462,27 @@ export default function UniqueMediaPage() {
             </label>
           </div>
 
-          {deviceMessage && <p className="mb-3 rounded-2xl bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800">{deviceMessage}</p>}
-
           {filteredMedia.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
-              <FolderOpen className="mx-auto h-12 w-12 text-emerald-500" />
-              <h3 className="mt-4 text-lg font-black text-slate-900">No {categories.find(([value]) => value === activeKind)?.[1].toLowerCase()} found</h3>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Connect your phone to load this category. Your files remain on the device unless you explicitly use a protected cloud or sharing action.</p>
-              <button type="button" onClick={() => void connectDeviceMedia()} className="mt-5 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">Connect phone media</button>
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start gap-4">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                  {(() => { const Icon = iconForKind(activeKind as Exclude<MediaKind, 'all'>); return <Icon className="h-6 w-6" />; })()}
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-base font-black text-slate-900">No {categories.find(([value]) => value === activeKind)?.[1].toLowerCase()} yet</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    {activeKind === 'video' && 'Connect your phone to bring your videos into this library.'}
+                    {activeKind === 'audio' && 'Connect your phone to bring your audio files into this library.'}
+                    {activeKind === 'image' && 'Connect your phone to bring your photos and images into this library.'}
+                    {activeKind === 'pdf' && 'Connect your phone to bring PDF documents into this reader.'}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" onClick={() => void connectDeviceMedia()} className="rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white">Connect phone</button>
+                {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700">Choose files</button>}
+              </div>
+              <p className="mt-3 text-[11px] leading-5 text-slate-400">Files stay on your device unless you explicitly choose a protected cloud or sharing action.</p>
             </div>
           ) : (
             <>
