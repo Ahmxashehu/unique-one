@@ -109,7 +109,7 @@ class MainActivity : ComponentActivity() {
             setTextColor(0xFF0F172A.toInt())
         }
         val message = TextView(this).apply {
-            text = "Allow access to your photos, videos and music so UniqueMedia can automatically show your phone media. Your files are not silently uploaded to the cloud."
+            text = "Allow access to your photos, videos and audio so UniqueMedia can automatically show your phone media. Your files are not silently uploaded to the cloud."
             textSize = 16f
             setTextColor(0xFF475569.toInt())
         }
