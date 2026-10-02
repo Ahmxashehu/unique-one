@@ -106,6 +106,69 @@ const UI: Record<SupportedLanguage, Record<Phrase, string>> = {
   }
 };
 
+
+// Expanded platform action vocabulary. These phrases are shared by many feature pages,
+// so they are translated here even when a page has not yet migrated to data-i18n keys.
+const EXTRA: Record<SupportedLanguage, Record<string,string>> = {
+  en: {},
+  ha: {
+    "Refresh":"Sabunta", "View":"Duba", "Apply":"Nema", "Post a job":"Sanya aikin yi", "All categories":"Dukkan rukuni",
+    "Connect phone media":"Haɗa kafofin wayar", "Open UniqueShare":"Buɗe UniqueShare", "Backup":"Ajiye kwafi", "Restore latest":"Maido na baya-bayan nan",
+    "Search jobs, employers, skills or locations...":"Bincika ayyuka, ma'aikata, ƙwarewa ko wurare...", "No published jobs found":"Ba a sami ayyukan da aka wallafa ba",
+    "Create Another Request":"Ƙirƙiri wata buƙata", "Save Draft":"Ajiye daftari", "Send Request":"Tura buƙata", "Change Login PIN":"Canja PIN na shiga",
+    "Updating...":"Ana sabuntawa...", "Message Seller":"Tura saƙo ga mai sayarwa", "Go to Dashboard":"Je zuwa Dashboard", "Open Store":"Buɗe Shago",
+    "Institution":"Cibiyar ilimi", "Course":"Darasi", "Enroll":"Yi rajista", "Invite Member":"Gayyaci memba", "Upload Documents":"Loda takardu",
+    "Search messages":"Bincika saƙonni", "Voice calls coming soon":"Kiran murya zai zo nan ba da jimawa ba", "Reshare to chat":"Sake rabawa zuwa hira", "Copy link":"Kwafi hanyar haɗi",
+    "Remove":"Cire", "Publishing...":"Ana wallafawa...", "Publish Service":"Wallafa aiki", "Save Draft":"Ajiye daftari", "Enable biometric security":"Kunna tsaron biometric",
+    "Allow media access":"Bada damar kafofin watsa labarai", "Next":"Na gaba", "Previous":"Na baya", "Close menu":"Rufe menu", "More UniquePlatform":"Ƙarin UniquePlatform"
+  },
+  fr: {
+    "Refresh":"Actualiser", "View":"Voir", "Apply":"Postuler", "Post a job":"Publier une offre", "All categories":"Toutes les catégories",
+    "Connect phone media":"Connecter les médias du téléphone", "Open UniqueShare":"Ouvrir UniqueShare", "Backup":"Sauvegarder", "Restore latest":"Restaurer la dernière sauvegarde",
+    "Search jobs, employers, skills or locations...":"Rechercher des emplois, employeurs, compétences ou lieux...", "No published jobs found":"Aucune offre publiée trouvée",
+    "Create Another Request":"Créer une autre demande", "Save Draft":"Enregistrer le brouillon", "Send Request":"Envoyer la demande", "Change Login PIN":"Modifier le PIN de connexion",
+    "Updating...":"Mise à jour...", "Message Seller":"Contacter le vendeur", "Go to Dashboard":"Aller au tableau de bord", "Open Store":"Ouvrir la boutique",
+    "Institution":"Établissement", "Course":"Cours", "Enroll":"S’inscrire", "Invite Member":"Inviter un membre", "Upload Documents":"Téléverser les documents",
+    "Search messages":"Rechercher des messages", "Voice calls coming soon":"Appels vocaux bientôt disponibles", "Reshare to chat":"Partager dans le chat", "Copy link":"Copier le lien",
+    "Remove":"Supprimer", "Publishing...":"Publication...", "Publish Service":"Publier le service", "Enable biometric security":"Activer la sécurité biométrique",
+    "Allow media access":"Autoriser l’accès aux médias", "Previous":"Précédent", "Close menu":"Fermer le menu", "More UniquePlatform":"Plus de UniquePlatform"
+  },
+  ig: {
+    "Refresh":"Melite", "View":"Lee", "Apply":"Tinye akwụkwọ", "Post a job":"Bipute ọrụ", "All categories":"Ụdị niile",
+    "Connect phone media":"Jikọọ mgbasa ozi ekwentị", "Open UniqueShare":"Mepee UniqueShare", "Backup":"Chekwaa ndabere", "Restore latest":"Weghachi nke kacha ọhụrụ",
+    "Search jobs, employers, skills or locations...":"Chọọ ọrụ, ndị were ọrụ, nka ma ọ bụ ebe...", "No published jobs found":"Enweghị ọrụ e bipụtara",
+    "Create Another Request":"Mepụta arịrịọ ọzọ", "Save Draft":"Chekwaa akwụkwọ nwa oge", "Send Request":"Zipu arịrịọ", "Change Login PIN":"Gbanwee PIN nbanye",
+    "Updating...":"Na-emelite...", "Message Seller":"Zitere onye na-ere ahịa ozi", "Go to Dashboard":"Gaa na Dashboard", "Open Store":"Mepee Ụlọ ahịa",
+    "Institution":"Ụlọ akwụkwọ", "Course":"Nkuzi", "Enroll":"Debanye aha", "Invite Member":"Kpọọ onye otu", "Upload Documents":"Bulite akwụkwọ",
+    "Search messages":"Chọọ ozi", "Voice calls coming soon":"Oku olu ga-abịa n'oge na-adịghị anya", "Reshare to chat":"Kesaa ọzọ na nkata", "Copy link":"Detuo njikọ",
+    "Publishing...":"Na-ebipụta...", "Publish Service":"Bipụta ọrụ", "Enable biometric security":"Kpoo nchekwa biometric", "Allow media access":"Kwe ka mgbasa ozi nweta ohere",
+    "Previous":"Nke gara aga", "Close menu":"Mechie nchịkọta", "More UniquePlatform":"Ọzọ UniquePlatform"
+  },
+  yo: {
+    "Refresh":"Túnṣe", "View":"Wo", "Apply":"Waye", "Post a job":"Fi iṣẹ́ sílẹ̀", "All categories":"Gbogbo ẹ̀ka",
+    "Connect phone media":"So media fóònù pọ̀", "Open UniqueShare":"Ṣí UniqueShare", "Backup":"Ṣe àfipamọ́", "Restore latest":"Mú èyí tuntun padà",
+    "Search jobs, employers, skills or locations...":"Wá iṣẹ́, àwọn agbanisíṣẹ́, ọgbọ́n tàbí ibi...", "No published jobs found":"A kò rí iṣẹ́ tí a tẹ̀ jáde",
+    "Create Another Request":"Ṣẹ̀dá ìbéèrè mìíràn", "Save Draft":"Fipamọ́ àkọsílẹ̀", "Send Request":"Firanṣẹ́ ìbéèrè", "Change Login PIN":"Yí PIN ìwọlé padà",
+    "Updating...":"Ń túnṣe...", "Message Seller":"Fi ifiranṣẹ́ ránṣẹ́ sí olùtajà", "Go to Dashboard":"Lọ sí pẹpẹ iṣakoso", "Open Store":"Ṣí ilé ìtajà",
+    "Institution":"Ilé ẹ̀kọ́", "Course":"Ẹ̀kọ́", "Enroll":"Forúkọsílẹ̀", "Invite Member":"Pe ọmọ ẹgbẹ́", "Upload Documents":"Gbé àwọn ìwé sókè",
+    "Search messages":"Wá àwọn ifiranṣẹ́", "Voice calls coming soon":"Àwọn ìpè ohùn ń bọ̀ láìpẹ́", "Reshare to chat":"Pín sí iwiregbe", "Copy link":"Da ọna asopọ̀ kọ",
+    "Publishing...":"Ń tẹ̀ jáde...", "Publish Service":"Tẹ iṣẹ́ jáde", "Enable biometric security":"Mú ààbò biometric ṣiṣẹ́", "Allow media access":"Gba àyè sí media",
+    "Previous":"Tẹ́lẹ̀", "Close menu":"Pa àkójọ", "More UniquePlatform":"Àwọn míì UniquePlatform"
+  },
+  pcm: {
+    "Refresh":"Refresh", "View":"See", "Apply":"Apply", "Post a job":"Post job", "All categories":"All categories",
+    "Connect phone media":"Connect phone media", "Open UniqueShare":"Open UniqueShare", "Backup":"Backup", "Restore latest":"Restore latest",
+    "Search jobs, employers, skills or locations...":"Find jobs, employers, skills or places...", "No published jobs found":"No published job dey",
+    "Create Another Request":"Create another request", "Save Draft":"Save draft", "Send Request":"Send request", "Change Login PIN":"Change login PIN",
+    "Updating...":"E dey update...", "Message Seller":"Message seller", "Go to Dashboard":"Go dashboard", "Open Store":"Open Store",
+    "Institution":"School", "Course":"Course", "Enroll":"Register", "Invite Member":"Invite member", "Upload Documents":"Upload documents",
+    "Search messages":"Find messages", "Voice calls coming soon":"Voice call dey come soon", "Reshare to chat":"Share am for chat", "Copy link":"Copy link",
+    "Publishing...":"E dey publish...", "Publish Service":"Publish service", "Enable biometric security":"Turn on biometric security", "Allow media access":"Allow media access",
+    "Previous":"Previous", "Close menu":"Close menu", "More UniquePlatform":"More UniquePlatform"
+  }
+};
+Object.entries(EXTRA).forEach(([language, values]) => Object.assign(UI[language as SupportedLanguage], values));
+
 const norm = (v:string) => v.replace(/\s+/g," ").trim();
 const reverse = (language:SupportedLanguage) => {
   const out:Record<string,string> = {};
