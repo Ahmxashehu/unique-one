@@ -4,7 +4,7 @@ import { Cloud, FileText, FolderOpen, Image as ImageIcon, Music2, Pause, Play, S
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
-import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia, loadNativeSharedMedia, shareNativeMedia } from '../lib/media/deviceMedia';
+import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia, loadNativeSharedMedia, shareNativeMedia, markNativeMediaSeen } from '../lib/media/deviceMedia';
 import { stageMediaForDestination } from '../lib/media/shareBridge';
 
 type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
@@ -54,11 +54,20 @@ export default function UniqueMediaPage() {
   const [nativeOffset, setNativeOffset] = useState(0);
   const [nativeHasMore, setNativeHasMore] = useState(false);
   const [nativeLoadingMore, setNativeLoadingMore] = useState(false);
+  const [newReceivedCount, setNewReceivedCount] = useState(0);
   const [playerRate, setPlayerRate] = useState(1);
   const [playerFit, setPlayerFit] = useState<'contain' | 'cover'>('contain');
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
   const playerVideoRef = React.useRef<HTMLVideoElement | null>(null);
   const phoneFileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const openMediaWithSeen = (item: LocalMedia) => {
+    if (item.isNew) {
+      markNativeMediaSeen(item);
+      setNewReceivedCount((count) => Math.max(0, count - 1));
+    }
+    openMedia(item);
+  };
 
   const filteredMedia = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -91,6 +100,7 @@ export default function UniqueMediaPage() {
           const nativeItems = await loadNativeAndroidMedia(0, 100);
           const sharedItems = await loadNativeSharedMedia();
           const importedCount = nativeItems.length + sharedItems.length;
+          setNewReceivedCount(nativeItems.filter((item) => item.isNew).length);
           if (!cancelled && (nativeItems.length || sharedItems.length)) {
             setMedia((current) => {
               const existing = new Set(current.map((item) => item.file.name + ':' + item.file.size));
@@ -143,7 +153,7 @@ export default function UniqueMediaPage() {
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
             <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white"><FolderOpen className="h-4 w-4" /> Connect phone</button>
-            <Link to="/os/unique-share" className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800"><Share2 className="h-4 w-4" /> UniqueShare</Link>
+            <Link to="/os/unique-share" className="relative inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800"><Share2 className="h-4 w-4" /> UniqueShare{newReceivedCount > 0 && <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-emerald-600 px-1.5 py-0.5 text-center text-[10px] font-black text-white">{newReceivedCount}</span>}</Link>
           </div>
         </header>
 
@@ -189,7 +199,7 @@ export default function UniqueMediaPage() {
                     const isSelected = selected.includes(item.id);
                     return (
                       <article key={item.id} className={'group overflow-hidden rounded-2xl border bg-white shadow-sm ' + (isSelected ? 'border-emerald-500 ring-2 ring-emerald-100' : 'border-slate-200')}>
-                        <button type="button" onClick={() => openMedia(item)} className="relative block aspect-square w-full overflow-hidden bg-slate-100">
+                        <button type="button" onClick={() => openMediaWithSeen(item)} className="relative block aspect-square w-full overflow-hidden bg-slate-100">
                           <img src={item.url} alt={item.file.name} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
                           <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-1 text-[10px] font-bold text-white">{formatBytes(item.file.size)}</span>
                         </button>
@@ -207,7 +217,7 @@ export default function UniqueMediaPage() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredMedia.map((item) => (
                     <article key={item.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                      <button type="button" onClick={() => openMedia(item)} className="block w-full text-left">
+                      <button type="button" onClick={() => openMediaWithSeen(item)} className="block w-full text-left">
                         <div className="relative aspect-video bg-slate-950"><video src={item.url} muted playsInline preload="metadata" className="h-full w-full object-cover" /><span className="absolute bottom-3 left-3 rounded-full bg-black/70 px-3 py-1 text-xs font-bold text-white"><Play className="mr-1 inline h-3 w-3" /> Video</span></div>
                         <div className="p-4"><p className="truncate text-sm font-black text-slate-900">{item.file.name}</p><p className="mt-1 text-xs text-slate-400">{formatBytes(item.file.size)}</p></div>
                       </button>
@@ -220,7 +230,7 @@ export default function UniqueMediaPage() {
                 <div className="space-y-2">
                   {filteredMedia.map((item, index) => (
                     <article key={item.id} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                      <button type="button" onClick={() => openMedia(item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                      <button type="button" onClick={() => openMediaWithSeen(item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><Music2 className="h-6 w-6" /></span>
                         <span className="min-w-0"><span className="block truncate text-sm font-black text-slate-900">{item.file.name}</span><span className="text-xs text-slate-400">Track {index + 1} · {formatBytes(item.file.size)}</span></span>
                       </button>
@@ -234,11 +244,11 @@ export default function UniqueMediaPage() {
                 <div className="space-y-2">
                   {filteredMedia.map((item) => (
                     <article key={item.id} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <button type="button" onClick={() => openMedia(item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                      <button type="button" onClick={() => openMediaWithSeen(item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600"><FileText className="h-6 w-6" /></span>
                         <span className="min-w-0"><span className="block truncate text-sm font-black text-slate-900">{item.file.name}</span><span className="text-xs text-slate-400">PDF · {formatBytes(item.file.size)}</span></span>
                       </button>
-                      <button type="button" onClick={() => openMedia(item)} className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white">Open</button>
+                      <button type="button" onClick={() => openMediaWithSeen(item)} className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white">Open</button>
                     </article>
                   ))}
                 </div>
