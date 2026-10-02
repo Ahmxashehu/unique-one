@@ -65,6 +65,7 @@ import RoleGuard from "./components/auth/RoleGuard";
 
 
 import InstallPrompt from "./components/InstallPrompt";
+import GlobalLanguageLayer from "./components/GlobalLanguageLayer";
 import OfflineIndicator from "./components/OfflineIndicator";
 
 
@@ -201,7 +202,8 @@ export default function App() {
       <OfflineQueueProvider>
         <BrowserRouter>
           <div className="flex flex-col h-screen overflow-hidden w-full max-w-[100vw]">
-            <OfflineIndicator />
+            <GlobalLanguageLayer />
+          <OfflineIndicator />
           <InstallPrompt />
           <SyncOverlay />
           <U1Loader visible={u1Booting} />
