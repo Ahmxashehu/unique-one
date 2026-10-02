@@ -110,4 +110,5 @@ export type UniqueAiRequest = {
   message: unknown;
   history?: unknown;
   requestId?: unknown;
+  preferredLanguage?: string;
 };
