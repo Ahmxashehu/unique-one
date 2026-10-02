@@ -24,14 +24,21 @@ export default function PublicLayout() {
       {location.pathname !== '/' && (
         <header className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-100 shrink-0">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="unique-u1-glow relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full" aria-label="UniquePlatform">
-                <span className="unique-u1-orbit unique-u1-orbit-ring absolute inset-0 rounded-full" aria-hidden="true" />
-                <span className="unique-u1-mark relative z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/90 bg-white text-[11px] font-black tracking-[-0.08em] text-emerald-700 shadow-sm">
+            <Link
+              to="/"
+              className="group flex min-w-0 items-center gap-2.5"
+              aria-label="UniquePlatform"
+            >
+              <span className="unique-platform-orb relative flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden="true">
+                <span className="unique-platform-orb-sphere absolute inset-0 rounded-full" />
+                <span className="unique-platform-orb-ring absolute inset-[-1px] rounded-full" />
+                <span className="unique-platform-orb-mark relative z-10 text-[10px] font-black tracking-[-0.08em] text-white">
                   UP
                 </span>
-              </div>
-              <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">UNIQUEPLATFORM</span>
+              </span>
+              <span className="unique-platform-wordmark truncate text-[1.05rem] font-extrabold tracking-[-0.035em] text-slate-950 sm:text-xl">
+                UniquePlatform
+              </span>
             </Link>
             <nav className="hidden md:flex gap-6 items-center">
               <Link to="/discover" className="text-sm font-medium text-slate-600 hover:text-slate-900">{t('activeEdge', language)}</Link>
