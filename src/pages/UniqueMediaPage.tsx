@@ -718,7 +718,7 @@ export default function UniqueMediaPage() {
                     {React.createElement(iconForKind(activeKind), { className: 'h-6 w-6' })}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300">Your {categories.find(([value]) => value === activeKind)?.[1] || 'media'}}</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300">Your {categories.find(([value]) => value === activeKind)?.[1] || 'media'}</p>
                     <h3 className="mt-1 text-2xl font-black tracking-tight">This category is ready for you.</h3>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">
                       {activeKind === 'video' && 'Connect phone media to watch with queue controls, PiP and background audio on supported devices.'}
