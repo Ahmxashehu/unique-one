@@ -214,6 +214,38 @@ class MainActivity : ComponentActivity() {
                 })
             }
         }
+        @JavascriptInterface fun shareNativeMedia(idsJson: String): Boolean {
+            return try {
+                val ids = JSONArray(idsJson)
+                val uris = ArrayList<Uri>()
+                var mime: String? = null
+                for (index in 0 until ids.length()) {
+                    val key = ids.optString(index)
+                    val record = nativeMedia[key] ?: return false
+                    uris.add(record.first)
+                    val nextMime = record.second
+                    mime = when {
+                        mime == null -> nextMime
+                        mime == nextMime -> mime
+                        mime.substringBefore("/") == nextMime.substringBefore("/") -> mime
+                        else -> "*/*"
+                    }
+                }
+                if (uris.isEmpty()) return false
+                val sendIntent = Intent().apply {
+                    action = if (uris.size == 1) Intent.ACTION_SEND else Intent.ACTION_SEND_MULTIPLE
+                    type = mime ?: "*/*"
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    if (uris.size == 1) putExtra(Intent.EXTRA_STREAM, uris.first())
+                    else putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                }
+                startActivity(Intent.createChooser(sendIntent, "Share with"))
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
+
         @JavascriptInterface fun openExternalShare(uri: String) {
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                 type = "*/*"
