@@ -20,7 +20,7 @@ export type UniqueShareFile = {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const user = auth.currentUser;
-  if (!user) throw new Error("Sign in is required for UniqueShare.");
+  if (!user) throw new Error("A secure guest session is required for UniqueShare.");
   const token = await user.getIdToken();
   const response = await fetch(path, {
     ...init,
