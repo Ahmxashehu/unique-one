@@ -4,7 +4,7 @@ import { Cloud, FileText, FolderOpen, Image as ImageIcon, Music2, Pause, Play, S
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
-import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia, loadNativeSharedMedia } from '../lib/media/deviceMedia';
+import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia, loadNativeSharedMedia, shareNativeMedia } from '../lib/media/deviceMedia';
 import { stageMediaForDestination } from '../lib/media/shareBridge';
 
 type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
