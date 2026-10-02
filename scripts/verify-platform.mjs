@@ -29,6 +29,7 @@ assert(globalLanguage.includes("placeholder"), "form placeholders are included i
 const backendSources = [
   ["server.ts", read("server.ts")],
   ["src/server/ajoRoutes.ts", read("src/server/ajoRoutes.ts")],
+  ["src/server/identityVerificationRoutes.ts", read("src/server/identityVerificationRoutes.ts")],
   ["src/server/uniqueShareRoutes.ts", read("src/server/uniqueShareRoutes.ts")],
 ];
 for (const route of ["/api/health", "/api/communication", "/api/unique-share", "/api/ajo", "/api/verification", "/api/auth/unique-otp"]) {
