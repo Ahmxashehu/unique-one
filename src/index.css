@@ -526,3 +526,9 @@ button, input, textarea, select {
     min-height: 2.875rem;
   }
 }
+
+
+/* Modern typography pass: reduce legacy ultra-bold utility weight without changing layout or functionality. */
+.font-black {
+  font-weight: 650 !important;
+}
