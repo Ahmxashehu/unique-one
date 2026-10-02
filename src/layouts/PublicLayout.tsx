@@ -17,8 +17,11 @@ export default function PublicLayout() {
         <header className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-100 shrink-0">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">UP</span>
+              <div className="unique-u1-glow relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full" aria-label="UniquePlatform">
+                <span className="unique-u1-orbit unique-u1-orbit-ring absolute inset-0 rounded-full" aria-hidden="true" />
+                <span className="unique-u1-mark relative z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/90 bg-white text-[11px] font-black tracking-[-0.08em] text-emerald-700 shadow-sm">
+                  UP
+                </span>
               </div>
               <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">UNIQUEPLATFORM</span>
             </Link>
