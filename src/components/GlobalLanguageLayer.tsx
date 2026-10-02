@@ -15,14 +15,16 @@ const UI: Record<SupportedLanguage, Record<Phrase, string>> = {
     "Change Password":"Canja kalmar sirri", Password:"Kalmar sirri", Email:"Imel", Phone:"Waya", Name:"Suna", Address:"Adireshi",
     "First name":"Sunan farko", "Last name":"Sunan ƙarshe", Country:"Ƙasa", State:"Jiha", City:"Birni", "Date of birth":"Ranar haihuwa",
     "Forgot password?":"Ka manta kalmar sirri?", "Don't have an account?":"Ba ka da asusu?", "Already have an account?":"Kana da asusu?",
-    "Get started":"Fara", "Learn more":"Ƙara koyo", "View all":"Duba duka", More:"Ƙari", Menu:"Menu", Home:"Gida",
-    "Your cart":"Kwandonka", Cart:"Kwando", Checkout:"Biya", Payment:"Biya", Wallet:"Walat", Transactions:"Mu'amaloli",
-    Products:"Kayayyaki", Product:"Kaya", Services:"Ayyuka", Service:"Aiki", Store:"Shago", Shop:"Sayi", Sell:"Sayar",
-    Buy:"Saya", Orders:"Oda", Delivery:"Isarwa", Location:"Wuri", "Near you":"Kusa da kai", Notifications:"Sanarwa",
-    "No results":"Babu sakamako", "Try again":"Sake gwadawa", "Something went wrong":"An samu matsala", Retry:"Sake gwadawa",
-    "Please wait":"Don Allah jira", "Coming soon":"Nan ba da jimawa ba", "View details":"Duba bayanai", Details:"Bayanai",
-    "Search...":"Bincika...", "Search products":"Bincika kayayyaki", "Add to cart":"Ƙara zuwa kwando", "Buy now":"Saya yanzu",
-    "Remove":"Cire", Delete:"Share", Update:"Sabunta", Create:"Ƙirƙira", Done:"An gama", Yes:"Eh", No:"A'a"
+    "Get started":"Fara", "Learn more":"Ƙara koyo", "View all":"Duba duka", More:"Ƙari", Menu:"Menu", "Your cart":"Kwandonka",
+    Cart:"Kwando", Checkout:"Biya", Payment:"Biya", Wallet:"Walat", Transactions:"Mu'amaloli", Products:"Kayayyaki", Product:"Kaya",
+    Services:"Ayyuka", Service:"Aiki", Store:"Shago", Shop:"Sayi", Sell:"Sayar", Buy:"Saya", Delivery:"Isarwa", Location:"Wuri",
+    "Near you":"Kusa da kai", "No results":"Babu sakamako", "Try again":"Sake gwadawa", "Something went wrong":"An samu matsala",
+    Retry:"Sake gwadawa", "Please wait":"Don Allah jira", "Coming soon":"Nan ba da jimawa ba", "View details":"Duba bayanai",
+    Details:"Bayanai", "Search...":"Bincika...", "Search products":"Bincika kayayyaki", "Add to cart":"Ƙara zuwa kwando",
+    "Buy now":"Saya yanzu", Remove:"Cire", Delete:"Share", Update:"Sabunta", Create:"Ƙirƙira", Done:"An gama", Yes:"Eh", No:"A'a",
+    Restaurant:"Gidan abinci", Hotel:"Otal", Flights:"Jirage", School:"Makaranta", Transportation:"Sufuri", "Real Estate":"Gidaje",
+    "Global Search":"Bincike na duniya", Jobs:"Ayyuka", Contributions:"Gudummawa", Education:"Ilimi", Travel:"Tafiya",
+    "Open UniqueOS":"Buɗe UniqueOS", "More experiences":"Ƙarin ayyuka"
   },
   fr: {
     Home:"Accueil", Search:"Rechercher", AI:"IA", Language:"Langue", "Light mode":"Mode clair", "Dark mode":"Mode sombre",
@@ -42,7 +44,9 @@ const UI: Record<SupportedLanguage, Record<Phrase, string>> = {
     "Something went wrong":"Une erreur s’est produite", Retry:"Réessayer", "Please wait":"Veuillez patienter", "Coming soon":"Bientôt disponible",
     "View details":"Voir les détails", Details:"Détails", "Search...":"Rechercher...", "Search products":"Rechercher des produits",
     "Add to cart":"Ajouter au panier", "Buy now":"Acheter maintenant", Remove:"Supprimer", Delete:"Supprimer", Update:"Mettre à jour",
-    Create:"Créer", Done:"Terminé", Yes:"Oui", No:"Non"
+    Create:"Créer", Done:"Terminé", Yes:"Oui", No:"Non", Restaurant:"Restaurant", Hotel:"Hôtel", Flights:"Vols", School:"École",
+    Transportation:"Transport", "Real Estate":"Immobilier", "Global Search":"Recherche globale", Jobs:"Emplois", Contributions:"Contributions",
+    Education:"Éducation", Travel:"Voyage", "Open UniqueOS":"Ouvrir UniqueOS", "More experiences":"Plus d’expériences"
   },
   ig: {
     Home:"Ụlọ", Search:"Chọọ", AI:"AI", Language:"Asụsụ", "Light mode":"Ọnọdụ ọkụ", "Dark mode":"Ọnọdụ ọchịchịrị",
@@ -58,7 +62,10 @@ const UI: Record<SupportedLanguage, Record<Phrase, string>> = {
     Store:"Ụlọ ahịa", Shop:"Ụlọ ahịa", Sell:"Ree", Buy:"Zụta", Delivery:"Nnyefe", Location:"Ebe", "Near you":"N’akụkụ gị",
     "No results":"Enweghị nsonaazụ", "Try again":"Nwaa ọzọ", "Please wait":"Biko chere", "Coming soon":"Na-abịa n’oge na-adịghị anya",
     "View details":"Lee nkọwa", Details:"Nkọwa", "Search...":"Chọọ...", "Search products":"Chọọ ngwaahịa", "Add to cart":"Tinye na akpa",
-    "Buy now":"Zụta ugbu a", Remove:"Wepụ", Delete:"Hichapụ", Update:"Melite", Create:"Mepụta", Done:"Emechara", Yes:"Ee", No:"Mba"
+    "Buy now":"Zụta ugbu a", Remove:"Wepụ", Delete:"Hichapụ", Update:"Melite", Create:"Mepụta", Done:"Emechara", Yes:"Ee", No:"Mba",
+    Restaurant:"Ụlọ oriri", Hotel:"Ụlọ nkwari akụ", Flights:"Ụgbọ elu", School:"Ụlọ akwụkwọ", Transportation:"Ụgbọ njem",
+    "Real Estate":"Ala na ụlọ", "Global Search":"Ọchụchọ zuru ụwa", Jobs:"Ọrụ", Contributions:"Onyinye", Education:"Agụmakwụkwọ",
+    Travel:"Njem", "Open UniqueOS":"Mepee UniqueOS", "More experiences":"Ahụmịhe ndị ọzọ"
   },
   yo: {
     Home:"Ilé", Search:"Wa", AI:"AI", Language:"Èdè", "Light mode":"Ipo ìmọ́lẹ̀", "Dark mode":"Ipo òkùnkùn",
@@ -74,21 +81,26 @@ const UI: Record<SupportedLanguage, Record<Phrase, string>> = {
     Services:"Àwọn iṣẹ́", Service:"Iṣẹ́", Store:"Ilé ìtajà", Shop:"Ilé ìtajà", Sell:"Ta", Buy:"Ra", Delivery:"Ìfijiṣẹ́", Location:"Ibi",
     "Near you":"Nítòsí rẹ", "No results":"Kò sí àbájáde", "Try again":"Gbìyànjú lẹ́ẹ̀kan síi", "Please wait":"Jọ̀wọ́ dúró",
     "Coming soon":"Ó ń bọ̀ láìpẹ́", "View details":"Wo àwọn àlàyé", Details:"Àwọn àlàyé", "Search...":"Wá...", "Search products":"Wá àwọn ọjà",
-    "Add to cart":"Fi sínú àpò", "Buy now":"Ra nísinsìnyí", Remove:"Yọ", Delete:"Paarẹ́", Update:"Ṣàfikún", Create:"Ṣẹ̀dá", Done:"Ti parí", Yes:"Bẹ́ẹ̀ni", No:"Rárá"
+    "Add to cart":"Fi sínú àpò", "Buy now":"Ra nísinsìnyí", Remove:"Yọ", Delete:"Paarẹ́", Update:"Ṣàfikún", Create:"Ṣẹ̀dá", Done:"Ti parí", Yes:"Bẹ́ẹ̀ni", No:"Rárá",
+    Restaurant:"Ilé ìjẹun", Hotel:"Hotẹẹli", Flights:"Àwọn ọkọ̀ òfuurufú", School:"Ilé ẹ̀kọ́", Transportation:"Ìrìnàjò", "Real Estate":"Ohun-ìní ilẹ̀",
+    "Global Search":"Ìwádìí àgbáyé", Jobs:"Àwọn iṣẹ́", Contributions:"Àwọn àfikún", Education:"Ẹ̀kọ́", Travel:"Ìrìnàjò", "Open UniqueOS":"Ṣí UniqueOS", "More experiences":"Àwọn ìrírí míì"
   },
   pcm: {
     Home:"House", Search:"Find", AI:"AI", Language:"Language", "Light mode":"Light mode", "Dark mode":"Dark mode",
     "Log in":"Login", "Sign Up":"Sign Up", Register:"Register", Categories:"Categories", "Near Me":"Near Me", About:"About", Support:"Support",
     Close:"Close", Cancel:"Cancel", Save:"Save", Back:"Back", Next:"Next", Continue:"Continue", Submit:"Send", Settings:"Settings",
     Profile:"Profile", Messages:"Messages", Orders:"Orders", Bookings:"Bookings", Wishlist:"Wishlist", Notifications:"Notifications", Logout:"Logout",
-    Send:"Send", Receive:"Receive", "Welcome back":"Welcome back", "Create account":"Create account", Loading:"E dey load", Error:"Error", Success:"Success",
+    Send:"Send", Receive:"Receive", "Welcome back":"Welcome back", "Create account":"Create account", Loading:"E dey load", Error:"Error", Success:"Error",
     "My Account":"My Account", "My Profile":"My Profile", Password:"Password", Email:"Email", Phone:"Phone", Name:"Name", Address:"Address",
     Country:"Country", State:"State", City:"City", "Get started":"Start", "Learn more":"Learn more", "View all":"See all", More:"More", Menu:"Menu",
     Cart:"Cart", Checkout:"Checkout", Payment:"Payment", Wallet:"Wallet", Transactions:"Transactions", Products:"Products", Product:"Product",
     Services:"Services", Service:"Service", Store:"Store", Shop:"Shop", Sell:"Sell", Buy:"Buy", Delivery:"Delivery", Location:"Location",
     "Near you":"Near you", "No results":"No results", "Try again":"Try again", "Please wait":"Abeg wait", "Coming soon":"E dey come soon",
     "View details":"See details", Details:"Details", "Search...":"Find...", "Search products":"Find products", "Add to cart":"Add to cart",
-    "Buy now":"Buy now", Remove:"Remove", Delete:"Delete", Update:"Update", Create:"Create", Done:"Done", Yes:"Yes", No:"No"
+    "Buy now":"Buy now", Remove:"Remove", Delete:"Delete", Update:"Update", Create:"Create", Done:"Done", Yes:"Yes", No:"No",
+    Restaurant:"Chop place", Hotel:"Hotel", Flights:"Flights", School:"School", Transportation:"Transport", "Real Estate":"Land and house",
+    "Global Search":"Search everywhere", Jobs:"Work", Contributions:"Contributions", Education:"Education", Travel:"Travel",
+    "Open UniqueOS":"Open UniqueOS", "More experiences":"More experiences"
   }
 };
 
@@ -100,14 +112,20 @@ const reverse = (language:SupportedLanguage) => {
   });
   return out;
 };
+const canonicalEnglish = (value:string) => {
+  const key = norm(value);
+  for (const language of Object.keys(UI) as SupportedLanguage[]) {
+    const english = reverse(language)[key];
+    if (english) return english;
+  }
+  return key;
+};
 
 function translateText(value:string, language:SupportedLanguage) {
-  const map = UI[language] || {};
-  const back = reverse(language);
-  const key = norm(value);
-  const english = back[key] || key;
-  const translated = map[english];
-  return translated || (language === "en" ? english : value);
+  const english = canonicalEnglish(value);
+  const translated = UI[language]?.[english];
+  if (translated) return translated;
+  return language === "en" ? english : value;
 }
 
 function apply(root:Node, language:SupportedLanguage) {
@@ -115,7 +133,6 @@ function apply(root:Node, language:SupportedLanguage) {
   const nodes:Text[] = [];
   let node:Node|null;
   while ((node = walker.nextNode())) nodes.push(node as Text);
-
   nodes.forEach(textNode => {
     const parent = textNode.parentElement;
     if (!parent || parent.closest("script,style,noscript,[data-no-translate],[data-i18n]")) return;
@@ -128,12 +145,10 @@ function apply(root:Node, language:SupportedLanguage) {
       textNode.nodeValue = raw.slice(0,start) + translated + raw.slice(start + trimmed.length);
     }
   });
-
   document.querySelectorAll("[data-i18n]").forEach(el => {
     const key = el.getAttribute("data-i18n");
     if (key) el.textContent = t(key, language);
   });
-
   document.querySelectorAll("input[placeholder],textarea[placeholder],[title],[aria-label],[alt]").forEach(el => {
     ["placeholder","title","aria-label","alt"].forEach(attr => {
       const value = el.getAttribute(attr);
