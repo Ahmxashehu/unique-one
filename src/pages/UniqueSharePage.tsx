@@ -278,7 +278,7 @@ export default function UniqueSharePage() {
               <p className="mt-3 text-xs text-slate-400">QR scanning is available on supported browsers. The camera preview is shown while scanning, and the authenticated token remains the pairing credential.</p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-slate-900 p-6"><div className="flex items-center gap-3"><CheckCircle2 className={session?.status === "accepted" ? "h-6 w-6 text-emerald-300" : "h-6 w-6 text-slate-500"} /><p className="font-bold">{session?.status === "accepted" ? "Receiver accepted — ready to send." : "Waiting for receiver to connect and accept…"}</p></div></div>
-            {session?.status === "accepted" && <TransferPanel files={files} selectedFiles={selectedFiles} setSelectedFiles={setSelectedFiles} uploadProgress={uploadProgress} busy={busy} onUpload={() => void uploadSelected()} />}
+            {session?.status === "accepted" && <CyclePanel files={files} selectedFiles={selectedFiles} setSelectedFiles={setSelectedFiles} uploadProgress={uploadProgress} busy={busy} onUpload={() => void uploadSelected()} onDownload={downloadFile} />}
           </section>
         ) : (
           <section className="mt-5 space-y-4">
