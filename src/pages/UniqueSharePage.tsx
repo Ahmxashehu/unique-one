@@ -331,7 +331,7 @@ export default function UniqueSharePage() {
           <p className="relative mt-3 text-center text-xs text-slate-400">Guest sharing · no login or registration · connect → choose files → send or receive.</p>
         </header>
 
-        {!authenticated ? (
+        {!guestAccessReady ? (
           <section className="mt-5 rounded-3xl border border-amber-400/20 bg-amber-950/30 p-6 text-sm text-amber-100">Guest sharing is available. No registration or login is required.</section>
         ) : mode === "home" ? (
           <section className="mt-5">
