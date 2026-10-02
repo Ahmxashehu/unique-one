@@ -43,6 +43,7 @@ export default function UniqueSharePage() {
   const [files, setFiles] = useState<UniqueShareFile[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -133,7 +134,8 @@ export default function UniqueSharePage() {
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
       const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-      scanTimerRef.current = window.setInterval(async () => {
+      setScanning(true);
+    scanTimerRef.current = window.setInterval(async () => {
         if (!videoRef.current) return;
         try {
           const results = await detector.detect(videoRef.current);
@@ -255,7 +257,7 @@ export default function UniqueSharePage() {
               <div className="flex items-center gap-3"><QrCode className="h-6 w-6 text-emerald-300" /><div><h2 className="font-black">Secure connection</h2><p className="text-xs text-slate-400">One-time session · expires in 5 minutes</p></div></div>
               <div className="mt-5 break-all rounded-2xl border border-emerald-400/20 bg-black/30 p-5 text-center font-mono text-sm text-emerald-200">{connectionToken}</div>
               <div className="mt-3 flex gap-2"><button type="button" onClick={() => void copyToken()} className="flex-1 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black"><Copy className="mr-2 inline h-4 w-4" />Copy connection</button><button type="button" onClick={() => void reset()} className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-bold"><X className="inline h-4 w-4" /></button></div>
-              <p className="mt-3 text-xs text-slate-400">The current web build provides QR scanning on supported browsers; QR display can be added without changing this authenticated session protocol.</p>
+              <p className="mt-3 text-xs text-slate-400">QR scanning is available on supported browsers. The camera preview is shown while scanning, and the authenticated token remains the pairing credential.</p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-slate-900 p-6"><div className="flex items-center gap-3"><CheckCircle2 className={session?.status === "accepted" ? "h-6 w-6 text-emerald-300" : "h-6 w-6 text-slate-500"} /><p className="font-bold">{session?.status === "accepted" ? "Receiver accepted — ready to send." : "Waiting for receiver to connect and accept…"}</p></div></div>
             {session?.status === "accepted" && <TransferPanel files={files} selectedFiles={selectedFiles} setSelectedFiles={setSelectedFiles} uploadProgress={uploadProgress} busy={busy} onUpload={() => void uploadSelected()} />}
@@ -265,8 +267,8 @@ export default function UniqueSharePage() {
             {!session ? (
               <div className="rounded-3xl border border-emerald-400/20 bg-slate-900 p-6">
                 <div className="flex items-center gap-3"><ScanLine className="h-6 w-6 text-emerald-300" /><h2 className="font-black">Connect securely</h2></div>
-                <button type="button" onClick={() => void startScanner()} className="mt-5 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black"><ScanLine className="mr-2 inline h-4 w-4" />Scan secure QR</button>
-                <video ref={videoRef} muted playsInline className="mt-4 hidden aspect-video w-full rounded-2xl bg-black object-cover" />
+                <button type="button" onClick={() => void startScanner()} className="mt-5 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black disabled:opacity-40" disabled={scanning}><ScanLine className="mr-2 inline h-4 w-4" />{scanning ? "Scanning secure QR…" : "Scan secure QR"}</button>
+                <video ref={videoRef} muted playsInline className="mt-4 aspect-video w-full rounded-2xl bg-black object-cover" aria-label="UniqueShare QR scanner camera" />
                 <div className="my-4 text-center text-xs font-bold text-slate-500">OR ENTER CONNECTION TOKEN</div>
                 <input value={inputToken} onChange={e => setInputToken(e.target.value)} placeholder="U1SHARE1.…" className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-xs text-white outline-none focus:border-emerald-400" />
                 <div className="mt-3 flex gap-2"><button type="button" disabled={busy || !inputToken.trim()} onClick={() => void connectReceive()} className="flex-1 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black disabled:opacity-40">Connect</button><button type="button" onClick={() => void reset()} className="rounded-2xl border border-white/10 px-4 py-3"><X className="h-4 w-4" /></button></div>
