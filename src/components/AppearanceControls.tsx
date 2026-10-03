@@ -53,7 +53,7 @@ export default function AppearanceControls() {
 
   return (
     <>
-      <div className="fixed right-3 top-11 z-[80] flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 p-1 shadow-lg shadow-slate-900/5 backdrop-blur-xl transition-all unique-appearance-controls sm:right-4 sm:top-11">
+      <div className="fixed right-3 top-7 z-[80] flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 p-1 shadow-lg shadow-slate-900/5 backdrop-blur-xl transition-all unique-appearance-controls sm:right-4 sm:top-7">
       <div className="relative flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden="true">
         <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-emerald-400 border-r-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.65)]" style={{ animationDuration: '2.4s' }} />
         <span className="absolute inset-[-2px] animate-pulse rounded-full bg-emerald-400/15 blur-md" />
