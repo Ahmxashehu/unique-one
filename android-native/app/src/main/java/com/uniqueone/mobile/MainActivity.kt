@@ -200,7 +200,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun scanMedia(limit: Int = 100, offset: Int = 0) {
+    private fun scanMedia(limit: Int = 100, offset: Int = 0): JSONArray {
         nativeMedia.clear()
         val result = JSONArray()
         if (!mediaAccessGranted()) return result
