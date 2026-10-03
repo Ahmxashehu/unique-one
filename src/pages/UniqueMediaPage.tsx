@@ -130,7 +130,7 @@ export default function UniqueMediaPage() {
           setDeviceMessage('Preparing secure phone media access…');
           const granted = await requestNativeMediaAccess();
           if (!granted || cancelled) {
-            if (!cancelled) setDeviceMessage('Phone media permission was not granted. You can try again with Connect phone media.');
+            if (!cancelled) setDeviceMessage('Phone media permission was not granted. Check Android permissions and try again.');
             return;
           }
           const nativeItems = await loadNativeAndroidMedia(0, 100);
@@ -249,7 +249,7 @@ export default function UniqueMediaPage() {
     }
     const items = media.filter((item) => item.kind === activeKind && !item.id.startsWith('shared:'));
     if (!items.length) {
-      setLocalShareMessage('No phone media is available to send yet. Connect phone media first.');
+      setLocalShareMessage('No phone media is available to send yet. Add files or receive media first.');
       return;
     }
     const selectedItems = items.filter((item) => selected.includes(item.id));
