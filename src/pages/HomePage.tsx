@@ -781,21 +781,7 @@ export default function HomePage() {
                       <div className="grid grid-cols-2 gap-2">
                         {[
                           ['Business Dashboard', '/os/business/dashboard'],
-                          ['Products & Catalog', '/os/business/catalog'],
-                          ['Orders', '/os/business/orders'],
-                          ['Inventory', '/os/business/inventory'],
-                          ['Customers', '/os/business/customers'],
-                          ['Suppliers', '/os/business/suppliers'],
-                          ['Invoices', '/os/business/invoices'],
-                          ['Finance', '/os/business/finance'],
-                          ['Reports & Analytics', '/os/business/reports'],
-                          ['Staff & Teams', '/os/business/staff'],
-                          ['Branches', '/os/business/branches'],
-                          ['Activity Logs', '/os/business/activity'],
-                          ['Business Settings', '/os/business/settings'],
-                          ['Messages', '/os/messages'],
-                          ['Unique Store', '/store'],
-                          ['UniquePay', '/os/pay'],
+                          ['Pros Near Me', '/discover?mode=services'],
                         ].map(([label, href]) => (
                           <Link key={label} to={href} className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 sm:rounded-2xl sm:p-3">
                             <ArrowRight className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
