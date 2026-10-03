@@ -387,8 +387,8 @@ export default function HomePage() {
       {/* Sticky discovery header */}
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
         <div className="relative h-8 border-b border-slate-100/90 bg-slate-50/70 px-3" aria-label="Independent smart status controls">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2">
-            <div className="inline-flex h-6 items-center rounded-full border border-slate-200/80 bg-white/95 px-2.5 text-[9px] font-bold text-slate-600 shadow-sm" aria-label="Current date">
+          <div className="absolute left-2 top-1/2 -translate-y-1/2">
+            <div className="inline-flex h-6 items-center rounded-full border border-slate-200/80 bg-white/95 px-2 text-[9px] font-bold text-slate-600 shadow-sm" aria-label="Current date">
               <span>{smartNow.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" })}</span>
             </div>
           </div>
