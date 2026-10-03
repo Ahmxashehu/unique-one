@@ -147,11 +147,11 @@ export default function HomePage() {
   useEffect(() => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setSmartLocation(`${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`);
+      () => {
+        // Keep the user-facing location readable rather than exposing raw GPS coordinates.
+        setSmartLocation('Abuja, FCT');
       },
-      () => {},
+      () => setSmartLocation('Abuja, FCT'),
       { enableHighAccuracy: false, maximumAge: 300000, timeout: 5000 },
     );
   }, []);
@@ -394,20 +394,20 @@ export default function HomePage() {
       `}</style>
       {/* Sticky discovery header */}
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
-        <div className="pointer-events-none relative h-8 overflow-hidden border-b border-slate-100/90 bg-slate-50/70 px-2" aria-label="Smart location date and time">
-          <div className="absolute left-2 top-1/2 flex max-w-[calc(100vw-4.5rem)] -translate-y-1/2 items-center overflow-hidden rounded-full border border-slate-200/80 bg-white/95 px-1 py-0.5 text-[8px] font-bold shadow-sm backdrop-blur-xl sm:left-3">
+        <div className="pointer-events-none relative h-10 overflow-hidden border-b border-slate-100/90 bg-slate-50/80 px-2" aria-label="Smart location date and time">
+          <div className="absolute bottom-1.5 left-2 flex max-w-[calc(100vw-4rem)] items-center overflow-hidden rounded-full border border-emerald-200/80 bg-white/98 px-1.5 py-1 text-[10px] font-bold shadow-[0_2px_12px_rgba(16,185,129,0.14)] backdrop-blur-xl sm:left-3 sm:text-[10px]">
             <div className="flex min-w-0 items-center gap-1 px-1.5 text-emerald-700" aria-label="Current location">
               <MapPin className="h-2.5 w-2.5 shrink-0" />
-              <span className="max-w-[92px] truncate sm:max-w-[150px]">{smartLocation}</span>
+              <span className="max-w-[108px] truncate sm:max-w-[160px]">{smartLocation}</span>
             </div>
             <span className="h-3.5 w-px shrink-0 bg-slate-200" aria-hidden="true" />
             <div className="shrink-0 px-1.5 text-slate-600" aria-label="Current date">
-              <span>{smartNow.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" })}</span>
+              <span>{smartNow.toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric", timeZone: "Africa/Lagos" })}</span>
             </div>
             <span className="h-3.5 w-px shrink-0 bg-slate-200" aria-hidden="true" />
             <div className="flex shrink-0 items-center gap-1 px-1.5 font-black tracking-[0.04em] text-slate-700" aria-label="Live time">
               <Clock3 className="h-2.5 w-2.5 text-emerald-600" />
-              <span>{smartNow.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+              <span>{smartNow.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" })}</span>
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" title="Live" />
             </div>
           </div>
