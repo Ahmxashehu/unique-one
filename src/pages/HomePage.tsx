@@ -394,19 +394,21 @@ export default function HomePage() {
       `}</style>
       {/* Sticky discovery header */}
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
-        <div className="pointer-events-none relative h-8 border-b border-slate-100/90 bg-slate-50/70 px-2" aria-label="Independent smart status controls">
-          <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 sm:right-3">
-            <div className="inline-flex h-6 shrink-0 items-center rounded-full border border-slate-200/80 bg-white/95 px-2 text-[9px] font-bold text-slate-600 shadow-sm" aria-label="Current date">
+        <div className="pointer-events-none relative h-8 overflow-hidden border-b border-slate-100/90 bg-slate-50/70 px-2" aria-label="Smart location date and time">
+          <div className="absolute left-2 top-1/2 flex max-w-[calc(100vw-4.5rem)] -translate-y-1/2 items-center overflow-hidden rounded-full border border-slate-200/80 bg-white/95 px-1 py-0.5 text-[8px] font-bold shadow-sm backdrop-blur-xl sm:left-3">
+            <div className="flex min-w-0 items-center gap-1 px-1.5 text-emerald-700" aria-label="Current location">
+              <MapPin className="h-2.5 w-2.5 shrink-0" />
+              <span className="max-w-[92px] truncate sm:max-w-[150px]">{smartLocation}</span>
+            </div>
+            <span className="h-3.5 w-px shrink-0 bg-slate-200" aria-hidden="true" />
+            <div className="shrink-0 px-1.5 text-slate-600" aria-label="Current date">
               <span>{smartNow.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" })}</span>
             </div>
-            <div className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-emerald-200/80 bg-white/95 px-2.5 text-[9px] font-black tracking-[0.06em] text-slate-700 shadow-sm" aria-label="Live time">
-              <Clock3 className="h-3 w-3 text-emerald-600" />
+            <span className="h-3.5 w-px shrink-0 bg-slate-200" aria-hidden="true" />
+            <div className="flex shrink-0 items-center gap-1 px-1.5 font-black tracking-[0.04em] text-slate-700" aria-label="Live time">
+              <Clock3 className="h-2.5 w-2.5 text-emerald-600" />
               <span>{smartNow.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" title="Live" />
-            </div>
-            <div className="inline-flex h-6 min-w-0 max-w-[42vw] items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/95 px-2.5 text-[9px] font-bold text-emerald-700 shadow-sm" aria-label="Current location">
-              <MapPin className="h-3 w-3 shrink-0" />
-              <span className="max-w-[105px] truncate sm:max-w-[180px]">{smartLocation}</span>
             </div>
           </div>
         </div>
