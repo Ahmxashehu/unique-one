@@ -201,7 +201,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun scanMedia(limit: Int = 100, offset: Int = 0): JSONArray {
-        nativeMedia.clear()
         val result = JSONArray()
         if (!mediaAccessGranted()) return result
         val sources = listOf(
@@ -387,6 +386,24 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface fun listMedia(): String = scanMedia().toString()
         @JavascriptInterface fun listMediaPage(offset: Int, limit: Int): String = scanMedia(limit, offset).toString()
         @JavascriptInterface fun refreshMediaIndex(): String = scanMedia().toString()
+        @JavascriptInterface fun deleteMedia(id: String): Boolean {
+            return try {
+                when {
+                    id.startsWith("received:") -> {
+                        val name = id.removePrefix("received:")
+                        val file = File(receivedMediaDir, name)
+                        if (file.canonicalFile.parentFile != receivedMediaDir.canonicalFile) false else file.delete()
+                    }
+                    id.startsWith("shared:") -> false
+                    else -> {
+                        val record = nativeMedia[id] ?: return false
+                        contentResolver.delete(record.first, null, null) > 0
+                    }
+                }
+            } catch (_: Exception) {
+                false
+            }
+        }
         @JavascriptInterface fun markMediaSeen(id: String) { if (id.startsWith("received:")) receivedSeenPrefs.edit().putBoolean(id, true).apply() }
         @JavascriptInterface fun getSharedMedia(): String = sharedMediaJson().toString()
         @JavascriptInterface fun openFilePicker() { filePicker.launch(arrayOf("*/*")) }
