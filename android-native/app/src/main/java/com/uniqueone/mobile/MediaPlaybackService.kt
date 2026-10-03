@@ -62,6 +62,11 @@ class MediaPlaybackService : MediaSessionService() {
             ACTION_PREVIOUS -> player?.seekToPreviousMediaItem()
             ACTION_TOGGLE_REPEAT -> player?.let { it.repeatMode = if (it.repeatMode == ExoPlayer.REPEAT_MODE_ALL) ExoPlayer.REPEAT_MODE_OFF else ExoPlayer.REPEAT_MODE_ALL }
             ACTION_TOGGLE_SHUFFLE -> player?.let { it.shuffleModeEnabled = !it.shuffleModeEnabled }
+            ACTION_SEEK_BY -> player?.let { exoPlayer ->
+                val requested = (exoPlayer.currentPosition + intent.getIntExtra(EXTRA_SEEK_SECONDS, 0) * 1000L).coerceAtLeast(0L)
+                val duration = exoPlayer.duration
+                exoPlayer.seekTo(if (duration != C.TIME_UNSET && duration >= 0L) requested.coerceAtMost(duration) else requested)
+            }
             ACTION_STOP -> {
                 player?.stop()
                 stopSelf()
@@ -86,6 +91,8 @@ class MediaPlaybackService : MediaSessionService() {
         const val ACTION_PREVIOUS = "com.uniqueone.mobile.PREVIOUS"
         const val ACTION_TOGGLE_REPEAT = "com.uniqueone.mobile.TOGGLE_REPEAT"
         const val ACTION_TOGGLE_SHUFFLE = "com.uniqueone.mobile.TOGGLE_SHUFFLE"
+        const val ACTION_SEEK_BY = "com.uniqueone.mobile.SEEK_BY"
+        const val EXTRA_SEEK_SECONDS = "seek_seconds"
         const val ACTION_STOP = "com.uniqueone.mobile.STOP"
         const val EXTRA_URIS = "uris"
         const val EXTRA_TITLES = "titles"
