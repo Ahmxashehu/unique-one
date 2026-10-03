@@ -458,7 +458,7 @@ export default function HomePage() {
               { label: 'UniquePay', description: 'Pay & transfer', href: '/os/pay', icon: WalletCards },
               { label: 'Unique Store', description: 'Buy & discover', href: '/store', icon: ShoppingBag },
               { label: 'Communication', description: 'Connect & chat', href: '/os/messages', icon: MessageCircle },
-              { label: 'Online Conference', description: 'Meet & connect', href: '/conference', icon: Video },
+    { label: 'Online Conference', description: 'Meet & connect', href: '/conference', icon: Video },
             ].map(({ label, description, href, icon: Icon }) => (
               <Link
                 key={label}
@@ -799,3 +799,41 @@ export default function HomePage() {
                           ['Inventory', '/os/business/inventory'],
                           ['Customers', '/os/business/customers'],
                           ['Suppliers', '/os/business/suppliers'],
+                          ['Invoices', '/os/business/invoices'],
+                          ['Finance', '/os/business/finance'],
+                          ['Reports & Analytics', '/os/business/reports'],
+                          ['Staff & Teams', '/os/business/staff'],
+                          ['Branches', '/os/business/branches'],
+                          ['Activity Logs', '/os/business/activity'],
+                          ['Business Settings', '/os/business/settings'],
+                          ['Messages', '/os/messages'],
+                          ['Unique Store', '/store'],
+                          ['UniquePay', '/os/pay'],
+                        ].map(([label, href]) => (
+                          <Link key={label} to={href} className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 sm:rounded-2xl sm:p-3">
+                            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                            <span className="min-w-0 break-words">{label}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </details>
+                <div className="mt-3 overflow-hidden rounded-xl bg-emerald-50 px-2 py-2 sm:rounded-full sm:px-3 sm:py-1.5"><p className="animate-[bounce_2.4s_ease-in-out_infinite] text-center text-[10px] leading-4 font-bold text-emerald-700 sm:whitespace-nowrap sm:text-xs sm:leading-normal">Some identity, NIN modification and CAC services require an authorized external provider; the links open the relevant existing platform areas.</p></div>
+              </div>
+              
+              <div className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50 p-3.5 sm:rounded-3xl sm:p-5">
+                <div className="flex min-w-0 items-start gap-2 font-black text-emerald-900">
+                  <Sparkles className="mt-0.5 h-5 w-5 shrink-0" />
+                  <span className="min-w-0 break-words text-sm leading-5 sm:text-base">One platform, many experiences</span>
+                </div>
+                <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 text-[11px] font-semibold text-emerald-900 sm:mt-4 sm:text-xs">
+                  <Link to="/os" className="rounded-2xl bg-white/80 p-3">UniqueCycle/Aju</Link>
+                </div>
+              </div>
+            </aside>
+          </div>        </section>
+      </div>
+    </main>
+  );
+}
