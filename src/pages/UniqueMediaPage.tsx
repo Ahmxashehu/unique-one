@@ -52,6 +52,7 @@ export default function UniqueMediaPage() {
   const [deviceMessage, setDeviceMessage] = useState('');
   const [player, setPlayer] = useState<LocalMedia | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [nativePlaybackActive, setNativePlaybackActive] = useState(false);
   const [videoAudioMode, setVideoAudioMode] = useState(false);
   const [deleting, setDeleting] = useState<string[]>([]);
   const [nativeOffset, setNativeOffset] = useState(0);
@@ -425,11 +426,12 @@ export default function UniqueMediaPage() {
     setVideoAudioMode(false);
     const queueIndex = playableQueue.findIndex((entry) => entry.id === item.id);
     setPlayerQueueIndex(queueIndex >= 0 ? queueIndex : 0);
+    // Use Media3 for Android phone-library audio; browser-picked files fall back to the HTML audio element.
+    const nativeStarted = item.kind === 'audio' && queueIndex >= 0 && supportsNativeAndroidStorage()
+      ? playNativeBackgroundMedia(playableQueue, queueIndex)
+      : false;
+    setNativePlaybackActive(nativeStarted);
     setIsPlaying(item.kind === 'video' || item.kind === 'audio');
-    // Native Android audio uses Media3 so playback survives screen lock and exposes system media controls.
-    if (item.kind === 'audio' && queueIndex >= 0 && supportsNativeAndroidStorage()) {
-      playNativeBackgroundMedia(playableQueue, queueIndex);
-    }
   };
   const playQueueItem = (index: number) => {
     if (!playableQueue.length) return;
@@ -443,8 +445,11 @@ export default function UniqueMediaPage() {
     setPlayer(item);
     setPlayerQueueIndex(nextIndex);
     setVideoAudioMode(false);
+    const nativeStarted = item.kind === 'audio' && supportsNativeAndroidStorage()
+      ? playNativeBackgroundMedia(playableQueue, nextIndex)
+      : false;
+    setNativePlaybackActive(nativeStarted);
     setIsPlaying(true);
-    if (supportsNativeAndroidStorage()) playNativeBackgroundMedia(playableQueue, nextIndex);
   };
   useEffect(() => {
     const session = (navigator as any).mediaSession;
@@ -458,13 +463,13 @@ export default function UniqueMediaPage() {
       session.playbackState = isPlaying ? 'playing' : 'paused';
       const handlers: Record<string, (details?: any) => void> = {
         play: () => {
-          if (supportsNativeAndroidStorage()) resumeNativeBackgroundMedia();
+          if (nativePlaybackActive) resumeNativeBackgroundMedia();
           else if (player.kind === 'audio') void playerAudioRef.current?.play();
           else if (playerVideoRef.current) void playerVideoRef.current.play();
           setIsPlaying(true);
         },
         pause: () => {
-          if (supportsNativeAndroidStorage()) pauseNativeBackgroundMedia();
+          if (nativePlaybackActive) pauseNativeBackgroundMedia();
           else if (player.kind === 'audio') playerAudioRef.current?.pause();
           else playerVideoRef.current?.pause();
           setIsPlaying(false);
@@ -483,7 +488,7 @@ export default function UniqueMediaPage() {
         try { session.setActionHandler(action, null); } catch { /* optional action */ }
       });
     };
-  }, [player, isPlaying, playerQueueIndex, playerLoop, playerShuffle, playableQueue]);
+  }, [player, isPlaying, playerQueueIndex, playerLoop, playerShuffle, playableQueue, nativePlaybackActive]);
 
   const toggleBackgroundPlayback = () => {
     if (!player || (player.kind !== 'audio' && player.kind !== 'video')) return;
@@ -493,12 +498,20 @@ export default function UniqueMediaPage() {
       return;
     }
     if (isPlaying) {
-      pauseNativeBackgroundMedia();
+      if (nativePlaybackActive) pauseNativeBackgroundMedia();
+      else if (player.kind === 'audio') playerAudioRef.current?.pause();
+      else playerVideoRef.current?.pause();
       setIsPlaying(false);
       return;
     }
-    const started = supportsNativeAndroidStorage() && playNativeBackgroundMedia(playableQueue, playerQueueIndex);
-    if (!started && playerVideoRef.current) void playerVideoRef.current.play();
+    const started = supportsNativeAndroidStorage() && (player.kind === 'audio' || videoAudioMode)
+      ? playNativeBackgroundMedia(playableQueue, playerQueueIndex)
+      : false;
+    setNativePlaybackActive(started);
+    if (!started) {
+      if (player.kind === 'audio') void playerAudioRef.current?.play();
+      else if (playerVideoRef.current) void playerVideoRef.current.play();
+    }
     setIsPlaying(true);
   };
   const deleteCurrentMedia = async () => {
@@ -507,13 +520,21 @@ export default function UniqueMediaPage() {
     await permanentDelete(current);
     if (!current.parentHandle || !current.entryName) removeMedia(current.id);
     setPlayer(null);
+    setNativePlaybackActive(false);
     stopNativeBackgroundMedia();
   };
 
   const toggleVideoAudioMode = () => {
-    setVideoAudioMode((current) => !current);
+    const enteringBackgroundAudio = !videoAudioMode;
+    setVideoAudioMode(enteringBackgroundAudio);
     setIsPlaying(true);
-    if (player?.kind === 'video') playNativeBackgroundMedia(playableQueue, playerQueueIndex);
+    if (player?.kind === 'video' && enteringBackgroundAudio) {
+      const started = supportsNativeAndroidStorage() && playNativeBackgroundMedia(playableQueue, playerQueueIndex);
+      setNativePlaybackActive(started);
+    } else {
+      stopNativeBackgroundMedia();
+      setNativePlaybackActive(false);
+    }
   };
 
   const backupToCloud = async () => {
@@ -914,7 +935,7 @@ export default function UniqueMediaPage() {
                    <h2 className="mt-2 truncate text-2xl font-black sm:text-3xl">{player.file.name}</h2>
                    <p className="mt-2 text-xs text-white/45">{playerQueueIndex + 1} of {playableQueue.length} · {formatBytes(player.file.size)}</p>
                    <div className="mt-6 flex h-10 items-center justify-center gap-1 overflow-hidden">{Array.from({length:36},(_,i)=><span key={i} className="w-1 rounded-full bg-emerald-300/60" style={{height:(10 + ((i*17)%26))+'px'}} />)}</div>
-                   <audio ref={playerAudioRef} key={player.id + '-audio'} src={player.url} controls autoPlay={isPlaying && !supportsNativeAndroidStorage()} className="mt-5 w-full opacity-90" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => playQueueItem(playerQueueIndex + 1)} />
+                   <audio ref={playerAudioRef} key={player.id + '-audio'} src={player.url} controls autoPlay={isPlaying && !nativePlaybackActive} className="mt-5 w-full opacity-90" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => playQueueItem(playerQueueIndex + 1)} />
                  </div>
                </div>}
             </div>
