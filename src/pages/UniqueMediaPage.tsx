@@ -336,7 +336,7 @@ export default function UniqueMediaPage() {
     }
   };
 
-  const permanentDelete = async (item: LocalMedia) => {
+  const permanentDelete = async (item: LocalMedia): Promise<boolean> => {
     if (!item.parentHandle || !item.entryName) {
       if (supportsNativeAndroidStorage()) {
         const deleted = deleteNativeMedia(item);
@@ -344,27 +344,29 @@ export default function UniqueMediaPage() {
           removeMedia(item.id);
           setDeviceMessage(item.file.name + ' was deleted from your device media library.');
           if (player?.id === item.id) setPlayer(null);
-        } else {
-          setDeviceMessage('Android could not delete this protected media item. The system may require a confirmation step.');
+          return true;
         }
-        return;
+        setDeviceMessage('Android could not delete this protected media item. The system may require a confirmation step. The item remains in your library.');
+        return false;
       }
-      setDeviceMessage('This item was added through a file picker and cannot be permanently deleted by the web app. Remove it from UniqueMedia instead.');
-      return;
+      setDeviceMessage('This item was added through a file picker and cannot be permanently deleted by the web app. The item remains in your library.');
+      return false;
     }
-    if (!window.confirm('Permanently delete "' + item.file.name + '" from the authorized device folder? This cannot be undone.')) return;
+    if (!window.confirm('Permanently delete "' + item.file.name + '" from the authorized device folder? This cannot be undone.')) return false;
     try {
       setDeleting((current) => [...current, item.id]);
       const deleted = await permanentlyDeleteDeviceMedia(item);
       if (!deleted) {
-        setDeviceMessage('Permanent deletion requires write permission for the authorized folder.');
-        return;
+        setDeviceMessage('Permanent deletion requires write permission for the authorized folder. The item remains in your library.');
+        return false;
       }
       removeMedia(item.id);
       setDeviceMessage(item.file.name + ' was permanently deleted from the authorized folder.');
       if (player?.id === item.id) setPlayer(null);
+      return true;
     } catch {
-      setDeviceMessage('Permanent deletion failed. The operating system may have denied the delete request.');
+      setDeviceMessage('Permanent deletion failed. The item remains in your library.');
+      return false;
     } finally {
       setDeleting((current) => current.filter((id) => id !== item.id));
     }
@@ -528,8 +530,8 @@ export default function UniqueMediaPage() {
   const deleteCurrentMedia = async () => {
     if (!player) return;
     const current = player;
-    await permanentDelete(current);
-    if (!current.parentHandle || !current.entryName) removeMedia(current.id);
+    const deleted = await permanentDelete(current);
+    if (!deleted) return;
     setPlayer(null);
     setNativePlaybackActive(false);
     stopNativeBackgroundMedia();
