@@ -518,19 +518,6 @@ export default function HomePage() {
                     </Link>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {[
-                      ['Videos', Play, 'video'],
-                      ['Audio', Play, 'audio'],
-                      ['Images', Compass, 'image'],
-                      ['PDF Reader', Bookmark, 'pdf'],
-                    ].map(([label, Icon, kind]) => (
-                      <Link key={String(label)} to={`/media?kind=${kind}`} className="flex min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 transition hover:border-emerald-300 hover:bg-emerald-50">
-                        <Icon className="h-4 w-4 shrink-0 text-emerald-600" />
-                        <span className="truncate text-xs font-bold text-slate-700">{label}</span>
-                      </Link>
-                    ))}
-                  </div>
 
                   <div className="mt-3 flex items-center gap-1.5 border-t border-slate-100 pt-3 text-[10px] font-semibold text-slate-500 sm:text-xs">
                     <span>Private by default</span>
