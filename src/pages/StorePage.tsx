@@ -45,7 +45,7 @@ export default function StorePage() {
   const [posterProgress, setPosterProgress] = useState(0);
 
   const storePosters = [
-    { eyebrow: 'UNIQUE STORE', title: 'Buy • Sell • Hire • Book • Discover', body: 'One modern marketplace for real products, trusted services, local businesses and everyday needs.', icon: ShoppingBag },
+    { eyebrow: 'UNIQUE STORE', title: 'Buy • Book • Discover', body: 'One modern marketplace for real products, trusted services, local businesses and everyday needs.', icon: ShoppingBag },
     { eyebrow: 'SHOP SMART', title: 'Find what you need. Discover what you love.', body: 'Explore live marketplace listings across products, services, agriculture, fashion, electronics and more.', icon: Sparkles },
     { eyebrow: 'SELL & GROW', title: 'Put your business in front of real customers.', body: 'Publish your products and services through Unique Store and connect with customers across Nigeria.', icon: Tag },
     { eyebrow: 'LOCAL TO GLOBAL', title: 'Your marketplace, wherever you are.', body: 'Discover nearby opportunities and marketplace experiences, built to grow from Nigeria to Africa and beyond.', icon: Globe2 },
@@ -209,9 +209,11 @@ export default function StorePage() {
                     <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-400/10 text-emerald-300">
                       <PosterIcon className="h-6 w-6" />
                     </div>
-                    <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-[-0.04em] leading-[1.02]">
-                      {poster.title}
-                    </h1>
+                    <div className="inline-flex rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-3 py-2">
+                      <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-[-0.04em] leading-[1.02]">
+                        {poster.title}
+                      </h1>
+                    </div>
                     <p className="mt-3 max-w-2xl text-xs sm:text-sm lg:text-base leading-6 text-white/70">
                       {poster.body}
                     </p>
@@ -238,19 +240,31 @@ export default function StorePage() {
         </div>
       </section>
 
-      <section className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div><h2 className="text-lg font-bold text-slate-900">Shop by category</h2><p className="text-xs sm:text-sm text-slate-500">Explore every marketplace department already supported by Unique Store.</p></div>
-          <Link to="/store/search" className="hidden sm:inline-flex items-center gap-1 text-sm font-semibold text-emerald-700">All items <ChevronRight className="w-4 h-4" /></Link>
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-1 snap-x">
-          {categories.map(category => {
-            const Icon = category.icon;
-            return <Link key={category.key} to={`/store/search?cat=${category.key}`} className="min-w-[96px] sm:min-w-[124px] snap-start rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 hover:border-emerald-300 hover:bg-emerald-50 transition-colors">
-              <Icon className="w-5 h-5 text-emerald-700" />
-              <p className="text-xs sm:text-sm font-semibold text-slate-800 mt-2 line-clamp-2">{category.label}</p>
-            </Link>;
-          })}
+      <section className="relative overflow-hidden rounded-[2rem] border border-emerald-200/70 bg-white shadow-xl">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(16,185,129,0.13),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(20,184,166,0.12),transparent_26%),linear-gradient(180deg,#ffffff,#f8fafc)]" />
+        <div className="relative p-3 sm:p-5 lg:p-6">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black tracking-[0.22em] text-emerald-700">UNIQUE STORE MARKETPLACE</p>
+              <h2 className="mt-1 text-xl sm:text-2xl font-black tracking-tight text-slate-950">Shop by category</h2>
+              <p className="mt-1 text-xs sm:text-sm text-slate-500">Discover products, services and opportunities across one connected marketplace.</p>
+            </div>
+            <Link to="/store/search" className="shrink-0 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">Browse all <ChevronRight className="h-4 w-4" /></Link>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2 sm:gap-3">
+            {categories.map((category, index) => {
+              const Icon = category.icon;
+              return <Link key={category.key} to={`/store/search?cat=${category.key}`} className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-lg hover:shadow-emerald-900/10">
+                <div className="absolute right-[-12px] top-[-12px] h-10 w-10 rounded-full bg-emerald-50 transition-transform group-hover:scale-150" />
+                <div className="relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700">
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+                <p className="relative mt-2 text-[10px] sm:text-xs font-black leading-tight text-slate-800 line-clamp-2">{category.label}</p>
+                <span className="relative mt-1 block text-[9px] font-semibold text-slate-400">Explore</span>
+                {index < 3 && <span className="absolute bottom-0 left-0 h-0.5 w-full bg-emerald-400/70 opacity-70" />}
+              </Link>;
+            })}
+          </div>
         </div>
       </section>
 
