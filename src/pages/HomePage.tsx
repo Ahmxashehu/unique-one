@@ -458,7 +458,6 @@ export default function HomePage() {
               { label: 'UniquePay', description: 'Pay & transfer', href: '/os/pay', icon: WalletCards },
               { label: 'Unique Store', description: 'Buy & discover', href: '/store', icon: ShoppingBag },
               { label: 'Communication', description: 'Connect & chat', href: '/os/messages', icon: MessageCircle },
-              { label: 'Online Conference', description: 'Meet & present', href: '/conference', icon: Video },
             ].map(({ label, description, href, icon: Icon }) => (
               <Link
                 key={label}
