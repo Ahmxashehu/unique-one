@@ -4,11 +4,14 @@ import { Cloud, FileText, Image as ImageIcon, Music2, Pause, Play, Search, Share
 import { auth, storage } from '../lib/firebase';
 import AuthActionGate from '../components/auth/AuthActionGate';
 import { getDownloadURL, listAll, ref, uploadBytesResumable } from 'firebase/storage';
-import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia, loadNativeSharedMedia, shareNativeMedia, markNativeMediaSeen, deleteNativeMedia, playNativeBackgroundMedia, pauseNativeBackgroundMedia, resumeNativeBackgroundMedia, stopNativeBackgroundMedia, toggleNativeBackgroundRepeat, toggleNativeBackgroundShuffle } from '../lib/media/deviceMedia';
+import { DeviceMediaItem, formatBytes, getStoredDeviceMediaDirectory, loadPickedDeviceMedia, permanentlyDeleteDeviceMedia, pickDeviceMediaDirectory, rememberDeviceMediaDirectory, scanDeviceMediaDirectory, supportsDeviceDirectoryAccess, supportsPhoneFilePicker, supportsNativeAndroidStorage, requestNativeMediaAccess, loadNativeAndroidMedia, loadNativeSharedMedia, shareNativeMedia, markNativeMediaSeen, deleteNativeMedia, playNativeBackgroundMedia, pauseNativeBackgroundMedia, resumeNativeBackgroundMedia, stopNativeBackgroundMedia, toggleNativeBackgroundRepeat, toggleNativeBackgroundShuffle, seekNativeBackgroundMedia } from '../lib/media/deviceMedia';
 import { stageMediaForDestination } from '../lib/media/shareBridge';
 
 type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
 type LocalMedia = DeviceMediaItem;
+
+const isNativeMediaItem = (item: LocalMedia): boolean =>
+  item.url.startsWith('https://unique.native/media/');
 
 const kindForFile = (file: File): Exclude<MediaKind, 'all'> | null => {
   if (file.type.startsWith('video/')) return 'video';
@@ -420,16 +423,20 @@ export default function UniqueMediaPage() {
     setSelected((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
   };
 
-  const playableQueue = useMemo(() => media.filter((item) => item.kind === 'audio' || item.kind === 'video'), [media]);
+  const queueKind = player?.kind === 'video' || (!player && activeKind === 'video') ? 'video' : 'audio';
+  const playableQueue = useMemo(() => media.filter((item) => item.kind === queueKind), [media, queueKind]);
   const openMedia = (item: LocalMedia) => {
     setPlayer(item);
     setVideoAudioMode(false);
-    const queueIndex = playableQueue.findIndex((entry) => entry.id === item.id);
+    const queue = media.filter((entry) => entry.kind === item.kind);
+    const queueIndex = queue.findIndex((entry) => entry.id === item.id);
     setPlayerQueueIndex(queueIndex >= 0 ? queueIndex : 0);
-    // Use Media3 for Android phone-library audio; browser-picked files fall back to the HTML audio element.
-    const nativeStarted = item.kind === 'audio' && queueIndex >= 0 && supportsNativeAndroidStorage()
-      ? playNativeBackgroundMedia(playableQueue, queueIndex)
+    const nativeQueue = queue.filter(isNativeMediaItem);
+    const nativeIndex = nativeQueue.findIndex((entry) => entry.id === item.id);
+    const nativeStarted = item.kind === 'audio' && supportsNativeAndroidStorage() && nativeIndex >= 0
+      ? playNativeBackgroundMedia(nativeQueue, nativeIndex)
       : false;
+    if (!nativeStarted) stopNativeBackgroundMedia();
     setNativePlaybackActive(nativeStarted);
     setIsPlaying(item.kind === 'video' || item.kind === 'audio');
   };
@@ -445,9 +452,12 @@ export default function UniqueMediaPage() {
     setPlayer(item);
     setPlayerQueueIndex(nextIndex);
     setVideoAudioMode(false);
-    const nativeStarted = item.kind === 'audio' && supportsNativeAndroidStorage()
-      ? playNativeBackgroundMedia(playableQueue, nextIndex)
+    const nativeQueue = playableQueue.filter(isNativeMediaItem);
+    const nativeIndex = nativeQueue.findIndex((entry) => entry.id === item.id);
+    const nativeStarted = item.kind === 'audio' && supportsNativeAndroidStorage() && nativeIndex >= 0
+      ? playNativeBackgroundMedia(nativeQueue, nativeIndex)
       : false;
+    if (!nativeStarted) stopNativeBackgroundMedia();
     setNativePlaybackActive(nativeStarted);
     setIsPlaying(true);
   };
@@ -504,15 +514,16 @@ export default function UniqueMediaPage() {
       setIsPlaying(false);
       return;
     }
-    const started = supportsNativeAndroidStorage() && (player.kind === 'audio' || videoAudioMode)
-      ? playNativeBackgroundMedia(playableQueue, playerQueueIndex)
-      : false;
-    setNativePlaybackActive(started);
-    if (!started) {
-      if (player.kind === 'audio') void playerAudioRef.current?.play();
-      else if (playerVideoRef.current) void playerVideoRef.current.play();
+    if (nativePlaybackActive) {
+      resumeNativeBackgroundMedia();
+      setIsPlaying(true);
+      return;
     }
-    setIsPlaying(true);
+    if (player.kind === 'audio') {
+      void playerAudioRef.current?.play().then(() => setIsPlaying(true)).catch(() => setDeviceMessage('Playback could not resume. Tap Play again.'));
+    } else if (playerVideoRef.current) {
+      void playerVideoRef.current.play().then(() => setIsPlaying(true)).catch(() => setDeviceMessage('Video playback could not resume. Tap Play again.'));
+    }
   };
   const deleteCurrentMedia = async () => {
     if (!player) return;
@@ -525,16 +536,28 @@ export default function UniqueMediaPage() {
   };
 
   const toggleVideoAudioMode = () => {
-    const enteringBackgroundAudio = !videoAudioMode;
-    setVideoAudioMode(enteringBackgroundAudio);
-    setIsPlaying(true);
-    if (player?.kind === 'video' && enteringBackgroundAudio) {
-      const started = supportsNativeAndroidStorage() && playNativeBackgroundMedia(playableQueue, playerQueueIndex);
-      setNativePlaybackActive(started);
-    } else {
-      stopNativeBackgroundMedia();
-      setNativePlaybackActive(false);
+    if (player?.kind !== 'video') return;
+    if (!videoAudioMode) {
+      if (!supportsNativeAndroidStorage() || !isNativeMediaItem(player)) {
+        setDeviceMessage('Background audio for video is supported for phone-library media in the Android app. Browser playback may stop when the screen locks.');
+        return;
+      }
+      const nativeQueue = playableQueue.filter(isNativeMediaItem);
+      const nativeIndex = nativeQueue.findIndex((entry) => entry.id === player.id);
+      const started = nativeIndex >= 0 && playNativeBackgroundMedia(nativeQueue, nativeIndex);
+      if (!started) {
+        setDeviceMessage('Could not start background audio for this video. Please try again.');
+        return;
+      }
+      setVideoAudioMode(true);
+      setNativePlaybackActive(true);
+      setIsPlaying(true);
+      return;
     }
+    stopNativeBackgroundMedia();
+    setNativePlaybackActive(false);
+    setVideoAudioMode(false);
+    setIsPlaying(true);
   };
 
   const backupToCloud = async () => {
@@ -609,9 +632,14 @@ export default function UniqueMediaPage() {
   };
 
   const seekPlayer = (seconds: number) => {
-    const video = playerVideoRef.current;
-    if (!video) return;
-    video.currentTime = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + seconds));
+    if (player && nativePlaybackActive) {
+      seekNativeBackgroundMedia(seconds);
+      return;
+    }
+    const element = player?.kind === 'audio' ? playerAudioRef.current : playerVideoRef.current;
+    if (!element) return;
+    const duration = Number.isFinite(element.duration) ? element.duration : Infinity;
+    element.currentTime = Math.max(0, Math.min(duration, element.currentTime + seconds));
   };
 
   const changePlayerRate = () => {
