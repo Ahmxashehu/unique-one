@@ -11,6 +11,7 @@ type MediaKind = 'all' | 'video' | 'audio' | 'image' | 'pdf';
 type LocalMedia = DeviceMediaItem;
 
 const isNativeMediaItem = (item: LocalMedia): boolean =>
+  item.url.startsWith('https://unique.native/media/') ||
   item.url.startsWith('https://unique-one-162s.onrender.com/native-media/');
 
 const kindForFile = (file: File): Exclude<MediaKind, 'all'> | null => {
