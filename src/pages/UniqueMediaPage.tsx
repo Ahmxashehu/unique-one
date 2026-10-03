@@ -684,7 +684,7 @@ export default function UniqueMediaPage() {
 
   return (
     <main className="min-h-full overflow-y-auto bg-slate-50 pb-24">
-      <div className="fixed bottom-24 right-3 z-40 flex max-w-[calc(100vw-1.5rem)] items-center gap-1 rounded-full border border-emerald-200 bg-white/95 p-1.5 shadow-xl shadow-slate-900/10 backdrop-blur-xl" aria-label="UniqueShare quick actions">
+      <div className="fixed bottom-24 left-1/2 z-40 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-1 rounded-full border border-emerald-200 bg-white/95 p-1.5 shadow-xl shadow-slate-900/10 backdrop-blur-xl" aria-label="UniqueShare quick actions">
         <Link to="/os/unique-share" className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-2 text-[11px] font-black text-slate-900 transition hover:bg-emerald-50" aria-label="Open UniqueShare">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white"><Share2 className="h-3.5 w-3.5" /></span>
           <span>UniqueShare</span>
@@ -699,10 +699,9 @@ export default function UniqueMediaPage() {
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">UniqueMedia</p><h1 className="truncate text-xl font-black text-slate-950">Smart library</h1></div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-            <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-3 py-2.5 text-xs font-black text-white"><Smartphone className="h-4 w-4" /> Connect phone</button>
-            {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-black text-slate-700"><Cloud className="h-4 w-4" /> Add files</button>}
-          </div>
+          {supportsPhoneFilePicker() && <div className="mt-4 flex justify-end">
+            <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-black text-slate-700"><Cloud className="h-4 w-4" /> Add files</button>
+          </div>}
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="UniqueMedia categories">
             {categories.map(([value, label]) => {
               const Icon = iconForKind(value);
@@ -799,17 +798,14 @@ export default function UniqueMediaPage() {
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300">Your {categories.find(([value]) => value === activeKind)?.[1] || 'media'}</p>
                     <h3 className="mt-1 text-2xl font-black tracking-tight">This category is ready for you.</h3>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">
-                      {activeKind === 'video' && 'Connect phone media to watch with queue controls, PiP and background audio on supported devices.'}
-                      {activeKind === 'audio' && 'Connect phone media to enjoy a full Audio player with background playback, lock-screen controls, queue, next, previous and replay.'}
-                      {activeKind === 'image' && 'Connect phone media to browse a private photo library with fast previews and full-screen viewing.'}
-                      {activeKind === 'pdf' && 'Connect phone media to open a focused PDF Reader with full-screen document viewing.'}
+                      {activeKind === 'video' && 'Add videos from your device or receive them through UniqueShare. Play with queue controls, PiP and supported background audio.'}
+                      {activeKind === 'audio' && 'Add Audio from your device or receive it through UniqueShare. Enjoy background playback, lock-screen controls, queue, next, previous and replay on supported devices.'}
+                      {activeKind === 'image' && 'Add images from your device or receive them through UniqueShare to browse a private photo library with fast previews and full-screen viewing.'}
+                      {activeKind === 'pdf' && 'Add PDFs from your device or receive them through UniqueShare to open them in the focused PDF Reader.'}
                     </p>
                   </div>
                 </div>
                 <div className="mt-6 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-full bg-emerald-400 px-4 py-2.5 text-xs font-black text-slate-950 shadow-lg shadow-emerald-400/10">
-                    <Smartphone className="h-4 w-4" /> Connect phone
-                  </button>
                   {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2.5 text-xs font-black text-white ring-1 ring-white/10">
                     Add {activeKind === 'pdf' ? 'PDFs' : activeKind === 'audio' ? 'Audio' : categories.find(([value]) => value === activeKind)?.[1] || 'files'}
                   </button>}
