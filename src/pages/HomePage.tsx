@@ -386,15 +386,20 @@ export default function HomePage() {
       `}</style>
       {/* Sticky discovery header */}
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
-        <div className="flex h-7 items-center justify-center border-b border-slate-100/90 bg-slate-50/70 px-3">
-          <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-2.5 py-1 text-[9px] font-black tracking-[0.08em] text-slate-600 shadow-sm backdrop-blur sm:gap-2.5 sm:px-3 sm:text-[10px]" aria-label="Current time, date and location">
-            <span className="inline-flex items-center gap-1 text-slate-950"><Clock3 className="h-3 w-3 text-emerald-600" />{smartNow.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-            <span className="h-3 w-px bg-slate-200" />
-            <span className="hidden sm:inline">{smartNow.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" })}</span>
-            <span className="sm:hidden">{smartNow.toLocaleDateString([], { day: "2-digit", month: "short" })}</span>
-            <span className="h-3 w-px bg-slate-200" />
-            <span className="inline-flex min-w-0 items-center gap-1 truncate text-emerald-700"><MapPin className="h-3 w-3 shrink-0" /><span className="max-w-[120px] truncate sm:max-w-[180px]">{smartLocation}</span></span>
-            <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-emerald-500" title="Live" />
+        <div className="flex h-8 items-center justify-center border-b border-slate-100/90 bg-slate-50/70 px-3">
+          <div className="flex w-full max-w-7xl items-center justify-center gap-1.5">
+            <div className="inline-flex h-6 items-center gap-1.5 rounded-full border border-emerald-200/80 bg-white/95 px-2.5 text-[9px] font-black tracking-[0.06em] text-slate-700 shadow-sm" aria-label="Live time">
+              <Clock3 className="h-3 w-3 text-emerald-600" />
+              <span>{smartNow.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" title="Live" />
+            </div>
+            <div className="inline-flex h-6 max-w-[45%] items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/95 px-2.5 text-[9px] font-bold text-slate-600 shadow-sm" aria-label="Current date">
+              <span>{smartNow.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" })}</span>
+            </div>
+            <div className="inline-flex h-6 max-w-[45%] items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/95 px-2.5 text-[9px] font-bold text-emerald-700 shadow-sm" aria-label="Current location">
+              <MapPin className="h-3 w-3 shrink-0" />
+              <span className="max-w-[120px] truncate sm:max-w-[180px]">{smartLocation}</span>
+            </div>
           </div>
         </div>
         <div className="mx-auto flex min-w-0 max-w-7xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3 lg:px-8">
