@@ -44,7 +44,6 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> filePathCallback;
     private boolean loadedHostedApp = false;
     private final Map<String, Uri> mediaUris = new HashMap<>();
-    private final Map<String, String> mediaNames = new HashMap<>();
     private final Map<String, File> sharedFiles = new HashMap<>();
 
     @Override
@@ -223,7 +222,6 @@ public class MainActivity extends Activity {
                 Uri itemUri = Uri.withAppendedPath(collection, String.valueOf(id));
                 String key = kind + ":" + id;
                 mediaUris.put(key, itemUri);
-                mediaNames.put(key, name == null ? "Media" : name);
                 JSONObject item = new JSONObject();
                 item.put("id", key);
                 item.put("name", name == null ? "Media" : name);
@@ -258,7 +256,6 @@ public class MainActivity extends Activity {
             if (!file.isFile()) continue;
             String key = "received:" + file.getName();
             sharedFiles.put(key, file);
-            mediaNames.put(key, file.getName());
             try {
                 JSONObject item = new JSONObject();
                 item.put("id", key);
@@ -280,14 +277,13 @@ public class MainActivity extends Activity {
                 int deleted = getContentResolver().delete(uri, null, null);
                 if (deleted > 0) {
                     mediaUris.remove(id);
-                    mediaNames.remove(id);
                     return true;
                 }
             }
             File file = sharedFiles.get(id);
             if (file != null && file.exists()) {
                 boolean deleted = file.delete();
-                if (deleted) { sharedFiles.remove(id); mediaNames.remove(id); }
+                if (deleted) sharedFiles.remove(id);
                 return deleted;
             }
         } catch (SecurityException ignored) {
@@ -315,7 +311,7 @@ public class MainActivity extends Activity {
                         File file = sharedFiles.get(id);
                         if (file != null) uri = Uri.fromFile(file);
                     }
-                    if (uri != null) { uris.put(uri.toString()); names.put(mediaNames.containsKey(id) ? mediaNames.get(id) : id); }
+                    if (uri != null) { uris.put(uri.toString()); names.put(id); }
                 }
                 if (uris.length() == 0) return false;
                 Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
@@ -323,7 +319,7 @@ public class MainActivity extends Activity {
                 intent.putExtra(MediaPlaybackService.EXTRA_URIS, uris.toString());
                 intent.putExtra(MediaPlaybackService.EXTRA_NAMES, names.toString());
                 intent.putExtra(MediaPlaybackService.EXTRA_INDEX, Math.max(0, Math.min(index, uris.length() - 1)));
-                if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent); else startService(intent);
+                startService(intent);
                 return true;
             } catch (Exception e) { return false; }
         }
@@ -338,20 +334,6 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void stopBackgroundMedia() {
             Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
             intent.setAction(MediaPlaybackService.ACTION_STOP); startService(intent);
-        }
-        @JavascriptInterface public void backgroundToggleRepeat() {
-            Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
-            intent.setAction(MediaPlaybackService.ACTION_REPEAT); startService(intent);
-        }
-        @JavascriptInterface public void backgroundToggleShuffle() {
-            Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
-            intent.setAction(MediaPlaybackService.ACTION_SHUFFLE); startService(intent);
-        }
-        @JavascriptInterface public void seekBackgroundMedia(int seconds) {
-            Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
-            intent.setAction(MediaPlaybackService.ACTION_SEEK);
-            intent.putExtra(MediaPlaybackService.EXTRA_SEEK_SECONDS, seconds);
-            startService(intent);
         }
         @JavascriptInterface public boolean shareNativeMedia(String idsJson) {
             try {
