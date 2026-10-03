@@ -684,14 +684,20 @@ export default function UniqueMediaPage() {
 
   return (
     <main className="min-h-full overflow-y-auto bg-slate-50 pb-24">
+      <div className="fixed bottom-24 right-3 z-40 flex max-w-[calc(100vw-1.5rem)] items-center gap-1 rounded-full border border-emerald-200 bg-white/95 p-1.5 shadow-xl shadow-slate-900/10 backdrop-blur-xl" aria-label="UniqueShare quick actions">
+        <Link to="/os/unique-share" className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-2 text-[11px] font-black text-slate-900 transition hover:bg-emerald-50" aria-label="Open UniqueShare">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white"><Share2 className="h-3.5 w-3.5" /></span>
+          <span>UniqueShare</span>
+          {newReceivedCount > 0 && <span className="min-w-5 rounded-full bg-emerald-600 px-1.5 py-0.5 text-center text-[10px] text-white">{newReceivedCount}</span>}
+        </Link>
+        <Link to="/os/unique-share?mode=send" className="rounded-full bg-slate-950 px-3 py-2.5 text-[11px] font-black text-white transition hover:bg-slate-800" aria-label="Send with UniqueShare">Send</Link>
+        <Link to="/os/unique-share?mode=receive" className="rounded-full bg-emerald-50 px-3 py-2.5 text-[11px] font-black text-emerald-800 transition hover:bg-emerald-100" aria-label="Receive with UniqueShare">Receive</Link>
+      </div>
       <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
         <header className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <input ref={phoneFileInputRef} type="file" multiple accept="video/*,audio/*,image/*,application/pdf" className="hidden" onChange={(event) => { importFromPhoneStorage(event.target.files); event.currentTarget.value = ''; }} />
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">UniqueMedia</p><h1 className="truncate text-xl font-black text-slate-950">Smart library</h1></div>
-            <Link to="/os/unique-share" className="relative inline-flex shrink-0 items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700">
-              <Share2 className="h-4 w-4" /> Share{newReceivedCount > 0 && <span className="min-w-5 rounded-full bg-white px-1.5 py-0.5 text-center text-[10px] text-emerald-700">{newReceivedCount}</span>}
-            </Link>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-3 py-2.5 text-xs font-black text-white"><Smartphone className="h-4 w-4" /> Connect phone</button>
