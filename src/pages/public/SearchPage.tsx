@@ -100,7 +100,7 @@ export default function SearchPage() {
           <span className="absolute -inset-2 rounded-full bg-emerald-300/20 blur-xl" style={{ animation: 'globalSearchGlow 2.8s ease-in-out infinite' }} />
           <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-emerald-400 border-r-emerald-300 shadow-[0_0_14px_rgba(16,185,129,0.65)]" style={{ animationDuration: '2.4s' }} />
           <span className="absolute inset-[-2px] animate-pulse rounded-full bg-emerald-400/15 blur-md" />
-          <span className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/90 bg-white text-[11px] font-black tracking-[-0.08em] text-emerald-700 shadow-sm sm:h-14 sm:w-14 sm:text-xs">U1</span>
+          <span className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/90 bg-white text-[11px] font-black tracking-[-0.08em] text-emerald-700 shadow-sm sm:h-14 sm:w-14 sm:text-xs">UP</span>
         </div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
           Global Search
