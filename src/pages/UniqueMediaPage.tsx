@@ -820,7 +820,6 @@ export default function UniqueMediaPage() {
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-2xl font-black text-slate-950">{categories.find(([value]) => value === activeKind)?.[1]}</h2>
-              <p className="mt-1 text-sm text-slate-500">{filteredMedia.length} item{filteredMedia.length === 1 ? '' : 's'} available on this device.</p>
             </div>
             <label className="flex min-w-[220px] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />
