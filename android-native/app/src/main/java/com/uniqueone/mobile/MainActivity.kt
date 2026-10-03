@@ -57,7 +57,22 @@ class MainActivity : ComponentActivity() {
 
     private val filePicker =
         registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-            notifyJs("filesSelected", JSONArray().apply { uris.forEach { put(it.toString()) } }.toString())
+            val records = JSONArray()
+            uris.forEachIndexed { index, uri ->
+                try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+                val mime = contentResolver.getType(uri) ?: "application/octet-stream"
+                val name = queryDisplayName(uri) ?: "Selected file"
+                val key = "picked_${System.currentTimeMillis()}_${index}_${uri.hashCode()}"
+                nativeMedia[key] = uri to mime
+                records.put(JSONObject().apply {
+                    put("id", key)
+                    put("name", name)
+                    put("mime", mime)
+                    put("size", querySize(uri))
+                    put("url", "https://unique.native/media/$key")
+                })
+            }
+            notifyJs("filesSelected", records.toString())
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
