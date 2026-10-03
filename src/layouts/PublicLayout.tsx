@@ -70,20 +70,25 @@ export default function PublicLayout() {
                 ['Restaurant', '/categories'],
                 ['Hotel', '/travel'],
                 ['Flights', '/travel'],
-                ['School', '/education'],
-                ['Transportation', '/categories'],
-                ['Real Estate', '/categories'],
-                ['Global Search', '/search'],
-                [t('nearMe', language), '/near-me'],
                 ['Jobs', '/os/jobs'],
-                ['Contributions', '/os/contributions'],
-                ['Education', '/os/education'],
                 ['Travel', '/os/travel'],
               ].map(([name, path]) => (
                 <Link key={path + name} to={path} onClick={() => setIsMobileMenuOpen(false)} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm">
                   {name}
                 </Link>
               ))}
+            </div>
+            <div className="mt-6 border-t-2 border-slate-100 pt-6">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                {[
+                  ['Settings', '/settings'],
+                  ['Suggestions', '/suggestions'],
+                ].map(([name, path]) => (
+                  <Link key={path} to={path} onClick={() => setIsMobileMenuOpen(false)} className="min-w-0 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm">
+                    {name}
+                  </Link>
+                ))}
+              </div>
             </div>
             <div className="mt-3">
               {currentUser ? (
