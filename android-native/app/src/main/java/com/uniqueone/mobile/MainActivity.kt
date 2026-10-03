@@ -359,6 +359,12 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface fun backgroundToggleShuffle() {
             startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_TOGGLE_SHUFFLE))
         }
+        @JavascriptInterface fun seekBackgroundMedia(seconds: Int) {
+            startService(Intent(this@MainActivity, MediaPlaybackService::class.java).apply {
+                action = MediaPlaybackService.ACTION_SEEK_BY
+                putExtra(MediaPlaybackService.EXTRA_SEEK_SECONDS, seconds.coerceIn(-3600, 3600))
+            })
+        }
         @JavascriptInterface fun backgroundStop() {
             startService(Intent(this@MainActivity, MediaPlaybackService::class.java).setAction(MediaPlaybackService.ACTION_STOP))
         }
