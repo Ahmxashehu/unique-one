@@ -386,21 +386,17 @@ export default function HomePage() {
       `}</style>
       {/* Sticky discovery header */}
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
-        <div className="relative h-8 border-b border-slate-100/90 bg-slate-50/70 px-3" aria-label="Independent smart status controls">
-          <div className="absolute left-2 top-1/2 -translate-y-1/2">
-            <div className="inline-flex h-6 items-center rounded-full border border-slate-200/80 bg-white/95 px-2 text-[9px] font-bold text-slate-600 shadow-sm" aria-label="Current date">
+        <div className="relative h-8 border-b border-slate-100/90 bg-slate-50/70 px-2" aria-label="Independent smart status controls">
+          <div className="flex h-full items-center gap-1.5">
+            <div className="inline-flex h-6 shrink-0 items-center rounded-full border border-slate-200/80 bg-white/95 px-2 text-[9px] font-bold text-slate-600 shadow-sm" aria-label="Current date">
               <span>{smartNow.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" })}</span>
             </div>
-          </div>
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            <div className="inline-flex h-6 items-center gap-1.5 rounded-full border border-emerald-200/80 bg-white/95 px-2.5 text-[9px] font-black tracking-[0.06em] text-slate-700 shadow-sm" aria-label="Live time">
+            <div className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-emerald-200/80 bg-white/95 px-2.5 text-[9px] font-black tracking-[0.06em] text-slate-700 shadow-sm" aria-label="Live time">
               <Clock3 className="h-3 w-3 text-emerald-600" />
               <span>{smartNow.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" title="Live" />
             </div>
-          </div>
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <div className="inline-flex h-6 max-w-[42vw] items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/95 px-2.5 text-[9px] font-bold text-emerald-700 shadow-sm" aria-label="Current location">
+            <div className="inline-flex h-6 min-w-0 max-w-[42vw] items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/95 px-2.5 text-[9px] font-bold text-emerald-700 shadow-sm" aria-label="Current location">
               <MapPin className="h-3 w-3 shrink-0" />
               <span className="max-w-[105px] truncate sm:max-w-[180px]">{smartLocation}</span>
             </div>
