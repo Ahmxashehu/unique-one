@@ -387,30 +387,6 @@ export default function HomePage() {
       </header>
 
       <div className="mx-auto min-w-0 max-w-7xl px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pb-20 sm:pt-5 lg:px-8">
-        {/* Prominent Unique AI entry point: free public AI, with a clear path into the full registered experience. */}
-        <section aria-label="Unique AI" className="relative mt-4 overflow-hidden rounded-2xl border border-emerald-200/70 bg-slate-950 text-white shadow-lg sm:mt-5 sm:rounded-[2rem]">
-          <div className="absolute -left-16 -top-20 h-48 w-48 rounded-full bg-emerald-400/25 blur-3xl animate-pulse sm:h-72 sm:w-72" />
-          <div className="absolute -right-16 -bottom-20 h-56 w-56 rounded-full bg-teal-300/15 blur-3xl animate-pulse sm:h-80 sm:w-80" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.12),transparent_28%),radial-gradient(circle_at_80%_70%,rgba(16,185,129,0.14),transparent_30%)]" />
-          <Link to="/ai" className="group relative flex min-h-0 items-center gap-3 p-4 sm:min-h-[220px] sm:gap-5 sm:p-8 lg:p-10">
-            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 shadow-xl backdrop-blur-xl transition duration-500 group-hover:scale-105 sm:h-28 sm:w-28 sm:rounded-[2rem]">
-              <div className="absolute inset-1.5 rounded-xl border border-emerald-300/40 animate-pulse sm:inset-2 sm:rounded-[1.5rem]" />
-              <div className="absolute h-7 w-7 rounded-full bg-emerald-300/25 blur-lg sm:h-12 sm:w-12 sm:blur-xl" />
-              <Sparkles className="relative h-7 w-7 text-emerald-200 sm:h-12 sm:w-12" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-200 sm:px-3 sm:text-[11px] sm:tracking-[0.18em]">Free AI</span>
-                <span className="text-[10px] font-semibold text-white/50 sm:text-xs">Powered by Gemini</span>
-              </div>
-              <h2 className="mt-1.5 text-xl font-black leading-tight tracking-tight sm:mt-2 sm:text-4xl">Ask Unique AI anything.</h2>
-                            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2.5 text-xs font-black text-slate-950 shadow-xl transition group-hover:translate-x-1 sm:mt-5 sm:px-5 sm:py-3 sm:text-sm">
-                Start asking <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              </div>
-            </div>
-          </Link>
-        </section>
-
         {/* Main experience poster: every promotional and professional experience is one 10-second sliding list. */}
         <section aria-label="Unique main experience posters" className="relative mt-4 overflow-hidden rounded-2xl bg-slate-950 text-white shadow-sm sm:mt-6 sm:rounded-3xl">
           <div className="relative min-h-[235px] sm:min-h-[285px] lg:min-h-[315px]">
