@@ -684,15 +684,6 @@ export default function UniqueMediaPage() {
 
   return (
     <main className="min-h-full overflow-y-auto bg-slate-50 pb-24">
-      <div className="fixed bottom-24 left-1/2 z-40 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-1 rounded-full border border-emerald-200 bg-white/95 p-1.5 shadow-xl shadow-slate-900/10 backdrop-blur-xl" aria-label="UniqueShare quick actions">
-        <Link to="/os/unique-share" className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-2 text-[11px] font-black text-slate-900 transition hover:bg-emerald-50" aria-label="Open UniqueShare">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white"><Share2 className="h-3.5 w-3.5" /></span>
-          <span>UniqueShare</span>
-          {newReceivedCount > 0 && <span className="min-w-5 rounded-full bg-emerald-600 px-1.5 py-0.5 text-center text-[10px] text-white">{newReceivedCount}</span>}
-        </Link>
-        <Link to="/os/unique-share?mode=send" className="rounded-full bg-slate-950 px-3 py-2.5 text-[11px] font-black text-white transition hover:bg-slate-800" aria-label="Send with UniqueShare">Send</Link>
-        <Link to="/os/unique-share?mode=receive" className="rounded-full bg-emerald-50 px-3 py-2.5 text-[11px] font-black text-emerald-800 transition hover:bg-emerald-100" aria-label="Receive with UniqueShare">Receive</Link>
-      </div>
       <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
         <header className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <input ref={phoneFileInputRef} type="file" multiple accept="video/*,audio/*,image/*,application/pdf" className="hidden" onChange={(event) => { importFromPhoneStorage(event.target.files); event.currentTarget.value = ''; }} />
@@ -714,6 +705,16 @@ export default function UniqueMediaPage() {
           </div>
           {deviceMessage && <p className="mt-3 rounded-2xl bg-emerald-50 px-3 py-2.5 text-xs font-semibold text-emerald-800">{deviceMessage}</p>}
         </header>
+
+              <div className="mx-auto mt-4 flex w-fit max-w-[calc(100vw-1.5rem)] items-center justify-center gap-1 rounded-full border border-emerald-200 bg-white/95 p-1.5 shadow-xl shadow-slate-900/10 backdrop-blur-xl" aria-label="UniqueShare quick actions">
+                <Link to="/os/unique-share" className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-2 text-[11px] font-black text-slate-900 transition hover:bg-emerald-50" aria-label="Open UniqueShare">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white"><Share2 className="h-3.5 w-3.5" /></span>
+                  <span>UniqueShare</span>
+                  {newReceivedCount > 0 && <span className="min-w-5 rounded-full bg-emerald-600 px-1.5 py-0.5 text-center text-[10px] text-white">{newReceivedCount}</span>}
+                </Link>
+                <Link to="/os/unique-share?mode=send" className="rounded-full bg-slate-950 px-3 py-2.5 text-[11px] font-black text-white transition hover:bg-slate-800" aria-label="Send with UniqueShare">Send</Link>
+                <Link to="/os/unique-share?mode=receive" className="rounded-full bg-emerald-50 px-3 py-2.5 text-[11px] font-black text-emerald-800 transition hover:bg-emerald-100" aria-label="Receive with UniqueShare">Receive</Link>
+              </div>
 
         {localShareConnected && (
           <section className="mt-4 overflow-hidden rounded-3xl border border-emerald-200 bg-white shadow-sm">
@@ -814,18 +815,7 @@ export default function UniqueMediaPage() {
                   </Link>
                 </div>
               </div>
-              <div className="grid gap-2 p-3 sm:grid-cols-3 sm:p-4">
-                {[
-                  ['Private by default', 'Your local files stay on the device unless you choose a sharing or cloud action.'],
-                  ['Built for the device', 'Android MediaStore can load phone media directly when permission is granted.'],
-                  ['Ready to grow', activeKind === 'audio' ? 'Background playback continues with the screen locked on the native Android build.' : 'Use the player, viewer and sharing tools without leaving your media library.'],
-                ].map(([title, copy]) => (
-                  <div key={title} className="rounded-2xl bg-slate-50 p-3.5">
-                    <p className="text-xs font-black text-slate-800">{title}</p>
-                    <p className="mt-1 text-[11px] leading-5 text-slate-500">{copy}</p>
-                  </div>
-                ))}
-              </div>
+
             </div>
           ) : (
             <>
