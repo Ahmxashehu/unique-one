@@ -12,7 +12,7 @@ export type DeviceMediaItem = {
 
 export type DeviceMediaScan = { items: DeviceMediaItem[]; rootName: string; handle: any };
 type NativeMediaRecord = { id: string; name: string; mime: string; size: number; url: string; isNew?: boolean };
-type NativeBridge = { requestMediaAccess: () => void; hasMediaAccess: () => boolean; listMedia: () => string; listMediaPage?: (offset: number, limit: number) => string; getSharedMedia?: () => string; shareNativeMedia?: (idsJson: string) => boolean; markMediaSeen?: (id: string) => void; deleteMedia?: (id: string) => boolean; playBackgroundMedia?: (idsJson: string, index: number) => boolean; pauseBackgroundMedia?: () => void; resumeBackgroundMedia?: () => void; stopBackgroundMedia?: () => void };
+type NativeBridge = { requestMediaAccess: () => void; hasMediaAccess: () => boolean; listMedia: () => string; listMediaPage?: (offset: number, limit: number) => string; getSharedMedia?: () => string; shareNativeMedia?: (idsJson: string) => boolean; markMediaSeen?: (id: string) => void; deleteMedia?: (id: string) => boolean; playBackgroundMedia?: (idsJson: string, index: number) => boolean; pauseBackgroundMedia?: () => void; resumeBackgroundMedia?: () => void; stopBackgroundMedia?: () => void; backgroundToggleRepeat?: () => void; backgroundToggleShuffle?: () => void };
 
 const nativeBridge = (): NativeBridge | null =>
   typeof window !== 'undefined' ? ((window as any).UniqueNativeStorage || null) as NativeBridge | null : null;
