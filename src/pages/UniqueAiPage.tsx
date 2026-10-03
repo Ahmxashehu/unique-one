@@ -339,6 +339,14 @@ export default function UniqueAiPage() {
           70% { opacity: .2; }
           100% { transform: translateX(120%); opacity: 0; }
         }
+        @keyframes uniqueAiSearchGlow {
+          0%, 100% { opacity: .42; transform: scale(.985); }
+          50% { opacity: .88; transform: scale(1.012); }
+        }
+        @keyframes uniqueAiSearchSmoke {
+          0%, 100% { transform: translate3d(-2%, 0, 0) scale(1); opacity: .28; }
+          50% { transform: translate3d(2%, -1px, 0) scale(1.035); opacity: .55; }
+        }
       `}</style>
       <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-x-hidden sm:gap-4">
       <div className="relative flex min-h-[58px] min-w-0 items-center overflow-hidden rounded-2xl border border-emerald-100 bg-white px-3 py-2.5 shadow-sm sm:min-h-[68px] sm:px-4">
@@ -374,11 +382,12 @@ export default function UniqueAiPage() {
         <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain p-2.5 sm:p-6">
           {messages.length === 0 ? (
             <div className="mx-auto flex max-w-2xl flex-col items-center py-3 text-center sm:py-10">
-              <div className="unique-ai-platform-mark relative mb-2.5 flex h-14 w-14 items-center justify-center sm:mb-4 sm:h-16 sm:w-16" aria-hidden="true">
-                <span className="unique-platform-orb relative flex h-full w-full items-center justify-center">
-                  <span className="unique-platform-orb-sphere absolute inset-0 rounded-full" />
-                  <span className="unique-platform-orb-ring absolute inset-[-1px] rounded-full" />
-                  <span className="unique-platform-orb-mark relative z-10 text-[10px] font-black tracking-[-0.08em] text-white sm:text-xs">UP</span>
+              <div className="unique-ai-platform-mark relative mb-2.5 flex h-14 w-14 translate-y-1 items-center justify-center sm:mb-4 sm:h-16 sm:w-16" aria-hidden="true">
+                <span className="absolute -inset-2 rounded-full bg-emerald-300/20 blur-xl" style={{ animation: "uniqueAiSearchGlow 2.8s ease-in-out infinite" }} />
+                <span className="relative flex h-full w-full items-center justify-center">
+                  <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-emerald-400 border-r-emerald-300 shadow-[0_0_14px_rgba(16,185,129,0.65)]" style={{ animationDuration: "2.4s" }} />
+                  <span className="absolute inset-[-2px] animate-pulse rounded-full bg-emerald-400/15 blur-md" />
+                  <span className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/90 bg-white text-[11px] font-black tracking-[-0.08em] text-emerald-700 shadow-sm sm:h-14 sm:w-14 sm:text-xs">U1</span>
                 </span>
               </div>
               <h2 className="text-lg font-black tracking-tight text-slate-900 sm:text-2xl">Ask Unique AI anything.</h2>
@@ -444,27 +453,32 @@ export default function UniqueAiPage() {
         )}
 
         <form onSubmit={sendMessage} className="shrink-0 border-t border-slate-200/80 bg-white/95 px-2.5 pb-2.5 pt-2 backdrop-blur-xl sm:px-4 sm:pb-4 sm:pt-3">
-          <div className="relative mx-auto flex max-w-3xl items-end gap-2 overflow-hidden rounded-[26px] border border-slate-200 bg-slate-50/90 p-1.5 shadow-[0_8px_30px_rgba(15,23,42,.07)] transition-all focus-within:border-emerald-300 focus-within:bg-white focus-within:shadow-[0_8px_32px_rgba(16,185,129,.12)]">
-            <span className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -translate-x-full bg-gradient-to-r from-transparent via-emerald-200/35 to-transparent" style={{ animation: "uniqueAiComposerShine 3.8s ease-in-out infinite" }} aria-hidden="true" />
-            <textarea
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void sendMessage();
-                }
-              }}
-              rows={1}
-              maxLength={4000}
-              disabled={loading}
-              aria-label="Message Unique AI"
-              placeholder="Ask Unique AI…"
-              className="relative min-h-[42px] min-w-0 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm leading-5 text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-60 sm:min-h-[44px] sm:px-4 sm:py-3"
-            />
-            <button type="submit" disabled={!message.trim() || loading} aria-label="Send message" className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 text-white shadow-[0_4px_14px_rgba(15,23,42,.2)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-600 hover:shadow-[0_6px_18px_rgba(16,185,129,.25)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none sm:h-11 sm:w-11">
-              <Send className="h-4 w-4" />
-            </button>
+          <div className="unique-ai-search-shell relative mx-auto flex max-w-3xl items-end gap-2 overflow-visible rounded-[26px]">
+            <span className="pointer-events-none absolute -inset-1 rounded-[30px] bg-emerald-300/20 blur-md" aria-hidden="true" />
+            <span className="pointer-events-none absolute -inset-[2px] rounded-[28px] border border-emerald-300/40 bg-gradient-to-r from-emerald-300/10 via-white/30 to-teal-300/10 blur-[1px]" style={{ animation: "uniqueAiSearchGlow 3.8s ease-in-out infinite" }} aria-hidden="true" />
+            <span className="pointer-events-none absolute -inset-2 rounded-[32px] bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.20),transparent_68%)] blur-lg" style={{ animation: "uniqueAiSearchSmoke 5s ease-in-out infinite" }} aria-hidden="true" />
+            <div className="relative flex min-w-0 flex-1 items-end gap-2 overflow-hidden rounded-[26px] border border-emerald-200/80 bg-white/95 p-1.5 shadow-[0_0_18px_rgba(16,185,129,0.16)] backdrop-blur-xl transition-all focus-within:border-emerald-400 focus-within:bg-white focus-within:shadow-[0_0_28px_rgba(16,185,129,0.28)]">
+              <span className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -translate-x-full bg-gradient-to-r from-transparent via-emerald-200/35 to-transparent" style={{ animation: "uniqueAiComposerShine 3.8s ease-in-out infinite" }} aria-hidden="true" />
+              <textarea
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void sendMessage();
+                  }
+                }}
+                rows={1}
+                maxLength={4000}
+                disabled={loading}
+                aria-label="Message Unique AI"
+                placeholder="Ask Unique AI anything,"
+                className="relative min-h-[42px] min-w-0 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm leading-5 text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-60 sm:min-h-[44px] sm:px-4 sm:py-3"
+              />
+              <button type="submit" disabled={!message.trim() || loading} aria-label="Send message" className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 text-white shadow-[0_4px_14px_rgba(15,23,42,.2)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-600 hover:shadow-[0_6px_18px_rgba(16,185,129,.25)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none sm:h-11 sm:w-11">
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           {!currentUser && (
             <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 py-2 text-[10px] leading-4 text-emerald-800 sm:mt-3 sm:gap-3 sm:px-3 sm:text-xs">
