@@ -47,6 +47,7 @@ export default function HomePage() {
   const [search, setSearch] = useState('');
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [activeMainPoster, setActiveMainPoster] = useState(0);
+  const [smartNotificationIndex, setSmartNotificationIndex] = useState(0);
 
   const experiencePosters = [
     ['Restaurant', '/categories'],
@@ -133,6 +134,21 @@ export default function HomePage() {
 
     return () => window.clearInterval(timer);
   }, [mainPosterSlides.length]);
+
+  const smartNotifications = [
+    { label: 'ORDER', text: 'Your order is moving to the next step.', href: '/os/orders' },
+    { label: 'MESSAGE', text: 'You have a new message waiting.', href: '/os/messages' },
+    { label: 'STOCK', text: 'A saved product has a new stock update.', href: '/store' },
+    { label: 'UPDATE', text: 'You have a new Unique update.', href: '/os/notifications' },
+  ];
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setSmartNotificationIndex((current) => (current + 1) % smartNotifications.length);
+    }, 4200);
+
+    return () => window.clearInterval(timer);
+  }, [smartNotifications.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -494,40 +510,42 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* Compact live-updates bar: keeps Active Edge clean while surfacing important activity. */}
+          {/* Compact notifications bar with a smart mini-screen for brief rotating updates. */}
           <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Latest notifications">
-            <div className="flex min-w-0 items-center gap-2 px-2.5 py-2 sm:px-3">
+            <div className="flex min-w-0 items-center gap-2 p-2 sm:gap-2.5 sm:p-2.5">
               <Link
                 to="/os/notifications"
-                className="flex shrink-0 items-center gap-1.5 rounded-xl bg-slate-950 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-white sm:px-3 sm:text-[11px]"
+                className="flex shrink-0 items-center gap-1.5 rounded-xl bg-slate-950 px-2.5 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white sm:px-3 sm:text-[11px]"
               >
                 <Bell className="h-3.5 w-3.5" />
                 Updates
               </Link>
-              <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex w-max items-center gap-2 pr-1">
-                  <Link to="/os/orders" className="group flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5 transition hover:border-emerald-200 hover:bg-emerald-50 sm:px-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><ShoppingBag className="h-3.5 w-3.5" /></span>
-                    <span className="whitespace-nowrap text-[11px] font-bold text-slate-700">Order tracking</span>
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-label="Live" />
-                  </Link>
-                  <Link to="/os/messages" className="group flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5 transition hover:border-emerald-200 hover:bg-emerald-50 sm:px-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><MessageCircle className="h-3.5 w-3.5" /></span>
-                    <span className="whitespace-nowrap text-[11px] font-bold text-slate-700">New messages</span>
-                  </Link>
-                  <Link to="/store" className="group flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5 transition hover:border-emerald-200 hover:bg-emerald-50 sm:px-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600"><TrendingUp className="h-3.5 w-3.5" /></span>
-                    <span className="whitespace-nowrap text-[11px] font-bold text-slate-700">Stock updates</span>
-                  </Link>
-                  <Link to="/os/notifications" className="group flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5 transition hover:border-emerald-200 hover:bg-emerald-50 sm:px-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600"><Bell className="h-3.5 w-3.5" /></span>
-                    <span className="whitespace-nowrap text-[11px] font-bold text-slate-700">Other updates</span>
-                  </Link>
+
+              <Link
+                to={smartNotifications[smartNotificationIndex].href}
+                className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-white shadow-inner transition hover:border-emerald-500 sm:px-3.5"
+                aria-live="polite"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/20">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[8px] font-black tracking-[0.18em] text-emerald-300">{smartNotifications[smartNotificationIndex].label}</span>
+                      <span className="text-[8px] font-semibold text-slate-500">SMART SCREEN</span>
+                    </div>
+                    <p key={smartNotificationIndex} className="mt-0.5 truncate text-[11px] font-semibold text-slate-100 sm:text-xs">{smartNotifications[smartNotificationIndex].text}</p>
+                  </div>
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-500" />
                 </div>
-              </div>
-              <Link to="/os/notifications" aria-label="Open all notifications" className="hidden shrink-0 rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 sm:flex">
-                <ArrowRight className="h-4 w-4" />
               </Link>
+
+              <div className="hidden shrink-0 items-center gap-1 sm:flex">
+                <Link to="/os/orders" aria-label="Order tracking" className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100"><ShoppingBag className="h-3.5 w-3.5" /></Link>
+                <Link to="/os/messages" aria-label="New messages" className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100"><MessageCircle className="h-3.5 w-3.5" /></Link>
+                <Link to="/store" aria-label="Stock updates" className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100"><TrendingUp className="h-3.5 w-3.5" /></Link>
+              </div>
             </div>
           </div>
 
