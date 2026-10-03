@@ -426,6 +426,10 @@ export default function UniqueMediaPage() {
     const queueIndex = playableQueue.findIndex((entry) => entry.id === item.id);
     setPlayerQueueIndex(queueIndex >= 0 ? queueIndex : 0);
     setIsPlaying(item.kind === 'video' || item.kind === 'audio');
+    // Native Android audio uses Media3 so playback survives screen lock and exposes system media controls.
+    if (item.kind === 'audio' && queueIndex >= 0 && supportsNativeAndroidStorage()) {
+      playNativeBackgroundMedia(playableQueue, queueIndex);
+    }
   };
   const playQueueItem = (index: number) => {
     if (!playableQueue.length) return;
