@@ -263,7 +263,7 @@ public class MainActivity extends Activity {
                 item.put("mime", mimeForName(file.getName()));
                 item.put("size", file.length());
                 item.put("url", MEDIA_HOST + Uri.encode(key));
-                item.put("isNew", true);
+                item.put("isNew", !getSharedPreferences("unique_media", MODE_PRIVATE).getBoolean("seen:" + file.getName(), false));
                 result.put(item);
             } catch (Exception ignored) {}
         }
@@ -298,7 +298,13 @@ public class MainActivity extends Activity {
         @JavascriptInterface public String listMedia() { return listMediaPage(0, 300); }
         @JavascriptInterface public String listMediaPage(int offset, int limit) { return listMediaPage(Math.max(0, offset), Math.min(300, Math.max(1, limit))).toString(); }
         @JavascriptInterface public String getSharedMedia() { return listReceivedMedia().toString(); }
-        @JavascriptInterface public void markMediaSeen(String id) {}\n        @JavascriptInterface public boolean deleteMedia(String id) { return MainActivity.this.deleteMediaItem(id); }
+        @JavascriptInterface public void markMediaSeen(String id) {
+            if (id != null && id.startsWith("received:")) {
+                String name = id.substring("received:".length());
+                getSharedPreferences("unique_media", MODE_PRIVATE).edit().putBoolean("seen:" + name, true).apply();
+            }
+        }
+        @JavascriptInterface public boolean deleteMedia(String id) { return MainActivity.this.deleteMediaItem(id); }
         @JavascriptInterface public boolean playBackgroundMedia(String idsJson, int index) {
             try {
                 JSONArray ids = new JSONArray(idsJson);
@@ -319,7 +325,7 @@ public class MainActivity extends Activity {
                 intent.putExtra(MediaPlaybackService.EXTRA_URIS, uris.toString());
                 intent.putExtra(MediaPlaybackService.EXTRA_NAMES, names.toString());
                 intent.putExtra(MediaPlaybackService.EXTRA_INDEX, Math.max(0, Math.min(index, uris.length() - 1)));
-                startService(intent);
+                if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent); else startService(intent);
                 return true;
             } catch (Exception e) { return false; }
         }
@@ -334,6 +340,20 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void stopBackgroundMedia() {
             Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
             intent.setAction(MediaPlaybackService.ACTION_STOP); startService(intent);
+        }
+        @JavascriptInterface public void backgroundToggleRepeat() {
+            Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
+            intent.setAction(MediaPlaybackService.ACTION_REPEAT); startService(intent);
+        }
+        @JavascriptInterface public void backgroundToggleShuffle() {
+            Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
+            intent.setAction(MediaPlaybackService.ACTION_SHUFFLE); startService(intent);
+        }
+        @JavascriptInterface public void seekBackgroundMedia(int seconds) {
+            Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
+            intent.setAction(MediaPlaybackService.ACTION_SEEK);
+            intent.putExtra(MediaPlaybackService.EXTRA_SEEK_SECONDS, seconds);
+            startService(intent);
         }
         @JavascriptInterface public boolean shareNativeMedia(String idsJson) {
             try {
