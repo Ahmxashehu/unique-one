@@ -33,6 +33,8 @@ class MediaPlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Let Media3 manage its media-session lifecycle and foreground notification before handling app actions.
+        val serviceResult = super.onStartCommand(intent, flags, startId)
         when (intent?.action) {
             ACTION_PLAY_QUEUE -> {
                 val uris = intent.getStringArrayListExtra(EXTRA_URIS) ?: arrayListOf()
@@ -72,7 +74,7 @@ class MediaPlaybackService : MediaSessionService() {
                 stopSelf()
             }
         }
-        return START_STICKY
+        return serviceResult
     }
 
     override fun onDestroy() {
