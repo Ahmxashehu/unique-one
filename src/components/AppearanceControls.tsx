@@ -52,13 +52,15 @@ export default function AppearanceControls() {
   const currentLanguage = SUPPORTED_LANGUAGES.find((item) => item.code === language) || SUPPORTED_LANGUAGES[0];
 
   return (
-    <div className="fixed right-3 top-11 z-[80] flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 p-1 shadow-lg shadow-slate-900/5 backdrop-blur-xl transition-all unique-appearance-controls sm:right-4 sm:top-11">
-    <div className="unique-u1-glow relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full" aria-label="UniquePlatform">
-      <span className="unique-u1-orbit unique-u1-orbit-ring absolute inset-0 rounded-full" aria-hidden="true" />
-      <span className="unique-u1-mark relative z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/90 bg-white text-[11px] font-black tracking-[-0.08em] text-emerald-700 shadow-sm">
-        UP
-      </span>
-    </div>
+    <>
+      <div className="fixed right-3 top-11 z-[80] flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 p-1 shadow-lg shadow-slate-900/5 backdrop-blur-xl transition-all unique-appearance-controls sm:right-4 sm:top-11">
+      <div className="relative flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden="true">
+        <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-emerald-400 border-r-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.65)]" style={{ animationDuration: '2.4s' }} />
+        <span className="absolute inset-[-2px] animate-pulse rounded-full bg-emerald-400/15 blur-md" />
+        <span className="relative z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/90 bg-white text-[11px] font-black tracking-[-0.08em] text-emerald-700 shadow-sm">
+          U1
+        </span>
+      </div>
       <button
         type="button"
         onClick={toggleTheme}
@@ -109,6 +111,7 @@ export default function AppearanceControls() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
