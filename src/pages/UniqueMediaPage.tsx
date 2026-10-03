@@ -184,8 +184,8 @@ export default function UniqueMediaPage() {
               const incoming = [...sharedItems, ...nativeItems];
               return [...incoming.filter((item) => !existing.has(item.file.name + ':' + item.file.size)), ...current];
             });
-            setNativeOffset(nativeItems.length);
-            setNativeHasMore(nativeItems.length === 100);
+            setNativeOffset(100);
+            setNativeHasMore(nativeItems.length >= 100);
             setDeviceMessage(sharedItems.length
               ? sharedItems.length + ' shared file' + (sharedItems.length === 1 ? '' : 's') + ' received from Android and ' + nativeItems.length + ' phone media item' + (nativeItems.length === 1 ? '' : 's') + ' connected.'
               : importedCount + ' phone media item' + (importedCount === 1 ? '' : 's') + ' connected through Android MediaStore.');
@@ -245,8 +245,8 @@ export default function UniqueMediaPage() {
           return incoming.length ? [...incoming, ...current] : current;
         });
         setNewReceivedCount(items.filter((item) => item.isNew).length);
-        setNativeOffset(items.length);
-        setNativeHasMore(items.length === 100);
+        setNativeOffset(100);
+        setNativeHasMore(items.length >= 100);
       } catch {
         // The next normal media refresh can recover if Android is temporarily busy.
       }
@@ -313,8 +313,8 @@ export default function UniqueMediaPage() {
         const existing = new Set(current.map((item) => item.file.name + ':' + item.file.size));
         return [...next.filter((item) => !existing.has(item.file.name + ':' + item.file.size)), ...current];
       });
-      setNativeOffset((value) => value + next.length);
-      setNativeHasMore(next.length === 100);
+      setNativeOffset((value) => value + 100);
+      setNativeHasMore(next.length >= 100);
       setDeviceMessage(next.length ? next.length + ' more phone media items loaded.' : 'You have reached the end of your phone media library.');
     } catch {
       setDeviceMessage('More phone media could not be loaded.');
@@ -360,8 +360,8 @@ export default function UniqueMediaPage() {
           const existing = new Set(current.map((item) => item.file.name + ':' + item.file.size));
           return [...nativeItems.filter((item) => !existing.has(item.file.name + ':' + item.file.size)), ...current];
         });
-        setNativeOffset(nativeItems.length);
-        setNativeHasMore(nativeItems.length === 100);
+        setNativeOffset(100);
+        setNativeHasMore(nativeItems.length >= 100);
         setDeviceMessage(nativeItems.length + ' phone media item' + (nativeItems.length === 1 ? '' : 's') + ' loaded directly from Android storage.');
       } catch {
         setDeviceMessage('Android phone media access failed. Check the system permission and try again.');
