@@ -757,24 +757,6 @@ export default function HomePage() {
               )}
             </div>
 
-              <div className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-slate-950 p-3.5 text-white shadow-sm sm:rounded-3xl sm:p-5">
-                <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-emerald-400/20 blur-2xl animate-pulse" />
-                <div className="relative flex items-start gap-3">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-300/20">
-                    <Video className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">New experience</p>
-                    <h3 className="mt-1 text-lg font-black tracking-tight">Online Conference</h3>
-                    
-                  </div>
-                </div>
-                <div className="relative mt-3 grid grid-cols-2 gap-2">
-                  <Link to="/conference" className="rounded-xl bg-emerald-400 px-3 py-2.5 text-center text-xs font-black text-slate-950 transition hover:bg-emerald-300">Start Conference</Link>
-                  <Link to="/conference" className="rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-center text-xs font-black text-white transition hover:bg-white/10">Join Conference</Link>
-                </div>
-              </div>
-
             <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
               <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:rounded-3xl sm:p-5">
                 <div className="flex min-w-0 items-center gap-2">
