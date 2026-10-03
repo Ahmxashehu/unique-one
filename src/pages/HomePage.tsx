@@ -4,6 +4,8 @@ import {
   ArrowRight,
   Bell,
   Building2,
+  Clock3,
+  MapPin,
   Bookmark,
   Compass,
   Heart,
@@ -48,6 +50,8 @@ export default function HomePage() {
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [activeMainPoster, setActiveMainPoster] = useState(0);
   const [smartNotificationIndex, setSmartNotificationIndex] = useState(0);
+  const [smartNow, setSmartNow] = useState(() => new Date());
+  const [smartLocation, setSmartLocation] = useState('Abuja, FCT');
 
   const experiencePosters = [
     ['Restaurant', '/categories'],
@@ -134,6 +138,23 @@ export default function HomePage() {
 
     return () => window.clearInterval(timer);
   }, [mainPosterSlides.length]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setSmartNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setSmartLocation(`${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`);
+      },
+      () => {},
+      { enableHighAccuracy: false, maximumAge: 300000, timeout: 5000 },
+    );
+  }, []);
 
   const smartNotifications = [
     { label: 'ORDER', text: 'Your order is moving to the next step.', href: '/os/orders' },
@@ -365,6 +386,17 @@ export default function HomePage() {
       `}</style>
       {/* Sticky discovery header */}
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+        <div className="flex h-7 items-center justify-center border-b border-slate-100/90 bg-slate-50/70 px-3">
+          <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-2.5 py-1 text-[9px] font-black tracking-[0.08em] text-slate-600 shadow-sm backdrop-blur sm:gap-2.5 sm:px-3 sm:text-[10px]" aria-label="Current time, date and location">
+            <span className="inline-flex items-center gap-1 text-slate-950"><Clock3 className="h-3 w-3 text-emerald-600" />{smartNow.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+            <span className="h-3 w-px bg-slate-200" />
+            <span className="hidden sm:inline">{smartNow.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" })}</span>
+            <span className="sm:hidden">{smartNow.toLocaleDateString([], { day: "2-digit", month: "short" })}</span>
+            <span className="h-3 w-px bg-slate-200" />
+            <span className="inline-flex min-w-0 items-center gap-1 truncate text-emerald-700"><MapPin className="h-3 w-3 shrink-0" /><span className="max-w-[120px] truncate sm:max-w-[180px]">{smartLocation}</span></span>
+            <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-emerald-500" title="Live" />
+          </div>
+        </div>
         <div className="mx-auto flex min-w-0 max-w-7xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3 lg:px-8">
           <Link to="/os" className="flex shrink-0 items-center gap-2 font-black tracking-tight">
             <span className="hidden sm:block">UNIQUE</span>
