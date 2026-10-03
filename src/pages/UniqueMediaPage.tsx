@@ -835,11 +835,11 @@ export default function UniqueMediaPage() {
             {search.trim() && <p className="text-xs font-semibold text-slate-500">{searchResults.length} matching file{searchResults.length === 1 ? '' : 's'} across your library</p>}
           </div>
 
-          {filteredMedia.length === 0 ? (
+          {visibleMedia.length === 0 ? (
             <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
               <div className="mx-auto flex max-w-xl flex-col items-center text-center">
                 <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                  {React.createElement(iconForKind(activeKind), { className: 'h-7 w-7' })}
+                  {search.trim() ? <Search className="h-7 w-7" /> : React.createElement(iconForKind(activeKind), { className: 'h-7 w-7' })}
                 </span>
                 <h3 className="mt-4 text-xl font-black text-slate-950">{search.trim() ? 'No matching media found' : 'No ' + (categories.find(([value]) => value === activeKind)?.[1]?.toLowerCase() || 'media') + ' found'}</h3>
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
