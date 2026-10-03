@@ -89,15 +89,29 @@ export default function SearchPage() {
           35% { opacity: .7; }
           70%, 100% { transform: translateX(320%); opacity: 0; }
         }
+        @keyframes globalSearchSmoke {
+          0%, 100% { transform: translate3d(-2%, 0, 0) scale(1); opacity: .28; }
+          50% { transform: translate3d(2%, -1px, 0) scale(1.035); opacity: .55; }
+        }
       `}</style>
 
       <div className="max-w-3xl mx-auto text-center space-y-6">
+        <div className="relative mx-auto flex h-14 w-14 translate-y-1 items-center justify-center sm:h-16 sm:w-16" aria-hidden="true">
+          <span className="absolute -inset-2 rounded-full bg-emerald-300/20 blur-xl" style={{ animation: 'globalSearchGlow 2.8s ease-in-out infinite' }} />
+          <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-emerald-400 border-r-emerald-300 shadow-[0_0_14px_rgba(16,185,129,0.65)]" style={{ animationDuration: '2.4s' }} />
+          <span className="absolute inset-[-2px] animate-pulse rounded-full bg-emerald-400/15 blur-md" />
+          <span className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/90 bg-white text-[11px] font-black tracking-[-0.08em] text-emerald-700 shadow-sm sm:h-14 sm:w-14 sm:text-xs">U1</span>
+        </div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
           Global Search
         </h1>
 
         <div className="flex items-center gap-2">
-          <div className="relative flex min-w-0 flex-1 overflow-hidden rounded-[26px] border border-slate-200 bg-slate-50/90 p-1.5 shadow-[0_8px_30px_rgba(15,23,42,.07)] transition-all focus-within:border-emerald-300 focus-within:bg-white focus-within:shadow-[0_8px_32px_rgba(16,185,129,.12)]">
+          <div className="relative flex min-w-0 flex-1 overflow-visible rounded-[26px]">
+            <span className="pointer-events-none absolute -inset-1 rounded-[30px] bg-emerald-300/20 blur-md" aria-hidden="true" />
+            <span className="pointer-events-none absolute -inset-[2px] rounded-[28px] border border-emerald-300/40 bg-gradient-to-r from-emerald-300/10 via-white/30 to-teal-300/10 blur-[1px]" style={{ animation: 'globalSearchGlow 3.8s ease-in-out infinite' }} aria-hidden="true" />
+            <span className="pointer-events-none absolute -inset-2 rounded-[32px] bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.20),transparent_68%)] blur-lg" style={{ animation: 'globalSearchSmoke 5s ease-in-out infinite' }} aria-hidden="true" />
+            <div className="relative flex min-w-0 flex-1 overflow-hidden rounded-[26px] border border-emerald-200/80 bg-white/95 p-1.5 shadow-[0_0_18px_rgba(16,185,129,0.16)] backdrop-blur-xl transition-all focus-within:border-emerald-400 focus-within:bg-white focus-within:shadow-[0_0_28px_rgba(16,185,129,0.28)]">
             <span
               className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -translate-x-full bg-gradient-to-r from-transparent via-emerald-200/35 to-transparent"
               style={{ animation: 'globalSearchShine 3.8s ease-in-out infinite' }}
