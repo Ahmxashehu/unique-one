@@ -383,7 +383,7 @@ export default function UniqueSharePage() {
                 </div>
                 <div className="mt-5 grid grid-cols-2 gap-3">
                   <button type="button" disabled={busy} onClick={() => void startSend()} className="group rounded-3xl border border-emerald-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-400 disabled:opacity-50">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white"><Send className="h-5 w-5" /></span><h3 className="mt-4 font-black">Share</h3><p className="mt-1 text-xs leading-5 text-slate-500">Generate secure connection</p>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white"><Send className="h-5 w-5" /></span><h3 className="mt-4 font-black">Send</h3><p className="mt-1 text-xs leading-5 text-slate-500">Choose files and create a secure connection</p>
                   </button>
                   <button type="button" onClick={() => { setMode("receive"); setMessage("Scan the sender's secure QR or enter the connection token."); }} className="group rounded-3xl border border-slate-800 bg-slate-950 p-5 text-left text-white shadow-sm transition hover:-translate-y-0.5">
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-white"><ScanLine className="h-5 w-5" /></span><h3 className="mt-4 font-black">Receive</h3><p className="mt-1 text-xs leading-5 text-slate-400">Connect to a sender</p>
