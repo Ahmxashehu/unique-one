@@ -494,6 +494,43 @@ export default function HomePage() {
             </Link>
           </div>
 
+          {/* Compact live-updates bar: keeps Active Edge clean while surfacing important activity. */}
+          <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Latest notifications">
+            <div className="flex min-w-0 items-center gap-2 px-2.5 py-2 sm:px-3">
+              <Link
+                to="/os/notifications"
+                className="flex shrink-0 items-center gap-1.5 rounded-xl bg-slate-950 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-white sm:px-3 sm:text-[11px]"
+              >
+                <Bell className="h-3.5 w-3.5" />
+                Updates
+              </Link>
+              <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex w-max items-center gap-2 pr-1">
+                  <Link to="/os/orders" className="group flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5 transition hover:border-emerald-200 hover:bg-emerald-50 sm:px-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><ShoppingBag className="h-3.5 w-3.5" /></span>
+                    <span className="whitespace-nowrap text-[11px] font-bold text-slate-700">Order tracking</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-label="Live" />
+                  </Link>
+                  <Link to="/os/messages" className="group flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5 transition hover:border-emerald-200 hover:bg-emerald-50 sm:px-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><MessageCircle className="h-3.5 w-3.5" /></span>
+                    <span className="whitespace-nowrap text-[11px] font-bold text-slate-700">New messages</span>
+                  </Link>
+                  <Link to="/store" className="group flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5 transition hover:border-emerald-200 hover:bg-emerald-50 sm:px-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600"><TrendingUp className="h-3.5 w-3.5" /></span>
+                    <span className="whitespace-nowrap text-[11px] font-bold text-slate-700">Stock updates</span>
+                  </Link>
+                  <Link to="/os/notifications" className="group flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5 transition hover:border-emerald-200 hover:bg-emerald-50 sm:px-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600"><Bell className="h-3.5 w-3.5" /></span>
+                    <span className="whitespace-nowrap text-[11px] font-bold text-slate-700">Other updates</span>
+                  </Link>
+                </div>
+              </div>
+              <Link to="/os/notifications" aria-label="Open all notifications" className="hidden shrink-0 rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 sm:flex">
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
             <div className="space-y-5">
               {loading ? (
