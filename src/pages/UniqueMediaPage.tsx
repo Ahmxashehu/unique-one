@@ -93,6 +93,14 @@ export default function UniqueMediaPage() {
     });
   }, [activeKind, media, search]);
 
+  // Searching is library-wide: a filename can match Audio, Videos, Images, or PDFs.
+  const searchResults = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return [];
+    return media.filter((item) => item.file.name.toLowerCase().includes(term));
+  }, [media, search]);
+  const visibleMedia = search.trim() ? searchResults : filteredMedia;
+
   const loadAuthorizedDeviceMedia = async (handle: any, announce = false) => {
     const result = await scanDeviceMediaDirectory(handle);
     setMedia((current) => {
@@ -731,7 +739,12 @@ export default function UniqueMediaPage() {
         <header className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
           <input ref={phoneFileInputRef} type="file" multiple accept="video/*,audio/*,image/*,application/pdf" className="hidden" onChange={(event) => { importFromPhoneStorage(event.target.files); event.currentTarget.value = ''; }} />
           <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">UniqueMedia</p><h1 className="truncate text-xl font-black text-slate-950">Smart library</h1></div>
+            <div className="min-w-0 flex-1"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">UniqueMedia</p><h1 className="truncate text-xl font-black text-slate-950">Smart library</h1></div>
+            <label className="flex w-36 shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-2 sm:w-52" aria-label="Search all media">
+              <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search all media" aria-label="Search all media" className="min-w-0 w-full bg-transparent text-xs outline-none placeholder:text-slate-400" />
+              {search && <button type="button" onClick={() => setSearch('')} className="shrink-0 rounded-full p-0.5 text-slate-400 hover:bg-slate-200" aria-label="Clear search"><X className="h-3.5 w-3.5" /></button>}
+            </label>
           </div>
           <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1" aria-label="UniqueMedia categories">
             {categories.map(([value, label]) => {
@@ -818,13 +831,8 @@ export default function UniqueMediaPage() {
 
         <section className="mt-5">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-black text-slate-950">{categories.find(([value]) => value === activeKind)?.[1]}</h2>
-            </div>
-            <label className="flex min-w-[220px] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
-              <Search className="h-4 w-4 shrink-0 text-slate-400" />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={'Search ' + (categories.find(([value]) => value === activeKind)?.[1] || 'media').toLowerCase()} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
-            </label>
+            <h2 className="text-2xl font-black text-slate-950">{search.trim() ? 'Search results' : categories.find(([value]) => value === activeKind)?.[1]}</h2>
+            {search.trim() && <p className="text-xs font-semibold text-slate-500">{searchResults.length} matching file{searchResults.length === 1 ? '' : 's'} across your library</p>}
           </div>
 
           {filteredMedia.length === 0 ? (
@@ -833,7 +841,7 @@ export default function UniqueMediaPage() {
                 <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
                   {React.createElement(iconForKind(activeKind), { className: 'h-7 w-7' })}
                 </span>
-                <h3 className="mt-4 text-xl font-black text-slate-950">No {categories.find(([value]) => value === activeKind)?.[1]?.toLowerCase() || 'media'} found</h3>
+                <h3 className="mt-4 text-xl font-black text-slate-950">{search.trim() ? 'No matching media found' : 'No ' + (categories.find(([value]) => value === activeKind)?.[1]?.toLowerCase() || 'media') + ' found'}</h3>
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
                   {supportsPhoneFilePicker() && <button type="button" onClick={() => openPhoneFilePicker()} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700">
                     Add {activeKind === 'pdf' ? 'PDFs' : activeKind === 'audio' ? 'Audio' : categories.find(([value]) => value === activeKind)?.[1] || 'files'}
@@ -843,6 +851,26 @@ export default function UniqueMediaPage() {
                   </Link>
                 </div>
               </div>
+            </div>
+          ) : search.trim() ? (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {searchResults.map((item) => {
+                const ItemIcon = iconForKind(item.kind);
+                const itemLabel = categories.find(([value]) => value === item.kind)?.[1] || 'Media';
+                return (
+                  <article key={item.id} className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-emerald-200 hover:shadow-md">
+                    <button type="button" onClick={() => openMediaWithSeen(item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                      {item.kind === 'image' ? <img src={item.url} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover bg-slate-100" /> : <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><ItemIcon className="h-5 w-5" /></span>}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-bold text-slate-900">{item.file.name}</span>
+                        <span className="mt-1 block text-[11px] font-semibold text-slate-500">{itemLabel} · {formatBytes(item.file.size)}</span>
+                      </span>
+                    </button>
+                    {item.isNew && <span className="rounded-full bg-emerald-600 px-2 py-1 text-[9px] font-black text-white">NEW</span>}
+                    <button type="button" onClick={() => void shareFiles([item])} className="rounded-full p-2 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700" aria-label={'Share ' + item.file.name}><Share2 className="h-4 w-4" /></button>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <>
