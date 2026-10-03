@@ -531,6 +531,7 @@ export default function UniqueMediaPage() {
   const deleteCurrentMedia = async () => {
     if (!player) return;
     const current = player;
+    if (supportsNativeAndroidStorage() && isNativeMediaItem(current) && !window.confirm('Delete "' + current.file.name + '" from your phone? This cannot be undone.')) return;
     const deleted = await permanentDelete(current);
     if (!deleted) return;
     setPlayer(null);
