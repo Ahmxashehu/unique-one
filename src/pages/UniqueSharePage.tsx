@@ -344,6 +344,20 @@ export default function UniqueSharePage() {
 
   const guestAccessReady = Boolean(auth.currentUser) || guestReady;
 
+  const requestedMode = new URLSearchParams(window.location.search).get("mode");
+  const launchIntentHandled = useRef(false);
+  useEffect(() => {
+    if (!guestAccessReady || launchIntentHandled.current) return;
+    if (requestedMode !== "send" && requestedMode !== "receive") return;
+    launchIntentHandled.current = true;
+    if (requestedMode === "send") {
+      void startSend();
+    } else {
+      setMode("receive");
+      setMessage("Scan the sender's secure QR or enter the connection token.");
+    }
+  }, [guestAccessReady, requestedMode]);
+
   return (
     <main className="min-h-full overflow-y-auto bg-slate-950 pb-24 text-white">
       <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
