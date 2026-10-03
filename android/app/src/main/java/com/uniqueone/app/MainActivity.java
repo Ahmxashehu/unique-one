@@ -44,6 +44,7 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> filePathCallback;
     private boolean loadedHostedApp = false;
     private final Map<String, Uri> mediaUris = new HashMap<>();
+    private final Map<String, String> mediaNames = new HashMap<>();
     private final Map<String, File> sharedFiles = new HashMap<>();
 
     @Override
@@ -222,6 +223,7 @@ public class MainActivity extends Activity {
                 Uri itemUri = Uri.withAppendedPath(collection, String.valueOf(id));
                 String key = kind + ":" + id;
                 mediaUris.put(key, itemUri);
+                mediaNames.put(key, name == null ? "Media" : name);
                 JSONObject item = new JSONObject();
                 item.put("id", key);
                 item.put("name", name == null ? "Media" : name);
@@ -313,11 +315,15 @@ public class MainActivity extends Activity {
                 for (int i = 0; i < ids.length(); i++) {
                     String id = ids.getString(i);
                     Uri uri = mediaUris.get(id);
+                    String displayName = mediaNames.get(id);
                     if (uri == null) {
                         File file = sharedFiles.get(id);
-                        if (file != null) uri = Uri.fromFile(file);
+                        if (file != null) {
+                            uri = Uri.fromFile(file);
+                            displayName = file.getName();
+                        }
                     }
-                    if (uri != null) { uris.put(uri.toString()); names.put(id); }
+                    if (uri != null) { uris.put(uri.toString()); names.put(displayName == null ? id : displayName); }
                 }
                 if (uris.length() == 0) return false;
                 Intent intent = new Intent(MainActivity.this, MediaPlaybackService.class);
