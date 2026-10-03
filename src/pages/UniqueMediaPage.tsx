@@ -843,6 +843,9 @@ export default function UniqueMediaPage() {
                 </span>
                 <h3 className="mt-4 text-xl font-black text-slate-950">{search.trim() ? 'No matching media found' : 'No ' + (categories.find(([value]) => value === activeKind)?.[1]?.toLowerCase() || 'media') + ' found'}</h3>
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-xs font-black text-white">
+                    <Smartphone className="h-4 w-4" /> Connect phone
+                  </button>
                   {supportsPhoneFilePicker() && <button type="button" onClick={() => openPhoneFilePicker()} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700">
                     Add {activeKind === 'pdf' ? 'PDFs' : activeKind === 'audio' ? 'Audio' : categories.find(([value]) => value === activeKind)?.[1] || 'files'}
                   </button>}
