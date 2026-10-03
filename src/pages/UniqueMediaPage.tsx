@@ -795,10 +795,10 @@ export default function UniqueMediaPage() {
                   {React.createElement(iconForKind(activeKind), { className: 'h-7 w-7' })}
                 </span>
                 <h3 className="mt-4 text-xl font-black text-slate-950">No {categories.find(([value]) => value === activeKind)?.[1]?.toLowerCase() || 'media'} found</h3>
-                <p className="mt-1 text-sm text-slate-500">Matching files will appear here when they are available.</p>
+                <p className="mt-1 text-sm text-slate-500">Scan your phone or add files to this category. Nothing is uploaded unless you choose to share it.</p>
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
                   <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-xs font-black text-white">
-                    <Smartphone className="h-4 w-4" /> Refresh library
+                    <Smartphone className="h-4 w-4" /> Scan phone
                   </button>
                   {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700">
                     Add {activeKind === 'pdf' ? 'PDFs' : activeKind === 'audio' ? 'Audio' : categories.find(([value]) => value === activeKind)?.[1] || 'files'}
@@ -809,7 +809,7 @@ export default function UniqueMediaPage() {
                 </div>
               </div>
             </div>
-
+          ) : (
             <>
               {activeKind === 'image' && (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
