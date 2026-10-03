@@ -383,6 +383,14 @@ export default function HomePage() {
           22%, 72% { transform: translateY(0); opacity: 1; }
           84%, 100% { transform: translateY(-110%); opacity: 0; }
         }
+        @keyframes uniqueSearchGlow {
+          0%, 100% { opacity: .48; transform: scale(.985); }
+          50% { opacity: .9; transform: scale(1.012); }
+        }
+        @keyframes uniqueSearchSmoke {
+          0%, 100% { transform: translate3d(-2%, 0, 0) scale(1); opacity: .32; }
+          50% { transform: translate3d(2%, -1px, 0) scale(1.035); opacity: .58; }
+        }
       `}</style>
       {/* Sticky discovery header */}
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
@@ -407,27 +415,36 @@ export default function HomePage() {
             <span className="hidden sm:block">UNIQUE</span>
           </Link>
 
-          <div className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search Unique..."
-              className="h-10 w-full rounded-full border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition focus:border-emerald-400 focus:bg-white"
-              aria-label="Search Unique"
-            />
+          <div className="unique-search-shell relative min-w-0 flex-1">
+            <span className="pointer-events-none absolute -inset-1 rounded-full bg-emerald-300/25 blur-md" aria-hidden="true" />
+            <span className="pointer-events-none absolute -inset-[2px] rounded-full border border-emerald-300/40 bg-gradient-to-r from-emerald-300/10 via-white/30 to-teal-300/10 blur-[1px]" style={{ animation: 'uniqueSearchGlow 3.8s ease-in-out infinite' }} aria-hidden="true" />
+            <span className="pointer-events-none absolute -inset-2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.20),transparent_68%)] blur-lg" style={{ animation: 'uniqueSearchSmoke 5s ease-in-out infinite' }} aria-hidden="true" />
+            <div className="relative flex h-10 items-center overflow-hidden rounded-full border border-emerald-200/80 bg-white/95 shadow-[0_0_18px_rgba(16,185,129,0.16)] backdrop-blur-xl transition-all focus-within:border-emerald-400 focus-within:shadow-[0_0_24px_rgba(16,185,129,0.28)]">
+              <Search className="pointer-events-none absolute left-3 h-4 w-4 text-emerald-600" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search Unique..."
+                className="h-full w-full bg-transparent pl-10 pr-4 text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400"
+                aria-label="Search Unique"
+              />
+            </div>
           </div>
 
           <Link
             to="/os/ai"
             aria-label="Open Unique AI"
-            className="group relative hidden h-10 items-center gap-2 overflow-hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 text-emerald-800 shadow-sm transition hover:scale-[1.03] hover:border-emerald-300 hover:bg-emerald-100 sm:inline-flex"
+            className="group relative hidden h-10 shrink-0 translate-y-1 items-center gap-1.5 rounded-full border border-emerald-200/80 bg-white/90 px-2.5 text-emerald-800 shadow-[0_0_16px_rgba(16,185,129,0.18)] backdrop-blur-xl transition hover:scale-[1.04] hover:border-emerald-300 hover:shadow-[0_0_22px_rgba(16,185,129,0.3)] sm:inline-flex"
           >
-            <span className="absolute inset-0 animate-pulse bg-emerald-200/30" />
-            <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm">
-              <Sparkles className="h-4 w-4 animate-pulse text-emerald-600" />
+            <span className="absolute -inset-1 rounded-full bg-emerald-300/20 blur-md" aria-hidden="true" />
+            <span className="relative flex h-8 w-8 items-center justify-center" aria-hidden="true">
+              <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-emerald-400 border-r-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.65)]" style={{ animationDuration: '2.4s' }} />
+              <span className="absolute inset-[-2px] animate-pulse rounded-full bg-emerald-400/15 blur-md" />
+              <span className="relative z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/90 bg-white text-[10px] font-black tracking-[-0.08em] text-emerald-700 shadow-sm">
+                U1
+              </span>
             </span>
-            <span className="relative text-xs font-black tracking-tight">Unique AI</span>
+            <span className="relative text-[11px] font-black tracking-tight">Unique AI</span>
           </Link>
           <Link
             to="/os/notifications"
