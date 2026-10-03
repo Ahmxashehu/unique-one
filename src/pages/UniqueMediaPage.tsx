@@ -789,35 +789,27 @@ export default function UniqueMediaPage() {
           </div>
 
           {filteredMedia.length === 0 ? (
-            <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-              <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 px-5 py-7 text-white sm:px-8">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-300/20">
-                    {React.createElement(iconForKind(activeKind), { className: 'h-6 w-6' })}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300">Your {categories.find(([value]) => value === activeKind)?.[1] || 'media'}</p>
-                    <h3 className="mt-1 text-2xl font-black tracking-tight">This category is ready for you.</h3>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">
-                      {activeKind === 'video' && 'Add videos from your device or receive them through UniqueShare. Play with queue controls, PiP and supported background audio.'}
-                      {activeKind === 'audio' && 'Add Audio from your device or receive it through UniqueShare. Enjoy background playback, lock-screen controls, queue, next, previous and replay on supported devices.'}
-                      {activeKind === 'image' && 'Add images from your device or receive them through UniqueShare to browse a private photo library with fast previews and full-screen viewing.'}
-                      {activeKind === 'pdf' && 'Add PDFs from your device or receive them through UniqueShare to open them in the focused PDF Reader.'}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-6 flex flex-wrap gap-2">
-                  {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2.5 text-xs font-black text-white ring-1 ring-white/10">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+              <div className="mx-auto flex max-w-xl flex-col items-center text-center">
+                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                  {React.createElement(iconForKind(activeKind), { className: 'h-7 w-7' })}
+                </span>
+                <h3 className="mt-4 text-xl font-black text-slate-950">No {categories.find(([value]) => value === activeKind)?.[1]?.toLowerCase() || 'media'} found</h3>
+                <p className="mt-1 text-sm text-slate-500">Matching files will appear here when they are available.</p>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-xs font-black text-white">
+                    <Smartphone className="h-4 w-4" /> Refresh library
+                  </button>
+                  {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700">
                     Add {activeKind === 'pdf' ? 'PDFs' : activeKind === 'audio' ? 'Audio' : categories.find(([value]) => value === activeKind)?.[1] || 'files'}
                   </button>}
-                  <Link to="/os/unique-share" className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2.5 text-xs font-black text-white ring-1 ring-white/10">
+                  <Link to="/os/unique-share?mode=receive" className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-xs font-black text-white">
                     <Share2 className="h-4 w-4" /> Receive with UniqueShare
                   </Link>
                 </div>
               </div>
-
             </div>
-          ) : (
+
             <>
               {activeKind === 'image' && (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
