@@ -103,6 +103,39 @@ export default function UniqueMediaPage() {
   };
 
   useEffect(() => {
+    const handler = (event: Event) => {
+      const records = (event as CustomEvent<Array<{ id: string; name: string; mime: string; size: number; url: string }>>).detail || [];
+      void (async () => {
+        const imported: LocalMedia[] = [];
+        for (const record of records) {
+          try {
+            const response = await fetch(record.url);
+            if (!response.ok) continue;
+            const blob = await response.blob();
+            const file = new File([blob], record.name || 'Selected file', { type: record.mime || blob.type });
+            const kind = kindForFile(file);
+            if (!kind) continue;
+            imported.push({ id: record.id, file, kind, url: record.url });
+          } catch {
+            // Skip files the system provider cannot currently read.
+          }
+        }
+        if (!imported.length) {
+          setDeviceMessage('No supported Videos, Audio, Images or PDF files were selected.');
+          return;
+        }
+        setMedia(current => {
+          const existing = new Set(current.map(item => item.id));
+          return [...imported.filter(item => !existing.has(item.id)), ...current];
+        });
+        setDeviceMessage(imported.length + ' selected file' + (imported.length === 1 ? '' : 's') + ' added to UniqueMedia.');
+      })();
+    };
+    window.addEventListener('filesSelected', handler);
+    return () => window.removeEventListener('filesSelected', handler);
+  }, []);
+
+  useEffect(() => {
     const handler = async (event: Event) => {
       const detail = (event as CustomEvent<{ id?: string; name?: string }>).detail || {};
       if (!supportsNativeAndroidStorage()) return;
@@ -296,6 +329,15 @@ export default function UniqueMediaPage() {
     setDeviceMessage(picked.length + ' media item' + (picked.length === 1 ? '' : 's') + ' imported from your phone storage.');
   };
 
+  const openPhoneFilePicker = () => {
+    const bridge = (window as any).UniqueNativeStorage;
+    if (supportsNativeAndroidStorage() && typeof bridge?.openFilePicker === 'function') {
+      bridge.openFilePicker();
+      return;
+    }
+    phoneFileInputRef.current?.click();
+  };
+
   const connectDeviceMedia = async () => {
     if (supportsNativeAndroidStorage()) {
       try {
@@ -320,7 +362,7 @@ export default function UniqueMediaPage() {
     }
     if (!supportsDeviceDirectoryAccess()) {
       if (supportsPhoneFilePicker()) {
-        phoneFileInputRef.current?.click();
+        openPhoneFilePicker();
         return;
       }
       setDeviceMessage('This browser does not expose device-folder or phone file-picker access. Use a supported Android browser or the native Android build for deeper phone-wide access.');
@@ -692,7 +734,7 @@ export default function UniqueMediaPage() {
             <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">UniqueMedia</p><h1 className="truncate text-xl font-black text-slate-950">Smart library</h1></div>
           </div>
           {supportsPhoneFilePicker() && <div className="mt-4 flex justify-end">
-            <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-black text-slate-700"><Cloud className="h-4 w-4" /> Add files</button>
+            <button type="button" onClick={() => openPhoneFilePicker()} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-black text-slate-700"><Cloud className="h-4 w-4" /> Add files</button>
           </div>}
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="UniqueMedia categories">
             {categories.map(([value, label]) => {
@@ -801,7 +843,7 @@ export default function UniqueMediaPage() {
                   <button type="button" onClick={() => void connectDeviceMedia()} className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-xs font-black text-white">
                     <Smartphone className="h-4 w-4" /> Scan phone
                   </button>
-                  {supportsPhoneFilePicker() && <button type="button" onClick={() => phoneFileInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700">
+                  {supportsPhoneFilePicker() && <button type="button" onClick={() => openPhoneFilePicker()} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700">
                     Add {activeKind === 'pdf' ? 'PDFs' : activeKind === 'audio' ? 'Audio' : categories.find(([value]) => value === activeKind)?.[1] || 'files'}
                   </button>}
                   <Link to="/os/unique-share?mode=receive" className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-xs font-black text-white">
