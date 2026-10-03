@@ -40,7 +40,7 @@ export default function HomePage() {
   const [contributions, setContributions] = useState<Array<{ id: string; title?: string; description?: string; category?: string; location?: string }>>([]);
   const [businesses, setBusinesses] = useState<Array<{ id: string; name?: string; businessName?: string; description?: string; ownerUid?: string; category?: string; status?: string; verificationStatus?: string }>>([]);
   const [services, setServices] = useState<EdgeService[]>([]);
-  const [mode, setMode] = useState<EdgeMode>('for-you');
+  const [mode] = useState<EdgeMode>('for-you');
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
@@ -492,27 +492,6 @@ export default function HomePage() {
             <Link to="/discover" className="text-sm font-bold text-emerald-700">
               View full Discover →
             </Link>
-          </div>
-
-          <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
-            {[
-              ['for-you', 'For You'],
-              ['following', 'Following'],
-              ['discover', 'Discover'],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setMode(value as EdgeMode)}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
-                  mode === value
-                    ? 'bg-slate-950 text-white'
-                    : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
           </div>
 
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
