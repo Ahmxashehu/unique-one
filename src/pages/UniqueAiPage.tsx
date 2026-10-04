@@ -227,16 +227,11 @@ function downloadAiPdf(title: string, body: string) {
   });
 
   const xrefOffset = length;
-  chunks.push("xref\n0 " + (objects.length + 1) + "
-0000000000 65535 f 
-");
+  chunks.push("xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n");
   for (let i = 1; i <= objects.length; i += 1) {
     chunks.push(String(offsets[i]).padStart(10, "0") + " 00000 n \n");
   }
-  chunks.push("trailer\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>
-startxref
-" + xrefOffset + "
-%%EOF");
+  chunks.push("trailer\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefOffset + "\n%%EOF");
 
   const blob = new Blob([chunks.join("")], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
