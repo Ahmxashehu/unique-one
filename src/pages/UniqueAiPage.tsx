@@ -23,6 +23,13 @@ type DiscoveryResult = {
   score: number;
 };
 
+type AiAccess = {
+  mode: "guest" | "registered" | "subscriber";
+  limitSeconds: number;
+  usedSeconds: number;
+  remainingSeconds: number;
+};
+
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -200,6 +207,9 @@ export default function UniqueAiPage() {
   const [lastRequestId, setLastRequestId] = useState<string | null>(null);
   const [suggestedIndex, setSuggestedIndex] = useState(0);
   const [language, setLanguage] = useState<SupportedLanguage>(getLanguage());
+  const [aiAccess, setAiAccess] = useState<AiAccess | null>(null);
+  const [displayRemainingSeconds, setDisplayRemainingSeconds] = useState<number | null>(null);
+  const guestSessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const handleLanguageChange = (event: Event) => {
@@ -209,6 +219,34 @@ export default function UniqueAiPage() {
     return () => window.removeEventListener("unique-language-change", handleLanguageChange);
   }, []);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (currentUser || guestSessionIdRef.current) return;
+    const storageKey = "unique-ai-guest-session-v1";
+    let sessionId = window.sessionStorage.getItem(storageKey);
+    if (!sessionId) {
+      sessionId = crypto.randomUUID().replace(/-/g, "");
+      window.sessionStorage.setItem(storageKey, sessionId);
+    }
+    guestSessionIdRef.current = sessionId;
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (displayRemainingSeconds === null || displayRemainingSeconds <= 0) return;
+    const intervalId = window.setInterval(() => {
+      setDisplayRemainingSeconds((value) => value === null ? null : Math.max(0, value - 1));
+    }, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [displayRemainingSeconds]);
+
+  const formatAiTime = (seconds: number) => {
+    const safe = Math.max(0, Math.floor(seconds));
+    const hours = Math.floor(safe / 3600);
+    const minutes = Math.floor((safe % 3600) / 60);
+    const secs = safe % 60;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m ${secs.toString().padStart(2, "0")}s`;
+  };
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -251,6 +289,8 @@ export default function UniqueAiPage() {
       };
       if (currentUser) {
         headers.Authorization = `Bearer ${await currentUser.getIdToken()}`;
+      } else if (guestSessionIdRef.current) {
+        headers["X-AI-Session-ID"] = guestSessionIdRef.current;
       }
       const response = await fetch(currentUser ? "/api/ai/chat" : "/api/ai/public-chat", {
         method: "POST",
@@ -260,8 +300,16 @@ export default function UniqueAiPage() {
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { message?: string; readOnly?: boolean; requestId?: string; capabilities?: UniqueAiCapabilities; error?: { message?: string } }
+        | { message?: string; readOnly?: boolean; requestId?: string; capabilities?: UniqueAiCapabilities; error?: { message?: string; code?: string }; aiAccess?: AiAccess }
         | null;
+      if (payload?.aiAccess) {
+        setAiAccess(payload.aiAccess);
+        setDisplayRemainingSeconds(payload.aiAccess.remainingSeconds);
+      }
+      const remainingHeader = response.headers.get("X-AI-Remaining-Seconds");
+      if (remainingHeader && /^\\d+$/.test(remainingHeader)) {
+        setDisplayRemainingSeconds(Number(remainingHeader));
+      }
 
       const responseRequestId = response.headers.get("X-Request-ID")?.trim();
       if (responseRequestId && !/^[A-Za-z0-9._:-]{1,64}$/.test(responseRequestId)) {
@@ -400,6 +448,26 @@ export default function UniqueAiPage() {
         }
       `}</style>
       <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-x-hidden sm:gap-4">
+      {aiAccess && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-900 shadow-sm">
+          <div className="min-w-0">
+            <div className="font-semibold">
+              {aiAccess.mode === "guest" ? "Guest AI access" : aiAccess.mode === "registered" ? "Daily AI access" : "Unique AI Premium"}
+            </div>
+            <div className="truncate opacity-80">
+              {aiAccess.mode === "guest"
+                ? "Register to unlock 1 hour of Unique AI every day."
+                : aiAccess.mode === "registered"
+                  ? "Your daily allowance is shared across conversations."
+                  : "Extended AI access with fair-use protection."}
+            </div>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="font-bold">{displayRemainingSeconds === null ? formatAiTime(aiAccess.remainingSeconds) : formatAiTime(displayRemainingSeconds)}</div>
+            <div className="opacity-70">remaining</div>
+          </div>
+        </div>
+      )}
       <div className="relative flex min-h-[58px] min-w-0 items-center overflow-hidden rounded-2xl border border-emerald-100 bg-white px-3 py-2.5 shadow-sm sm:min-h-[68px] sm:px-4">
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-emerald-50" aria-hidden="true">
           <span
