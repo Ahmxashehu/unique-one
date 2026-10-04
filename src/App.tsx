@@ -30,7 +30,7 @@ const LoginPage = lazy(() => import("./pages/public/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/public/RegisterPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/public/ForgotPasswordPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
-const StorePage = lazy(() => import("./pages/StorePage"));
+import StorePage from "./pages/StorePage";
 const PayPage = lazy(() => import("./pages/PayPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
