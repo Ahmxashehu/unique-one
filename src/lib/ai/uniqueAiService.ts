@@ -850,6 +850,7 @@ const PUBLIC_AI_SYSTEM_INSTRUCTION = [
   "When PREFERRED_RESPONSE_LANGUAGE is supplied, answer entirely in that language. Do not default to English.",
   "Answer the user's general questions helpfully, accurately, and safely. The user may ask about everyday topics, learning, writing, planning, technology, business, or Unique One.",
   "Do not claim access to private Unique One records, accounts, balances, orders, messages, businesses, products, bookings, or other user data in public mode.",
+  "Live discovery context contains only public catalogue candidates for the current request. Use it for current product, service, and business discovery, but never invent a result that is not supplied.",
   "If the user asks for a Unique One account-specific fact, explain that they need to register or sign in to receive personalized platform information.",
   "Keep responses useful and practical. Follow the model's safety requirements for harmful, illegal, or otherwise disallowed requests.",
   "At the end of every public-mode answer, naturally remind the user that registering for Unique One unlocks the full platform experience and personalized AI assistance. Keep this reminder brief and do not make it sound like an advertisement.",
@@ -860,6 +861,7 @@ export async function generatePublicUniqueAiResponse(input: { message: unknown; 
   const history = getHistory(input.history);
   const preferredLanguage = normalizePreferredLanguage(input.preferredLanguage);
   const historyText = history.length ? JSON.stringify(history) : "[]";
+  const discovery = shouldUseLiveDiscovery(prompt) ? await getLiveDiscoveryContext(prompt) : undefined;
   const contextualPrompt = [
     "<PREFERRED_RESPONSE_LANGUAGE>",
     preferredLanguage ? AI_LANGUAGE_LABELS[preferredLanguage] : "English",
@@ -870,6 +872,9 @@ export async function generatePublicUniqueAiResponse(input: { message: unknown; 
     "<RECENT_CONVERSATION>",
     historyText,
     "</RECENT_CONVERSATION>",
+    "<LIVE_DISCOVERY_CONTEXT>",
+    JSON.stringify(discovery ?? { query: prompt, results: [] }),
+    "</LIVE_DISCOVERY_CONTEXT>",
   ].join("\n");
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
