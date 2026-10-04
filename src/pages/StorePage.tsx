@@ -118,6 +118,8 @@ const prototypeStock: PrototypeStock[] = [
   { category: 'services', categoryLabel: 'Services', name: 'Business Support Package', price: 50000, quantity: 8 },
   { category: 'digital_products', categoryLabel: 'Digital Products', name: 'Business Template Pack', price: 15000, quantity: 50 },
   { category: 'digital_products', categoryLabel: 'Digital Products', name: 'Digital Learning Bundle', price: 25000, quantity: 40 },
+  { category: 'other', categoryLabel: 'Other', name: 'Everyday Essentials Bundle', price: 18000, quantity: 24 },
+  { category: 'other', categoryLabel: 'Other', name: 'General Household Items', price: 32000, quantity: 16 },
 ];
 
 
