@@ -564,25 +564,6 @@ export default function UniqueAiPage() {
         )}
       </div>
       <div className="hidden" aria-hidden="true" />
-
-          <div className="min-w-0">
-            <div className="font-semibold">
-              {aiAccess.mode === "guest" ? "Guest AI access" : aiAccess.mode === "registered" ? "Daily AI access" : "Unique AI Premium"}
-            </div>
-            <div className="truncate opacity-80">
-              {aiAccess.mode === "guest"
-                ? "Register to unlock 1 hour of Unique AI every day."
-                : aiAccess.mode === "registered"
-                  ? "Your daily allowance is shared across conversations."
-                  : "Extended AI access with fair-use protection."}
-            </div>
-          </div>
-          <div className="shrink-0 text-right">
-            <div className="font-bold">{displayRemainingSeconds === null ? formatAiTime(aiAccess.remainingSeconds) : formatAiTime(displayRemainingSeconds)}</div>
-            <div className="opacity-70">remaining</div>
-          </div>
-        </div>
-      )}
       <div className="relative flex min-h-[58px] min-w-0 items-center overflow-hidden rounded-2xl border border-emerald-100 bg-white px-3 py-2.5 shadow-sm sm:min-h-[68px] sm:px-4">
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-emerald-50" aria-hidden="true">
           <span
