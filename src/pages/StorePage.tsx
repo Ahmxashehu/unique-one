@@ -285,14 +285,18 @@ export default function StorePage() {
             <Loader2 className="w-7 h-7 animate-spin text-slate-400" />
           </div>
         ) : visibleProducts.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center">
-            <ShoppingBag className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <h3 className="font-semibold text-slate-900">No published listings yet</h3>
-            <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
-              Unique Store will show real seller listings here as they become available. No sample products are displayed.
-            </p>
-            <Link to="/store/product-request" className="inline-flex mt-5 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold">
-              Request what you need
+          <div className="flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white/90 px-3 py-3 sm:px-4 sm:py-3.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-400">
+              <ShoppingBag className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1 text-left">
+              <h3 className="text-sm font-semibold text-slate-800">No published listings yet</h3>
+              <p className="mt-0.5 text-xs leading-4 text-slate-500">
+                Real seller products will appear here when available.
+              </p>
+            </div>
+            <Link to="/store/product-request" className="inline-flex shrink-0 items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[11px] font-bold text-emerald-800 transition hover:bg-emerald-100 sm:px-3 sm:text-xs">
+              Request item
             </Link>
           </div>
         ) : (
