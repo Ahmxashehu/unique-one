@@ -1,11 +1,11 @@
 
 export type UniqueAiDiscoveryResult = {
-  type: "product" | "service" | "business";
+  type: "product" | "service" | "business" | "google_place";
   id: string;
   name: string;
   category?: string;
   description?: string;
-  providerName?: string;
+  providerName?: string;\n  address?: string;\n  rating?: number;\n  ratingCount?: number;\n  businessStatus?: string;\n  mapsUrl?: string;\n  source?: "unique_one" | "google_places";
   price?: number;
   currency?: string;
   score: number;
