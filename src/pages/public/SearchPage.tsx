@@ -156,6 +156,7 @@ export default function SearchPage() {
               />
             </div>
           </div>
+          </div>
           <button
             type="submit"
             aria-label="Search Unique One"
