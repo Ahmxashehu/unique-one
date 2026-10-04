@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { randomUUID } from "node:crypto";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { ThinkingLevel, type HarmBlockThreshold, type HarmCategory, type SafetySetting } from "@google/genai";
-import { getAuthorizedPlatformContext } from "./aiTools";
+import { getAuthorizedPlatformContext, getLiveDiscoveryContext } from "./aiTools";
 import type { UniqueAiConversationTurn, UniqueAiRequest } from "./aiTypes";
 
 const DEFAULT_MODEL = "gemini-3.8-flash";
@@ -56,6 +56,7 @@ const SYSTEM_INSTRUCTION = [
   "For requests to change, send, cancel, approve, create, delete, refund, edit, or otherwise mutate platform records, clearly state that this read-only assistant cannot perform that action.",
   "You may explain what information or authorized workflow would be needed for a future action, but do not provide a false success confirmation.",
   "Only use platform records explicitly supplied as authoritative context.",
+  "When liveDiscovery is supplied, use it as the current public discovery catalogue for the user request. Do not invent listings. If it contains no matches, say that no matching live published result was found in the current discovery set.",
   "Deterministic summary counts describe only the bounded authorized records loaded for this request; do not present them as complete database totals.",
   "If contextTruncated is true for a collection, explicitly say the displayed counts may be incomplete and do not estimate or extrapolate the unseen records.",
   "Use contextWarnings when they are present to explain exactly which bounded collection reached its limit; do not expose internal query mechanics beyond that plain-language limitation.",
@@ -495,11 +496,16 @@ function validateAuthorizedContext(
   }
 }
 
+
+function shouldUseLiveDiscovery(message: string): boolean {
+  return /\b(find|search|look for|show me|where can i|where is|available|buy|sell|hire|book|service|product|business|store|marketplace|cement|rice|phone|solar|car|hotel|restaurant|delivery|near me)\b/i.test(message);
+}
 function buildContextualPrompt(
   message: string,
   history: UniqueAiConversationTurn[],
   context: Awaited<ReturnType<typeof getAuthorizedPlatformContext>>,
   preferredLanguage?: string,
+  discovery?: Awaited<ReturnType<typeof getLiveDiscoveryContext>>,
 ): string {
   const historyText = history.length
     ? JSON.stringify(history)
@@ -513,6 +519,7 @@ function buildContextualPrompt(
     products: context.products,
     contextLoadedAt: context.summary.contextLoadedAt,
     contextWarnings: context.summary.contextWarnings,
+    ...(discovery ? { liveDiscovery: discovery } : {}),
   });
   if (authorizedContext.length > MAX_CONTEXT_JSON_LENGTH) {
     throw new UniqueAiValidationError("Authorized AI context is too large for this request.");
@@ -784,7 +791,8 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
   validateMutationBoundary(prompt);
   const context = await getAuthorizedPlatformContext(input.uid);
   validateAuthorizedContext(context);
-  const contextualPrompt = buildContextualPrompt(prompt, history, context, preferredLanguage);
+  const discovery = shouldUseLiveDiscovery(prompt) ? await getLiveDiscoveryContext(prompt) : undefined;
+  const contextualPrompt = buildContextualPrompt(prompt, history, context, preferredLanguage, discovery);
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
 
