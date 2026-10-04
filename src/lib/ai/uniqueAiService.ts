@@ -874,6 +874,79 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
 }
 
 
+
+const VISION_MAX_DATA_LENGTH = 8_000_000;
+const VISION_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+
+function validateVisionInput(value: unknown): { data: string; mimeType: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new UniqueAiValidationError("image input is required.");
+  const candidate = value as Record<string, unknown>;
+  if (typeof candidate.data !== "string" || candidate.data.length < 100 || candidate.data.length > VISION_MAX_DATA_LENGTH) {
+    throw new UniqueAiValidationError("image data is invalid or too large.");
+  }
+  if (typeof candidate.mimeType !== "string" || !VISION_MIME_TYPES.has(candidate.mimeType)) {
+    throw new UniqueAiValidationError("Unsupported image format.");
+  }
+  if (!/^[A-Za-z0-9+/=]+$/.test(candidate.data)) throw new UniqueAiValidationError("image data is invalid.");
+  return { data: candidate.data, mimeType: candidate.mimeType };
+}
+
+const VISION_SYSTEM_INSTRUCTION = [
+  "You are Unique AI Vision for the Unique One platform.",
+  "Analyze the supplied image carefully and answer the user's request.",
+  "For products, identify the likely product/category, visible brand or model when readable, visible attributes, and useful shopping clues.",
+  "Never invent a model number, price, seller, availability, authenticity, warranty, or specification that cannot be established from the image or supplied context.",
+  "Clearly distinguish confident observations from likely guesses. If text is blurry or unreadable, say so.",
+  "For shopping requests, explain that the image can be used as a starting point for Unique Store search and comparison, but do not claim that a matching listing exists unless live discovery context is supplied.",
+  "Do not identify a private person from an image or infer sensitive personal traits.",
+  "Be concise and practical.",
+].join(" ");
+
+export async function analyzeUniqueAiImage(input: { image: unknown; prompt?: unknown; preferredLanguage?: string }): Promise<string> {
+  const image = validateVisionInput(input.image);
+  const prompt = getPrompt(typeof input.prompt === "string" && input.prompt.trim()
+    ? input.prompt
+    : "Identify this image, especially any product or object. Give the likely name, category, visible brand/model if readable, key visible details, and useful next steps.");
+  const preferredLanguage = normalizePreferredLanguage(input.preferredLanguage);
+  const languageInstruction = preferredLanguage ? `Answer entirely in ${AI_LANGUAGE_LABELS[preferredLanguage]}.` : "Answer in English.";
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
+  const configuredModel = process.env.GEMINI_MODEL?.trim();
+  const model = configuredModel || DEFAULT_MODEL;
+  if (model.length > MAX_MODEL_NAME_LENGTH || !/^[A-Za-z0-9._:-]+$/.test(model)) throw new UniqueAiValidationError("GEMINI_MODEL is invalid.");
+
+  const ai = new GoogleGenAI({ apiKey });
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: [{
+        role: "user",
+        parts: [
+          { text: languageInstruction + "\n" + prompt },
+          { inlineData: { mimeType: image.mimeType, data: image.data } },
+        ],
+      }],
+      config: {
+        systemInstruction: VISION_SYSTEM_INSTRUCTION,
+        safetySettings: MODEL_SAFETY_SETTINGS,
+        thinkingConfig: { thinkingLevel: MODEL_THINKING_LEVEL },
+        maxOutputTokens: MAX_MODEL_OUTPUT_TOKENS,
+      },
+    });
+    if (response.promptFeedback?.blockReason) throw new Error(`Gemini image analysis was blocked: ${String(response.promptFeedback.blockReason)}.`);
+    if (!Array.isArray(response.candidates) || response.candidates.length === 0) throw new Error("Gemini returned no image analysis candidate.");
+    const finishReason = response.candidates[0]?.finishReason;
+    if (finishReason === "SAFETY") throw new Error("Gemini image analysis was blocked by safety filters.");
+    if (finishReason === "MAX_TOKENS") throw new Error("Gemini image analysis was truncated by the output limit.");
+    return validateAiOutput(response.text, prompt);
+  } catch (error) {
+    if (shouldUseLocalAiFallback(error)) {
+      return "I can inspect images with Unique AI Vision when the advanced vision model is available. It is temporarily busy right now, so I have not guessed what is in your image. No subscription is required for this feature.";
+    }
+    throw error;
+  }
+}
+
 const PUBLIC_AI_SYSTEM_INSTRUCTION = [
   "You are Unique AI, the free public AI assistant for the Unique One platform.",
   "When PREFERRED_RESPONSE_LANGUAGE is supplied, answer entirely in that language. Do not default to English.",
