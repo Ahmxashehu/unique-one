@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Search, ShoppingBag, Heart, Package, ArrowRight, Sparkles, MapPin, Clock3, Zap, Tag, ChevronRight,
+  Search, ShoppingBag, Heart, Package, ArrowRight, Sparkles, Clock3, Zap, ChevronRight,
   Smartphone, Shirt, Home, Hammer, Sprout, Utensils, Car, Briefcase, Loader2, Gem, PackageOpen, Layers3, Wheat, Tractor, Factory, Building2, Globe2
 } from 'lucide-react';
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
@@ -136,15 +136,7 @@ export default function StorePage() {
   const visibleProducts = useMemo(() => products.filter(product => product.status === 'published'), [products]);
   const lowStockProducts = useMemo(() => visibleProducts.filter(product => Number(product.quantity) > 0 && Number(product.quantity) <= 5), [visibleProducts]);
   const serviceListings = useMemo(() => visibleProducts.filter(product => product.category === 'services'), [visibleProducts]);
-  const departmentListings = useMemo(() => {
-    const grouped = new Map<ProductCategory, Product[]>();
-    visibleProducts.forEach(product => {
-      const current = grouped.get(product.category) || [];
-      if (current.length < 4) current.push(product);
-      grouped.set(product.category, current);
-    });
-    return Array.from(grouped.entries()).slice(0, 6);
-  }, [visibleProducts]);
+
 
   return (
     <div className="min-h-full space-y-6 pb-8">
@@ -278,60 +270,7 @@ export default function StorePage() {
         </Link>
       </section>
 
-      <section className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div><h2 className="text-lg font-bold text-slate-900">Departments with current listings</h2><p className="text-xs sm:text-sm text-slate-500">Browse real marketplace items by the departments currently represented in Store.</p></div>
-          <Link to="/store/search" className="hidden sm:inline-flex items-center gap-1 text-sm font-semibold text-emerald-700">Browse all <ChevronRight className="w-4 h-4" /></Link>
-        </div>
-        {departmentListings.length > 0 ? (
-          <div className="space-y-5">
-            {departmentListings.map(([category, items]) => {
-              const meta = categories.find(item => item.key === category);
-              const Icon = meta?.icon || Package;
-              return <div key={category}>
-                <div className="flex items-center justify-between mb-2">
-                  <Link to={`/store/search?cat=${category}`} className="flex items-center gap-2 font-semibold text-slate-900 hover:text-emerald-700">
-                    <span className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center"><Icon className="w-4 h-4 text-emerald-700" /></span>
-                    {meta?.label || category.replace(/_/g, ' ')}
-                  </Link>
-                  <Link to={`/store/search?cat=${category}`} className="text-xs font-semibold text-slate-500 hover:text-emerald-700">See all</Link>
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
-                  {items.map(product => <Link key={product.id} to={`/store/product/${product.id}`} className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50 hover:border-emerald-300 hover:shadow-sm transition-all">
-                    <div className="aspect-[4/3] bg-white overflow-hidden flex items-center justify-center">{product.images?.[0] ? <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" /> : <ShoppingBag className="w-7 h-7 text-slate-300" />}</div>
-                    <div className="p-2.5"><p className="text-xs sm:text-sm font-medium text-slate-900 line-clamp-2">{product.name}</p><p className="text-sm font-bold text-slate-900 mt-1.5">{product.currency === 'NGN' ? '₦' : product.currency + ' '}{Number(product.price).toLocaleString()}</p></div>
-                  </Link>)}
-                </div>
-              </div>;
-            })}
-          </div>
-        ) : <p className="text-sm text-slate-500 py-4">Departments will appear here as real published listings become available.</p>}
-      </section>
-
-      <section className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-        <Link to="/store/search" className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
-          <MapPin className="w-5 h-5 text-blue-600" />
-          <p className="font-semibold text-slate-900 mt-3">Find nearby</p>
-          <p className="text-xs text-slate-500 mt-1">Use filters to narrow listings</p>
-        </Link>
-        <Link to="/store/product-request" className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
-          <Tag className="w-5 h-5 text-violet-600" />
-          <p className="font-semibold text-slate-900 mt-3">Request an item</p>
-          <p className="text-xs text-slate-500 mt-1">Tell sellers what you need</p>
-        </Link>
-      </section>
-
       <section>
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Latest listings</h2>
-            <p className="text-sm text-slate-500">Fresh listings from the live Unique Store marketplace.</p>
-          </div>
-          <Link to="/store/search" className="text-sm font-semibold text-slate-700 flex items-center gap-1">
-            View all <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-
         {!loading && lowStockProducts.length > 0 && (
           <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
             <div className="flex items-center justify-between gap-3 mb-3"><div><h3 className="font-bold text-slate-900">Low stock</h3><p className="text-xs text-slate-600">Real listings with five or fewer units currently available.</p></div><Zap className="w-5 h-5 text-amber-500" /></div>
