@@ -40,7 +40,7 @@ type ChatMessage = {
 const shouldLoadDiscovery = (value: string) =>
   /\b(find|search|look for|show me|where can i|where is|available|buy|sell|hire|book|service|product|business|store|marketplace|cement|rice|phone|solar|car|hotel|restaurant|delivery|near me)\b/i.test(value);
 
-function shouldOfferPdf(text: string) {
+function userExplicitlyRequestedPdf(text: string) {\n  return /\\b(create|make|generate|download|export|turn|convert)\\b[\\s-]*(this|that|it|the (answer|response|breakdown|report|document))?[\\s-]*(as|into|to)?[\\s-]*pdf\\b|\\bpdf\\b/i.test(text.trim());\n}\n\nfunction shouldOfferPdf(text: string) {
   const value = text.trim();
   if (value.length < 350) return false;
   return /\b(breakdown|detailed analysis|report|proposal|business plan|roadmap|assessment|comparison|strategy|implementation plan|project plan|market analysis|financial analysis|summary|brief|document|guide|specification|requirements)\b/i.test(value);
@@ -462,7 +462,7 @@ export default function UniqueAiPage() {
 
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", text: payload.message!.trim(), ...(discoveryResults.length ? { discovery: discoveryResults } : {}) },
+        { id: crypto.randomUUID(), role: "assistant", text: payload.message!.trim(), pdfRequested: userExplicitlyRequestedPdf(trimmed), ...(discoveryResults.length ? { discovery: discoveryResults } : {}) },
       ]);
     } catch (err) {
       setLastFailedMessage(trimmed);
@@ -667,7 +667,7 @@ export default function UniqueAiPage() {
                       </div>
                     )}
                     <div>{item.text}</div>
-                    {item.role === "assistant" && shouldOfferPdf(item.text) && (
+                    {item.role === "assistant" && (item.pdfRequested || shouldOfferPdf(item.text)) && (
                       <button type="button" onClick={() => downloadAiPdf("Unique AI Breakdown", item.text)} className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100" aria-label="Create a professional Unique Platform PDF">
                         <FileDown className="h-3.5 w-3.5" />
                         Create PDF
