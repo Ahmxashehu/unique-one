@@ -510,6 +510,13 @@ export default function UniqueAiPage() {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
+        @keyframes uniqueAiFlagOrbit {
+          0% { transform: rotate(0deg) translateX(25px) rotate(0deg); }
+          25% { transform: rotate(90deg) translateX(25px) rotate(-90deg); }
+          50% { transform: rotate(180deg) translateX(25px) rotate(-180deg); }
+          75% { transform: rotate(270deg) translateX(25px) rotate(-270deg); }
+          100% { transform: rotate(360deg) translateX(25px) rotate(-360deg); }
+        }
       `}</style>
       <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-x-hidden sm:gap-4">
       {aiAccess && (
@@ -600,23 +607,19 @@ export default function UniqueAiPage() {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain p-2.5 sm:p-6">
           {messages.length === 0 ? (
-            <div className="mx-auto flex max-w-2xl flex-col items-center py-3 text-center sm:py-10">
-              <div className="unique-ai-platform-mark relative mb-1.5 flex h-[72px] w-[72px] translate-y-1 items-center justify-center sm:mb-2 sm:h-20 sm:w-20" aria-hidden="true">
-                <span className="absolute -inset-3 rounded-full bg-emerald-300/25 blur-2xl" style={{ animation: "uniqueAiSearchGlow 2.8s ease-in-out infinite" }} />
-                <span className="absolute -inset-1 rounded-full border border-emerald-300/30" style={{ animation: "uniqueAiOrbPulse 2.4s ease-in-out infinite" }} />
-                <span className="relative flex h-full w-full items-center justify-center">
-                  <span className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-emerald-400 border-r-teal-300 shadow-[0_0_18px_rgba(16,185,129,0.7)]" style={{ animation: "uniqueAiOrbSweep 2.2s linear infinite" }} />
-                  <span className="absolute inset-[-3px] rounded-full bg-emerald-400/15 blur-md" style={{ animation: "uniqueAiOrbPulse 2.2s ease-in-out infinite" }} />
-                  <span className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full border border-white/90 bg-slate-950 text-[12px] font-black tracking-[0.12em] text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,.35)] sm:h-16 sm:w-16 sm:text-sm">AI</span>
+            <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-end pb-2 text-center sm:pb-4">
+              <div className="unique-ai-platform-mark relative flex h-[58px] w-[58px] translate-y-0 items-center justify-center sm:h-16 sm:w-16" aria-hidden="true">
+                <span className="absolute -inset-3 rounded-full bg-emerald-300/20 blur-2xl" style={{ animation: "uniqueAiSearchGlow 3.6s ease-in-out infinite" }} />
+                <span className="absolute -inset-1.5 rounded-full border border-emerald-300/30" style={{ animation: "uniqueAiOrbPulse 3s ease-in-out infinite" }} />
+                <span className="absolute inset-[-8px] rounded-full border border-emerald-400/20" style={{ animation: "uniqueAiOrbSweep 5.5s linear infinite" }} />
+                <span className="absolute inset-[-12px] flex items-center justify-center" style={{ animation: "uniqueAiFlagOrbit 6s linear infinite" }}>
+                  <span className="flex h-5 w-7 items-center justify-center overflow-hidden rounded-[4px] border border-white/70 bg-white text-[14px] leading-none shadow-[0_2px_8px_rgba(15,23,42,.22)]">🇳🇬</span>
+                </span>
+                <span className="absolute inset-[-5px] rounded-full border border-emerald-200/20 bg-emerald-400/10 blur-md" style={{ animation: "uniqueAiOrbPulse 2.6s ease-in-out infinite" }} />
+                <span className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/90 bg-slate-950 text-[11px] font-black tracking-[0.12em] text-emerald-300 shadow-[0_0_22px_rgba(16,185,129,.38)] sm:h-14 sm:w-14 sm:text-xs">
+                  <span className="relative">AI<span className="absolute -right-1 -top-1 h-1 w-1 rounded-full bg-white shadow-[0_0_5px_rgba(255,255,255,.9)]" /></span>
                 </span>
               </div>
-              <h2
-                className="text-lg font-black tracking-tight text-slate-900 sm:text-2xl"
-                style={{ animation: "uniqueAiTitleFloat 2.8s ease-in-out infinite" }}
-              >
-                Ask Unique AI anything.
-              </h2>
-
             </div>
           ) : (
             <div className="mx-auto max-w-3xl space-y-4">
