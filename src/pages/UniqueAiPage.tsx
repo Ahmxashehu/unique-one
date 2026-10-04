@@ -558,38 +558,42 @@ export default function UniqueAiPage() {
         </div>
       )}
       <div className="flex items-center justify-between gap-2 px-1">
-        <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">AI access</div>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
+          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Try asking</span>
+          <span className="hidden text-[10px] text-slate-400 sm:inline">— a quick idea to get started</span>
+        </div>
         {aiAccess?.mode !== "subscriber" && (
-          <Link to="/ai/premium" className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800">See Premium plans →</Link>
+          <Link to="/ai/premium" className="shrink-0 text-[10px] font-bold text-emerald-700 hover:text-emerald-800">Premium plans →</Link>
         )}
       </div>
-      <div className="hidden" aria-hidden="true" />
-      <div className="relative flex min-h-[58px] min-w-0 items-center overflow-hidden rounded-2xl border border-emerald-100 bg-white px-3 py-2.5 shadow-sm sm:min-h-[68px] sm:px-4">
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-emerald-50" aria-hidden="true">
-          <span
-            key={suggestedIndex}
-            className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-emerald-400/80"
-            style={{ animation: "uniqueAiSuggestionSweep 2s linear both" }}
-          />
-        </div>
-        <div className="pointer-events-none absolute -left-8 top-1/2 h-14 w-14 -translate-y-1/2 rounded-full bg-emerald-300/20 blur-2xl" style={{ animation: "uniqueAiSuggestionGlow 2.8s ease-in-out infinite" }} aria-hidden="true" />
-        <div className="min-w-0 w-full">
-          <button
-            key={QUICK_PROMPTS[suggestedIndex]}
-            type="button"
-            disabled={loading}
-            onClick={() => setMessage(QUICK_PROMPTS[suggestedIndex])}
-            className="group relative block w-full min-w-0 overflow-hidden pr-1 text-left"
-            aria-label={`Use suggested question: ${QUICK_PROMPTS[suggestedIndex]}`}
-          >
+      <div className="relative min-w-0 overflow-hidden rounded-2xl border border-emerald-100/90 bg-gradient-to-r from-white via-emerald-50/70 to-white p-2.5 shadow-[0_4px_18px_rgba(15,23,42,.045)] sm:p-3">
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-1 rounded-l-2xl bg-gradient-to-b from-emerald-300 via-emerald-500 to-teal-300" aria-hidden="true" />
+        <div className="pointer-events-none absolute -right-5 -top-7 h-20 w-20 rounded-full bg-emerald-300/15 blur-2xl" style={{ animation: "uniqueAiSuggestionGlow 2.8s ease-in-out infinite" }} aria-hidden="true" />
+        <button
+          key={QUICK_PROMPTS[suggestedIndex]}
+          type="button"
+          disabled={loading}
+          onClick={() => setMessage(QUICK_PROMPTS[suggestedIndex])}
+          className="group relative flex w-full min-w-0 items-center gap-2.5 rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-white/80 disabled:opacity-60 sm:gap-3 sm:px-2"
+          aria-label={`Use suggested question: ${QUICK_PROMPTS[suggestedIndex]}`}
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-white text-emerald-600 shadow-sm sm:h-9 sm:w-9">
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="mb-0.5 block text-[9px] font-bold uppercase tracking-[0.1em] text-emerald-700/80">Suggested prompt</span>
             <span
-              className="block min-w-0 whitespace-normal break-words text-sm font-semibold leading-5 text-slate-800 transition-colors group-hover:text-emerald-700 sm:text-base sm:leading-6"
-              style={{ animation: "uniqueAiSuggestedSlide 700ms cubic-bezier(.22,1,.36,1) both" }}
+              className="block min-w-0 whitespace-normal break-words text-[13px] font-semibold leading-[1.4rem] text-slate-800 transition-colors group-hover:text-emerald-800 sm:text-sm"
+              style={{ animation: "uniqueAiSuggestedSlide 500ms cubic-bezier(.22,1,.36,1) both" }}
             >
-              <Sparkles className="mr-1.5 inline-block h-3.5 w-3.5 text-emerald-500 sm:h-4 sm:w-4" aria-hidden="true" />
               {QUICK_PROMPTS[suggestedIndex]}
             </span>
-          </button>
+          </span>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-emerald-100 bg-white text-sm font-bold text-emerald-700 transition-transform group-hover:translate-x-0.5" aria-hidden="true">↗</span>
+        </button>
+        <div className="pointer-events-none absolute inset-x-2 bottom-0.5 h-px overflow-hidden bg-emerald-100" aria-hidden="true">
+          <span key={suggestedIndex} className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-emerald-400/80" style={{ animation: "uniqueAiSuggestionSweep 2s linear both" }} />
         </div>
       </div>
 
