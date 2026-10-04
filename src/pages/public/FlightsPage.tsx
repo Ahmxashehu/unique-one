@@ -148,7 +148,9 @@ export default function FlightsPage() {
     }
   },[currentUser,location.pathname,draft.action,pendingAction,stage]);
 
-  const openSearch = () => { setError(''); setSearchOpen(true); };\n\n  const reset = () => { sessionStorage.removeItem(KEY); setDraft(emptyDraft); setPendingAction(null); setSelectedFlight(null); setStage('form'); setNotice(''); setError(''); };
+  const openSearch = () => { setError(''); setSearchOpen(true); };
+
+  const reset = () => { sessionStorage.removeItem(KEY); setDraft(emptyDraft); setPendingAction(null); setSelectedFlight(null); setStage('form'); setNotice(''); setError(''); };
 
   return <div className="min-h-full bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
     <div className="mx-auto max-w-5xl space-y-5 pb-10">
