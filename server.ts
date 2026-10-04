@@ -11,6 +11,7 @@ import { getStorage } from "firebase-admin/storage";
 import type { Conversation, ConversationMember, ConversationType, Message, MessageRequest } from "./src/lib/os/communication-types";
 import { validateMessageDraft, CommunicationValidationError } from "./communicationCore";
 import { generatePublicUniqueAiResponse, generateUniqueAiResponse, UniqueAiValidationError } from "./src/lib/ai/uniqueAiService";
+import { getLiveDiscoveryContext } from "./src/lib/ai/aiTools";
 import { registerIdentityVerificationRoutes } from "./src/server/identityVerificationRoutes";
 import { registerAjoRoutes } from "./src/server/ajoRoutes";
 import { registerUniqueShareRoutes } from "./src/server/uniqueShareRoutes";
@@ -725,6 +726,29 @@ const app = express();
   registerIdentityVerificationRoutes(app, authenticate);
   registerAjoRoutes(app, authenticate);
   registerUniqueShareRoutes(app, authenticate);
+
+  app.post("/api/ai/discovery", rateLimit({
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => res.status(429).json({ error: { message: "Too many discovery requests. Please try again shortly." } }),
+  }), async (req, res) => {
+    try {
+      if (!req.body || typeof req.body !== "object" || Array.isArray(req.body) || typeof req.body.message !== "string") {
+        return res.status(400).json({ error: { message: "A search message is required." } });
+      }
+      const message = req.body.message.trim();
+      if (!message || message.length > 4_000) {
+        return res.status(400).json({ error: { message: "Search message must contain 1-4,000 characters." } });
+      }
+      const discovery = await getLiveDiscoveryContext(message);
+      return res.status(200).json(discovery);
+    } catch (error) {
+      console.error("Unique AI discovery failed:", error);
+      return res.status(503).json({ error: { message: "Live discovery is temporarily unavailable." } });
+    }
+  });
 
   app.post("/api/ai/public-chat", rateLimit({
     windowMs: 60_000,
