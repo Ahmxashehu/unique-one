@@ -11,11 +11,27 @@ type UniqueAiCapabilities = {
   mutations: string[];
 };
 
+type DiscoveryResult = {
+  type: "product" | "service" | "business";
+  id: string;
+  name: string;
+  category?: string;
+  description?: string;
+  providerName?: string;
+  price?: number;
+  currency?: string;
+  score: number;
+};
+
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  discovery?: DiscoveryResult[];
 };
+
+const shouldLoadDiscovery = (value: string) =>
+  /\b(find|search|look for|show me|where can i|where is|available|buy|sell|hire|book|service|product|business|store|marketplace|cement|rice|phone|solar|car|hotel|restaurant|delivery|near me)\b/i.test(value);
 
 const QUICK_PROMPTS = [
   "What can Unique One do for individuals, families, businesses, and organizations?",
@@ -289,9 +305,32 @@ export default function UniqueAiPage() {
       }
 
       setLastRequestId(responseRequestId || payload.requestId);
+
+      let discoveryResults: DiscoveryResult[] = [];
+      if (shouldLoadDiscovery(trimmed)) {
+        try {
+          const discoveryResponse = await fetch("/api/ai/discovery", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: trimmed }),
+            signal: controller.signal,
+          });
+          if (discoveryResponse.ok) {
+            const discoveryPayload = (await discoveryResponse.json().catch(() => null)) as { results?: DiscoveryResult[] } | null;
+            if (Array.isArray(discoveryPayload?.results)) {
+              discoveryResults = discoveryPayload.results
+                .filter((item) => item && typeof item.id === "string" && typeof item.name === "string")
+                .slice(0, 6);
+            }
+          }
+        } catch {
+          // AI text remains usable when the optional discovery cards are unavailable.
+        }
+      }
+
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", text: payload.message!.trim() },
+        { id: crypto.randomUUID(), role: "assistant", text: payload.message!.trim(), ...(discoveryResults.length ? { discovery: discoveryResults } : {}) },
       ]);
     } catch (err) {
       setLastFailedMessage(trimmed);
@@ -431,6 +470,31 @@ export default function UniqueAiPage() {
                       </div>
                     )}
                     {item.text}
+                    {item.discovery && item.discovery.length > 0 && (
+                      <div className="mt-3 space-y-2 border-t border-slate-200/80 pt-3">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-600">Live Unique One results</div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {item.discovery.map((result) => (
+                            <Link
+                              key={`${result.type}-${result.id}`}
+                              to={result.type === "product" ? `/store/search?q=${encodeURIComponent(result.name)}` : `/store/search?q=${encodeURIComponent(result.name)}`}
+                              className="block rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 text-left transition hover:border-emerald-300 hover:bg-emerald-50/50"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">{result.type}</span>
+                                {typeof result.price === "number" && (
+                                  <span className="text-[10px] font-bold text-emerald-700">{result.currency || "NGN"} {result.price.toLocaleString()}</span>
+                                )}
+                              </div>
+                              <div className="mt-1 text-xs font-semibold leading-4 text-slate-800">{result.name}</div>
+                              {(result.category || result.providerName) && (
+                                <div className="mt-1 truncate text-[10px] text-slate-500">{result.providerName || result.category}</div>
+                              )}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
