@@ -1,3 +1,21 @@
+
+export type UniqueAiDiscoveryResult = {
+  type: "product" | "service" | "business";
+  id: string;
+  name: string;
+  category?: string;
+  description?: string;
+  providerName?: string;
+  price?: number;
+  currency?: string;
+  score: number;
+};
+
+export type UniqueAiDiscoveryContext = {
+  query: string;
+  results: UniqueAiDiscoveryResult[];
+};
+
 export type UniqueAiCapabilityContract = {
   version: 1;
   readOnly: true;
