@@ -39,7 +39,7 @@ export default defineConfig(() => ({
             urlPattern: ({ request }) => request.destination === 'script' || request.destination === 'style',
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'unique-platform-app-assets-v13',
+              cacheName: 'unique-platform-app-assets-v14',
               expiration: { maxEntries: 100, maxAgeSeconds: 604800 },
             },
           },
