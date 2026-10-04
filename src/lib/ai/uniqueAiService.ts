@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { ThinkingLevel, type HarmBlockThreshold, type HarmCategory, type SafetySetting } from "@google/genai";
 import { getAuthorizedPlatformContext, getLiveDiscoveryContext } from "./aiTools";
+import { buildUniqueAiIntent, uniqueAiCapabilitySummary } from "./aiIntent";
 import type { UniqueAiConversationTurn, UniqueAiRequest } from "./aiTypes";
 
 const DEFAULT_MODEL = "gemini-3.8-flash";
@@ -50,6 +51,8 @@ const MODEL_SAFETY_SETTINGS: SafetySetting[] = [
 const SYSTEM_INSTRUCTION = [
   "You are Unique AI, the assistant for the Unique One platform.",
   "Be accurate, practical, and concise.",
+  "Understand the user's intent before answering. Route requests toward the appropriate Unique One capability when relevant, and use a Find -> Compare -> Recommend -> Prepare -> Confirm -> Execute workflow. Never claim execution when the current assistant is read-only.",
+  "Use the supplied UNIQUE_AI_INTENT as a routing hint, not as unquestionable truth. Correct it from the user's actual words when necessary.",
   "Always answer in the language named by PREFERRED_RESPONSE_LANGUAGE when one is supplied. Do not switch back to English merely because the question was typed in English. Keep UniquePlatform, UniquePay, Unique Store, Unique AI, product names, IDs, URLs, and required technical identifiers unchanged unless a natural localized form is appropriate.",
   "Do not invent Unique One platform data, balances, orders, businesses, listings, bookings, users, or other records.",
   "This service is read-only: do not claim that you completed an action or changed platform data.",
@@ -788,11 +791,12 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
   const prompt = getPrompt(input.message);
   const history = getHistory(input.history);
   const preferredLanguage = normalizePreferredLanguage(input.preferredLanguage);
+  const intent = buildUniqueAiIntent(prompt);
   validateMutationBoundary(prompt);
   const context = await getAuthorizedPlatformContext(input.uid);
   validateAuthorizedContext(context);
   const discovery = shouldUseLiveDiscovery(prompt) ? await getLiveDiscoveryContext(prompt) : undefined;
-  const contextualPrompt = buildContextualPrompt(prompt, history, context, preferredLanguage, discovery);
+  const contextualPrompt = buildContextualPrompt(prompt, history, context, preferredLanguage, discovery) + "\n<UNIQUE_AI_INTENT>\n" + JSON.stringify(intent) + "\n" + uniqueAiCapabilitySummary(intent) + "\n</UNIQUE_AI_INTENT>";
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
 
@@ -860,12 +864,17 @@ export async function generatePublicUniqueAiResponse(input: { message: unknown; 
   const prompt = getPrompt(input.message);
   const history = getHistory(input.history);
   const preferredLanguage = normalizePreferredLanguage(input.preferredLanguage);
+  const intent = buildUniqueAiIntent(prompt);
   const historyText = history.length ? JSON.stringify(history) : "[]";
   const discovery = shouldUseLiveDiscovery(prompt) ? await getLiveDiscoveryContext(prompt) : undefined;
   const contextualPrompt = [
     "<PREFERRED_RESPONSE_LANGUAGE>",
     preferredLanguage ? AI_LANGUAGE_LABELS[preferredLanguage] : "English",
     "</PREFERRED_RESPONSE_LANGUAGE>",
+    "<UNIQUE_AI_INTENT>",
+    JSON.stringify(intent),
+    uniqueAiCapabilitySummary(intent),
+    "</UNIQUE_AI_INTENT>",
     "<PUBLIC_AI_REQUEST>",
     prompt,
     "</PUBLIC_AI_REQUEST>",
