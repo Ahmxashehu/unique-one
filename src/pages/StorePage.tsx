@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Search, ShoppingBag, Heart, Package, ArrowRight, Sparkles, Clock3, Zap, ChevronRight,
+  Search, ShoppingBag, Heart, Package, ArrowRight, Sparkles, Clock3, Zap, ChevronRight, MapPin, Truck, CreditCard, Minus, Plus, Edit3, ShieldCheck, RotateCcw, MessageCircle, CheckCircle2,
   Smartphone, Shirt, Home, Hammer, Sprout, Utensils, Car, Briefcase, Loader2, Gem, PackageOpen, Layers3, Wheat, Tractor, Factory, Building2, Globe2
 } from 'lucide-react';
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
@@ -137,8 +137,12 @@ export default function StorePage() {
   const lowStockProducts = useMemo(() => visibleProducts.filter(product => Number(product.quantity) > 0 && Number(product.quantity) <= 5), [visibleProducts]);
   const serviceListings = useMemo(() => visibleProducts.filter(product => product.category === 'services'), [visibleProducts]);
 
-  const [prototypeCategory, setPrototypeCategory] = useState<ProductCategory>(categories[0].key);
-  const selectedPrototypeCategory = categories.find(category => category.key === prototypeCategory) ?? categories[0];
+  const [buyerCategory,setBuyerCategory]=useState<ProductCategory>(categories[0].key);
+  const [buyerQty,setBuyerQty]=useState(1); const [buyerCheckout,setBuyerCheckout]=useState(false); const [buyerAddress,setBuyerAddress]=useState('Add delivery address'); const [editingAddress,setEditingAddress]=useState(false); const [deliveryMethod,setDeliveryMethod]=useState('Platform delivery');
+  const selectedBuyerCategory=categories.find(x=>x.key===buyerCategory)??categories[0];
+  const buyerName=selectedBuyerCategory.label==='Electronics'?'Smart LED TV':selectedBuyerCategory.label==='Cement'?'POP Cement 40kg':selectedBuyerCategory.label==='Services'?'Professional Home Service':`Representative ${selectedBuyerCategory.label} item`;
+  const buyerPrice=selectedBuyerCategory.key==='vehicles'?12500000:selectedBuyerCategory.key==='property'?8500000:selectedBuyerCategory.key==='machinery'?2450000:selectedBuyerCategory.key==='electronics'?285000:25000;
+  const deliveryFee=deliveryMethod==='Customer pickup'?0:2500; const buyerSubtotal=buyerPrice*buyerQty;
 
 
 
@@ -276,133 +280,13 @@ export default function StorePage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-              <Package className="h-3.5 w-3.5" />
-              Seller publishing prototype
-            </div>
-            <h2 className="mt-2 text-lg font-black tracking-tight text-slate-900">Product listing, stock, checkout & delivery — one view</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Prototype only: fields are ready for the real seller flow. Nothing here creates a fake listing or sample inventory.</p>
-          </div>
-          <span className="text-[11px] font-bold text-slate-400">19 store categories</span>
-        </div>
-
-        <div className="mt-4 grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-2">
-            <p className="px-2 pb-2 text-[10px] font-black uppercase tracking-wider text-slate-400">Choose category</p>
-            <div className="max-h-[430px] space-y-1 overflow-y-auto pr-1">
-              {categories.map(category => {
-                const Icon = category.icon;
-                const active = category.key === prototypeCategory;
-                return (
-                  <button
-                    key={category.key}
-                    type="button"
-                    onClick={() => setPrototypeCategory(category.key)}
-                    className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition ${active ? 'border border-emerald-200 bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:bg-white'}`}
-                  >
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-slate-400'}`}><Icon className="h-4 w-4" /></span>
-                    <span className="min-w-0 flex-1 truncate text-xs font-bold">{category.label}</span>
-                    {active && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4">
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm"><selectedPrototypeCategory.icon className="h-5 w-5" /></span>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Selected shop category</p>
-                  <h3 className="text-base font-black text-slate-900">{selectedPrototypeCategory.label}</h3>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 p-3">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">1 · Product / service</p>
-                <div className="mt-2 grid gap-2">
-                  <input className="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" placeholder="Listing name" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input className="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" placeholder="Price (₦)" />
-                    <input className="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" placeholder="SKU / item code" />
-                  </div>
-                  <textarea className="min-h-16 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" placeholder="Description, specifications, variants..." />
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 p-3">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">2 · Stock & availability</p>
-                <div className="mt-2 grid gap-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <input className="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" placeholder="Stock quantity" type="number" min="0" />
-                    <input className="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" placeholder="Low-stock alert" type="number" min="0" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <select className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>In stock</option><option>Out of stock</option><option>Pre-order</option></select>
-                    <select className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>Active</option><option>Paused</option></select>
-                  </div>
-                  <p className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500">Stock will be checked again at checkout before payment is accepted.</p>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 p-3">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">3 · Where it is published</p>
-                <div className="mt-2 space-y-2">
-                  {['Unique Store category page', 'Global Search', 'Near Me / location discovery', 'Seller shop profile'].map(label => (
-                    <label key={label} className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-                      <input type="checkbox" defaultChecked className="h-4 w-4 accent-emerald-600" />
-                      {label}
-                    </label>
-                  ))}
-                  <select className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>Draft — not published</option><option>Publish when approved</option></select>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 p-3">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">4 · Checkout details</p>
-                <div className="mt-2 space-y-2">
-                  <label className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-700"><span>Cart quantity limits</span><input className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-xs" placeholder="Max" /></label>
-                  <label className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-700"><span>Accept UniquePay</span><input type="checkbox" defaultChecked className="h-4 w-4 accent-emerald-600" /></label>
-                  <label className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-700"><span>Customer note</span><input type="checkbox" defaultChecked className="h-4 w-4 accent-emerald-600" /></label>
-                  <p className="rounded-lg bg-emerald-50 px-3 py-2 text-[11px] text-emerald-800">Checkout preview: item total + delivery fee + applicable charges = final payable amount.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-3">
-              <p className="text-[10px] font-black uppercase tracking-wider text-sky-700">5 · Delivery details</p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-4">
-                <select className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs"><option>Seller delivery</option><option>Platform logistics</option><option>Customer pickup</option></select>
-                <input className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs" placeholder="Dispatch time" />
-                <input className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs" placeholder="Delivery fee (₦)" />
-                <input className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs" placeholder="Delivery areas" />
-              </div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                <div className="rounded-lg bg-white px-3 py-2"><p className="text-[10px] text-slate-400">Destination</p><p className="text-xs font-bold text-slate-700">Customer delivery address</p></div>
-                <div className="rounded-lg bg-white px-3 py-2"><p className="text-[10px] text-slate-400">Tracking</p><p className="text-xs font-bold text-slate-700">Pending → Shipped → Delivered</p></div>
-                <div className="rounded-lg bg-white px-3 py-2"><p className="text-[10px] text-slate-400">Returns</p><p className="text-xs font-bold text-slate-700">Policy shown before payment</p></div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <div>
-                <p className="text-xs font-black text-slate-800">Final seller checklist</p>
-                <p className="text-[11px] text-slate-500">Category • listing • price • stock • publish status • checkout • delivery • returns</p>
-              </div>
-              <button type="button" className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-emerald-500">
-                <Package className="h-4 w-4" /> Preview listing
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
+      <section className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm sm:p-5">
+  <div><div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700"><ShoppingBag className="h-3.5 w-3.5"/> Buyer journey prototype</div><h2 className="mt-2 text-lg font-black text-slate-900">Explore the whole marketplace as a customer</h2><p className="mt-1 text-xs leading-5 text-slate-500">Click any category to see its representative item and test discovery, product details, save, quantity, cart, checkout, address updates, delivery, payment review, returns and tracking. Prototype only — no real charge.</p></div>
+  <div className="mt-4 grid gap-4 lg:grid-cols-[210px_1fr]"><div className="rounded-2xl border border-slate-200 bg-slate-50 p-2"><p className="px-2 pb-2 text-[10px] font-black uppercase text-slate-400">Categories</p><div className="max-h-[460px] space-y-1 overflow-y-auto">{categories.map(cat=>{const I=cat.icon;return <button key={cat.key} onClick={()=>{setBuyerCategory(cat.key);setBuyerQty(1);setBuyerCheckout(false)}} className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left ${cat.key===buyerCategory?'bg-white border border-emerald-200 text-emerald-800':'text-slate-600 hover:bg-white'}`}><I className="h-4 w-4"/><span className="truncate text-xs font-bold">{cat.label}</span>{cat.key===buyerCategory&&<CheckCircle2 className="ml-auto h-4 w-4 text-emerald-500"/>}</button>})}</div></div>
+  <div className="space-y-3"><div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 flex gap-4"><div className="h-36 w-36 shrink-0 rounded-xl bg-white border flex items-center justify-center"><selectedBuyerCategory.icon className="h-12 w-12 text-emerald-500"/></div><div><span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">{selectedBuyerCategory.label}</span><h3 className="mt-2 text-xl font-black">{buyerName}</h3><p className="text-xs text-slate-500">Representative customer-facing listing for this category, with seller, stock, delivery and return information.</p><p className="mt-2 text-xl font-black">₦{buyerPrice.toLocaleString()}</p><div className="mt-3 flex items-center gap-2"><button onClick={()=>setBuyerQty(q=>Math.max(1,q-1))} className="h-9 w-9 rounded-lg border"><Minus className="mx-auto h-4 w-4"/></button><b>{buyerQty}</b><button onClick={()=>setBuyerQty(q=>q+1)} className="h-9 w-9 rounded-lg border"><Plus className="mx-auto h-4 w-4"/></button><button className="ml-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"><Heart className="inline h-4 w-4"/> Save</button></div><div className="mt-3 flex gap-2"><button onClick={()=>setBuyerCheckout(true)} className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-black text-white">Add to cart</button><button onClick={()=>setBuyerCheckout(true)} className="rounded-lg bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800">Buy now</button></div></div></div>
+  <div className="grid gap-3 md:grid-cols-2"><div className="rounded-xl border p-3 text-xs text-slate-600 space-y-2"><p className="text-[10px] font-black uppercase text-slate-400">Buyer confidence</p><div><ShieldCheck className="inline h-4 w-4 text-emerald-600"/> Seller verification, ratings and product details</div><div><MessageCircle className="inline h-4 w-4 text-emerald-600"/> Chat seller / ask questions</div><div><RotateCcw className="inline h-4 w-4 text-emerald-600"/> Returns, refunds and buyer protection</div><div><Package className="inline h-4 w-4 text-emerald-600"/> Stock re-check before payment</div></div><div className="rounded-xl border p-3 text-xs text-slate-600"><p className="text-[10px] font-black uppercase text-slate-400">Marketplace services</p><p className="mt-2">Delivery scheduling • pickup • order notes • invoice/receipt • seller contact • support • dispute/return request • live order tracking</p></div></div>
+  {buyerCheckout&&<div className="rounded-2xl border border-sky-200 bg-sky-50 p-4"><div className="flex justify-between"><b>Checkout</b><b>₦{buyerSubtotal.toLocaleString()}</b></div><div className="mt-3 grid gap-3 md:grid-cols-2"><div className="rounded-xl bg-white p-3"><div className="flex justify-between"><b className="text-xs">Shipping address</b><button onClick={()=>setEditingAddress(v=>!v)} className="text-[11px] font-bold text-emerald-700"><Edit3 className="inline h-3.5 w-3.5"/> {editingAddress?'Done':'Update'}</button></div>{editingAddress?<input value={buyerAddress==='Add delivery address'?'':buyerAddress} onChange={e=>setBuyerAddress(e.target.value)} placeholder="House, street, area, city, state" className="mt-2 w-full rounded-lg border px-3 py-2 text-xs"/>:<div className="mt-2 flex gap-2 rounded-lg bg-slate-50 p-2 text-xs"><MapPin className="h-4 w-4 text-emerald-600"/>{buyerAddress}</div>}<p className="mt-2 text-[10px] text-slate-400">Update recipient name, phone and shipping location before payment.</p></div><div className="rounded-xl bg-white p-3"><b className="text-xs">Delivery method</b>{['Platform delivery','Seller delivery','Customer pickup'].map(m=><label key={m} className="mt-2 flex items-center gap-2 text-xs"><input type="radio" name="buyer-delivery" checked={deliveryMethod===m} onChange={()=>setDeliveryMethod(m)}/><Truck className="h-4 w-4 text-emerald-600"/>{m}</label>)}</div></div><div className="mt-3 grid grid-cols-3 gap-2 text-xs"><div className="rounded-lg bg-white p-2">Items<b className="block">₦{buyerSubtotal.toLocaleString()}</b></div><div className="rounded-lg bg-white p-2">Delivery<b className="block">{deliveryFee?'₦'+deliveryFee.toLocaleString():'Free'}</b></div><div className="rounded-lg bg-emerald-600 p-2 text-white">Final total<b className="block">₦{(buyerSubtotal+deliveryFee).toLocaleString()}</b></div></div><div className="mt-3 flex gap-2"><button className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white"><CreditCard className="inline h-4 w-4"/> Review payment</button><button className="rounded-lg border bg-white px-3 py-2 text-xs font-bold">Add order note</button></div><div className="mt-3 rounded-xl border bg-white p-3"><p className="text-[10px] font-black uppercase text-slate-400">Order tracking</p><div className="mt-2 grid grid-cols-4 gap-1 text-center text-[10px] font-bold"><span className="rounded bg-emerald-50 p-2 text-emerald-700">Placed</span><span className="rounded bg-slate-50 p-2">Confirmed</span><span className="rounded bg-slate-50 p-2">Shipped</span><span className="rounded bg-slate-50 p-2">Delivered</span></div></div></div>}</div></div>
+</section>
 
       <section>
         {!loading && lowStockProducts.length > 0 && (
