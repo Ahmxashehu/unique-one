@@ -1,5 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { scoreSearchMatch, normalizeSearchQuery } from "../search/intelligentSearch";
+import { searchGooglePlaces, type GooglePlaceSearchLocation } from "./googlePlaces";
 import type {
   UniqueAiDiscoveryContext,
   UniqueAiDiscoveryResult,
@@ -44,7 +45,7 @@ function toIsoString(value: unknown): string | undefined {
   return undefined;
 }
 
-export async function getLiveDiscoveryContext(query: string): Promise<UniqueAiDiscoveryContext> {
+export async function getLiveDiscoveryContext(query: string, location?: GooglePlaceSearchLocation): Promise<UniqueAiDiscoveryContext> {
   const normalizedQuery = normalizeSearchQuery(query);
   if (!normalizedQuery) return { query, results: [] };
   const db = getFirestore();
@@ -54,6 +55,24 @@ export async function getLiveDiscoveryContext(query: string): Promise<UniqueAiDi
     db.collection("businesses").limit(MAX_DISCOVERY_SCAN).get(),
   ]);
   const results: UniqueAiDiscoveryResult[] = [];
+  const googleResults = await searchGooglePlaces(query, location).catch((error) => {
+    console.warn("Google Places discovery unavailable:", error instanceof Error ? error.message : error);
+    return [];
+  });
+  for (const place of googleResults) {
+    results.push({
+      type: "google_place",
+      id: place.id,
+      name: place.name,
+      address: place.address,
+      rating: place.rating,
+      ratingCount: place.ratingCount,
+      businessStatus: place.businessStatus,
+      mapsUrl: place.mapsUrl,
+      source: "google_places",
+      score: place.score + 1,
+    });
+  }
   const addResult = (result: UniqueAiDiscoveryResult) => { if (result.score > 0) results.push(result); };
   for (const doc of productSnapshot.docs) {
     const data = doc.data();
