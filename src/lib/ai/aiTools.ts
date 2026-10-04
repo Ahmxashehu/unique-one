@@ -1,5 +1,8 @@
 import { getFirestore } from "firebase-admin/firestore";
+import { scoreSearchMatch, normalizeSearchQuery } from "../search/intelligentSearch";
 import type {
+  UniqueAiDiscoveryContext,
+  UniqueAiDiscoveryResult,
   UniqueAiBusinessContext,
   UniqueAiOrderContext,
   UniqueAiPlatformContext,
@@ -11,6 +14,8 @@ const MAX_ORDER_CONTEXT = 20;
 const MAX_BUSINESS_CONTEXT = 5;
 const MAX_PRODUCT_CONTEXT = 30;
 const MAX_CONTEXT_STRING_LENGTH = 160;
+const MAX_DISCOVERY_RESULTS = 12;
+const MAX_DISCOVERY_SCAN = 60;
 
 function safeString(value: unknown, fallback?: string): string | undefined {
   if (typeof value !== "string") return fallback;
@@ -39,6 +44,51 @@ function toIsoString(value: unknown): string | undefined {
   return undefined;
 }
 
+export async function getLiveDiscoveryContext(query: string): Promise<UniqueAiDiscoveryContext> {
+  const normalizedQuery = normalizeSearchQuery(query);
+  if (!normalizedQuery) return { query, results: [] };
+  const db = getFirestore();
+  const [productSnapshot, serviceSnapshot, businessSnapshot] = await Promise.all([
+    db.collection("products").where("status", "==", "published").limit(MAX_DISCOVERY_SCAN).get(),
+    db.collection("services").where("status", "==", "published").limit(MAX_DISCOVERY_SCAN).get(),
+    db.collection("businesses").limit(MAX_DISCOVERY_SCAN).get(),
+  ]);
+  const results: UniqueAiDiscoveryResult[] = [];
+  const addResult = (result: UniqueAiDiscoveryResult) => { if (result.score > 0) results.push(result); };
+  for (const doc of productSnapshot.docs) {
+    const data = doc.data();
+    const name = safeString(data.name, "Unnamed product")!;
+    const category = safeString(data.category);
+    const description = safeString(data.description);
+    addResult({ type: "product", id: doc.id, name, category, description,
+      price: typeof data.price === "number" && Number.isFinite(data.price) ? data.price : undefined,
+      currency: safeString(data.currency, "NGN"),
+      score: scoreSearchMatch(query, [name, category, description]) });
+  }
+  for (const doc of serviceSnapshot.docs) {
+    const data = doc.data();
+    const name = safeString(data.title, "Unnamed service")!;
+    const category = safeString(data.category);
+    const description = safeString(data.description);
+    const providerName = safeString(data.providerName);
+    addResult({ type: "service", id: doc.id, name, category, description, providerName,
+      price: typeof data.price === "number" && Number.isFinite(data.price) ? data.price : undefined,
+      currency: safeString(data.currency, "NGN"),
+      score: scoreSearchMatch(query, [name, category, description, providerName]) });
+  }
+  for (const doc of businessSnapshot.docs) {
+    const data = doc.data();
+    const status = safeString(data.status);
+    if (status && !["published", "active", "approved", "verified", "discoverable"].includes(status.toLowerCase())) continue;
+    const name = safeString(data.name, safeString(data.businessName, "Unnamed business"))!;
+    const category = safeString(data.category);
+    const description = safeString(data.description);
+    addResult({ type: "business", id: doc.id, name, category, description,
+      score: scoreSearchMatch(query, [name, category, description, doc.id]) });
+  }
+  results.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  return { query, results: results.slice(0, MAX_DISCOVERY_RESULTS) };
+}
 export async function getAuthorizedUserContext(uid: string): Promise<UniqueAiUserContext> {
   const snapshot = await getFirestore().collection("users").doc(uid).get();
   if (!snapshot.exists) return { fullName: "Unique One user", roles: [] };
