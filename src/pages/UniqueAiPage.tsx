@@ -66,35 +66,65 @@ function downloadAiPdf(title: string, body: string) {
     .replace(/[–—]/g, "-")
     .replace(/[‘’]/g, "'")
     .replace(/[“”]/g, '"')
-    .replace(/[^\x20-\x7E\n]/g, "");
+    .replace(/[•·]/g, "-")
+    .replace(/[*_~#]/g, "")
+    .replace(/[\\u0000-\\u001F\\u007F]/g, " ")
+    .replace(/[^\\x20-\\x7E\\n]/g, "")
+    .replace(/[ \\t]+/g, " ")
+    .replace(/ +\\n/g, "\\n")
+    .trim();
 
-  const wrap = (value: string, width = 88) => {
+  const normalizeLine = (line: string) => line
+    .replace(/^[-•*]+\\s*/, "")
+    .replace(/^\\d+[.)]\\s*/, "")
+    .replace(/^#{1,6}\\s*/, "")
+    .replace(/\\s{2,}/g, " ")
+    .trim();
+
+  const cleanBody = cleanPdfText(body)
+    .split(/\\r?\\n/)
+    .map(normalizeLine)
+    .filter(Boolean)
+    .join("\\n");
+
+  const wrap = (value: string, maxChars: number) => {
     const output: string[] = [];
-    for (const raw of sanitize(value).split(/\r?\n/)) {
-      if (!raw.trim()) {
-        output.push("");
-        continue;
+    for (const raw of sanitize(value).split(/\\r?\\n/)) {
+      const line = raw.trim();
+      if (!line) { output.push(""); continue; }
+      let remaining = line;
+      while (remaining.length > maxChars) {
+        let cut = remaining.lastIndexOf(" ", maxChars);
+        if (cut < Math.floor(maxChars * 0.55)) cut = maxChars;
+        output.push(remaining.slice(0, cut).trim());
+        remaining = remaining.slice(cut).trimStart();
       }
-      let line = raw.trim();
-      while (line.length > width) {
-        let cut = line.lastIndexOf(" ", width);
-        if (cut < 20) cut = width;
-        output.push(line.slice(0, cut));
-        line = line.slice(cut).trimStart();
-      }
-      output.push(line);
+      output.push(remaining);
     }
     return output;
   };
 
   const titleText = sanitize(title).slice(0, 120) || "Unique AI Answer";
-  const preparedBody = cleanPdfText(body) || body.trim() || "No answer available.";
-  const bodyLines = wrap(preparedBody);
-  const pageLines = 42;
+  const preparedBody = cleanBody || "No answer available.";
+
+  // A4 portrait: 595 x 842 points, professional margins, 12 pt body, 1.5 spacing.
+  const PAGE_W = 595;
+  const PAGE_H = 842;
+  const MARGIN_X = 50;
+  const TOP = 72;
+  const BOTTOM = 58;
+  const BODY_SIZE = 12;
+  const LEADING = 18;
+  const BODY_WIDTH = 74;
+  const lines = wrap(preparedBody, BODY_WIDTH);
   const pages: string[][] = [];
-  for (let i = 0; i < bodyLines.length; i += pageLines) {
-    pages.push(bodyLines.slice(i, i + pageLines));
+  let current: string[] = [];
+  const maxLines = Math.floor((PAGE_H - TOP - BOTTOM) / LEADING);
+  for (const line of lines) {
+    if (current.length >= maxLines) { pages.push(current); current = []; }
+    current.push(line);
   }
+  if (current.length) pages.push(current);
   if (!pages.length) pages.push([""]);
 
   const objects: string[] = [
@@ -104,48 +134,41 @@ function downloadAiPdf(title: string, body: string) {
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
   ];
   const pageRefs: number[] = [];
+  const esc = (value: string) => value.replace(/\\\\/g, "\\\\\\\\").replace(/\\(/g, "\\\\(").replace(/\\)/g, "\\\\)");
 
-  for (const page of pages) {
+  pages.forEach((page, pageIndex) => {
     const contentNumber = objects.length + 2;
     const pageNumber = objects.length + 1;
     pageRefs.push(pageNumber);
-    const esc = (value: string) =>
-      value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-
     const commands = [
-      "q","0.05 0.55 0.32 rg","50 755 512 5 re f","Q",
-      "BT","/F2 16 Tf","0.06 0.12 0.18 rg","50 720 Td","(" + esc(titleText) + ") Tj",
-      "/F1 8 Tf","0.35 0.40 0.45 rg","0 -18 Td","(UNIQUE PLATFORM  |  UNIQUE AI) Tj",
-      "0 -28 Td","/F1 10 Tf","0.12 0.15 0.18 rg",
-      ...page.map((line, index) => "(" + esc(line) + ") Tj" + (index === page.length - 1 ? "" : " 0 -15 Td")),
+      "q", "0.05 0.55 0.32 rg", `50 792 495 4 re f`, "Q",
+      "BT", "/F2 17 Tf", "0.06 0.12 0.18 rg", `50 758 Td`, `(${esc(titleText)}) Tj`,
+      "/F1 9 Tf", "0.35 0.40 0.45 rg", "0 -18 Td", "(UNIQUE PLATFORM  |  UNIQUE AI) Tj",
+      "0 -28 Td", `/F1 ${BODY_SIZE} Tf`, "0.12 0.15 0.18 rg",
+      ...page.flatMap((line, index) => index === page.length - 1 ? [`(${esc(line)}) Tj`] : [`(${esc(line)}) Tj`, `0 -${LEADING} Td`]),
       "ET",
-      "q","0.06 0.12 0.18 rg","50 35 512 1 re f","Q",
-      "BT","/F1 8 Tf","0.35 0.40 0.45 rg","50 22 Td","(Unique Platform  |  Powered by Unique AI) Tj","ET",
-    ].join("\n");
+      "q", "0.06 0.12 0.18 rg", "50 42 495 1 re f", "Q",
+      "BT", "/F1 8 Tf", "0.35 0.40 0.45 rg", "50 27 Td",
+      `(Unique Platform  |  Unique AI  |  Page ${pageIndex + 1} of ${pages.length}) Tj`, "ET",
+    ].join("\\n");
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentNumber} 0 R >>`);
+    objects.push(`<< /Length ${commands.length} >>\\nstream\\n${commands}\\nendstream`);
+  });
 
-    objects.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + contentNumber + " 0 R >>");
-    objects.push("<< /Length " + commands.length + " >>\nstream\n" + commands + "\nendstream");
-  }
-
-  objects[1] = "<< /Type /Pages /Kids [" + pageRefs.map(n => n + " 0 R").join(" ") + "] /Count " + pageRefs.length + " >>";
-  const chunks = ["%PDF-1.4\n%UniquePlatform\n"];
+  objects[1] = `<< /Type /Pages /Kids [${pageRefs.map(n => n + " 0 R").join(" ")}] /Count ${pageRefs.length} >>`;
+  const chunks = ["%PDF-1.4\\n%UniquePlatform\\n"];
   const offsets = [0];
   let length = chunks[0].length;
-
   objects.forEach((obj, index) => {
     offsets[index + 1] = length;
-    const chunk = (index + 1) + " 0 obj\n" + obj + "\nendobj\n";
+    const chunk = (index + 1) + " 0 obj\\n" + obj + "\\nendobj\\n";
     chunks.push(chunk);
     length += chunk.length;
   });
-
   const xrefOffset = length;
-  chunks.push("xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n");
-  for (let i = 1; i <= objects.length; i++) {
-    chunks.push(String(offsets[i]).padStart(10, "0") + " 00000 n \n");
-  }
-  chunks.push("trailer\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefOffset + "\n%%EOF");
-
+  chunks.push("xref\\n0 " + (objects.length + 1) + "\\n0000000000 65535 f \\n");
+  for (let i = 1; i <= objects.length; i++) chunks.push(String(offsets[i]).padStart(10, "0") + " 00000 n \\n");
+  chunks.push("trailer\\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\\nstartxref\\n" + xrefOffset + "\\n%%EOF");
   const blob = new Blob([chunks.join("")], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
