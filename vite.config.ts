@@ -25,11 +25,25 @@ export default defineConfig(() => ({
       injectRegister: 'auto',
       workbox: {
         globPatterns: ['**/*.{css,html,ico,png,svg,webmanifest,js}'],
-        runtimeCaching: [{
-          urlPattern: ({ request }) => request.destination === 'script' || request.destination === 'style',
-          handler: 'NetworkFirst',
-          options: { cacheName: 'unique-platform-app-assets-v12', expiration: { maxEntries: 100, maxAgeSeconds: 604800 } },
-        }],
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.destination === 'document',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'unique-platform-app-documents-v2',
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 20, maxAgeSeconds: 86400 },
+            },
+          },
+          {
+            urlPattern: ({ request }) => request.destination === 'script' || request.destination === 'style',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'unique-platform-app-assets-v13',
+              expiration: { maxEntries: 100, maxAgeSeconds: 604800 },
+            },
+          },
+        ],
         navigateFallback: '/index.html',
         navigateFallbackAllowlist: [/^\/(?!api(?:\/|$)).*/],
         navigateFallbackDenylist: [/^\/api(?:\/|$)/],
