@@ -140,7 +140,8 @@ export default function StoreProductPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6 sm:space-y-8 pb-28">
-      <Link to="/store/search" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700"><ChevronLeft className="w-4 h-4" /> Back to Store</Link>\n      <div className="grid md:grid-cols-2 gap-6 lg:gap-12">
+      <Link to="/store/search" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700"><ChevronLeft className="w-4 h-4" /> Back to Store</Link>
+      <div className="grid md:grid-cols-2 gap-6 lg:gap-12">
         <div className="space-y-4">
           <div className="aspect-square bg-slate-100 rounded-2xl sm:rounded-3xl border border-slate-200 flex items-center justify-center overflow-hidden relative">
             {product.images?.length > 0 ? <img src={product.images[selectedImage] || product.images[0]} alt={product.name} className="w-full h-full object-cover" /> : <Store className="w-16 h-16 text-slate-300" />}
@@ -149,7 +150,7 @@ export default function StoreProductPage() {
               {product.wholesalePrice && <span className="px-3 py-1 bg-blue-100 text-[10px] font-bold uppercase tracking-wider rounded shadow-sm text-blue-800">Wholesale Avail</span>}
             </div>
           </div>
-          <div className="flex gap-2">{product.images?.slice(1, 5).map((image, index) => <img key={image + index} src={image} alt={product.name + ' ' + (index + 2)} className="w-full h-full object-cover" /></button>)}</div>
+          <div className="flex gap-2 overflow-x-auto">{product.images?.slice(0, 8).map((image, index) => <button type="button" key={image + index} onClick={() => setSelectedImage(index)} className={"w-20 h-20 shrink-0 rounded-xl overflow-hidden border-2 " + (selectedImage === index ? "border-emerald-500" : "border-slate-200")}><img src={image} alt={product.name + " " + (index + 1)} className="w-full h-full object-cover" /></button>)}</div>
         </div>
 
         <div className="space-y-6">
