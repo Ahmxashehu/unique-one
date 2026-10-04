@@ -169,7 +169,14 @@ export default function StorePage() {
 
 
   return (
-    <div className="min-h-full space-y-6 pb-8">
+    <div className="min-h-full space-y-6 pb-8" data-store-experience="buyer-marketplace-v2">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-300/60 bg-emerald-50 px-3 py-2.5 shadow-sm">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">Buyer marketplace · Test experience</p>
+          <p className="mt-0.5 text-xs font-semibold text-slate-700">Shop items, save finds, use cart, review delivery and test order tracking. Seller publishing stays in Business Dashboard.</p>
+        </div>
+        <button type="button" onClick={() => document.getElementById('buyer-marketplace-prototype')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="shrink-0 rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-black text-white">Open buyer test</button>
+      </div>
       <style>{`
         @keyframes storeBandLeft { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @keyframes storeBandRight { from { transform: translateX(-50%); } to { transform: translateX(0); } }
