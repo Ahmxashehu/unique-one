@@ -123,7 +123,7 @@ export type UniqueAiPlatformContext = {
   summary: UniqueAiPlatformSummary;
 };
 
-export type UniqueAiRequest = {
+export type UniqueAiLocation = { latitude: number; longitude: number; radiusMeters?: number };\n\nexport type UniqueAiRequest = {
   uid: string;
   message: unknown;
   history?: unknown;
