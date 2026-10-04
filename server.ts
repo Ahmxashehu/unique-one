@@ -765,7 +765,7 @@ const app = express();
     try {
       if (!isPlainObject(req.body)) return errorResponse(res, 'INVALID_REQUEST', 'The AI request body must be a plain object.');
       const payload = req.body as Record<string, unknown>;
-      const allowedKeys = new Set(['message', 'history']);
+      const allowedKeys = new Set(['message', 'history', 'preferredLanguage']);
       for (const key of Object.keys(payload)) {
         if (!allowedKeys.has(key)) return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
       }
@@ -837,7 +837,7 @@ const app = express();
         });
       }
       const preferredLanguage =
-        typeof req.body?.preferredLanguage === "string" ? req.body.preferredLanguage.trim().toLowerCase() : undefined;
+        typeof payload.preferredLanguage === "string" ? payload.preferredLanguage.trim().toLowerCase() : undefined;
       const responseText = await generateUniqueAiResponse({
         uid,
         message,
