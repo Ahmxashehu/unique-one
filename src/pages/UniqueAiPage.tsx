@@ -11,13 +11,21 @@ type UniqueAiCapabilities = {
   mutations: string[];
 };
 
-type AiLocation = { latitude: number; longitude: number; radiusMeters?: number };\n\ntype DiscoveryResult = {
+type AiLocation = { latitude: number; longitude: number; radiusMeters?: number };
+
+type DiscoveryResult = {
   type: "product" | "service" | "business" | "google_place";
   id: string;
   name: string;
   category?: string;
   description?: string;
-  providerName?: string;\n  address?: string;\n  rating?: number;\n  ratingCount?: number;\n  businessStatus?: string;\n  mapsUrl?: string;\n  source?: "unique_one" | "google_places";
+  providerName?: string;
+  address?: string;
+  rating?: number;
+  ratingCount?: number;
+  businessStatus?: string;
+  mapsUrl?: string;
+  source?: "unique_one" | "google_places";
   price?: number;
   currency?: string;
   score: number;
@@ -83,10 +91,12 @@ function cleanPdfText(body: string) {
   const filler = /^(here(?:'s| is)|sure[!.]?$|of course[!.]?$|i(?:'ll| will) explain|i hope (this|that) helps|would you like me to|let me know if you(?:'d| would) like|feel free to ask|if you need anything else)/i;
 
   return normalize(body)
-    .split("\n")
+    .split("
+")
     .map((line) => normalize(line))
     .filter((line) => line && !filler.test(line))
-    .join("\n")
+    .join("
+")
     .trim();
 }
 
@@ -100,11 +110,13 @@ function downloadAiPdf(title: string, body: string) {
     .replace(/_{2,}/g, "")
     .replace(/#{1,6}\s*/g, "")
     .replace(/[•●▪◦]/g, "-")
-    .replace(/[^\x20-\x7E\n]/g, "");
+    .replace(/[^\x20-\x7E
+]/g, "");
 
   const wrap = (value: string, width = 88) => {
     const output: string[] = [];
-    for (const raw of sanitize(value).split(/\r?\n/)) {
+    for (const raw of sanitize(value).split(/\r?
+/)) {
       if (!raw.trim()) {
         output.push("");
         continue;
@@ -208,29 +220,46 @@ function downloadAiPdf(title: string, body: string) {
       "ET",
     );
 
-    const stream = commands.join("\n");
+    const stream = commands.join("
+");
     objects.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pageWidth + " " + pageHeight + "] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + contentNumber + " 0 R >>");
-    objects.push("<< /Length " + stream.length + " >>\nstream\n" + stream + "\nendstream");
+    objects.push("<< /Length " + stream.length + " >>
+stream
+" + stream + "
+endstream");
   }
 
   objects[1] = "<< /Type /Pages /Kids [" + pageRefs.map((n) => n + " 0 R").join(" ") + "] /Count " + pageRefs.length + " >>";
-  const chunks = ["%PDF-1.4\n%UniquePlatform\n"];
+  const chunks = ["%PDF-1.4
+%UniquePlatform
+"];
   const offsets = [0];
   let length = chunks[0].length;
 
   objects.forEach((obj, index) => {
     offsets[index + 1] = length;
-    const chunk = (index + 1) + " 0 obj\n" + obj + "\nendobj\n";
+    const chunk = (index + 1) + " 0 obj
+" + obj + "
+endobj
+";
     chunks.push(chunk);
     length += chunk.length;
   });
 
   const xrefOffset = length;
-  chunks.push("xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n");
+  chunks.push("xref
+0 " + (objects.length + 1) + "
+0000000000 65535 f 
+");
   for (let i = 1; i <= objects.length; i += 1) {
-    chunks.push(String(offsets[i]).padStart(10, "0") + " 00000 n \n");
+    chunks.push(String(offsets[i]).padStart(10, "0") + " 00000 n 
+");
   }
-  chunks.push("trailer\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefOffset + "\n%%EOF");
+  chunks.push("trailer
+<< /Size " + (objects.length + 1) + " /Root 1 0 R >>
+startxref
+" + xrefOffset + "
+%%EOF");
 
   const blob = new Blob([chunks.join("")], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
