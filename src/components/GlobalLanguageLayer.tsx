@@ -1,18 +1,19 @@
 import { useEffect } from "react";
 import { getLanguage, type SupportedLanguage, t } from "../lib/i18n";
-import { UI } from "../lib/globalTranslations";
+
+let translationUI: typeof import("../lib/globalTranslations").UI | null = null;
 
 const norm = (v:string) => v.replace(/\s+/g," ").trim();
 const reverse = (language:SupportedLanguage) => {
   const out:Record<string,string> = {};
-  Object.entries(UI[language] || {}).forEach(([english, translated]) => {
+  Object.entries(translationUI?.[language] || {}).forEach(([english, translated]) => {
     if (translated && !out[translated]) out[translated] = english;
   });
   return out;
 };
 const canonicalEnglish = (value:string) => {
   const key = norm(value);
-  for (const language of Object.keys(UI) as SupportedLanguage[]) {
+  for (const language of Object.keys(translationUI || {}) as SupportedLanguage[]) {
     const english = reverse(language)[key];
     if (english) return english;
   }
@@ -21,7 +22,7 @@ const canonicalEnglish = (value:string) => {
 
 function translateText(value:string, language:SupportedLanguage) {
   const english = canonicalEnglish(value);
-  const translated = UI[language]?.[english];
+  const translated = translationUI?.[language]?.[english];
   if (translated) return translated;
   return language === "en" ? english : value;
 }
@@ -66,7 +67,7 @@ export default function GlobalLanguageLayer() {
       document.documentElement.lang = next;
       document.documentElement.dataset.language = next;
       if (next !== "en") {
-        void import("../lib/globalTranslations").then(() => apply(document.body, next));
+        void import("../lib/globalTranslations").then((module) => { translationUI = module.UI; apply(document.body, next); });
       }
     };
     run(language);
