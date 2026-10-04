@@ -162,6 +162,10 @@ export default function StoreSearchPage() {
       { name: 'Business Template Pack', price: '₦15,000', stock: '50 licenses' },
       { name: 'Digital Learning Bundle', price: '₦25,000', stock: '40 licenses' },
     ],
+    other: [
+      { name: 'Everyday Essentials Bundle', price: '₦18,000', stock: '24 bundles' },
+      { name: 'General Household Items', price: '₦32,000', stock: '16 bundles' },
+    ],
   };
 
   useEffect(() => {
@@ -267,8 +271,8 @@ export default function StoreSearchPage() {
 
         <div className="hidden md:block w-64 shrink-0 space-y-6">
           <div><h3 className="font-semibold text-slate-900 mb-3">Categories</h3><div className="space-y-2">
-            {['electronics', 'electricity_power', 'phones_accessories', 'fashion', 'shoes', 'beauty', 'home_furniture', 'building_materials', 'cement', 'agriculture', 'fertilizer', 'farm_equipment', 'food_groceries', 'machinery', 'vehicles', 'property', 'services', 'digital_products'].map(cat => (
-              <Link key={cat} to={`/store/search?cat=${cat}`} className={`block text-sm ${filterCat === cat ? 'text-blue-600 font-medium' : 'text-slate-600 hover:text-slate-900'} capitalize`}>{cat.replace('_', ' ')}</Link>
+            {categoryOptions.map(([cat, label]) => (
+              <Link key={cat} to={`/store/search?cat=${cat}`} className={`block text-sm ${filterCat === cat ? 'text-emerald-700 font-medium' : 'text-slate-600 hover:text-slate-900'} ${filterCat === cat ? 'rounded-lg bg-emerald-50 px-2 py-1' : ''}`}>{label}</Link>
             ))}
             <Link to="/store/search" className="block text-sm text-slate-400 hover:text-slate-600">Clear Category</Link>
           </div></div>
