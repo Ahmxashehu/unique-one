@@ -147,12 +147,6 @@ export default function StorePage() {
   const lowStockProducts = useMemo(() => visibleProducts.filter(product => Number(product.quantity) > 0 && Number(product.quantity) <= 5), [visibleProducts]);
   const serviceListings = useMemo(() => visibleProducts.filter(product => product.category === 'services'), [visibleProducts]);
 
-  const [buyerCategory,setBuyerCategory]=useState<ProductCategory>(categories[0].key);
-  const [buyerQty,setBuyerQty]=useState(1); const [buyerCheckout,setBuyerCheckout]=useState(false); const [buyerAddress,setBuyerAddress]=useState('Add delivery address'); const [editingAddress,setEditingAddress]=useState(false); const [deliveryMethod,setDeliveryMethod]=useState('Platform delivery');
-  
-  const deliveryFee=deliveryMethod==='Customer pickup'?0:2500; const buyerSubtotal=buyerPrice*buyerQty;
-
-
 
   return (
     <div className="min-h-full space-y-6 pb-8" data-store-experience="buyer-marketplace-v4">
