@@ -106,7 +106,7 @@ export interface AuditLog {
 }
 
 export type ProductCategory = 
-  | 'electronics' | 'phones_accessories' | 'fashion' | 'shoes' | 'beauty'
+  | 'electronics' | 'electricity_power' | 'phones_accessories' | 'fashion' | 'shoes' | 'beauty'
   | 'home_furniture' | 'building_materials' | 'cement' | 'agriculture'
   | 'fertilizer' | 'seeds' | 'farm_equipment' | 'food_groceries'
   | 'machinery' | 'vehicles' | 'property' | 'services' | 'digital_products' | 'other';
