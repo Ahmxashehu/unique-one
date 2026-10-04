@@ -5,7 +5,13 @@ export type UniqueAiDiscoveryResult = {
   name: string;
   category?: string;
   description?: string;
-  providerName?: string;\n  address?: string;\n  rating?: number;\n  ratingCount?: number;\n  businessStatus?: string;\n  mapsUrl?: string;\n  source?: "unique_one" | "google_places";
+  providerName?: string;
+  address?: string;
+  rating?: number;
+  ratingCount?: number;
+  businessStatus?: string;
+  mapsUrl?: string;
+  source?: "unique_one" | "google_places";
   price?: number;
   currency?: string;
   score: number;
@@ -123,10 +129,13 @@ export type UniqueAiPlatformContext = {
   summary: UniqueAiPlatformSummary;
 };
 
-export type UniqueAiLocation = { latitude: number; longitude: number; radiusMeters?: number };\n\nexport type UniqueAiRequest = {
+export type UniqueAiLocation = { latitude: number; longitude: number; radiusMeters?: number };
+
+export type UniqueAiRequest = {
   uid: string;
   message: unknown;
   history?: unknown;
   requestId?: unknown;
   preferredLanguage?: string;
+  location?: UniqueAiLocation;
 };
