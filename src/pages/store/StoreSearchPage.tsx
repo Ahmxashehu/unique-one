@@ -33,6 +33,44 @@ type StoreService = {
   status?: string;
 };
 
+
+const SEARCH_SYNONYMS: Record<string, string[]> = {
+  tv: ['television'], television: ['tv'],
+  phone: ['mobile', 'smartphone'], mobile: ['phone', 'smartphone'], smartphone: ['phone', 'mobile'],
+  cement: ['building', 'construction'], rice: ['food', 'groceries'],
+  clothes: ['fashion', 'clothing'], clothing: ['fashion', 'clothes'],
+  car: ['vehicle', 'vehicles', 'auto'], vehicle: ['car', 'vehicles', 'auto'],
+  repair: ['repairs', 'maintenance', 'service'], repairs: ['repair', 'maintenance', 'service'],
+  service: ['services'], services: ['service'],
+};
+
+const normalizeSearchText = (value: unknown) =>
+  String(value ?? '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+
+const expandSearchTerms = (input: string) => {
+  const terms = normalizeSearchText(input).split(/\s+/).filter(Boolean);
+  return Array.from(new Set(terms.flatMap(term => [term, ...(SEARCH_SYNONYMS[term] || [])])));
+};
+
+const scoreSearchMatch = (input: string, fields: unknown[]) => {
+  const queryText = normalizeSearchText(input);
+  if (!queryText) return 1;
+  const queryTerms = expandSearchTerms(input);
+  const fieldText = fields.map(normalizeSearchText).filter(Boolean);
+  if (!fieldText.length) return 0;
+  const combined = fieldText.join(' ');
+  let score = 0;
+  if (fieldText.some(value => value === queryText)) score += 500;
+  if (fieldText.some(value => value.startsWith(queryText))) score += 300;
+  if (combined.includes(queryText)) score += 180;
+  for (const term of queryTerms) {
+    if (fieldText.some(value => value === term)) score += 120;
+    if (fieldText.some(value => value.startsWith(term))) score += 80;
+    if (combined.includes(term)) score += 30;
+  }
+  return score;
+};
+
 const STORE_PRODUCTS_CACHE_TTL_MS = 30_000;
 const storeProductsCache = new Map<string, StoreProductsCacheEntry>();
 const storeProductsRequests = new Map<string, Promise<Product[]>>();
@@ -124,11 +162,11 @@ export default function StoreSearchPage() {
 
         let productResults = publishedProducts;
         if (lowerQ) {
-          productResults = productResults.filter(p =>
-            [p.name, p.description, p.category, p.sellerId]
-              .filter(Boolean)
-              .some(value => String(value).toLowerCase().includes(lowerQ))
-          );
+          productResults = productResults
+          .map(product => ({ product, score: scoreSearchMatch(initialQuery, [product.name, product.description, product.category, product.sellerId]) }))
+          .filter(entry => !lowerQ || entry.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .map(entry => entry.product);
         }
         productResults = productResults.filter(p => {
           const price = Number(p.price);
@@ -141,10 +179,9 @@ export default function StoreSearchPage() {
               .filter(service => {
                 if (filterCat && filterCat !== 'services' && String(service.category || '').toLowerCase() !== filterCat.toLowerCase()) return false;
                 if (!lowerQ) return true;
-                return [service.title, service.providerName, service.category, service.description]
-                  .filter(Boolean)
-                  .some(value => String(value).toLowerCase().includes(lowerQ));
+                return scoreSearchMatch(initialQuery, [service.title, service.providerName, service.category, service.description]) > 0;
               })
+              .sort((a, b) => scoreSearchMatch(initialQuery, [b.title, b.providerName, b.category, b.description]) - scoreSearchMatch(initialQuery, [a.title, a.providerName, a.category, a.description]))
           : [];
 
         const businessResults: StoreBusiness[] = businessSnapshot
@@ -160,9 +197,7 @@ export default function StoreSearchPage() {
                 if (!publiclyDiscoverable) return false;
                 if (filterCat && String(b.category || '').toLowerCase() !== filterCat.toLowerCase()) return false;
                 if (!lowerQ) return true;
-                return [b.name, b.businessName, b.description, b.category, b.id]
-                  .filter(Boolean)
-                  .some(value => String(value).toLowerCase().includes(lowerQ));
+                return scoreSearchMatch(initialQuery, [b.name, b.businessName, b.description, b.category, b.id]) > 0;
               })
           : [];
 
@@ -240,7 +275,7 @@ export default function StoreSearchPage() {
       <section className="mb-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 sm:p-4">
         <div className="flex items-center justify-between gap-2 mb-3"><div><h2 className="text-sm font-black text-slate-900">Prototype stock preview</h2><p className="text-[11px] text-slate-600">Buyer marketplace prototype — all matching category stock is visible for UI testing.</p></div><span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-1 text-[9px] font-black text-amber-800">PROTOTYPE</span></div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {prototypeStock.filter(item => (!filterCat || item.category === filterCat) && (!initialQuery.trim() || item.name.toLowerCase().includes(initialQuery.trim().toLowerCase()) || item.categoryLabel.toLowerCase().includes(initialQuery.trim().toLowerCase()))).map(item => (
+          {prototypeStock.filter(item => (!filterCat || item.category === filterCat) && (!initialQuery.trim() || scoreSearchMatch(initialQuery, [item.name, item.categoryLabel]) > 0)).map(item => (
             <Link key={item.category + item.name} to={'/store/search?cat=' + item.category} className="group overflow-hidden rounded-xl border border-amber-100 bg-white">
               <div className="aspect-[4/3] flex items-center justify-center bg-gradient-to-br from-slate-100 via-white to-emerald-50"><StoreIcon className="w-8 h-8 text-emerald-300 group-hover:scale-110 transition" /></div>
               <div className="p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">{item.categoryLabel}</p><p className="mt-1 text-sm font-bold text-slate-900 line-clamp-2">{item.name}</p><p className="mt-2 text-sm font-black text-slate-900">₦{item.price.toLocaleString()}</p><p className="mt-1 text-[11px] text-slate-500">{item.quantity} {item.unit ?? 'units'}</p></div>
