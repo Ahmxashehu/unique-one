@@ -94,7 +94,7 @@ const BeneficiariesPage = lazy(() => import("./pages/pay/BeneficiariesPage"));
 const PaySettingsPage = lazy(() => import("./pages/pay/PaySettingsPage"));
 const PaySecurityPage = lazy(() => import("./pages/pay/PaySecurityPage"));
 const UniqueAiPage = lazy(() => import("./pages/UniqueAiPage"));
-const UniqueAiPremiumPage = lazy(() => import("./pages/UniqueAiPremiumPage"));
+const UniqueAiSubscriptionPage = lazy(() => import("./pages/UniqueAiSubscriptionPage"));
 const JobsPage = lazy(() => import("./pages/JobsPage"));
 const ContributionNetworkPage = lazy(() => import("./pages/ContributionNetworkPage"));
 const EducationPage = lazy(() => import("./pages/EducationPage"));
@@ -140,7 +140,7 @@ export default function App() {
                     <Route path="/register" element={<RegisterPage />} />
                     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                     <Route path="/ai" element={<UniqueAiPage />} />
-                    <Route path="/ai/premium" element={<UniqueAiPremiumPage />} />
+                    <Route path="/ai/premium" element={<UniqueAiSubscriptionPage />} />
                     <Route path="/media" element={<UniqueMediaPage />} />
                     <Route path="/unique-media" element={<UniqueMediaPage />} />
                     <Route path="/store" element={<StorePage />} />
@@ -171,7 +171,7 @@ export default function App() {
                     <Route path="pay" element={<PayPage />} />
                     <Route path="store" element={<StorePage />} />
                     <Route path="ai" element={<UniqueAiPage />} />
-                    <Route path="ai/premium" element={<UniqueAiPremiumPage />} />
+                    <Route path="ai/premium" element={<UniqueAiSubscriptionPage />} />
                     <Route path="master-vision" element={<MasterVisionPage />} />
                     <Route path="unique-share" element={<UniqueSharePage />} />
                     <Route path="jobs" element={<JobsPage />} />
