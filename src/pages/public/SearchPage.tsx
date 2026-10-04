@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search as SearchIcon,
-  Filter,
   Sparkles,
   ShoppingBasket,
   Shirt,
@@ -28,6 +27,8 @@ const SEARCH_PLACEHOLDERS = [
   'Search across Unique One…',
   'What are you looking for today?'
 ];
+
+const POPULAR_PROTOTYPE_SEARCHES = ['Smart LED TV', 'Rice 50kg', 'POP Cement 40kg', 'Solar Inverter 3.5kVA', 'Android Smartphone', 'Modern Sofa Set'];
 
 const DISCOVERY_ITEMS = [
   { label: 'Groceries & food', detail: 'Foodstuffs, drinks, fresh produce', icon: ShoppingBasket, query: 'Groceries and food' },
@@ -167,9 +168,10 @@ export default function SearchPage() {
           <button
             type="submit"
             aria-label="Search Unique One"
+            title="Search"
             className="shrink-0 rounded-2xl border border-slate-200 bg-white p-4 text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:text-emerald-700 hover:shadow-md"
           >
-            <Filter className="h-6 w-6" />
+            <SearchIcon className="h-5 w-5" />
           </button>
         </form>
       </div>
@@ -267,6 +269,22 @@ export default function SearchPage() {
                 {item}
               </button>
             ))}
+          </div>
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">Prototype catalogue</p>
+            <p className="mt-1 text-xs text-slate-500">Quickly preview sample stock before live seller listings arrive.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {POPULAR_PROTOTYPE_SEARCHES.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => explore(item)}
+                  className="rounded-full border border-emerald-100 bg-emerald-50/70 px-3 py-1.5 text-xs font-medium text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100"
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </section>
