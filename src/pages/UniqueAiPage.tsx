@@ -211,10 +211,7 @@ function downloadAiPdf(title: string, body: string) {
 
     const stream = commands.join("\n");
     objects.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pageWidth + " " + pageHeight + "] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + contentNumber + " 0 R >>");
-    objects.push("<< /Length " + stream.length + " >>
-stream
-" + stream + "
-endstream");
+    objects.push("<< /Length " + stream.length + " >>\\nstream\\n" + stream + "\\nendstream");
   }
 
   objects[1] = "<< /Type /Pages /Kids [" + pageRefs.map((n) => n + " 0 R").join(" ") + "] /Count " + pageRefs.length + " >>";
