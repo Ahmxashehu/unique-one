@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ChevronRight, CircleHelp, Globe2, LogIn, Plane, Search, ShieldCheck, Users } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 type FlightType = 'domestic' | 'international';
 type TripType = 'round' | 'oneway';
