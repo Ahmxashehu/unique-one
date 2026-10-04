@@ -137,6 +137,10 @@ export default function StorePage() {
   const lowStockProducts = useMemo(() => visibleProducts.filter(product => Number(product.quantity) > 0 && Number(product.quantity) <= 5), [visibleProducts]);
   const serviceListings = useMemo(() => visibleProducts.filter(product => product.category === 'services'), [visibleProducts]);
 
+  const [prototypeCategory, setPrototypeCategory] = useState<ProductCategory>(categories[0].key);
+  const selectedPrototypeCategory = categories.find(category => category.key === prototypeCategory) ?? categories[0];
+
+
 
   return (
     <div className="min-h-full space-y-6 pb-8">
@@ -271,6 +275,134 @@ export default function StorePage() {
           </div>
         </div>
       </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+              <Package className="h-3.5 w-3.5" />
+              Seller publishing prototype
+            </div>
+            <h2 className="mt-2 text-lg font-black tracking-tight text-slate-900">Product listing, stock, checkout & delivery — one view</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Prototype only: fields are ready for the real seller flow. Nothing here creates a fake listing or sample inventory.</p>
+          </div>
+          <span className="text-[11px] font-bold text-slate-400">19 store categories</span>
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-2">
+            <p className="px-2 pb-2 text-[10px] font-black uppercase tracking-wider text-slate-400">Choose category</p>
+            <div className="max-h-[430px] space-y-1 overflow-y-auto pr-1">
+              {categories.map(category => {
+                const Icon = category.icon;
+                const active = category.key === prototypeCategory;
+                return (
+                  <button
+                    key={category.key}
+                    type="button"
+                    onClick={() => setPrototypeCategory(category.key)}
+                    className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition ${active ? 'border border-emerald-200 bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:bg-white'}`}
+                  >
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-slate-400'}`}><Icon className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1 truncate text-xs font-bold">{category.label}</span>
+                    {active && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm"><selectedPrototypeCategory.icon className="h-5 w-5" /></span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Selected shop category</p>
+                  <h3 className="text-base font-black text-slate-900">{selectedPrototypeCategory.label}</h3>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 p-3">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">1 · Product / service</p>
+                <div className="mt-2 grid gap-2">
+                  <input className="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" placeholder="Listing name" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input className="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" placeholder="Price (₦)" />
+                    <input className="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" placeholder="SKU / item code" />
+                  </div>
+                  <textarea className="min-h-16 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" placeholder="Description, specifications, variants..." />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-3">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">2 · Stock & availability</p>
+                <div className="mt-2 grid gap-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input className="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" placeholder="Stock quantity" type="number" min="0" />
+                    <input className="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" placeholder="Low-stock alert" type="number" min="0" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>In stock</option><option>Out of stock</option><option>Pre-order</option></select>
+                    <select className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>Active</option><option>Paused</option></select>
+                  </div>
+                  <p className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500">Stock will be checked again at checkout before payment is accepted.</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-3">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">3 · Where it is published</p>
+                <div className="mt-2 space-y-2">
+                  {['Unique Store category page', 'Global Search', 'Near Me / location discovery', 'Seller shop profile'].map(label => (
+                    <label key={label} className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                      <input type="checkbox" defaultChecked className="h-4 w-4 accent-emerald-600" />
+                      {label}
+                    </label>
+                  ))}
+                  <select className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>Draft — not published</option><option>Publish when approved</option></select>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-3">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">4 · Checkout details</p>
+                <div className="mt-2 space-y-2">
+                  <label className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-700"><span>Cart quantity limits</span><input className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-xs" placeholder="Max" /></label>
+                  <label className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-700"><span>Accept UniquePay</span><input type="checkbox" defaultChecked className="h-4 w-4 accent-emerald-600" /></label>
+                  <label className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-700"><span>Customer note</span><input type="checkbox" defaultChecked className="h-4 w-4 accent-emerald-600" /></label>
+                  <p className="rounded-lg bg-emerald-50 px-3 py-2 text-[11px] text-emerald-800">Checkout preview: item total + delivery fee + applicable charges = final payable amount.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-3">
+              <p className="text-[10px] font-black uppercase tracking-wider text-sky-700">5 · Delivery details</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-4">
+                <select className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs"><option>Seller delivery</option><option>Platform logistics</option><option>Customer pickup</option></select>
+                <input className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs" placeholder="Dispatch time" />
+                <input className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs" placeholder="Delivery fee (₦)" />
+                <input className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs" placeholder="Delivery areas" />
+              </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-lg bg-white px-3 py-2"><p className="text-[10px] text-slate-400">Destination</p><p className="text-xs font-bold text-slate-700">Customer delivery address</p></div>
+                <div className="rounded-lg bg-white px-3 py-2"><p className="text-[10px] text-slate-400">Tracking</p><p className="text-xs font-bold text-slate-700">Pending → Shipped → Delivered</p></div>
+                <div className="rounded-lg bg-white px-3 py-2"><p className="text-[10px] text-slate-400">Returns</p><p className="text-xs font-bold text-slate-700">Policy shown before payment</p></div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div>
+                <p className="text-xs font-black text-slate-800">Final seller checklist</p>
+                <p className="text-[11px] text-slate-500">Category • listing • price • stock • publish status • checkout • delivery • returns</p>
+              </div>
+              <button type="button" className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-emerald-500">
+                <Package className="h-4 w-4" /> Preview listing
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
 
       <section>
         {!loading && lowStockProducts.length > 0 && (
