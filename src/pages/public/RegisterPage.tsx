@@ -91,7 +91,7 @@ export default function RegisterPage(){
       const b=await r.json();
       if(!r.ok)throw new Error(b?.error?.message||'Registration could not be completed.');
       setMessage(`Account created. Your Unique ID is ${b.uniqueOneId}.`);
-      navigate('/login',{replace:true,state:{message:`Your Unique One account is ready. Unique ID: ${b.uniqueOneId}. You can sign in with your phone number or Unique ID.`}});
+      navigate('/login',{replace:true,state:{from:location.state?.from||undefined,message:`Your Unique One account is ready. Unique ID: ${b.uniqueOneId}. You can sign in with your phone number or Unique ID.`}});
     }catch(e:any){setError(e.message||'Registration could not be completed.');}finally{setLoading(false);}
   };
 
