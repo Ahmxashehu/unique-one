@@ -26,6 +26,7 @@ const CategoriesPage = lazy(() => import("./pages/public/CategoriesPage"));
 const NearMePage = lazy(() => import("./pages/public/NearMePage"));
 const AboutPage = lazy(() => import("./pages/public/AboutPage"));
 const SupportPage = lazy(() => import("./pages/public/SupportPage"));
+const FlightsPage = lazy(() => import("./pages/public/FlightsPage"));
 const LoginPage = lazy(() => import("./pages/public/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/public/RegisterPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/public/ForgotPasswordPage"));
@@ -136,6 +137,7 @@ export default function App() {
                     <Route path="/near-me" element={<NearMePage />} />
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/support" element={<SupportPage />} />
+      <Route path="/flights" element={<FlightsPage />} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/register" element={<RegisterPage />} />
                     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
