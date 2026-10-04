@@ -31,13 +31,6 @@ type DiscoveryResult = {
   score: number;
 };
 
-type AiAccess = {
-  mode: "guest" | "registered" | "subscriber";
-  limitSeconds: number;
-  usedSeconds: number;
-  remainingSeconds: number;
-};
-
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -47,7 +40,7 @@ type ChatMessage = {
 };
 
 const shouldUseDeviceLocation = (value: string) =>
-  /\\b(near me|nearby|nearest|closest|around me|where is|where are|in my area|close to me)\\b/i.test(value);
+  /\b(near me|nearby|nearest|closest|around me|where is|where are|in my area|close to me)\\b/i.test(value);
 
 async function getDeviceLocation(): Promise<AiLocation | undefined> {
   if (!navigator.geolocation) return undefined;
@@ -91,12 +84,10 @@ function cleanPdfText(body: string) {
   const filler = /^(here(?:'s| is)|sure[!.]?$|of course[!.]?$|i(?:'ll| will) explain|i hope (this|that) helps|would you like me to|let me know if you(?:'d| would) like|feel free to ask|if you need anything else)/i;
 
   return normalize(body)
-    .split("
-")
+    .split("\n")
     .map((line) => normalize(line))
     .filter((line) => line && !filler.test(line))
-    .join("
-")
+    .join("\n")
     .trim();
 }
 
@@ -220,8 +211,7 @@ function downloadAiPdf(title: string, body: string) {
       "ET",
     );
 
-    const stream = commands.join("
-");
+    const stream = commands.join("\n");
     objects.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pageWidth + " " + pageHeight + "] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + contentNumber + " 0 R >>");
     objects.push("<< /Length " + stream.length + " >>
 stream
@@ -230,33 +220,25 @@ endstream");
   }
 
   objects[1] = "<< /Type /Pages /Kids [" + pageRefs.map((n) => n + " 0 R").join(" ") + "] /Count " + pageRefs.length + " >>";
-  const chunks = ["%PDF-1.4
-%UniquePlatform
-"];
+  const chunks = ["%PDF-1.4\n%UniquePlatform\n"];
   const offsets = [0];
   let length = chunks[0].length;
 
   objects.forEach((obj, index) => {
     offsets[index + 1] = length;
-    const chunk = (index + 1) + " 0 obj
-" + obj + "
-endobj
-";
+    const chunk = (index + 1) + " 0 obj\n" + obj + "\nendobj\n";
     chunks.push(chunk);
     length += chunk.length;
   });
 
   const xrefOffset = length;
-  chunks.push("xref
-0 " + (objects.length + 1) + "
+  chunks.push("xref\n0 " + (objects.length + 1) + "
 0000000000 65535 f 
 ");
   for (let i = 1; i <= objects.length; i += 1) {
-    chunks.push(String(offsets[i]).padStart(10, "0") + " 00000 n 
-");
+    chunks.push(String(offsets[i]).padStart(10, "0") + " 00000 n \n");
   }
-  chunks.push("trailer
-<< /Size " + (objects.length + 1) + " /Root 1 0 R >>
+  chunks.push("trailer\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>
 startxref
 " + xrefOffset + "
 %%EOF");
@@ -326,6 +308,10 @@ export default function UniqueAiPage() {
   const { currentUser } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [message, setMessage] = useState("");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
@@ -336,9 +322,6 @@ export default function UniqueAiPage() {
   const [smartOpportunityOpen, setSmartOpportunityOpen] = useState(false);
   const [smartOpportunityDismissed, setSmartOpportunityDismissed] = useState(false);
   const [language, setLanguage] = useState<SupportedLanguage>(getLanguage());
-  const [aiAccess, setAiAccess] = useState<AiAccess | null>(null);
-  const [displayRemainingSeconds, setDisplayRemainingSeconds] = useState<number | null>(null);
-  const [premiumNoticeOpen, setPremiumNoticeOpen] = useState(false);
   const guestSessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -360,35 +343,6 @@ export default function UniqueAiPage() {
     }
     guestSessionIdRef.current = sessionId;
   }, [currentUser]);
-
-  useEffect(() => {
-    if (displayRemainingSeconds === null || displayRemainingSeconds <= 0) return;
-    const intervalId = window.setInterval(() => {
-      setDisplayRemainingSeconds((value) => value === null ? null : Math.max(0, value - 1));
-    }, 1000);
-    return () => window.clearInterval(intervalId);
-  }, [displayRemainingSeconds]);
-
-  const formatAiTime = (seconds: number) => {
-    const safe = Math.max(0, Math.floor(seconds));
-    const hours = Math.floor(safe / 3600);
-    const minutes = Math.floor((safe % 3600) / 60);
-    const secs = safe % 60;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m ${secs.toString().padStart(2, "0")}s`;
-  };
-
-  useEffect(() => {
-    if (aiAccess?.mode === "subscriber") return;
-    const noticeKey = "unique-ai-premium-notice-v1";
-    if (window.sessionStorage.getItem(noticeKey)) return;
-    const timeoutId = window.setTimeout(() => {
-      window.sessionStorage.setItem(noticeKey, "1");
-      setPremiumNoticeOpen(true);
-      window.setTimeout(() => setPremiumNoticeOpen(false), 8500);
-    }, 25_000);
-    return () => window.clearTimeout(timeoutId);
-  }, [aiAccess?.mode]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -420,6 +374,70 @@ export default function UniqueAiPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, loading, error]);
+
+  const handleImageSelected = async (file: File | undefined) => {
+    if (!file) return;
+    const allowed = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+    if (!allowed.has(file.type)) {
+      setError("Please choose a JPG, PNG, WEBP, HEIC, or HEIF image.");
+      return;
+    }
+    if (file.size > 6 * 1024 * 1024) {
+      setError("Please choose an image smaller than 6 MB.");
+      return;
+    }
+    setError("");
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const analyzeSelectedImage = async () => {
+    if (!imageFile || imageBusy || loading) return;
+    setImageBusy(true);
+    setError("");
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Could not read image."));
+        reader.onerror = () => reject(new Error("Could not read image."));
+        reader.readAsDataURL(imageFile);
+      });
+      const comma = dataUrl.indexOf(",");
+      if (comma < 0) throw new Error("Invalid image data.");
+      const requestId = crypto.randomUUID();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "X-Request-ID": requestId,
+      };
+      if (currentUser) headers.Authorization = `Bearer ${await currentUser.getIdToken()}`;
+      else if (guestSessionIdRef.current) headers["X-AI-Session-ID"] = guestSessionIdRef.current;
+      const response = await fetch(currentUser ? "/api/ai/vision" : "/api/ai/public-vision", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          prompt: message.trim() || "Identify this image, especially any product or object. Give the likely name, category, visible brand/model if readable, key visible details, and what I can do next in Unique One. Be clear about uncertainty.",
+          mimeType: imageFile.type,
+          imageData: dataUrl.slice(comma + 1),
+          preferredLanguage: language,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error?.message || "Image analysis is temporarily unavailable.");
+      setMessages((current) => [
+        ...current,
+        { id: crypto.randomUUID(), role: "user", text: message.trim() || "Identify this image.", },
+        { id: crypto.randomUUID(), role: "assistant", text: payload.message || "I could not identify the image confidently." },
+      ]);
+      setMessage("");
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+      setImagePreview(null);
+      setImageFile(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image analysis is temporarily unavailable.");
+    } finally {
+      setImageBusy(false);
+    }
+  };
 
   const sendMessage = async (event?: FormEvent, retryMessage?: string) => {
     event?.preventDefault();
@@ -456,7 +474,7 @@ export default function UniqueAiPage() {
       const response = await fetch(currentUser ? "/api/ai/chat" : "/api/ai/public-chat", {
         method: "POST",
         headers,
-        body: JSON.stringify({ message: trimmed, history, preferredLanguage: language, ...(location ? { location } : {}) }),
+        body: JSON.stringify({ message: trimmed, history, preferredLanguage: language, ...(shouldUseDeviceLocation(trimmed) ? { location: await getDeviceLocation() } : {}) }),
         signal: controller.signal,
       });
 
@@ -673,9 +691,6 @@ export default function UniqueAiPage() {
           <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Try asking</span>
           <span className="hidden text-[10px] text-slate-400 sm:inline">— a quick idea to get started</span>
         </div>
-        {aiAccess?.mode !== "subscriber" && (
-          <Link to="/ai/premium" className="shrink-0 text-[10px] font-bold text-emerald-700 hover:text-emerald-800">Premium plans →</Link>
-        )}
       </div>
       <div className="relative min-w-0 overflow-hidden rounded-2xl border border-emerald-100/90 bg-gradient-to-r from-white via-emerald-50/70 to-white p-2.5 shadow-[0_4px_18px_rgba(15,23,42,.045)] sm:p-3">
         <div className="pointer-events-none absolute inset-y-0 left-0 w-1 rounded-l-2xl bg-gradient-to-b from-emerald-300 via-emerald-500 to-teal-300" aria-hidden="true" />
@@ -872,6 +887,36 @@ export default function UniqueAiPage() {
             <div className="relative flex min-w-0 flex-1 items-end gap-2 overflow-hidden rounded-[26px] border border-emerald-200/80 bg-white/95 p-1.5 shadow-[0_0_22px_rgba(16,185,129,0.2)] backdrop-blur-xl transition-all duration-300 focus-within:border-emerald-400 focus-within:bg-white focus-within:shadow-[0_0_34px_rgba(16,185,129,0.34)]">
               <span className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -translate-x-full bg-gradient-to-r from-transparent via-emerald-200/35 to-transparent" style={{ animation: "uniqueAiComposerShine 3.8s ease-in-out infinite" }} aria-hidden="true" />
               <span className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/80 to-transparent" style={{ animation: "uniqueAiComposerShine 2.8s ease-in-out infinite" }} aria-hidden="true" />
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                className="hidden"
+                onChange={(event) => {
+                  void handleImageSelected(event.target.files?.[0]);
+                  event.currentTarget.value = "";
+                }}
+              />
+              <button
+                type="button"
+                disabled={loading || imageBusy}
+                onClick={() => imageInputRef.current?.click()}
+                className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-white text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:opacity-50 sm:h-11 sm:w-11"
+                aria-label="Scan or add an image"
+                title="Scan or add an image"
+              >
+                📷
+              </button>
+              {imagePreview && (
+                <div className="absolute -top-20 left-2 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white/95 p-1.5 shadow-lg backdrop-blur-xl">
+                  <img src={imagePreview} alt="Selected for Unique AI" className="h-16 w-16 rounded-xl object-cover" />
+                  <div className="pr-1">
+                    <div className="max-w-[150px] truncate text-[10px] font-bold text-slate-700">{imageFile?.name || "Image"}</div>
+                    <button type="button" onClick={() => { if (imagePreview) URL.revokeObjectURL(imagePreview); setImagePreview(null); setImageFile(null); }} className="mt-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white">Remove</button>
+                  </div>
+                  <button type="button" onClick={() => void analyzeSelectedImage()} disabled={imageBusy} className="rounded-full bg-slate-950 px-3 py-2 text-[10px] font-bold text-white disabled:opacity-50">{imageBusy ? "Reading…" : "Identify"}</button>
+                </div>
+              )}
               <textarea
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
@@ -885,7 +930,7 @@ export default function UniqueAiPage() {
                 maxLength={4000}
                 disabled={loading}
                 aria-label="Message Unique AI"
-                placeholder="Ask Unique AI anything,"
+                placeholder="Ask Unique AI anything — or scan an image"
                 className="relative min-h-[42px] min-w-0 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm leading-5 text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-60 sm:min-h-[44px] sm:px-4 sm:py-3"
               />
               <button type="submit" disabled={!message.trim() || loading} aria-label="Send message" className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 text-white shadow-[0_4px_14px_rgba(15,23,42,.2)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-600 hover:shadow-[0_6px_18px_rgba(16,185,129,.25)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none sm:h-11 sm:w-11">
