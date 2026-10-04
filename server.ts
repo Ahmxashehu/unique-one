@@ -898,7 +898,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       for (const key of Object.keys(payload)) {
         if (!allowedKeys.has(key)) return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
       }
-      const location = parseAiLocation(payload.location);\n      const access = await enforceAiAccess(req, res);
+      const location = parseAiLocation(payload.location);
+      const access = await enforceAiAccess(req, res);
       if (!access) return;
       const usageStartedAt = Date.now();
       const responseText = await generatePublicUniqueAiResponse({ message: payload.message, history: payload.history, preferredLanguage: typeof payload.preferredLanguage === "string" ? payload.preferredLanguage : undefined, location });
@@ -948,7 +949,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         return errorResponse(res, 'INVALID_REQUEST', 'The AI request body must be a plain object.');
       }
       const payload = req.body as Record<string, unknown>;
-      const allowedKeys = new Set(['message', 'history', 'preferredLanguage']);
+      const allowedKeys = new Set(['message', 'history', 'preferredLanguage', 'location']);
       for (const key of Object.keys(payload)) {
         if (!allowedKeys.has(key)) {
           return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
@@ -960,6 +961,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       }
       const message = payload.message;
       const history = payload.history;
+      const location = parseAiLocation(payload.location);
       const access = await enforceAiAccess(req, res, uid);
       if (!access) return;
       const usageStartedAt = Date.now();
@@ -981,6 +983,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         history,
         requestId: resolvedRequestId,
         preferredLanguage,
+        location,
       });
       const updatedAccess = await consumeAiAccess(uid, undefined, usageStartedAt);
       res.setHeader("X-AI-Remaining-Seconds", String(updatedAccess.remainingSeconds));
