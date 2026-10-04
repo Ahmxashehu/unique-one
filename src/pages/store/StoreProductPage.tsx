@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Store, Heart, ShoppingBag, MessageSquare, Handshake, MapPin, Loader2, AlertCircle, ChevronLeft } from 'lucide-react';
+import { Store, Heart, ShoppingBag, MessageSquare, Handshake, MapPin, Loader2, AlertCircle, ChevronLeft, Truck, PackageCheck, Minus, Plus } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Product } from '../../lib/os/types';
@@ -17,6 +17,8 @@ export default function StoreProductPage() {
   const [addingToCart, setAddingToCart] = useState(false);
   const [savingWishlist, setSavingWishlist] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(0);
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -34,6 +36,8 @@ export default function StoreProductPage() {
           } else {
             setProduct(data);
             setQuantity(Math.max(1, data.minOrderQuantity || 1));
+            setSelectedImage(0);
+            setSelectedVariants(Object.fromEntries((data.variants || []).map(variant => [variant.name, variant.options[0] || ''])));
           }
         } else {
           setError('Product not found.');
@@ -83,6 +87,7 @@ export default function StoreProductPage() {
         customerId: currentUser!.uid,
         productId: id,
         quantity: safeQuantity,
+        ...(Object.keys(selectedVariants).length ? { variant: selectedVariants } : {}),
         updatedAt: serverTimestamp()
       }, { merge: true });
       navigate('/store/cart');
@@ -129,19 +134,22 @@ export default function StoreProductPage() {
 
   const minQuantity = Math.max(1, product.minOrderQuantity || 1);
   const maxQuantity = Math.max(minQuantity, product.quantity);
+  const hasDiscount = Number(product.discount || 0) > 0;
+  const salePrice = hasDiscount ? Math.max(0, product.price * (1 - Number(product.discount) / 100)) : product.price;
+  const lineTotal = salePrice * quantity;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6 sm:space-y-8 pb-28">
       <Link to="/store/search" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700"><ChevronLeft className="w-4 h-4" /> Back to Store</Link>\n      <div className="grid md:grid-cols-2 gap-6 lg:gap-12">
         <div className="space-y-4">
           <div className="aspect-square bg-slate-100 rounded-2xl sm:rounded-3xl border border-slate-200 flex items-center justify-center overflow-hidden relative">
-            {product.images?.length > 0 ? <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" /> : <Store className="w-16 h-16 text-slate-300" />}
+            {product.images?.length > 0 ? <img src={product.images[selectedImage] || product.images[0]} alt={product.name} className="w-full h-full object-cover" /> : <Store className="w-16 h-16 text-slate-300" />}
             <div className="absolute top-4 left-4 flex gap-2">
               <span className="px-3 py-1 bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider rounded shadow-sm text-slate-700">{product.condition}</span>
               {product.wholesalePrice && <span className="px-3 py-1 bg-blue-100 text-[10px] font-bold uppercase tracking-wider rounded shadow-sm text-blue-800">Wholesale Avail</span>}
             </div>
           </div>
-          <div className="flex gap-2">{product.images?.slice(1, 5).map((image, index) => <img key={image + index} src={image} alt={product.name + ' ' + (index + 2)} className="w-20 h-20 object-cover rounded-xl border border-slate-200" />)}</div>
+          <div className="flex gap-2">{product.images?.slice(1, 5).map((image, index) => <img key={image + index} src={image} alt={product.name + ' ' + (index + 2)} className="w-full h-full object-cover" /></button>)}</div>
         </div>
 
         <div className="space-y-6">
@@ -149,12 +157,21 @@ export default function StoreProductPage() {
             <p className="text-sm font-medium text-slate-500 mb-2 uppercase tracking-wide">{product.category.replace('_', ' ')}</p>
             <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight leading-tight">{product.name}</h1>
             <div className="mt-4 flex items-end gap-4">
-              <span className="text-3xl font-bold text-slate-900">{product.currency === 'NGN' ? '₦' : `${product.currency} `}{product.price.toLocaleString()}</span>
+              <span className="text-3xl font-bold text-slate-900">{product.currency === 'NGN' ? '₦' : product.currency + ' '}{salePrice.toLocaleString()}</span>{hasDiscount && <span className="text-sm text-slate-400 line-through">{product.currency === 'NGN' ? '₦' : product.currency + ' '}{product.price.toLocaleString()}</span>}
               {product.quantity > 0 ? <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full mb-1">In Stock ({product.quantity})</span> : <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full mb-1">Out of Stock</span>}
             </div>
             {product.wholesalePrice && <p className="text-sm font-medium text-blue-600 mt-2">Wholesale: {product.currency === 'NGN' ? '₦' : '$'}{product.wholesalePrice.toLocaleString()} (Min qty: {product.minOrderQuantity})</p>}
           </div>
           <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{product.description}</p>
+          {(product.variants || []).length > 0 && <div className="space-y-3 rounded-2xl border border-slate-200 p-4 bg-slate-50">
+            <h3 className="font-bold text-slate-900">Choose options</h3>
+            {(product.variants || []).map(variant => <div key={variant.name}>
+              <label className="text-xs font-bold uppercase tracking-wide text-slate-500">{variant.name}</label>
+              <select value={selectedVariants[variant.name] || ''} onChange={e => setSelectedVariants(current => ({ ...current, [variant.name]: e.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold">
+                {variant.options.map(option => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </div>)}
+          </div>}
           {product.location?.address && <div className="flex items-center gap-1 text-sm text-slate-500"><MapPin className="w-4 h-4" /> {product.location.address}</div>}
           <div className="pt-6 border-t border-slate-100 space-y-4">
             <div className="flex items-center gap-4">
