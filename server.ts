@@ -863,6 +863,22 @@ async function enforceAiAccess(req: Request, res: Response, uid?: string): Promi
   return access;
 }
 
+function parseAiLocation(value: unknown): { latitude: number; longitude: number; radiusMeters?: number } | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value)) throw new RequestValidationError('INVALID_REQUEST', 'location must be an object.');
+  const latitude = value.latitude;
+  const longitude = value.longitude;
+  const radiusMeters = value.radiusMeters;
+  if (typeof latitude !== 'number' || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+      typeof longitude !== 'number' || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    throw new RequestValidationError('INVALID_REQUEST', 'location coordinates are invalid.');
+  }
+  if (radiusMeters !== undefined && (typeof radiusMeters !== 'number' || !Number.isFinite(radiusMeters) || radiusMeters < 100 || radiusMeters > 50_000)) {
+    throw new RequestValidationError('INVALID_REQUEST', 'location radius is invalid.');
+  }
+  return { latitude, longitude, ...(radiusMeters !== undefined ? { radiusMeters } : {}) };
+}
+
   app.post("/api/ai/public-chat", rateLimit({
     windowMs: 60_000,
     limit: 12,
@@ -878,14 +894,14 @@ async function enforceAiAccess(req: Request, res: Response, uid?: string): Promi
     try {
       if (!isPlainObject(req.body)) return errorResponse(res, 'INVALID_REQUEST', 'The AI request body must be a plain object.');
       const payload = req.body as Record<string, unknown>;
-      const allowedKeys = new Set(['message', 'history', 'preferredLanguage']);
+      const allowedKeys = new Set(['message', 'history', 'preferredLanguage', 'location']);
       for (const key of Object.keys(payload)) {
         if (!allowedKeys.has(key)) return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
       }
-      const access = await enforceAiAccess(req, res);
+      const location = parseAiLocation(payload.location);\n      const access = await enforceAiAccess(req, res);
       if (!access) return;
       const usageStartedAt = Date.now();
-      const responseText = await generatePublicUniqueAiResponse({ message: payload.message, history: payload.history, preferredLanguage: typeof payload.preferredLanguage === "string" ? payload.preferredLanguage : undefined });
+      const responseText = await generatePublicUniqueAiResponse({ message: payload.message, history: payload.history, preferredLanguage: typeof payload.preferredLanguage === "string" ? payload.preferredLanguage : undefined, location });
       const updatedAccess = await consumeAiAccess(undefined, typeof req.headers["x-ai-session-id"] === "string" ? req.headers["x-ai-session-id"] : undefined, usageStartedAt);
       res.setHeader("X-AI-Remaining-Seconds", String(updatedAccess.remainingSeconds));
       return res.status(200).json({
