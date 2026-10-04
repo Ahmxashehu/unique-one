@@ -110,7 +110,7 @@ export default function StoreSearchPage() {
       setLoading(true); setError('');
       try {
         const lowerQ = initialQuery.trim().toLowerCase();
-        const [publishedProducts, businessSnapshot] = await Promise.all([
+        const [publishedProducts, businessSnapshot, serviceSnapshot] = await Promise.all([
           loadPublishedProducts(filterCat),
           getDocs(collection(db, 'businesses')).catch(err => {
             console.warn('Business discovery unavailable; continuing with Store listings:', err);
