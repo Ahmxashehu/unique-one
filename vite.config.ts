@@ -5,6 +5,18 @@ import {defineConfig} from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => ({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
+          'vendor-ui': ['lucide-react', 'motion'],
+          'vendor-ai': ['@google/genai'],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -15,8 +27,8 @@ export default defineConfig(() => ({
         globPatterns: ['**/*.{css,html,ico,png,svg,webmanifest,js}'],
         runtimeCaching: [{
           urlPattern: ({ request }) => request.destination === 'script' || request.destination === 'style',
-          handler: 'NetworkFirst',
-          options: { cacheName: 'unique-platform-app-assets-v8', expiration: { maxEntries: 100, maxAgeSeconds: 604800 } },
+          handler: 'CacheFirst',
+          options: { cacheName: 'unique-platform-app-assets-v9', expiration: { maxEntries: 100, maxAgeSeconds: 604800 } },
         }],
         navigateFallback: '/index.html',
         navigateFallbackAllowlist: [/^\/(?!api(?:\/|$)).*/],
