@@ -71,7 +71,7 @@ const AdminReportsPage = lazy(() => import("./pages/admin/AdminReportsPage"));
 const AdminVerificationPage = lazy(() => import("./pages/admin/AdminVerificationPage"));
 const AdminTransactionsPage = lazy(() => import("./pages/admin/AdminTransactionsPage"));
 const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage"));
-const StoreDiscoverPage = lazy(() => import("./pages/store/StoreDiscoverPage"));
+const StoreDiscoverPage = lazy(() => import("./pages/store/StoreDiscoverPage"));\nconst StorePage = lazy(() => import("./pages/StorePage"));
 const StoreCategoriesPage = lazy(() => import("./pages/store/StoreCategoriesPage"));
 const StoreProductPage = lazy(() => import("./pages/store/StoreProductPage"));
 const StoreSellerProfilePage = lazy(() => import("./pages/store/StoreSellerProfilePage"));
@@ -140,7 +140,7 @@ export default function App() {
                     <Route path="/ai" element={<UniqueAiPage />} />
                     <Route path="/media" element={<UniqueMediaPage />} />
                     <Route path="/unique-media" element={<UniqueMediaPage />} />
-                    <Route path="/store" element={<StoreSearchPage />} />
+                    <Route path="/store" element={<StorePage />} />
                     <Route path="/store/categories" element={<StoreCategoriesPage />} />
                     <Route path="/store/product/:id" element={<StoreProductPage />} />
                     <Route path="/store/seller/:id" element={<StoreSellerProfilePage />} />
@@ -166,7 +166,7 @@ export default function App() {
                     <Route path="wishlist" element={<WishlistPage />} />
                     <Route path="requests" element={<UserRequestsPage />} />
                     <Route path="pay" element={<PayPage />} />
-                    <Route path="store" element={<StoreSearchPage />} />
+                    <Route path="store" element={<StorePage />} />
                     <Route path="ai" element={<UniqueAiPage />} />
                     <Route path="master-vision" element={<MasterVisionPage />} />
                     <Route path="unique-share" element={<UniqueSharePage />} />
