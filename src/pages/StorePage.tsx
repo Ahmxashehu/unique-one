@@ -39,6 +39,7 @@ async function loadStoreProducts(): Promise<Product[]> {
 
 const categories: Array<{ key: ProductCategory; label: string; icon: React.ElementType }> = [
   { key: 'electronics', label: 'Electronics', icon: Smartphone },
+  { key: 'electricity_power', label: 'Electricity & Power', icon: Zap },
   { key: 'phones_accessories', label: 'Phones & Accessories', icon: Smartphone },
   { key: 'fashion', label: 'Fashion', icon: Shirt },
   { key: 'shoes', label: 'Shoes', icon: PackageOpen },
