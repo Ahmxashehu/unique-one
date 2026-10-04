@@ -109,7 +109,7 @@ export default function App() {
   const [u1Booting, setU1Booting] = useState(true);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setU1Booting(false), 900);
+    const timer = window.setTimeout(() => setU1Booting(false), 350);
     return () => window.clearTimeout(timer);
   }, []);
 
