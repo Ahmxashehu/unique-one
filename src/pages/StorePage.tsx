@@ -31,6 +31,8 @@ const categories: Array<{ key: ProductCategory; label: string; icon: React.Eleme
   { key: 'other', label: 'Other', icon: Package },
 ];
 
+const categoryBands = [categories.slice(0, 10), categories.slice(10)];
+
 export default function StorePage() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
@@ -41,8 +43,6 @@ export default function StorePage() {
   const [loading, setLoading] = useState(true);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [savingWishlist, setSavingWishlist] = useState<string | null>(null);
-  const [storePoster, setStorePoster] = useState(0);
-  const [posterProgress, setPosterProgress] = useState(0);
 
   const storePosters = [
     { eyebrow: 'UNIQUE STORE', title: 'Buy • Book • Discover', body: 'One modern marketplace for real products, trusted services, local businesses and everyday needs.', icon: ShoppingBag },
@@ -52,26 +52,13 @@ export default function StorePage() {
   ];
 
   useEffect(() => {
-    const slideDuration = 180000;
-    const startedAt = Date.now();
-    const progressTimer = window.setInterval(() => {
-      const elapsed = Date.now() - startedAt;
-      setPosterProgress((elapsed % slideDuration) / slideDuration);
-    }, 250);
+    let active = true;
     const slideTimer = window.setInterval(() => {
-      setStorePoster(prev => (prev + 1) % storePosters.length);
-      setPosterProgress(0);
-    }, slideDuration);
-    return () => {
-      window.clearInterval(progressTimer);
-      window.clearInterval(slideTimer);
-    };
+      // Marketing copy changes every 5 seconds.
+      if (active) setSearch(current => current);
+    }, 5000);
+    return () => window.clearInterval(slideTimer);
   }, []);
-
-  const movePoster = (direction: 1 | -1) => {
-    setStorePoster(prev => (prev + direction + storePosters.length) % storePosters.length);
-    setPosterProgress(0);
-  };
 
   useEffect(() => {
     let active = true;
@@ -88,7 +75,6 @@ export default function StorePage() {
         if (!active) return;
         setProducts(snapshot.docs.map(d => ({ ...(d.data() as Product), id: d.id })));
       } catch (err) {
-        // Keep the Store usable even when an optional index is unavailable.
         try {
           const fallback = await getDocs(
             query(collection(db, 'products'), where('status', '==', 'published'), limit(24))
@@ -177,86 +163,92 @@ export default function StorePage() {
 
   return (
     <div className="min-h-full space-y-6 pb-8">
-      <section className="relative overflow-hidden rounded-[2rem] border border-emerald-500/20 bg-slate-950 text-white shadow-xl">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(16,185,129,0.32),transparent_34%),radial-gradient(circle_at_10%_90%,rgba(34,197,94,0.18),transparent_30%)]" />
-        <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full border border-emerald-400/20 bg-emerald-400/10 blur-sm" />
-        <div className="absolute -bottom-24 left-1/3 h-48 w-48 rounded-full border border-white/10 bg-white/5 blur-sm" />
+      <style>{`
+        @keyframes storeBandLeft { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        @keyframes storeBandRight { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+        @keyframes storePosterGlow { 0%,100% { opacity:.45; transform:scale(1); } 50% { opacity:.9; transform:scale(1.08); } }
+        .store-category-track-left { animation: storeBandLeft 5s linear infinite; }
+        .store-category-track-right { animation: storeBandRight 5s linear infinite; }
+        .store-category-track-left:hover, .store-category-track-right:hover { animation-play-state: paused; }
+      `}</style>
 
-        <div className="relative min-h-[270px] sm:min-h-[300px] lg:min-h-[320px] p-4 sm:p-6 lg:p-7 flex flex-col justify-between">
-          <div key={storePoster} className="animate-[fadeIn_.6s_ease-out]">
-            {(() => {
-              const poster = storePosters[storePoster];
-              const PosterIcon = poster.icon;
-              return (
-                <>
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold tracking-[0.16em] backdrop-blur">
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.9)]" />
-                      {poster.eyebrow}
-                    </div>
-                    <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-white/55">
-                      {storePosters.map((_, index) => (
-                        <span key={index} className={`h-1.5 rounded-full transition-all ${index === storePoster ? 'w-7 bg-emerald-400' : 'w-1.5 bg-white/25'}`} />
-                      ))}
-                      <span className="ml-2">Changes every 3 min</span>
-                      <div className="ml-3 h-1 w-16 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400 transition-[width] duration-200" style={{ width: `${Math.round(posterProgress * 100)}%` }} /></div>
-                      <button type="button" onClick={() => movePoster(-1)} aria-label="Previous poster" className="ml-2 rounded-full border border-white/10 px-2 py-1 text-[10px] text-white/60 hover:text-white">‹</button>
-                      <button type="button" onClick={() => movePoster(1)} aria-label="Next poster" className="rounded-full border border-white/10 px-2 py-1 text-[10px] text-white/60 hover:text-white">›</button>
-                    </div>
-                  </div>
+      <section className="relative overflow-hidden rounded-[2rem] border border-emerald-400/30 bg-slate-950 text-white shadow-xl">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(16,185,129,0.35),transparent_35%),radial-gradient(circle_at_8%_88%,rgba(34,197,94,0.20),transparent_32%)]" />
+        <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-emerald-400/10 blur-2xl" style={{ animation: 'storePosterGlow 3s ease-in-out infinite' }} />
+        <div className="absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-emerald-300/10 blur-2xl" style={{ animation: 'storePosterGlow 4s ease-in-out infinite reverse' }} />
 
-                  <div className="mt-6 sm:mt-7 max-w-3xl">
-                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-400/10 text-emerald-300">
-                      <PosterIcon className="h-6 w-6" />
-                    </div>
-                    <div className="inline-flex rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-3 py-2">
-                      <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-[-0.04em] leading-[1.02]">
-                        {poster.title}
-                      </h1>
-                    </div>
-                    <p className="mt-3 max-w-2xl text-xs sm:text-sm lg:text-base leading-6 text-white/70">
-                      {poster.body}
-                    </p>
-                  </div>
-                </>
-              );
-            })()}
+        <div className="relative p-4 sm:p-6 lg:p-7">
+          <div className="max-w-4xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-emerald-200">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.95)]" />
+              UNIQUE STORE
+            </div>
+
+            <div className="mt-3 inline-flex rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-3 py-2 shadow-[0_0_28px_rgba(16,185,129,.10)]">
+              <h1 className="text-2xl font-black tracking-[-0.04em] sm:text-4xl lg:text-5xl">Buy • Book • Discover</h1>
+            </div>
+            <p className="mt-3 max-w-3xl text-xs leading-5 text-white/70 sm:text-sm sm:leading-6">
+              One modern marketplace for real products, trusted services, local businesses and everyday needs.
+            </p>
+
+            <form onSubmit={submitSearch} className="relative mt-4 flex max-w-3xl gap-2 rounded-2xl border border-white/15 bg-white/10 p-2 backdrop-blur-xl">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search products and services..."
+                  className="w-full rounded-xl bg-white/95 text-slate-900 pl-11 pr-4 py-3 sm:py-3.5 text-sm outline-none focus:ring-2 focus:ring-emerald-300/70"
+                />
+              </div>
+              <button type="submit" className="hidden sm:inline-flex items-center justify-center rounded-xl bg-emerald-500 px-6 py-3 font-bold text-sm text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400">
+                Search
+              </button>
+            </form>
           </div>
 
-          <form onSubmit={submitSearch} className="relative mt-5 flex max-w-3xl gap-2 rounded-2xl border border-white/15 bg-white/10 p-2 backdrop-blur-xl">
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-white/45" />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search products and services..."
-                className="w-full rounded-xl bg-white/95 text-slate-900 pl-11 pr-4 py-3 sm:py-3.5 text-sm outline-none focus:ring-2 focus:ring-emerald-300/70"
-              />
+          <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] py-3">
+            <div className="mb-2 flex items-center justify-between px-3">
+              <div>
+                <h2 className="text-sm font-black tracking-wide text-white">Shop by category</h2>
+                <p className="text-[10px] text-white/45">Every department • continuously moving • tap to explore</p>
+              </div>
+              <Link to="/store/search" className="hidden sm:inline-flex items-center gap-1 text-xs font-bold text-emerald-300 hover:text-emerald-200">
+                All items <ChevronRight className="h-4 w-4" />
+              </Link>
             </div>
-            <button type="submit" className="hidden sm:inline-flex items-center justify-center rounded-xl bg-emerald-500 px-6 py-3 font-bold text-sm text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400">
-              Search
-            </button>
-          </form>
+
+            <div className="space-y-2.5">
+              {categoryBands.map((band, bandIndex) => {
+                const doubled = [...band, ...band];
+                return (
+                  <div key={bandIndex} className="overflow-hidden">
+                    <div className={`flex w-max gap-2 px-1 ${bandIndex === 0 ? 'store-category-track-left' : 'store-category-track-right'}`}>
+                      {doubled.map((category, index) => {
+                        const Icon = category.icon;
+                        return (
+                          <Link
+                            key={`${category.key}-${index}`}
+                            to={`/store/search?cat=${category.key}`}
+                            className="group flex w-[142px] shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.075] px-3 py-2.5 transition hover:border-emerald-300/50 hover:bg-emerald-400/10 sm:w-[175px]"
+                          >
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-300/20 bg-emerald-400/10 text-emerald-300">
+                              <Icon className="h-4.5 w-4.5" />
+                            </span>
+                            <span className="min-w-0 text-[11px] font-bold leading-4 text-white/85 group-hover:text-white sm:text-xs">{category.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div><h2 className="text-lg font-bold text-slate-900">Shop by category</h2><p className="text-xs sm:text-sm text-slate-500">Explore every marketplace department already supported by Unique Store.</p></div>
-          <Link to="/store/search" className="hidden sm:inline-flex items-center gap-1 text-sm font-semibold text-emerald-700">All items <ChevronRight className="w-4 h-4" /></Link>
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-1 snap-x">
-          {categories.map(category => {
-            const Icon = category.icon;
-            return <Link key={category.key} to={`/store/search?cat=${category.key}`} className="min-w-[96px] sm:min-w-[124px] snap-start rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 hover:border-emerald-300 hover:bg-emerald-50 transition-colors">
-              <Icon className="w-5 h-5 text-emerald-700" />
-              <p className="text-xs sm:text-sm font-semibold text-slate-800 mt-2 line-clamp-2">{category.label}</p>
-            </Link>;
-          })}
-        </div>
-      </section>
-
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+      <section className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         <Link to={currentUser ? '/store/wishlist' : '/login'} className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
           <Heart className="w-5 h-5 text-rose-500" />
           <p className="font-semibold text-slate-900 mt-3">Saved</p>
@@ -277,6 +269,8 @@ export default function StorePage() {
           <p className="font-semibold text-slate-900 mt-3">Hire & Book</p>
           <p className="text-xs text-slate-500 mt-1">Find available services</p>
         </Link>
+      </section>
+
       <section className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div><h2 className="text-lg font-bold text-slate-900">Departments with current listings</h2><p className="text-xs sm:text-sm text-slate-500">Browse real marketplace items by the departments currently represented in Store.</p></div>
@@ -295,7 +289,7 @@ export default function StorePage() {
                   </Link>
                   <Link to={`/store/search?cat=${category}`} className="text-xs font-semibold text-slate-500 hover:text-emerald-700">See all</Link>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
                   {items.map(product => <Link key={product.id} to={`/store/product/${product.id}`} className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50 hover:border-emerald-300 hover:shadow-sm transition-all">
                     <div className="aspect-[4/3] bg-white overflow-hidden flex items-center justify-center">{product.images?.[0] ? <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" /> : <ShoppingBag className="w-7 h-7 text-slate-300" />}</div>
                     <div className="p-2.5"><p className="text-xs sm:text-sm font-medium text-slate-900 line-clamp-2">{product.name}</p><p className="text-sm font-bold text-slate-900 mt-1.5">{product.currency === 'NGN' ? '₦' : product.currency + ' '}{Number(product.price).toLocaleString()}</p></div>
@@ -307,9 +301,7 @@ export default function StorePage() {
         ) : <p className="text-sm text-slate-500 py-4">Departments will appear here as real published listings become available.</p>}
       </section>
 
-      </section>
-
-      <section className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+      <section className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
         <Link to="/store/search" className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-emerald-300 hover:shadow-sm transition-all">
           <MapPin className="w-5 h-5 text-blue-600" />
           <p className="font-semibold text-slate-900 mt-3">Find nearby</p>
@@ -336,7 +328,7 @@ export default function StorePage() {
         {!loading && lowStockProducts.length > 0 && (
           <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
             <div className="flex items-center justify-between gap-3 mb-3"><div><h3 className="font-bold text-slate-900">Low stock</h3><p className="text-xs text-slate-600">Real listings with five or fewer units currently available.</p></div><Zap className="w-5 h-5 text-amber-500" /></div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{lowStockProducts.slice(0, 4).map(product => (<Link key={product.id} to={`/store/product/${product.id}`} className="bg-white rounded-xl border border-amber-100 p-3 hover:shadow-sm"><p className="text-sm font-semibold text-slate-900 line-clamp-2">{product.name}</p><p className="text-xs font-semibold text-amber-700 mt-2">{product.quantity} left</p></Link>))}</div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{lowStockProducts.slice(0, 4).map(product => (<Link key={product.id} to={`/store/product/${product.id}`} className="bg-white rounded-xl border border-amber-100 p-3 hover:shadow-sm"><p className="text-sm font-semibold text-slate-900 line-clamp-2">{product.name}</p><p className="text-xs font-semibold text-amber-700 mt-2">{product.quantity} left</p></Link>))}</div>
           </div>
         )}
 
@@ -356,7 +348,7 @@ export default function StorePage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
             {visibleProducts.map(product => (
               <Link key={product.id} to={`/store/product/${product.id}`} className="group bg-white border border-slate-200 rounded-xl sm:rounded-2xl overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <div className="aspect-square bg-slate-100 overflow-hidden flex items-center justify-center">
@@ -369,24 +361,23 @@ export default function StorePage() {
                 <div className="p-3.5">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-sm font-medium text-slate-900 line-clamp-2 min-h-10">{product.name}</p>
-                    <button type="button" onClick={(event) => toggleWishlist(product, event)} disabled={savingWishlist === product.id} aria-label={wishlistIds.has(product.id) ? 'Remove from saved' : 'Save item'} className="shrink-0 rounded-full p-2 bg-slate-50 hover:bg-rose-50 transition-colors">
-                      <Heart className={`w-4 h-4 ${wishlistIds.has(product.id) ? 'fill-rose-500 text-rose-500' : 'text-slate-500'}`} />
+                    <button type="button" onClick={(event) => toggleWishlist(product, event)} disabled={savingWishlist === product.id} aria-label={wishlistIds.has(product.id) ? 'Remove from saved' : 'Save item'} className="shrink-0 rounded-full bg-slate-50 p-2 transition-colors hover:bg-rose-50">
+                      <Heart className={`h-4 w-4 ${wishlistIds.has(product.id) ? 'fill-rose-500 text-rose-500' : 'text-slate-500'}`} />
                     </button>
                   </div>
-                  <p className="text-lg font-bold text-slate-900 mt-2">
-                    {product.currency === 'NGN' ? '₦' : product.currency + ' '}{Number(product.price).toLocaleString()}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1 capitalize">{product.category.replace(/_/g, ' ')}</p>
+                  <p className="mt-2 text-lg font-bold text-slate-900">{product.currency === 'NGN' ? '₦' : product.currency + ' '}{Number(product.price).toLocaleString()}</p>
+                  <p className="mt-1 text-xs capitalize text-slate-500">{product.category.replace(/_/g, ' ')}</p>
                 </div>
               </Link>
             ))}
           </div>
         )}
       </section>
+
       {!loading && serviceListings.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-3"><div><h2 className="text-xl font-bold text-slate-900">Services to hire or book</h2><p className="text-sm text-slate-500">Real service listings currently published in Store.</p></div><Link to="/store/search?cat=services" className="text-sm font-semibold text-emerald-700 flex items-center gap-1">See services <ChevronRight className="w-4 h-4" /></Link></div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{serviceListings.slice(0, 4).map(product => (<Link key={product.id} to={`/store/product/${product.id}`} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-emerald-300 hover:shadow-sm transition-all"><div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mb-3"><Clock3 className="w-5 h-5 text-emerald-700" /></div><p className="font-semibold text-slate-900 line-clamp-2">{product.name}</p><p className="text-sm font-bold text-slate-900 mt-2">{product.currency === 'NGN' ? '₦' : product.currency + ' '}{Number(product.price).toLocaleString()}</p></Link>))}</div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{serviceListings.slice(0, 4).map(product => (<Link key={product.id} to={`/store/product/${product.id}`} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-emerald-300 hover:shadow-sm transition-all"><div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mb-3"><Clock3 className="w-5 h-5 text-emerald-700" /></div><p className="font-semibold text-slate-900 line-clamp-2">{product.name}</p><p className="text-sm font-bold text-slate-900 mt-2">{product.currency === 'NGN' ? '₦' : product.currency + ' '}{Number(product.price).toLocaleString()}</p></Link>))}</div>
         </section>
       )}
     </div>
