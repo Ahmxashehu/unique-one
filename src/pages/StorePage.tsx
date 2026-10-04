@@ -44,21 +44,6 @@ export default function StorePage() {
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [savingWishlist, setSavingWishlist] = useState<string | null>(null);
 
-  const storePosters = [
-    { eyebrow: 'UNIQUE STORE', title: 'Buy • Book • Discover', body: 'One modern marketplace for real products, trusted services, local businesses and everyday needs.', icon: ShoppingBag },
-    { eyebrow: 'SHOP SMART', title: 'Find what you need. Discover what you love.', body: 'Explore live marketplace listings across products, services, agriculture, fashion, electronics and more.', icon: Sparkles },
-    { eyebrow: 'SELL & GROW', title: 'Put your business in front of real customers.', body: 'Publish your products and services through Unique Store and connect with customers across Nigeria.', icon: Tag },
-    { eyebrow: 'LOCAL TO GLOBAL', title: 'Your marketplace, wherever you are.', body: 'Discover nearby opportunities and marketplace experiences, built to grow from Nigeria to Africa and beyond.', icon: Globe2 },
-  ];
-
-  useEffect(() => {
-    let active = true;
-    const slideTimer = window.setInterval(() => {
-      // Marketing copy changes every 5 seconds.
-      if (active) setSearch(current => current);
-    }, 5000);
-    return () => window.clearInterval(slideTimer);
-  }, []);
 
   useEffect(() => {
     let active = true;
