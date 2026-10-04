@@ -28,7 +28,7 @@ export default defineConfig(() => ({
         runtimeCaching: [{
           urlPattern: ({ request }) => request.destination === 'script' || request.destination === 'style',
           handler: 'NetworkFirst',
-          options: { cacheName: 'unique-platform-app-assets-v11', expiration: { maxEntries: 100, maxAgeSeconds: 604800 } },
+          options: { cacheName: 'unique-platform-app-assets-v12', expiration: { maxEntries: 100, maxAgeSeconds: 604800 } },
         }],
         navigateFallback: '/index.html',
         navigateFallbackAllowlist: [/^\/(?!api(?:\/|$)).*/],
