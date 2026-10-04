@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search as SearchIcon,
   Filter,
@@ -48,6 +49,7 @@ export default function SearchPage() {
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [suggestion, setSuggestion] = useState('');
   const [submittedSuggestion, setSubmittedSuggestion] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -58,9 +60,18 @@ export default function SearchPage() {
   }, []);
 
   const explore = (value: string) => {
-    setQuery(value);
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    setQuery(trimmed);
     setSubmittedSuggestion('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigate(`/store/search?q=${encodeURIComponent(trimmed)}`);
+  };
+
+  const handleGlobalSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    navigate(`/store/search?q=${encodeURIComponent(trimmed)}`);
   };
 
   const handleSuggestion = (event: React.FormEvent<HTMLFormElement>) => {
@@ -70,6 +81,7 @@ export default function SearchPage() {
     setSubmittedSuggestion(trimmedSuggestion);
     setQuery(trimmedSuggestion);
     setSuggestion('');
+    navigate(`/store/search?q=${encodeURIComponent(trimmedSuggestion)}`);
   };
 
   return (
@@ -106,7 +118,7 @@ export default function SearchPage() {
           Global Search
         </h1>
 
-        <div className="flex items-center gap-2">
+        <form onSubmit={handleGlobalSearch} className="flex items-center gap-2">
           <div className="relative flex min-w-0 flex-1 overflow-visible rounded-[26px]">
             <span className="pointer-events-none absolute -inset-1 rounded-[30px] bg-emerald-300/20 blur-md" aria-hidden="true" />
             <span className="pointer-events-none absolute -inset-[2px] rounded-[28px] border border-emerald-300/40 bg-gradient-to-r from-emerald-300/10 via-white/30 to-teal-300/10 blur-[1px]" style={{ animation: 'globalSearchGlow 3.8s ease-in-out infinite' }} aria-hidden="true" />
@@ -136,7 +148,8 @@ export default function SearchPage() {
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && query.trim()) {
-                    setSubmittedSuggestion('');
+                    e.preventDefault();
+                    navigate(`/store/search?q=${encodeURIComponent(query.trim())}`);
                   }
                 }}
                 className="relative w-full bg-transparent px-3 py-3 text-base text-slate-800 outline-none placeholder:text-transparent sm:py-3.5 sm:text-lg"
@@ -144,13 +157,13 @@ export default function SearchPage() {
             </div>
           </div>
           <button
-            type="button"
-            aria-label="Open search filters"
+            type="submit"
+            aria-label="Search Unique One"
             className="shrink-0 rounded-2xl border border-slate-200 bg-white p-4 text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:text-emerald-700 hover:shadow-md"
           >
             <Filter className="h-6 w-6" />
           </button>
-        </div>
+        </form>
         </div>
       </div>
 
@@ -167,7 +180,7 @@ export default function SearchPage() {
           </div>
           <button
             type="button"
-            onClick={() => { setQuery(''); setSubmittedSuggestion(''); }}
+            onClick={() => navigate('/store/search')}
             className="self-start text-sm font-semibold text-emerald-700 transition hover:text-emerald-800 sm:self-auto"
           >
             Browse all categories
@@ -258,11 +271,11 @@ export default function SearchPage() {
           </div>
           <h3 className="font-semibold text-slate-900">Ready to explore “{query}”</h3>
           <p className="mt-1 text-sm text-slate-500">
-            This category selection is ready. Live results will appear here when Global Search is connected to platform listings.
+            Opening the results will search live Store listings and the buyer prototype catalogue, including published products, services and discoverable businesses.
           </p>
           <button
             type="button"
-            onClick={() => setQuery('')}
+            onClick={() => navigate(`/store/search?q=${encodeURIComponent(query.trim())}`)}
             className="mt-4 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
             Clear search
