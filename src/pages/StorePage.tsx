@@ -232,7 +232,7 @@ export default function StorePage() {
                 <section className="grid grid-cols-2 gap-3 sm:gap-4" aria-label="Your Store shortcuts">
                   <Link
                     to={currentUser ? '/store/wishlist' : '/login'}
-                    className="group relative isolate min-h-[132px] overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-white to-rose-50/70 p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-[0_12px_32px_rgba(244,63,94,0.10)] sm:min-h-[156px] sm:p-5"
+                    className="group relative isolate min-h-[96px] overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-white to-rose-50/70 px-3 py-2.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-[0_12px_32px_rgba(244,63,94,0.10)] sm:min-h-[108px] sm:px-4 sm:py-3"
                   >
                     <span className="pointer-events-none absolute -right-8 -top-8 -z-10 h-28 w-28 rounded-full bg-rose-200/40 blur-2xl transition-transform duration-500 group-hover:scale-125" />
                     <div className="flex items-start justify-between gap-3">
@@ -243,14 +243,14 @@ export default function StorePage() {
                         <ArrowRight className="h-4 w-4" />
                       </span>
                     </div>
-                    <div className="mt-4">
+                    <div className="mt-2.5">
                       <p className="text-base font-black tracking-tight text-slate-900 sm:text-lg">Save</p>
                       <p className="mt-1 text-xs leading-5 text-slate-500">{currentUser ? `${wishlistCount} saved item${wishlistCount === 1 ? '' : 's'}` : 'Keep favourite finds together'}</p>
                     </div>
                   </Link>
                   <Link
                     to={currentUser ? '/store/cart' : '/login'}
-                    className="group relative isolate min-h-[132px] overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-white to-emerald-50/80 p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_12px_32px_rgba(16,185,129,0.13)] sm:min-h-[156px] sm:p-5"
+                    className="group relative isolate min-h-[96px] overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-white to-emerald-50/80 px-3 py-2.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_12px_32px_rgba(16,185,129,0.13)] sm:min-h-[108px] sm:px-4 sm:py-3"
                   >
                     <span className="pointer-events-none absolute -right-8 -top-8 -z-10 h-28 w-28 rounded-full bg-emerald-200/45 blur-2xl transition-transform duration-500 group-hover:scale-125" />
                     <div className="flex items-start justify-between gap-3">
@@ -262,8 +262,8 @@ export default function StorePage() {
                         <ArrowRight className="h-4 w-4" />
                       </span>
                     </div>
-                    <div className="mt-4">
-                      <p className="text-base font-black tracking-tight text-slate-900 sm:text-lg">Cart</p>
+                    <div className="mt-2">
+                      <p className="text-sm font-black tracking-tight text-slate-900 sm:text-lg">Cart</p>
                       <p className="mt-1 text-xs leading-5 text-slate-500">{currentUser ? `${cartCount} item${cartCount === 1 ? '' : 's'} ready for checkout` : 'Your picks, ready when you are'}</p>
                     </div>
                   </Link>
