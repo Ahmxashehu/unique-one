@@ -62,67 +62,6 @@ const categories: Array<{ key: ProductCategory; label: string; icon: React.Eleme
 
 const categoryBands = [categories.slice(0, 10), categories.slice(10)];
 
-type PrototypeStock = {
-  category: ProductCategory;
-  categoryLabel: string;
-  name: string;
-  price: number;
-  quantity: number;
-  unit?: string;
-};
-
-const prototypeStock: PrototypeStock[] = [
-  { category: 'electronics', categoryLabel: 'Electronics', name: 'Smart LED TV', price: 285000, quantity: 12 },
-  { category: 'electronics', categoryLabel: 'Electronics', name: 'Bluetooth Speaker', price: 48000, quantity: 24 },
-  { category: 'electronics', categoryLabel: 'Electronics', name: 'Home Sound System', price: 175000, quantity: 8 },
-  { category: 'electronics', categoryLabel: 'Electronics', name: 'Smart Decoder', price: 32000, quantity: 30 },
-  { category: 'electricity_power', categoryLabel: 'Electricity & Power', name: 'Solar Inverter 3.5kVA', price: 420000, quantity: 6 },
-  { category: 'electricity_power', categoryLabel: 'Electricity & Power', name: 'Rechargeable Solar Fan', price: 95000, quantity: 15 },
-  { category: 'electricity_power', categoryLabel: 'Electricity & Power', name: 'Solar Panel 450W', price: 185000, quantity: 10 },
-  { category: 'electricity_power', categoryLabel: 'Electricity & Power', name: 'Rechargeable LED Bulb', price: 8500, quantity: 40 },
-  { category: 'beauty', categoryLabel: 'Beauty', name: 'Skincare Set', price: 28000, quantity: 18 },
-  { category: 'beauty', categoryLabel: 'Beauty', name: 'Hair Care Bundle', price: 35000, quantity: 14 },
-  { category: 'beauty', categoryLabel: 'Beauty', name: 'Perfume Collection', price: 42000, quantity: 20 },
-  { category: 'beauty', categoryLabel: 'Beauty', name: 'Beauty Essentials Kit', price: 22500, quantity: 25 },
-  { category: 'fashion', categoryLabel: 'Fashion', name: 'Men’s Clothing Set', price: 45000, quantity: 16 },
-  { category: 'fashion', categoryLabel: 'Fashion', name: 'Women’s Casual Set', price: 38000, quantity: 20 },
-  { category: 'fashion', categoryLabel: 'Fashion', name: 'Traditional Wear', price: 75000, quantity: 9 },
-  { category: 'fashion', categoryLabel: 'Fashion', name: 'Kids Clothing Bundle', price: 30000, quantity: 22 },
-  { category: 'phones_accessories', categoryLabel: 'Phones & Accessories', name: 'Android Smartphone', price: 185000, quantity: 20 },
-  { category: 'phones_accessories', categoryLabel: 'Phones & Accessories', name: 'Fast Charger & Cable', price: 12500, quantity: 35 },
-  { category: 'shoes', categoryLabel: 'Shoes', name: 'Men’s Sneakers', price: 35000, quantity: 18, unit: 'pairs' },
-  { category: 'shoes', categoryLabel: 'Shoes', name: 'Women’s Casual Shoes', price: 32000, quantity: 16, unit: 'pairs' },
-  { category: 'home_furniture', categoryLabel: 'Home & Furniture', name: 'Modern Sofa Set', price: 320000, quantity: 6 },
-  { category: 'home_furniture', categoryLabel: 'Home & Furniture', name: 'Dining Table Set', price: 185000, quantity: 8 },
-  { category: 'building_materials', categoryLabel: 'Building Materials', name: 'POP Ceiling Materials', price: 85000, quantity: 20 },
-  { category: 'building_materials', categoryLabel: 'Building Materials', name: 'Quality Paint 20L', price: 48000, quantity: 30 },
-  { category: 'cement', categoryLabel: 'Cement', name: 'POP Cement 40kg', price: 12500, quantity: 50 },
-  { category: 'cement', categoryLabel: 'Cement', name: 'Premium Cement 50kg', price: 14000, quantity: 45 },
-  { category: 'agriculture', categoryLabel: 'Agriculture', name: 'Maize Seed Pack', price: 18000, quantity: 25 },
-  { category: 'agriculture', categoryLabel: 'Agriculture', name: 'Farm Crop Starter Kit', price: 65000, quantity: 12 },
-  { category: 'fertilizer', categoryLabel: 'Fertilizer', name: 'NPK Fertilizer 50kg', price: 48000, quantity: 35 },
-  { category: 'fertilizer', categoryLabel: 'Fertilizer', name: 'Organic Fertilizer 25kg', price: 28000, quantity: 22 },
-  { category: 'seeds', categoryLabel: 'Seeds', name: 'Hybrid Maize Seeds', price: 22000, quantity: 30 },
-  { category: 'seeds', categoryLabel: 'Seeds', name: 'Vegetable Seed Collection', price: 15000, quantity: 40 },
-  { category: 'farm_equipment', categoryLabel: 'Farm Equipment', name: 'Knapsack Sprayer', price: 45000, quantity: 14 },
-  { category: 'farm_equipment', categoryLabel: 'Farm Equipment', name: 'Small Farm Tiller', price: 380000, quantity: 5 },
-  { category: 'food_groceries', categoryLabel: 'Food & Groceries', name: 'Family Grocery Basket', price: 75000, quantity: 18 },
-  { category: 'food_groceries', categoryLabel: 'Food & Groceries', name: 'Rice 50kg', price: 78000, quantity: 25 },
-  { category: 'machinery', categoryLabel: 'Machinery', name: 'Portable Generator', price: 420000, quantity: 7 },
-  { category: 'machinery', categoryLabel: 'Machinery', name: 'Industrial Water Pump', price: 285000, quantity: 9 },
-  { category: 'vehicles', categoryLabel: 'Vehicles', name: 'Family Sedan', price: 8500000, quantity: 3 },
-  { category: 'vehicles', categoryLabel: 'Vehicles', name: 'Utility Van', price: 12500000, quantity: 2 },
-  { category: 'property', categoryLabel: 'Property', name: 'Residential Plot', price: 6500000, quantity: 5 },
-  { category: 'property', categoryLabel: 'Property', name: 'Two-Bedroom Apartment', price: 35000000, quantity: 2 },
-  { category: 'services', categoryLabel: 'Services', name: 'Professional Home Service', price: 25000, quantity: 10 },
-  { category: 'services', categoryLabel: 'Services', name: 'Business Support Package', price: 50000, quantity: 8 },
-  { category: 'digital_products', categoryLabel: 'Digital Products', name: 'Business Template Pack', price: 15000, quantity: 50 },
-  { category: 'digital_products', categoryLabel: 'Digital Products', name: 'Digital Learning Bundle', price: 25000, quantity: 40 },
-  { category: 'other', categoryLabel: 'Other', name: 'Everyday Essentials Bundle', price: 18000, quantity: 24 },
-  { category: 'other', categoryLabel: 'Other', name: 'General Household Items', price: 32000, quantity: 16 },
-];
-
-
 export default function StorePage() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
@@ -345,42 +284,14 @@ export default function StorePage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-emerald-200 bg-white px-3 py-4 shadow-sm sm:px-4 sm:py-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-black text-slate-900">All category stock preview</h2>
-            <p className="mt-0.5 text-xs leading-4 text-slate-500">UI prototype only — this shows how the general Store catalogue will look across every category.</p>
-          </div>
-          <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-700">PROTOTYPE</span>
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-          {prototypeStock.map((item) => (
-            <Link key={item.category + item.name} to={`/store/search?cat=${item.category}`} className="group overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
-              <div className="flex aspect-[4/3] items-center justify-center bg-gradient-to-br from-slate-100 via-white to-emerald-50">
-                <ShoppingBag className="h-9 w-9 text-emerald-300 transition group-hover:scale-110" />
-              </div>
-              <div className="p-3">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">{item.categoryLabel}</p>
-                <p className="mt-1 min-h-9 text-sm font-bold leading-4 text-slate-900">{item.name}</p>
-                <p className="mt-2 text-sm font-black text-slate-900">₦{item.price.toLocaleString()}</p>
-                <p className="mt-1 text-[11px] text-slate-500">{item.quantity} {item.unit ?? 'units'} available</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-        <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-800">
-          Prototype stock is for visual testing only. It is not real seller inventory and cannot be purchased. Real seller listings will replace this preview as sellers publish products.
-        </p>
-      </section>
-
       <section className="rounded-2xl border border-emerald-200 bg-white px-3 py-3 shadow-sm sm:px-4 sm:py-3.5">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
             <ShoppingBag className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-black text-slate-900">Shop real listings</h2>
-            <p className="mt-0.5 text-xs leading-4 text-slate-500">Browse real published products and services. Category pages also show clearly labelled prototype stock cards until sellers publish.</p>
+            <h2 className="text-sm font-black text-slate-900">Browse Global Search</h2>
+            <p className="mt-0.5 text-xs leading-4 text-slate-500">Search and browse all real published products and services from one connected Store catalogue.</p>
           </div>
           <Link to="/store/search" className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-[11px] font-black text-white">Browse</Link>
         </div>
