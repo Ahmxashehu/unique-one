@@ -131,6 +131,12 @@ export type UniqueAiPlatformContext = {
 
 export type UniqueAiLocation = { latitude: number; longitude: number; radiusMeters?: number };
 
+export type UniqueAiImageInput = {
+  data: string;
+  mimeType: "image/jpeg" | "image/png" | "image/webp" | "image/heic" | "image/heif";
+  name?: string;
+};
+
 export type UniqueAiRequest = {
   uid: string;
   message: unknown;
@@ -138,4 +144,5 @@ export type UniqueAiRequest = {
   requestId?: unknown;
   preferredLanguage?: string;
   location?: UniqueAiLocation;
+  image?: UniqueAiImageInput;
 };
