@@ -148,7 +148,7 @@ export default function FlightsPage() {
     }
   },[currentUser,location.pathname,draft.action,pendingAction,stage]);
 
-  const reset = () => { sessionStorage.removeItem(KEY); setDraft(emptyDraft); setPendingAction(null); setSelectedFlight(null); setStage('form'); setNotice(''); setError(''); };
+  const openSearch = () => { setError(''); setSearchOpen(true); };\n\n  const reset = () => { sessionStorage.removeItem(KEY); setDraft(emptyDraft); setPendingAction(null); setSelectedFlight(null); setStage('form'); setNotice(''); setError(''); };
 
   return <div className="min-h-full bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
     <div className="mx-auto max-w-5xl space-y-5 pb-10">
@@ -184,21 +184,21 @@ export default function FlightsPage() {
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {['Abuja → Lagos','Lagos → Abuja','Abuja → Kano','Lagos → Port Harcourt','Lagos → London','Lagos → Dubai','Lagos → Accra','Lagos → Johannesburg'].map(route=>{
               const [from,to] = route.split(' → ');
-              return <button key={route} onClick={()=>{update({from,to,flightType:['London','Dubai','Accra','Johannesburg'].includes(to)?'international':'domestic'});setSearchOpen(true);}} className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold text-slate-600 hover:border-emerald-300 hover:text-emerald-700">{route}</button>;
+              return <button key={route} onClick={()=>{update({from,to,flightType:['London','Dubai','Accra','Johannesburg'].includes(to)?'international':'domestic'});openSearch();}} className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold text-slate-600 hover:border-emerald-300 hover:text-emerald-700">{route}</button>;
             })}
           </div>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <button onClick={()=>setSearchOpen(v=>!v)} className="flex w-full items-center justify-between gap-3 text-left">
+          <button onClick={openSearch} className="flex w-full items-center justify-between gap-3 text-left">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><Search className="h-4 w-4"/></span>
               <div className="min-w-0">
-                <p className="text-sm font-black text-slate-950">{searchOpen?'Search flights':'Search Flights'}</p>
-                <p className="truncate text-[11px] text-slate-500">{searchOpen?'Enter your route, dates and preferences':'Tap to open the full flight search'}</p>
+                <p className="text-sm font-black text-slate-950">Search Flights</p>
+                <p className="truncate text-[11px] text-slate-500">Tap to open the full flight search</p>
               </div>
             </div>
-            <span className={`rounded-full px-3 py-1.5 text-[10px] font-black ${searchOpen?'bg-slate-950 text-white':'bg-emerald-600 text-white'}`}>{searchOpen?'Hide':'Open'}</span>
+            <span className="rounded-full bg-emerald-600 px-3 py-1.5 text-[10px] font-black text-white">Open</span>
           </button>
         </section>
 
@@ -213,7 +213,7 @@ export default function FlightsPage() {
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2.5">
             {(draft.flightType==='domestic'?domesticFlights:internationalFlights).slice(0,6).map(f=>
-              <button key={f.id} onClick={()=>{update({from:f.from,to:f.to,flightType:f.type});setSearchOpen(true);}} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/40 active:scale-[0.99]">
+              <button key={f.id} onClick={()=>{update({from:f.from,to:f.to,flightType:f.type});openSearch();}} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/40 active:scale-[0.99]">
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-[11px] font-black text-slate-900">{f.from} → {f.to}</span>
                   {f.tag&&<span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[8px] font-black text-emerald-700">{f.tag}</span>}
@@ -228,7 +228,15 @@ export default function FlightsPage() {
           </div>
         </section>
 
-        {searchOpen&&<section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        {searchOpen&&<div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Search flights">
+          <section className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6">
+            <div className="sticky top-0 z-10 -mx-1 mb-4 flex items-center justify-between gap-3 bg-white/95 py-1 backdrop-blur">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-600">Flight search</p>
+                <h2 className="text-lg font-black text-slate-950">Plan your journey</h2>
+              </div>
+              <button type="button" onClick={()=>setSearchOpen(false)} className="rounded-full border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 hover:border-slate-300">Close</button>
+            </div>
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {(['round','oneway'] as const).map(value=><button key={value} onClick={()=>update({tripType:value})} className={`rounded-full px-3 py-1.5 text-xs font-bold ${draft.tripType===value?'bg-slate-950 text-white':'bg-slate-100 text-slate-600'}`}>{value==='round'?'Round trip':'One-way'}</button>)}
         </div>
@@ -254,7 +262,7 @@ export default function FlightsPage() {
           <button onClick={searchFlights} className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-700"><Search className="h-4 w-4"/> Search flights <ArrowRight className="h-4 w-4"/></button>
           <button onClick={beginRequest} className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-900 hover:border-emerald-300"><CircleHelp className="h-4 w-4 text-emerald-600"/> Send Booking Request</button>
         </div>
-        </section>}
+        </section></div>}
       </>}
 
       {stage==='results'&&<section className="space-y-3">
