@@ -202,6 +202,32 @@ export default function FlightsPage() {
           </button>
         </section>
 
+        <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-600">Available flights</p>
+              <h2 className="mt-1 text-sm font-black text-slate-950">Prototype flight categories</h2>
+              <p className="mt-1 text-[11px] text-slate-500">Quick options to explore before opening the full search.</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700">10+ options</span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2.5">
+            {(draft.flightType==='domestic'?domesticFlights:internationalFlights).slice(0,6).map(f=>
+              <button key={f.id} onClick={()=>{update({from:f.from,to:f.to,flightType:f.type});setSearchOpen(true);}} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/40 active:scale-[0.99]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-[11px] font-black text-slate-900">{f.from} → {f.to}</span>
+                  {f.tag&&<span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[8px] font-black text-emerald-700">{f.tag}</span>}
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-bold text-slate-500">{f.depart} • {f.duration}</span>
+                  <span className="text-[10px] font-black text-slate-900">{f.currency}{money(f.price)}</span>
+                </div>
+                <div className="mt-1 text-[9px] font-bold text-slate-400">{f.stops} • {f.baggage} baggage</div>
+              </button>
+            )}
+          </div>
+        </section>
+
         {searchOpen&&<section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {(['round','oneway'] as const).map(value=><button key={value} onClick={()=>update({tripType:value})} className={`rounded-full px-3 py-1.5 text-xs font-bold ${draft.tripType===value?'bg-slate-950 text-white':'bg-slate-100 text-slate-600'}`}>{value==='round'?'Round trip':'One-way'}</button>)}
