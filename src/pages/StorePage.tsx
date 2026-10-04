@@ -152,8 +152,8 @@ export default function StorePage() {
         @keyframes storeBandLeft { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @keyframes storeBandRight { from { transform: translateX(-50%); } to { transform: translateX(0); } }
         @keyframes storePosterGlow { 0%,100% { opacity:.45; transform:scale(1); } 50% { opacity:.9; transform:scale(1.08); } }
-        .store-category-track-left { animation: storeBandLeft 5s linear infinite; }
-        .store-category-track-right { animation: storeBandRight 5s linear infinite; }
+        .store-category-track-left { animation: storeBandLeft 28s linear infinite; }
+        .store-category-track-right { animation: storeBandRight 28s linear infinite; }
         .store-category-track-left:hover, .store-category-track-right:hover { animation-play-state: paused; }
       `}</style>
 
