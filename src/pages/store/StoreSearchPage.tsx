@@ -1,12 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Filter, Store as StoreIcon, Heart, Loader2 } from 'lucide-react';
+import { Search, Filter, Store as StoreIcon, Heart, Loader2, Building2 } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Product } from '../../lib/os/types';
 
 type StoreProductsCacheEntry = { products: Product[]; expiresAt: number };
+
+type StoreBusiness = {
+  id: string;
+  name?: string;
+  businessName?: string;
+  description?: string;
+  category?: string;
+  status?: string;
+  verificationStatus?: string;
+  logoUrl?: string;
+};
 
 const STORE_PRODUCTS_CACHE_TTL_MS = 30_000;
 const storeProductsCache = new Map<string, StoreProductsCacheEntry>();
@@ -49,6 +60,7 @@ export default function StoreSearchPage() {
   const [minPriceInput, setMinPriceInput] = useState(minPrice ? String(minPrice) : '');
   const [maxPriceInput, setMaxPriceInput] = useState(maxPrice !== null ? String(maxPrice) : '');
   const [products, setProducts] = useState<Product[]>([]);
+  const [businesses, setBusinesses] = useState<StoreBusiness[]>([]);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [wishlistLoading, setWishlistLoading] = useState<string | null>(null);
@@ -79,31 +91,62 @@ export default function StoreSearchPage() {
 
   useEffect(() => {
     let active = true;
-    const fetchProducts = async () => {
+    const fetchUnifiedResults = async () => {
       setLoading(true); setError('');
       try {
-        const publishedProducts = await loadPublishedProducts(filterCat);
-        let results = publishedProducts;
-        if (initialQuery) {
-          const lowerQ = initialQuery.toLowerCase();
-          results = results.filter(p =>
-            String(p.name || '').toLowerCase().includes(lowerQ) ||
-            String(p.description || '').toLowerCase().includes(lowerQ)
+        const lowerQ = initialQuery.trim().toLowerCase();
+        const [publishedProducts, businessSnapshot] = await Promise.all([
+          loadPublishedProducts(filterCat),
+          getDocs(collection(db, 'businesses')).catch(err => {
+            console.warn('Business discovery unavailable; continuing with Store listings:', err);
+            return null;
+          }),
+        ]);
+
+        let productResults = publishedProducts;
+        if (lowerQ) {
+          productResults = productResults.filter(p =>
+            [p.name, p.description, p.category, p.sellerId]
+              .filter(Boolean)
+              .some(value => String(value).toLowerCase().includes(lowerQ))
           );
         }
-        results = results.filter(p => {
+        productResults = productResults.filter(p => {
           const price = Number(p.price);
           return Number.isFinite(price) && price >= minPrice && (maxPrice === null || price <= maxPrice);
         });
-        if (active) setProducts(results);
+
+        const businessResults: StoreBusiness[] = businessSnapshot
+          ? businessSnapshot.docs
+              .map(d => ({ id: d.id, ...d.data() } as StoreBusiness))
+              .filter(b => {
+                const publicStatus = String(b.status || '').toLowerCase();
+                const verification = String(b.verificationStatus || '').toLowerCase();
+                const publiclyDiscoverable =
+                  !b.status && !b.verificationStatus ||
+                  ['published', 'active', 'approved', 'verified'].includes(publicStatus) ||
+                  verification === 'verified';
+                if (!publiclyDiscoverable) return false;
+                if (filterCat && String(b.category || '').toLowerCase() !== filterCat.toLowerCase()) return false;
+                if (!lowerQ) return true;
+                return [b.name, b.businessName, b.description, b.category, b.id]
+                  .filter(Boolean)
+                  .some(value => String(value).toLowerCase().includes(lowerQ));
+              })
+          : [];
+
+        if (active) {
+          setProducts(productResults);
+          setBusinesses(businessResults);
+        }
       } catch (err) {
-        console.error('Error fetching products:', err);
-        if (active) setError('Could not load Store products.');
+        console.error('Error fetching unified Store search:', err);
+        if (active) setError('Could not load Store listings.');
       } finally {
         if (active) setLoading(false);
       }
     };
-    void fetchProducts();
+    void fetchUnifiedResults();
     return () => { active = false; };
   }, [initialQuery, filterCat, minPrice, maxPrice]);
 
@@ -151,7 +194,7 @@ export default function StoreSearchPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">{initialQuery ? `Results for "${initialQuery}"` : filterCat ? `Category: ${filterCat.replace('_', ' ')}` : 'Global Search'}</h1>
-          <p className="text-sm text-slate-500 mt-1">{products.length} results found across Unique Store products and services.</p>
+          <p className="text-sm text-slate-500 mt-1">{products.length + businesses.length} results found across live products, services and discoverable businesses.</p>
         </div>
         <form onSubmit={handleSearch} className="flex items-center gap-2 w-full md:w-96">
           <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" placeholder="Search products, services, businesses..." value={searchInput} onChange={e => setSearchInput(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent" /></div>
@@ -194,8 +237,22 @@ export default function StoreSearchPage() {
         <div className="flex-1">
           {loading ? <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div> :
           error ? <div className="bg-white border border-red-100 rounded-2xl p-12 text-center"><h3 className="text-xl font-semibold text-slate-900">Could not load products</h3><p className="text-slate-500 mt-2">{error}</p></div> :
-          products.length === 0 ? <div className="bg-white border border-slate-200 rounded-2xl p-10 sm:p-12 text-center"><div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><Search className="w-8 h-8 text-slate-400" /></div><h3 className="text-lg font-semibold text-slate-900">No live listings found</h3><p className="text-slate-500 mt-2 max-w-md mx-auto">Unique Store will show real published seller products and services here as they become available. No sample stock is displayed.</p></div> :
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">{products.map(product => (
+          products.length === 0 && businesses.length === 0 ? <div className="bg-white border border-slate-200 rounded-2xl p-10 sm:p-12 text-center"><div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><Search className="w-8 h-8 text-slate-400" /></div><h3 className="text-lg font-semibold text-slate-900">No live listings found</h3><p className="text-slate-500 mt-2 max-w-md mx-auto">Unique Store will show real published seller products and services here as they become available. No sample stock is displayed.</p></div> :
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
+            {businesses.map(business => (
+              <div key={`business-${business.id}`} className="group flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all">
+                <div className="aspect-square bg-slate-50 relative overflow-hidden flex items-center justify-center">
+                  {business.logoUrl ? <img src={business.logoUrl} alt={business.businessName || business.name || 'Business'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <Building2 className="w-8 h-8 text-slate-300" />}
+                  <div className="absolute top-2 left-2 px-2 py-1 bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider rounded text-emerald-700">Business</div>
+                </div>
+                <div className="p-3 sm:p-4 flex flex-col flex-1">
+                  <h3 className="text-sm font-medium text-slate-900 line-clamp-2 mb-1">{business.businessName || business.name || 'Unnamed business'}</h3>
+                  <p className="text-xs text-slate-500 line-clamp-2 mt-auto">{business.description || 'Discover this business on Unique One.'}</p>
+                  <div className="flex items-center gap-1 text-xs text-slate-500 mt-2"><Building2 className="w-3 h-3" /><span className="truncate">{business.category || 'Business services'}</span></div>
+                </div>
+              </div>
+            ))}
+            {products.map(product => (
             <Link key={product.id} to={`/store/product/${product.id}`} className="group flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all">
               <div className="aspect-square bg-slate-100 relative overflow-hidden flex items-center justify-center">
                 {product.images?.length > 0 ? <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <StoreIcon className="w-8 h-8 text-slate-300" />}
