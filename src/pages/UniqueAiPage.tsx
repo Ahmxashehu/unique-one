@@ -101,8 +101,7 @@ function downloadAiPdf(title: string, body: string) {
     .replace(/_{2,}/g, "")
     .replace(/#{1,6}\s*/g, "")
     .replace(/[•●▪◦]/g, "-")
-    .replace(/[^\x20-\x7E
-]/g, "");
+    .replace(/[^\x20-\x7E\n]/g, "");
 
   const wrap = (value: string, width = 88) => {
     const output: string[] = [];
