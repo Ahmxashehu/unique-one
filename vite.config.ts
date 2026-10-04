@@ -30,7 +30,7 @@ export default defineConfig(() => ({
             urlPattern: ({ request }) => request.destination === 'document',
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'unique-platform-app-documents-v3',
+              cacheName: 'unique-platform-app-documents-v4',
               networkTimeoutSeconds: 30,
               expiration: { maxEntries: 20, maxAgeSeconds: 86400 },
             },
@@ -39,7 +39,7 @@ export default defineConfig(() => ({
             urlPattern: ({ request }) => request.destination === 'script' || request.destination === 'style',
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'unique-platform-app-assets-v14',
+              cacheName: 'unique-platform-app-assets-v15',
               expiration: { maxEntries: 100, maxAgeSeconds: 604800 },
             },
           },
