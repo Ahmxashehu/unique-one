@@ -227,8 +227,6 @@ export default function StorePage() {
               })}
             </div>
           </div>
-        </div>
-
 
           <div className="mt-4 border-t border-white/10 pt-4">
                 <section className="grid grid-cols-2 gap-3 sm:gap-4" aria-label="Your Store shortcuts">
@@ -271,6 +269,7 @@ export default function StorePage() {
                   </Link>
                 </section>
           </div>
+        </div>
       </section>
 
       <section>
