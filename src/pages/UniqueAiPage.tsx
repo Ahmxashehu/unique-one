@@ -260,6 +260,7 @@ export default function UniqueAiPage() {
   const [language, setLanguage] = useState<SupportedLanguage>(getLanguage());
   const [aiAccess, setAiAccess] = useState<AiAccess | null>(null);
   const [displayRemainingSeconds, setDisplayRemainingSeconds] = useState<number | null>(null);
+  const [premiumNoticeOpen, setPremiumNoticeOpen] = useState(false);
   const guestSessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -298,6 +299,18 @@ export default function UniqueAiPage() {
     if (hours > 0) return `${hours}h ${minutes}m`;
     return `${minutes}m ${secs.toString().padStart(2, "0")}s`;
   };
+
+  useEffect(() => {
+    if (aiAccess?.mode === "subscriber") return;
+    const noticeKey = "unique-ai-premium-notice-v1";
+    if (window.sessionStorage.getItem(noticeKey)) return;
+    const timeoutId = window.setTimeout(() => {
+      window.sessionStorage.setItem(noticeKey, "1");
+      setPremiumNoticeOpen(true);
+      window.setTimeout(() => setPremiumNoticeOpen(false), 8500);
+    }, 25_000);
+    return () => window.clearTimeout(timeoutId);
+  }, [aiAccess?.mode]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -501,6 +514,57 @@ export default function UniqueAiPage() {
       <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-x-hidden sm:gap-4">
       {aiAccess && (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-900 shadow-sm">
+          <div className="min-w-0">
+            <div className="font-semibold">
+              {aiAccess.mode === "guest" ? "Guest AI access" : aiAccess.mode === "registered" ? "Daily AI access" : "Unique AI Premium"}
+            </div>
+            <div className="truncate opacity-80">
+              {aiAccess.mode === "guest"
+                ? "Register to unlock 1 hour of Unique AI every day."
+                : aiAccess.mode === "registered"
+                  ? "Your daily allowance is shared across conversations."
+                  : "Extended AI access with fair-use protection."}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {aiAccess.mode !== "subscriber" && (
+              <Link
+                to="/ai/premium"
+                className="rounded-full border border-emerald-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+              >
+                ✨ Premium
+              </Link>
+            )}
+            <div className="text-right">
+              <div className="font-bold">{displayRemainingSeconds === null ? formatAiTime(aiAccess.remainingSeconds) : formatAiTime(displayRemainingSeconds)}</div>
+              <div className="opacity-70">remaining</div>
+            </div>
+          </div>
+        </div>
+      )}
+      {premiumNoticeOpen && aiAccess?.mode !== "subscriber" && (
+        <div className="pointer-events-none fixed inset-x-3 top-20 z-40 flex justify-center sm:inset-x-auto sm:right-5 sm:top-24 sm:w-[360px]">
+          <div className="pointer-events-auto w-full rounded-2xl border border-emerald-200 bg-white/95 p-3 shadow-[0_14px_45px_rgba(15,23,42,.16)] backdrop-blur-xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-950 text-sm text-emerald-300 shadow-[0_0_16px_rgba(16,185,129,.28)]">✨</div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-black text-slate-900">Unique AI Premium</div>
+                <div className="mt-0.5 text-[11px] leading-4 text-slate-500">Extended AI access from ₦180. Your conversation stays exactly where it is.</div>
+                <Link to="/ai/premium" className="mt-2 inline-flex rounded-full bg-slate-950 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-600">View plans</Link>
+              </div>
+              <button type="button" onClick={() => setPremiumNoticeOpen(false)} className="shrink-0 px-1 text-slate-400 hover:text-slate-700" aria-label="Dismiss Premium notice">×</button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-2 px-1">
+        <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">AI access</div>
+        {aiAccess?.mode !== "subscriber" && (
+          <Link to="/ai/premium" className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800">See Premium plans →</Link>
+        )}
+      </div>
+      <div className="hidden" aria-hidden="true" />
+
           <div className="min-w-0">
             <div className="font-semibold">
               {aiAccess.mode === "guest" ? "Guest AI access" : aiAccess.mode === "registered" ? "Daily AI access" : "Unique AI Premium"}
