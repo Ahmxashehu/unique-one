@@ -140,8 +140,30 @@ export default function StorePage() {
   const [buyerCategory,setBuyerCategory]=useState<ProductCategory>(categories[0].key);
   const [buyerQty,setBuyerQty]=useState(1); const [buyerCheckout,setBuyerCheckout]=useState(false); const [buyerAddress,setBuyerAddress]=useState('Add delivery address'); const [editingAddress,setEditingAddress]=useState(false); const [deliveryMethod,setDeliveryMethod]=useState('Platform delivery');
   const selectedBuyerCategory=categories.find(x=>x.key===buyerCategory)??categories[0];
-  const buyerName=selectedBuyerCategory.label==='Electronics'?'Smart LED TV':selectedBuyerCategory.label==='Cement'?'POP Cement 40kg':selectedBuyerCategory.label==='Services'?'Professional Home Service':`Representative ${selectedBuyerCategory.label} item`;
-  const buyerPrice=selectedBuyerCategory.key==='vehicles'?12500000:selectedBuyerCategory.key==='property'?8500000:selectedBuyerCategory.key==='machinery'?2450000:selectedBuyerCategory.key==='electronics'?285000:25000;
+  const buyerPrototypes: Record<ProductCategory, { name: string; price: number }> = {
+    electronics: { name: 'Smart LED TV', price: 285000 },
+    phones_accessories: { name: 'Android Smartphone', price: 185000 },
+    fashion: { name: "Men's Clothing Set", price: 45000 },
+    shoes: { name: 'Everyday Sneakers', price: 38000 },
+    beauty: { name: 'Skincare Set', price: 28000 },
+    home_furniture: { name: 'Modern Sofa Set', price: 650000 },
+    building_materials: { name: 'Building Materials Bundle', price: 120000 },
+    cement: { name: 'POP Cement 40kg', price: 12500 },
+    agriculture: { name: 'Farm Produce Basket', price: 75000 },
+    fertilizer: { name: 'A4s / 4Tree Fertilizer', price: 35000 },
+    seeds: { name: 'Certified Seed Pack', price: 18000 },
+    farm_equipment: { name: 'Small Farm Equipment Kit', price: 185000 },
+    food_groceries: { name: 'Family Grocery Basket', price: 65000 },
+    machinery: { name: 'Portable Generator', price: 2450000 },
+    vehicles: { name: 'Used Car', price: 12500000 },
+    property: { name: 'Apartment Listing', price: 8500000 },
+    services: { name: 'Professional Home Service', price: 25000 },
+    digital_products: { name: 'Digital E-book', price: 12000 },
+    other: { name: 'Local Seller Item', price: 25000 },
+  };
+  const buyerPrototype = buyerPrototypes[buyerCategory];
+  const buyerName = buyerPrototype.name;
+  const buyerPrice = buyerPrototype.price;
   const deliveryFee=deliveryMethod==='Customer pickup'?0:2500; const buyerSubtotal=buyerPrice*buyerQty;
 
 
