@@ -777,7 +777,7 @@ export default function UniqueAiPage() {
             </div>
           )}
           <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2 px-0.5 text-[9px] leading-3.5 text-slate-400 sm:mt-2 sm:gap-3 sm:text-xs sm:leading-4">
-            <span className="min-w-0 truncate">{currentUser ? "Registered mode: authorized Unique One context; mutations remain protected." : "Public mode is free. Register for personalized Unique One context."}</span>
+            
             <span className="max-w-full truncate text-left sm:text-right" aria-live="polite">
               {lastRequestId ? `Request: ${lastRequestId}` : "Support request ID will appear after a response"} · {message.length}/4000
             </span>
