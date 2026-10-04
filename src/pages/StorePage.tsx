@@ -370,8 +370,6 @@ export default function StorePage() {
           Prototype stock is for visual testing only. It is not real seller inventory and cannot be purchased. Real seller listings will replace this preview as sellers publish products.
         </p>
       </section>
-        </div>
-      </section>
 
       <section className="rounded-2xl border border-emerald-200 bg-white px-3 py-3 shadow-sm sm:px-4 sm:py-3.5">
         <div className="flex items-center gap-3">
