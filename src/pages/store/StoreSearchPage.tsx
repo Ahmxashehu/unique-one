@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Filter, Store as StoreIcon, Heart, Loader2, Building2 } from 'lucide-react';
+import { Search, Filter, Store as StoreIcon, Heart, Loader2, Building2, Briefcase } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
@@ -18,6 +18,19 @@ type StoreBusiness = {
   status?: string;
   verificationStatus?: string;
   logoUrl?: string;
+};
+
+type StoreService = {
+  id: string;
+  ownerUid?: string;
+  providerName?: string;
+  title?: string;
+  category?: string;
+  description?: string;
+  price?: number;
+  currency?: string;
+  durationHours?: number;
+  status?: string;
 };
 
 const STORE_PRODUCTS_CACHE_TTL_MS = 30_000;
@@ -62,6 +75,7 @@ export default function StoreSearchPage() {
   const [maxPriceInput, setMaxPriceInput] = useState(maxPrice !== null ? String(maxPrice) : '');
   const [products, setProducts] = useState<Product[]>([]);
   const [businesses, setBusinesses] = useState<StoreBusiness[]>([]);
+  const [services, setServices] = useState<StoreService[]>([]);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [wishlistLoading, setWishlistLoading] = useState<string | null>(null);
@@ -102,6 +116,10 @@ export default function StoreSearchPage() {
             console.warn('Business discovery unavailable; continuing with Store listings:', err);
             return null;
           }),
+          getDocs(query(collection(db, 'services'), where('status', '==', 'published'))).catch(err => {
+            console.warn('Service discovery unavailable; continuing with Store listings:', err);
+            return null;
+          }),
         ]);
 
         let productResults = publishedProducts;
@@ -116,6 +134,18 @@ export default function StoreSearchPage() {
           const price = Number(p.price);
           return Number.isFinite(price) && price >= minPrice && (maxPrice === null || price <= maxPrice);
         });
+
+        const serviceResults: StoreService[] = serviceSnapshot
+          ? serviceSnapshot.docs
+              .map(d => ({ id: d.id, ...d.data() } as StoreService))
+              .filter(service => {
+                if (filterCat && filterCat !== 'services' && String(service.category || '').toLowerCase() !== filterCat.toLowerCase()) return false;
+                if (!lowerQ) return true;
+                return [service.title, service.providerName, service.category, service.description]
+                  .filter(Boolean)
+                  .some(value => String(value).toLowerCase().includes(lowerQ));
+              })
+          : [];
 
         const businessResults: StoreBusiness[] = businessSnapshot
           ? businessSnapshot.docs
@@ -139,6 +169,7 @@ export default function StoreSearchPage() {
         if (active) {
           setProducts(productResults);
           setBusinesses(businessResults);
+          setServices(serviceResults);
         }
       } catch (err) {
         console.error('Error fetching unified Store search:', err);
@@ -195,7 +226,7 @@ export default function StoreSearchPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">{initialQuery ? `Results for "${initialQuery}"` : filterCat ? `Category: ${filterCat.replace('_', ' ')}` : 'Global Search'}</h1>
-          <p className="text-sm text-slate-500 mt-1">{products.length + businesses.length} results found across live products, services and discoverable businesses.</p>
+          <p className="text-sm text-slate-500 mt-1">{products.length + services.length + businesses.length} results found across live products, services and discoverable businesses.</p>
         </div>
         <form onSubmit={handleSearch} className="flex items-center gap-2 w-full md:w-96">
           <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" placeholder="Search products, services, businesses..." value={searchInput} onChange={e => setSearchInput(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent" /></div>
@@ -249,8 +280,22 @@ export default function StoreSearchPage() {
         <div className="flex-1">
           {loading ? <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div> :
           error ? <div className="bg-white border border-red-100 rounded-2xl p-12 text-center"><h3 className="text-xl font-semibold text-slate-900">Could not load products</h3><p className="text-slate-500 mt-2">{error}</p></div> :
-          products.length === 0 && businesses.length === 0 ? <div className="bg-white border border-slate-200 rounded-2xl p-10 sm:p-12 text-center"><div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><Search className="w-8 h-8 text-slate-400" /></div><h3 className="text-lg font-semibold text-slate-900">No live listings found</h3><p className="text-slate-500 mt-2 max-w-md mx-auto">Unique Store will show real published seller products and services here as they become available. No sample stock is displayed.</p></div> :
+          products.length === 0 && services.length === 0 && businesses.length === 0 ? <div className="bg-white border border-slate-200 rounded-2xl p-10 sm:p-12 text-center"><div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><Search className="w-8 h-8 text-slate-400" /></div><h3 className="text-lg font-semibold text-slate-900">No live listings found</h3><p className="text-slate-500 mt-2 max-w-md mx-auto">Unique Store will show real published seller products and services here as they become available. No sample stock is displayed.</p></div> :
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
+            {services.map(service => (
+              <div key={`service-${service.id}`} className="group flex flex-col bg-white border border-emerald-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all">
+                <div className="aspect-square bg-gradient-to-br from-emerald-50 via-white to-slate-100 relative overflow-hidden flex items-center justify-center">
+                  <Briefcase className="w-9 h-9 text-emerald-400" />
+                  <div className="absolute top-2 left-2 px-2 py-1 bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider rounded text-emerald-700">Service</div>
+                </div>
+                <div className="p-3 sm:p-4 flex flex-col flex-1">
+                  <h3 className="text-sm font-medium text-slate-900 line-clamp-2 mb-1">{service.title || 'Untitled service'}</h3>
+                  <p className="text-xs text-slate-500 line-clamp-2">{service.description || 'Professional service on Unique One.'}</p>
+                  <p className="text-base sm:text-lg font-bold text-slate-900 mt-auto pt-2">{service.currency === 'NGN' || !service.currency ? '₦' : service.currency}{Number(service.price || 0).toLocaleString()}</p>
+                  <div className="flex items-center gap-1 text-xs text-slate-500 mt-2"><Briefcase className="w-3 h-3" /><span className="truncate">{service.providerName || 'Unique provider'} · {service.category || 'Professional Services'}</span></div>
+                </div>
+              </div>
+            ))}
             {businesses.map(business => (
               <div key={`business-${business.id}`} className="group flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all">
                 <div className="aspect-square bg-slate-50 relative overflow-hidden flex items-center justify-center">
