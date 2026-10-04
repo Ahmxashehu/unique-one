@@ -10,101 +10,15 @@ import PublicLayout from "./layouts/PublicLayout";
 import { AuthProvider } from "./contexts/AuthContext";
 import AuthGuard from "./components/auth/AuthGuard";
 import RoleGuard from "./components/auth/RoleGuard";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import InstallPrompt from "./components/InstallPrompt";
 import GlobalLanguageLayer from "./components/GlobalLanguageLayer";
 import OfflineIndicator from "./components/OfflineIndicator";
-
-
-
-
-
-
-
-
-
-
-
 import { OfflineQueueProvider } from "./contexts/OfflineQueueContext";
 import SyncOverlay from "./components/SyncOverlay";
 import U1Loader from "./components/U1Loader";
 import { lazy, Suspense, useEffect, useState } from "react";
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const ConferencePage = lazy(() => import("./pages/ConferencePage"));
-
-
-
 const HomePage = lazy(() => import("./pages/HomePage"));
 const DiscoverPage = lazy(() => import("./pages/public/DiscoverPage"));
 const SearchPage = lazy(() => import("./pages/public/SearchPage"));
@@ -188,7 +102,8 @@ const CycleAjoPage = lazy(() => import("./pages/pay/CycleAjoPage"));
 const VerificationCenterPage = lazy(() => import("./pages/pay/VerificationCenterPage"));
 const MasterVisionPage = lazy(() => import("./pages/MasterVisionPage"));
 const UniqueMediaPage = lazy(() => import("./pages/UniqueMediaPage"));
-const UniqueSharePage = lazy(() => import("./pages/UniqueSharePage"));\nconst ObservationModePage = lazy(() => import("./pages/ObservationModePage"));
+const UniqueSharePage = lazy(() => import("./pages/UniqueSharePage"));
+const ObservationModePage = lazy(() => import("./pages/ObservationModePage"));
 
 export default function App() {
   const [u1Booting, setU1Booting] = useState(true);
@@ -204,135 +119,121 @@ export default function App() {
         <BrowserRouter>
           <div className="flex flex-col h-screen overflow-hidden w-full max-w-[100vw]">
             <GlobalLanguageLayer />
-          <OfflineIndicator />
-          <InstallPrompt />
-          <SyncOverlay />
-          <U1Loader visible={u1Booting} />
-          <div className="flex-1 relative overflow-hidden">
-            <Suspense fallback={<div className="flex min-h-[50vh] items-center justify-center bg-slate-50 text-sm font-semibold text-emerald-700" role="status">Loading Unique One…</div>}>
-            <Routes>
-              {/* Public Ecosystem Routes */}
-              <Route element={<PublicLayout />}>
-                <Route path="/" element={<HomePage />} />\n                <Route path="/test/observe" element={<ObservationModePage />} />
-                <Route path="/discover" element={<DiscoverPage />} />
-                <Route path="/search" element={<SearchPage />} />
-                <Route path="/categories" element={<CategoriesPage />} />
-                <Route path="/near-me" element={<NearMePage />} />
-                <Route path="/about" element={<AboutPage />} />
-                <Route path="/support" element={<SupportPage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                <Route path="/ai" element={<UniqueAiPage />} />
-                <Route path="/media" element={<UniqueMediaPage />} />
-                <Route path="/unique-media" element={<UniqueMediaPage />} />
-                
-                {/* Unique Store Public Routes */}
-                <Route path="/store" element={<StorePage />} />
-                <Route path="/store/categories" element={<StoreCategoriesPage />} />
-                <Route path="/store/product/:id" element={<StoreProductPage />} />
-                <Route path="/store/seller/:id" element={<StoreSellerProfilePage />} />
-                <Route path="/store/search" element={<StoreSearchPage />} />
-                <Route path="/store/wishlist" element={<StoreWishlistPage />} />
-                <Route path="/store/cart" element={<StoreCartPage />} />
-                <Route path="/store/orders" element={<StoreOrdersPage />} />
-                <Route path="/store/product-request" element={<StoreProductRequestPage />} />
-                <Route path="/store/quote-request" element={<StoreQuoteRequestPage />} />
-                <Route path="/store/command-centre" element={<StoreCommandCentrePage />} />
-              </Route>
-              
-              <Route path="/conference" element={<Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm font-bold text-emerald-300">Loading Unique Conference…</div>}><ConferencePage /></Suspense>} />
-              <Route path="/conference/:roomId" element={<Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm font-bold text-emerald-300">Loading Unique Conference…</div>}><ConferencePage /></Suspense>} />
-              
-              {/* UniqueOS Internal Routes */}
-              <Route path="/os" element={<AuthGuard><AppLayout /></AuthGuard>}>
-              <Route index element={<Navigate to="/os/dashboard" replace />} />
-              {/* User Account */}
-              <Route path="dashboard" element={<DashboardPage />} />
-              <Route path="profile" element={<ProfilePage />} />
-              <Route path="messages/*" element={<MessagesPage />} />
-              <Route path="orders" element={<OrdersPage />} />
-              <Route path="bookings" element={<BookingsPage />} />
-              <Route path="wishlist" element={<WishlistPage />} />
-              <Route path="requests" element={<UserRequestsPage />} />
-              <Route path="pay" element={<PayPage />} />
-              <Route path="store" element={<StorePage />} />
-              <Route path="ai" element={<UniqueAiPage />} />
-              <Route path="master-vision" element={<MasterVisionPage />} />
-              <Route path="unique-share" element={<UniqueSharePage />} />
-              <Route path="jobs" element={<JobsPage />} />
-              <Route path="contributions" element={<ContributionNetworkPage />} />
-              <Route path="education" element={<EducationPage />} />
-              <Route path="travel" element={<TravelPage />} />
+            <OfflineIndicator />
+            <InstallPrompt />
+            <SyncOverlay />
+            <U1Loader visible={u1Booting} />
+            <div className="flex-1 relative overflow-hidden">
+              <Suspense fallback={<div className="flex min-h-[50vh] items-center justify-center bg-slate-50 text-sm font-semibold text-emerald-700" role="status">Loading Unique One…</div>}>
+                <Routes>
+                  <Route element={<PublicLayout />}>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/test/observe" element={<ObservationModePage />} />
+                    <Route path="/discover" element={<DiscoverPage />} />
+                    <Route path="/search" element={<SearchPage />} />
+                    <Route path="/categories" element={<CategoriesPage />} />
+                    <Route path="/near-me" element={<NearMePage />} />
+                    <Route path="/about" element={<AboutPage />} />
+                    <Route path="/support" element={<SupportPage />} />
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/ai" element={<UniqueAiPage />} />
+                    <Route path="/media" element={<UniqueMediaPage />} />
+                    <Route path="/unique-media" element={<UniqueMediaPage />} />
+                    <Route path="/store" element={<StorePage />} />
+                    <Route path="/store/categories" element={<StoreCategoriesPage />} />
+                    <Route path="/store/product/:id" element={<StoreProductPage />} />
+                    <Route path="/store/seller/:id" element={<StoreSellerProfilePage />} />
+                    <Route path="/store/search" element={<StoreSearchPage />} />
+                    <Route path="/store/wishlist" element={<StoreWishlistPage />} />
+                    <Route path="/store/cart" element={<StoreCartPage />} />
+                    <Route path="/store/orders" element={<StoreOrdersPage />} />
+                    <Route path="/store/product-request" element={<StoreProductRequestPage />} />
+                    <Route path="/store/quote-request" element={<StoreQuoteRequestPage />} />
+                    <Route path="/store/command-centre" element={<StoreCommandCentrePage />} />
+                  </Route>
 
-              {/* Business Tools */}
-              <Route path="business/register" element={<BusinessRegisterPage />} />
-              {/* BOS Routes */}
-              <Route path="business/dashboard" element={<SellerDashboardPage />} />
-              <Route path="business/settings" element={<BusinessSettingsPage />} />
-              <Route path="business/staff" element={<StaffPage />} />
-              <Route path="business/branches" element={<BranchesPage />} />
-              <Route path="business/catalog" element={<CatalogPage />} />
-              <Route path="business/catalog/new-product" element={<AddProductPage />} />
-              <Route path="business/catalog/new-service" element={<AddServicePage />} />
-              <Route path="business/inventory" element={<InventoryPage />} />
-              <Route path="business/customers" element={<BusinessCustomersPage />} />
-              <Route path="business/suppliers" element={<SuppliersPage />} />
-              <Route path="business/orders" element={<BusinessOrdersPage />} />
-              <Route path="business/invoices" element={<InvoicesPage />} />
-              <Route path="business/finance" element={<FinancePage />} />
-              <Route path="business/reports" element={<ReportsPage />} />
-              <Route path="business/activity" element={<ActivityPage />} />
-              
-              {/* Legacy fallback if needed */}
-              <Route path="business/profile" element={<BusinessProfilePage />} />
-              <Route path="business/members" element={<OrganizationMembersPage />} />
-              <Route path="services" element={<ServicesPage />} />
-              <Route path="customers" element={<CustomersPage />} />
-              <Route path="invoices" element={<InvoicesPage />} />
-              <Route path="payment-requests" element={<PaymentRequestsPage />} />
-              <Route path="payment-requests/new" element={<CreatePaymentRequestPage />} />
-              <Route path="invoices/new" element={<CreateInvoicePage />} />
-              <Route path="pay/receipts/:id" element={<ReceiptPage />} />
-              <Route path="pay/school-payments" element={<SchoolPaymentDashboard />} />
-              <Route path="pay/history" element={<TransactionHistoryPage />} />
-              <Route path="pay/send" element={<SendMoneyPage />} />
-              <Route path="pay/receive" element={<ReceiveMoneyPage />} />
-              <Route path="pay/ajo" element={<CycleAjoPage />} />
-              <Route path="pay/verification" element={<VerificationCenterPage />} />
-              <Route path="pay/beneficiaries" element={<BeneficiariesPage />} />
-              <Route path="pay/settings" element={<PaySettingsPage />} />
-              <Route path="pay/security" element={<PaySecurityPage />} />
+                  <Route path="/conference" element={<Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm font-bold text-emerald-300">Loading Unique Conference…</div>}><ConferencePage /></Suspense>} />
+                  <Route path="/conference/:roomId" element={<Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm font-bold text-emerald-300">Loading Unique Conference…</div>}><ConferencePage /></Suspense>} />
 
+                  <Route path="/os" element={<AuthGuard><AppLayout /></AuthGuard>}>
+                    <Route index element={<Navigate to="/os/dashboard" replace />} />
+                    <Route path="dashboard" element={<DashboardPage />} />
+                    <Route path="profile" element={<ProfilePage />} />
+                    <Route path="messages/*" element={<MessagesPage />} />
+                    <Route path="orders" element={<OrdersPage />} />
+                    <Route path="bookings" element={<BookingsPage />} />
+                    <Route path="wishlist" element={<WishlistPage />} />
+                    <Route path="requests" element={<UserRequestsPage />} />
+                    <Route path="pay" element={<PayPage />} />
+                    <Route path="store" element={<StorePage />} />
+                    <Route path="ai" element={<UniqueAiPage />} />
+                    <Route path="master-vision" element={<MasterVisionPage />} />
+                    <Route path="unique-share" element={<UniqueSharePage />} />
+                    <Route path="jobs" element={<JobsPage />} />
+                    <Route path="contributions" element={<ContributionNetworkPage />} />
+                    <Route path="education" element={<EducationPage />} />
+                    <Route path="travel" element={<TravelPage />} />
+                    <Route path="business/register" element={<BusinessRegisterPage />} />
+                    <Route path="business/dashboard" element={<SellerDashboardPage />} />
+                    <Route path="business/settings" element={<BusinessSettingsPage />} />
+                    <Route path="business/staff" element={<StaffPage />} />
+                    <Route path="business/branches" element={<BranchesPage />} />
+                    <Route path="business/catalog" element={<CatalogPage />} />
+                    <Route path="business/catalog/new-product" element={<AddProductPage />} />
+                    <Route path="business/catalog/new-service" element={<AddServicePage />} />
+                    <Route path="business/inventory" element={<InventoryPage />} />
+                    <Route path="business/customers" element={<BusinessCustomersPage />} />
+                    <Route path="business/suppliers" element={<SuppliersPage />} />
+                    <Route path="business/orders" element={<BusinessOrdersPage />} />
+                    <Route path="business/invoices" element={<InvoicesPage />} />
+                    <Route path="business/finance" element={<FinancePage />} />
+                    <Route path="business/reports" element={<ReportsPage />} />
+                    <Route path="business/activity" element={<ActivityPage />} />
+                    <Route path="business/profile" element={<BusinessProfilePage />} />
+                    <Route path="business/members" element={<OrganizationMembersPage />} />
+                    <Route path="services" element={<ServicesPage />} />
+                    <Route path="customers" element={<CustomersPage />} />
+                    <Route path="invoices" element={<InvoicesPage />} />
+                    <Route path="payment-requests" element={<PaymentRequestsPage />} />
+                    <Route path="payment-requests/new" element={<CreatePaymentRequestPage />} />
+                    <Route path="invoices/new" element={<CreateInvoicePage />} />
+                    <Route path="pay/receipts/:id" element={<ReceiptPage />} />
+                    <Route path="pay/school-payments" element={<SchoolPaymentDashboard />} />
+                    <Route path="pay/history" element={<TransactionHistoryPage />} />
+                    <Route path="pay/send" element={<SendMoneyPage />} />
+                    <Route path="pay/receive" element={<ReceiveMoneyPage />} />
+                    <Route path="pay/ajo" element={<CycleAjoPage />} />
+                    <Route path="pay/verification" element={<VerificationCenterPage />} />
+                    <Route path="pay/beneficiaries" element={<BeneficiariesPage />} />
+                    <Route path="pay/settings" element={<PaySettingsPage />} />
+                    <Route path="pay/security" element={<PaySecurityPage />} />
+                    <Route path="notifications" element={<NotificationsPage />} />
+                    <Route path="language" element={<LanguagePage />} />
+                    <Route path="security" element={<SecurityPage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                  </Route>
 
-              
-              {/* System */}
-              <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="language" element={<LanguagePage />} />
-              <Route path="security" element={<SecurityPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-            </Route>
+                  <Route path="/admin/login" element={<AdminLoginPage />} />
+                  <Route path="/admin" element={<RoleGuard requiredRole="administrator"><AdminLayout /></RoleGuard>}>
+                    <Route index element={<Navigate to="/admin/users" replace />} />
+                    <Route path="users" element={<AdminUsersPage />} />
+                    <Route path="businesses" element={<AdminBusinessesPage />} />
+                    <Route path="products" element={<AdminProductsPage />} />
+                    <Route path="requests" element={<AdminRequestsPage />} />
+                    <Route path="reports" element={<AdminReportsPage />} />
+                    <Route path="verification" element={<AdminVerificationPage />} />
+                    <Route path="transactions" element={<AdminTransactionsPage />} />
+                    <Route path="settings" element={<AdminSettingsPage />} />
+                  </Route>
 
-            {/* Admin Routes */}
-            <Route path="/admin/login" element={<AdminLoginPage />} />
-            <Route path="/admin" element={<RoleGuard requiredRole="administrator"><AdminLayout /></RoleGuard>}>
-              <Route index element={<Navigate to="/admin/users" replace />} />
-              <Route path="users" element={<AdminUsersPage />} />
-              <Route path="businesses" element={<AdminBusinessesPage />} />
-              <Route path="products" element={<AdminProductsPage />} />
-              <Route path="requests" element={<AdminRequestsPage />} />
-              <Route path="reports" element={<AdminReportsPage />} />
-              <Route path="verification" element={<AdminVerificationPage />} />
-              <Route path="transactions" element={<AdminTransactionsPage />} />
-              <Route path="settings" element={<AdminSettingsPage />} />
-            </Route>
-
-            <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-            </Suspense>
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
+            </div>
           </div>
-        </div>
-      </BrowserRouter>
+        </BrowserRouter>
       </OfflineQueueProvider>
     </AuthProvider>
   );
