@@ -3,7 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
-const PWA_CACHE_MIGRATION = 'unique-one-pwa-cache-migration-v6';
+const PWA_CACHE_MIGRATION = 'unique-one-pwa-cache-migration-v7';
 
 async function recoverStalePwaCache() {
   if (window.localStorage.getItem(PWA_CACHE_MIGRATION) === 'done') return;
