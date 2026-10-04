@@ -6,6 +6,37 @@ import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Product } from '../../lib/os/types';
 
+type StoreProductsCacheEntry = { products: Product[]; expiresAt: number };
+
+const STORE_PRODUCTS_CACHE_TTL_MS = 30_000;
+const storeProductsCache = new Map<string, StoreProductsCacheEntry>();
+const storeProductsRequests = new Map<string, Promise<Product[]>>();
+
+async function loadPublishedProducts(category: string): Promise<Product[]> {
+  const cacheKey = category || '__all__';
+  const cached = storeProductsCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.products;
+
+  const existingRequest = storeProductsRequests.get(cacheKey);
+  if (existingRequest) return existingRequest;
+
+  const request = (async () => {
+    let q = query(collection(db, 'products'), where('status', '==', 'published'));
+    if (category) q = query(q, where('category', '==', category));
+    const snapshot = await getDocs(q);
+    const products = snapshot.docs.map(d => ({ ...(d.data() as Product), id: d.id }));
+    storeProductsCache.set(cacheKey, { products, expiresAt: Date.now() + STORE_PRODUCTS_CACHE_TTL_MS });
+    return products;
+  })();
+
+  storeProductsRequests.set(cacheKey, request);
+  try {
+    return await request;
+  } finally {
+    storeProductsRequests.delete(cacheKey);
+  }
+}
+
 export default function StoreSearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
@@ -74,13 +105,12 @@ export default function StoreSearchPage() {
   };
 
   useEffect(() => {
+    let active = true;
     const fetchProducts = async () => {
       setLoading(true); setError('');
       try {
-        let q = query(collection(db, 'products'), where('status', '==', 'published'));
-        if (filterCat) q = query(q, where('category', '==', filterCat));
-        const querySnapshot = await getDocs(q);
-        let results = querySnapshot.docs.map(d => ({ ...(d.data() as Product), id: d.id }));
+        const publishedProducts = await loadPublishedProducts(filterCat);
+        let results = publishedProducts;
         if (initialQuery) {
           const lowerQ = initialQuery.toLowerCase();
           results = results.filter(p =>
@@ -92,13 +122,16 @@ export default function StoreSearchPage() {
           const price = Number(p.price);
           return Number.isFinite(price) && price >= minPrice && (maxPrice === null || price <= maxPrice);
         });
-        setProducts(results);
+        if (active) setProducts(results);
       } catch (err) {
         console.error('Error fetching products:', err);
-        setError('Could not load Store products.');
-      } finally { setLoading(false); }
+        if (active) setError('Could not load Store products.');
+      } finally {
+        if (active) setLoading(false);
+      }
     };
-    fetchProducts();
+    void fetchProducts();
+    return () => { active = false; };
   }, [initialQuery, filterCat, minPrice, maxPrice]);
 
   useEffect(() => {
