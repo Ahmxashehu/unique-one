@@ -20,6 +20,7 @@ import {
   Lightbulb,
   ArrowUpRight
 } from 'lucide-react';
+import { prototypeStock } from '../store/storePrototype';
 
 const SEARCH_PLACEHOLDERS = [
   'Search businesses, products, services…',
@@ -50,6 +51,12 @@ export default function SearchPage() {
   const [suggestion, setSuggestion] = useState('');
   const [submittedSuggestion, setSubmittedSuggestion] = useState('');
   const navigate = useNavigate();
+  const normalizedQuery = query.trim().toLowerCase();
+  const prototypeResults = normalizedQuery
+    ? prototypeStock.filter((item) =>
+        `${item.name} ${item.categoryLabel}`.toLowerCase().includes(normalizedQuery)
+      )
+    : [];
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -265,22 +272,37 @@ export default function SearchPage() {
       </section>
 
       {query && (
-        <div className="max-w-3xl mx-auto rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm sm:p-7">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
-            <SearchIcon className="h-5 w-5 text-emerald-700" />
+        <section className="space-y-4" aria-label="Global Search results">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Global Search</p>
+              <h3 className="mt-1 text-xl font-bold text-slate-900">Results for “{query}”</h3>
+              <p className="mt-1 text-sm text-slate-500">Prototype catalogue matches are shown here now. Live published Store results open in the full catalogue.</p>
+            </div>
+            <button type="button" onClick={() => navigate(`/store/search?q=${encodeURIComponent(query.trim())}`)} className="shrink-0 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-semibold text-white">View all</button>
           </div>
-          <h3 className="font-semibold text-slate-900">Ready to explore “{query}”</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Opening the results will search live Store listings and the buyer prototype catalogue, including published products, services and discoverable businesses.
-          </p>
-          <button
-            type="button"
-            onClick={() => navigate(`/store/search?q=${encodeURIComponent(query.trim())}`)}
-            className="mt-4 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            Clear search
-          </button>
-        </div>
+          {prototypeResults.length ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {prototypeResults.map((item) => (
+                <button key={item.name} type="button" onClick={() => navigate(`/store/search?q=${encodeURIComponent(item.name)}`)} className="rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
+                  <div className="relative mb-3 flex h-24 items-end rounded-xl bg-slate-100 p-2 sm:h-28">
+                    <span className="absolute right-2 top-2 rounded-full bg-emerald-100 px-2 py-1 text-[9px] font-black tracking-wide text-emerald-800">PROTOTYPE</span>
+                    <span className="text-[10px] font-semibold text-slate-500">{item.categoryLabel}</span>
+                  </div>
+                  <p className="line-clamp-2 text-sm font-semibold text-slate-900">{item.name}</p>
+                  <p className="mt-1 text-sm font-bold text-emerald-700">₦{item.price.toLocaleString()}</p>
+                  <p className="mt-1 text-[11px] text-slate-500">Preview stock • {item.quantity} available</p>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
+              <SearchIcon className="mx-auto h-6 w-6 text-slate-400" />
+              <p className="mt-2 font-semibold text-slate-800">No prototype match yet</p>
+              <p className="mt-1 text-sm text-slate-500">Tap View all to search published products, services and businesses too.</p>
+            </div>
+          )}
+        </section>
       )}
     </div>
   );
