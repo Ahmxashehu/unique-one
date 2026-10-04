@@ -146,7 +146,7 @@ export default function StorePage() {
         @keyframes storePosterGlow { 0%,100% { opacity:.45; transform:scale(1); } 50% { opacity:.9; transform:scale(1.08); } }
         @keyframes storeSearchSmoke { 0%,100% { transform:translate3d(-3%,0,0) scale(1); opacity:.38; } 50% { transform:translate3d(3%,-2%,0) scale(1.06); opacity:.72; } }
         @keyframes storeSearchSweep { 0% { transform:translateX(-120%); opacity:0; } 25% { opacity:.75; } 70% { opacity:.45; } 100% { transform:translateX(120%); opacity:0; } }
-        @keyframes storeSearchPulse { 0%,100% { box-shadow:0 0 0 1px rgba(52,211,153,.16),0 0 22px rgba(16,185,129,.14),0 8px 30px rgba(0,0,0,.16); } 50% { box-shadow:0 0 0 1px rgba(110,231,183,.34),0 0 38px rgba(16,185,129,.30),0 10px 38px rgba(0,0,0,.20); } }
+        @keyframes storeTitleFloat { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-2px); } }\n        @keyframes storeWordPulse { 0%,100% { opacity:.55; transform:scale(.9); } 50% { opacity:1; transform:scale(1.2); } }\n        @keyframes storeSearchPulse { 0%,100% { box-shadow:0 0 0 1px rgba(52,211,153,.16),0 0 22px rgba(16,185,129,.14),0 8px 30px rgba(0,0,0,.16); } 50% { box-shadow:0 0 0 1px rgba(110,231,183,.34),0 0 38px rgba(16,185,129,.30),0 10px 38px rgba(0,0,0,.20); } }
         .store-category-track-left { animation: storeBandLeft 28s linear infinite; }
         .store-category-track-right { animation: storeBandRight 28s linear infinite; }
         .store-category-track-left:hover, .store-category-track-right:hover { animation-play-state: paused; }
@@ -164,14 +164,14 @@ export default function StorePage() {
               UNIQUE STORE
             </div>
 
-            <div className="mt-3 inline-flex rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-3 py-2 shadow-[0_0_28px_rgba(16,185,129,.10)]">
-              <h1 className="text-2xl font-black tracking-[-0.04em] sm:text-4xl lg:text-5xl">Buy • Book • Discover</h1>
+            <div className="mt-2 inline-flex rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-2.5 py-1.5 shadow-[0_0_24px_rgba(16,185,129,.10)]">
+              <h1 className="text-xl font-black tracking-[-0.04em] sm:text-3xl lg:text-4xl" style={{ animation: 'storeTitleFloat 4s ease-in-out infinite' }}>Buy <span className="inline-block" style={{ animation: 'storeWordPulse 3.2s ease-in-out infinite' }}>•</span> Book <span className="inline-block" style={{ animation: 'storeWordPulse 3.2s ease-in-out .8s infinite' }}>•</span> Discover</h1>
             </div>
-            <p className="mt-3 max-w-3xl text-xs leading-5 text-white/70 sm:text-sm sm:leading-6">
+            <p className="mt-1.5 max-w-3xl text-[11px] leading-4 text-white/70 sm:text-xs sm:leading-5">
               One modern marketplace for real products, trusted services, local businesses and everyday needs.
             </p>
 
-            <form onSubmit={submitSearch} className="relative mt-4 flex max-w-3xl gap-2 rounded-2xl border border-emerald-300/25 bg-white/[0.08] p-2 backdrop-blur-xl" style={{ animation: 'storeSearchPulse 3.2s ease-in-out infinite' }}>
+            <form onSubmit={submitSearch} className="relative mt-2.5 flex max-w-3xl gap-1.5 rounded-xl border border-emerald-300/25 bg-white/[0.08] p-1.5 backdrop-blur-xl" style={{ animation: 'storeSearchPulse 3.2s ease-in-out infinite' }}>
               <span className="pointer-events-none absolute -inset-3 -z-10 overflow-hidden rounded-[1.5rem] bg-emerald-400/20 blur-2xl" style={{ animation: 'storeSearchSmoke 4.5s ease-in-out infinite' }} />
               <span className="pointer-events-none absolute inset-y-0 left-1/4 w-1/3 -z-0 overflow-hidden rounded-full bg-emerald-300/20 blur-xl" style={{ animation: 'storeSearchSmoke 3.8s ease-in-out infinite reverse' }} />
               <span className="pointer-events-none absolute inset-y-0 left-0 z-20 w-1/4 -skew-x-12 bg-gradient-to-r from-transparent via-white/30 to-transparent blur-sm" style={{ animation: 'storeSearchSweep 4.2s linear infinite' }} />
@@ -181,10 +181,10 @@ export default function StorePage() {
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="Search products and services..."
-                  className="w-full rounded-xl border border-emerald-200/40 bg-white/[0.96] text-slate-900 pl-11 pr-4 py-3 sm:py-3.5 text-sm outline-none shadow-[inset_0_0_18px_rgba(16,185,129,.05)] transition-all focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/60"
+                  className="w-full rounded-lg border border-emerald-200/40 bg-white/[0.96] text-slate-900 pl-10 pr-3 py-2 sm:py-2.5 text-xs outline-none shadow-[inset_0_0_18px_rgba(16,185,129,.05)] transition-all focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/60"
                 />
               </div>
-              <button type="submit" className="hidden sm:inline-flex items-center justify-center rounded-xl bg-emerald-500 px-6 py-3 font-bold text-sm text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400">
+              <button type="submit" className="hidden sm:inline-flex items-center justify-center rounded-lg bg-emerald-500 px-4 py-2 font-bold text-xs text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400">
                 Search
               </button>
             </form>
