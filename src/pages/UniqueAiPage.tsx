@@ -40,7 +40,11 @@ type ChatMessage = {
 const shouldLoadDiscovery = (value: string) =>
   /\b(find|search|look for|show me|where can i|where is|available|buy|sell|hire|book|service|product|business|store|marketplace|cement|rice|phone|solar|car|hotel|restaurant|delivery|near me)\b/i.test(value);
 
-function userExplicitlyRequestedPdf(text: string) {\n  return /\\b(create|make|generate|download|export|turn|convert)\\b[\\s-]*(this|that|it|the (answer|response|breakdown|report|document))?[\\s-]*(as|into|to)?[\\s-]*pdf\\b|\\bpdf\\b/i.test(text.trim());\n}\n\nfunction shouldOfferPdf(text: string) {
+function userExplicitlyRequestedPdf(text: string) {
+  return /\\b(create|make|generate|download|export|turn|convert)\\b[\\s-]*(this|that|it|the (answer|response|breakdown|report|document))?[\\s-]*(as|into|to)?[\\s-]*pdf\\b|\\bpdf\\b/i.test(text.trim());
+}
+
+function shouldOfferPdf(text: string) {
   const value = text.trim();
   if (value.length < 350) return false;
   return /\b(breakdown|detailed analysis|report|proposal|business plan|roadmap|assessment|comparison|strategy|implementation plan|project plan|market analysis|financial analysis|summary|brief|document|guide|specification|requirements)\b/i.test(value);
