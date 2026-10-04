@@ -69,7 +69,7 @@ export default function PublicLayout() {
               {[
                 ['Restaurant', '/categories'],
                 ['Hotel', '/travel'],
-                ['Flights', '/travel'],
+                ['Flights', '/flights'],
                 ['Jobs', '/os/jobs'],
                 ['Travel', '/os/travel'],
               ].map(([name, path]) => (
