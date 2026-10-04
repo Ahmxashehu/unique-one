@@ -819,7 +819,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
   validateMutationBoundary(prompt);
   const context = await getAuthorizedPlatformContext(input.uid);
   validateAuthorizedContext(context);
-  const discovery = shouldUseLiveDiscovery(prompt) ? await getLiveDiscoveryContext(prompt) : undefined;
+  const discovery = shouldUseLiveDiscovery(prompt) ? await getLiveDiscoveryContext(prompt, input.location) : undefined;
   const contextualPrompt = buildContextualPrompt(prompt, history, context, preferredLanguage, discovery) + "\n<UNIQUE_AI_INTENT>\n" + JSON.stringify(intent) + "\n" + uniqueAiCapabilitySummary(intent) + "\n</UNIQUE_AI_INTENT>";
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
@@ -885,13 +885,13 @@ const PUBLIC_AI_SYSTEM_INSTRUCTION = [
   "At the end of every public-mode answer, naturally remind the user that registering for Unique One unlocks the full platform experience and personalized AI assistance. Keep this reminder brief and do not make it sound like an advertisement.",
 ].join(" ");
 
-export async function generatePublicUniqueAiResponse(input: { message: unknown; history?: unknown; preferredLanguage?: string }): Promise<string> {
+export async function generatePublicUniqueAiResponse(input: { message: unknown; history?: unknown; preferredLanguage?: string; location?: UniqueAiRequest["location"] }): Promise<string> {
   const prompt = getPrompt(input.message);
   const history = getHistory(input.history);
   const preferredLanguage = normalizePreferredLanguage(input.preferredLanguage);
   const intent = buildUniqueAiIntent(prompt);
   const historyText = history.length ? JSON.stringify(history) : "[]";
-  const discovery = shouldUseLiveDiscovery(prompt) ? await getLiveDiscoveryContext(prompt) : undefined;
+  const discovery = shouldUseLiveDiscovery(prompt) ? await getLiveDiscoveryContext(prompt, input.location) : undefined;
   const contextualPrompt = [
     "<PREFERRED_RESPONSE_LANGUAGE>",
     preferredLanguage ? AI_LANGUAGE_LABELS[preferredLanguage] : "English",
