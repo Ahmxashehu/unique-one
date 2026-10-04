@@ -40,7 +40,7 @@ type ChatMessage = {
 };
 
 const shouldUseDeviceLocation = (value: string) =>
-  /\b(near me|nearby|nearest|closest|around me|where is|where are|in my area|close to me)\\b/i.test(value);
+  /\b(near me|nearby|nearest|closest|around me|where is|where are|in my area|close to me)\b/i.test(value);
 
 async function getDeviceLocation(): Promise<AiLocation | undefined> {
   if (!navigator.geolocation) return undefined;
