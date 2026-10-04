@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Filter, Store as StoreIcon, Heart, Loader2, Smartphone, Shirt, Gem, Home, Hammer, Layers3, Sprout, Wheat, Tractor, Utensils, Factory, Car, Building2, Briefcase, Globe2, PackageOpen, Package } from 'lucide-react';
+import { Search, Filter, Store as StoreIcon, Heart, Loader2 } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
@@ -77,97 +77,6 @@ export default function StoreSearchPage() {
     ['other', 'Other'],
   ];
 
-  const prototypeStock: Record<string, Array<{ name: string; price: string; stock: string }>> = {
-    electronics: [
-      { name: 'Smart LED TV', price: '₦285,000', stock: '12 units' },
-      { name: 'Bluetooth Speaker', price: '₦48,000', stock: '24 units' },
-      { name: 'Home Sound System', price: '₦175,000', stock: '8 units' },
-      { name: 'Smart Decoder', price: '₦32,000', stock: '30 units' },
-    ],
-    electricity_power: [
-      { name: 'Solar Inverter 3.5kVA', price: '₦420,000', stock: '6 units' },
-      { name: 'Rechargeable Solar Fan', price: '₦95,000', stock: '15 units' },
-      { name: 'Solar Panel 450W', price: '₦185,000', stock: '10 units' },
-      { name: 'Rechargeable LED Bulb', price: '₦8,500', stock: '40 units' },
-    ],
-    beauty: [
-      { name: 'Skincare Set', price: '₦28,000', stock: '18 units' },
-      { name: 'Hair Care Bundle', price: '₦35,000', stock: '14 units' },
-      { name: 'Perfume Collection', price: '₦42,000', stock: '20 units' },
-      { name: 'Beauty Essentials Kit', price: '₦22,500', stock: '25 units' },
-    ],
-    fashion: [
-      { name: 'Men’s Clothing Set', price: '₦45,000', stock: '16 units' },
-      { name: 'Women’s Casual Set', price: '₦38,000', stock: '20 units' },
-      { name: 'Traditional Wear', price: '₦75,000', stock: '9 units' },
-      { name: 'Kids Clothing Bundle', price: '₦30,000', stock: '22 units' },
-    ],
-    phones_accessories: [
-      { name: 'Android Smartphone', price: '₦185,000', stock: '20 units' },
-      { name: 'Fast Charger & Cable', price: '₦12,500', stock: '35 units' },
-    ],
-    shoes: [
-      { name: 'Men’s Sneakers', price: '₦35,000', stock: '18 pairs' },
-      { name: 'Women’s Casual Shoes', price: '₦32,000', stock: '16 pairs' },
-    ],
-    home_furniture: [
-      { name: 'Modern Sofa Set', price: '₦320,000', stock: '6 sets' },
-      { name: 'Dining Table Set', price: '₦185,000', stock: '8 sets' },
-    ],
-    building_materials: [
-      { name: 'POP Ceiling Materials', price: '₦85,000', stock: '20 packs' },
-      { name: 'Quality Paint 20L', price: '₦48,000', stock: '30 tins' },
-    ],
-    cement: [
-      { name: 'POP Cement 40kg', price: '₦12,500', stock: '50 bags' },
-      { name: 'Premium Cement 50kg', price: '₦14,000', stock: '45 bags' },
-    ],
-    agriculture: [
-      { name: 'Maize Seed Pack', price: '₦18,000', stock: '25 packs' },
-      { name: 'Farm Crop Starter Kit', price: '₦65,000', stock: '12 kits' },
-    ],
-    fertilizer: [
-      { name: 'NPK Fertilizer 50kg', price: '₦48,000', stock: '35 bags' },
-      { name: 'Organic Fertilizer 25kg', price: '₦28,000', stock: '22 bags' },
-    ],
-    seeds: [
-      { name: 'Hybrid Maize Seeds', price: '₦22,000', stock: '30 packs' },
-      { name: 'Vegetable Seed Collection', price: '₦15,000', stock: '40 packs' },
-    ],
-    farm_equipment: [
-      { name: 'Knapsack Sprayer', price: '₦45,000', stock: '14 units' },
-      { name: 'Small Farm Tiller', price: '₦380,000', stock: '5 units' },
-    ],
-    food_groceries: [
-      { name: 'Family Grocery Basket', price: '₦75,000', stock: '18 baskets' },
-      { name: 'Rice 50kg', price: '₦78,000', stock: '25 bags' },
-    ],
-    machinery: [
-      { name: 'Portable Generator', price: '₦420,000', stock: '7 units' },
-      { name: 'Industrial Water Pump', price: '₦285,000', stock: '9 units' },
-    ],
-    vehicles: [
-      { name: 'Family Sedan', price: '₦8,500,000', stock: '3 units' },
-      { name: 'Utility Van', price: '₦12,500,000', stock: '2 units' },
-    ],
-    property: [
-      { name: 'Residential Plot', price: '₦6,500,000', stock: '5 plots' },
-      { name: 'Two-Bedroom Apartment', price: '₦35,000,000', stock: '2 units' },
-    ],
-    services: [
-      { name: 'Professional Home Service', price: '₦25,000', stock: '10 slots' },
-      { name: 'Business Support Package', price: '₦50,000', stock: '8 slots' },
-    ],
-    digital_products: [
-      { name: 'Business Template Pack', price: '₦15,000', stock: '50 licenses' },
-      { name: 'Digital Learning Bundle', price: '₦25,000', stock: '40 licenses' },
-    ],
-    other: [
-      { name: 'Everyday Essentials Bundle', price: '₦18,000', stock: '24 bundles' },
-      { name: 'General Household Items', price: '₦32,000', stock: '16 bundles' },
-    ],
-  };
-
   useEffect(() => {
     let active = true;
     const fetchProducts = async () => {
@@ -241,11 +150,11 @@ export default function StoreSearchPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{initialQuery ? `Search results for "${initialQuery}"` : filterCat ? `Category: ${filterCat.replace('_', ' ')}` : 'All Products'}</h1>
-          <p className="text-sm text-slate-500 mt-1">{products.length} products found.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{initialQuery ? `Results for "${initialQuery}"` : filterCat ? `Category: ${filterCat.replace('_', ' ')}` : 'Global Search'}</h1>
+          <p className="text-sm text-slate-500 mt-1">{products.length} results found across Unique Store products and services.</p>
         </div>
         <form onSubmit={handleSearch} className="flex items-center gap-2 w-full md:w-96">
-          <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" placeholder="Search store..." value={searchInput} onChange={e => setSearchInput(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent" /></div>
+          <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" placeholder="Search products, services, businesses..." value={searchInput} onChange={e => setSearchInput(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent" /></div>
           <button type="submit" className="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium">Search</button>
           <button type="button" onClick={() => setShowMobileFilters(prev => !prev)} className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50" aria-label={showMobileFilters ? 'Hide filters' : 'Show filters'} aria-expanded={showMobileFilters}>
             <Filter className="w-5 h-5" />
@@ -285,18 +194,8 @@ export default function StoreSearchPage() {
         <div className="flex-1">
           {loading ? <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div> :
           error ? <div className="bg-white border border-red-100 rounded-2xl p-12 text-center"><h3 className="text-xl font-semibold text-slate-900">Could not load products</h3><p className="text-slate-500 mt-2">{error}</p></div> :
-          products.length === 0 ? (filterCat && prototypeStock[filterCat] ? <div className="space-y-4">
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">Prototype stock preview</p>
-              <h3 className="mt-1 text-base font-black text-slate-900">{categoryOptions.find(([cat]) => cat === filterCat)?.[1] || 'Category'}</h3>
-              <p className="mt-1 text-xs leading-4 text-slate-600">These are UI test cards only. They are not real seller inventory and cannot be purchased. Real seller listings will appear automatically when published.</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">{prototypeStock[filterCat].map(item => <div key={item.name} className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white">
-              <div className="flex aspect-square items-center justify-center bg-slate-100"><StoreIcon className="h-10 w-10 text-slate-300" /></div>
-              <div className="p-3"><p className="line-clamp-2 text-sm font-semibold text-slate-900">{item.name}</p><p className="mt-2 text-base font-black text-slate-900">{item.price}</p><p className="mt-1 text-[11px] font-bold text-emerald-700">Prototype stock: {item.stock}</p></div>
-            </div>)}</div>
-          </div> : <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center"><div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><Search className="w-10 h-10 text-slate-400" /></div><h3 className="text-xl font-semibold text-slate-900">No products found</h3><p className="text-slate-500 mt-2 max-w-sm mx-auto">Try adjusting your search terms or filters to find what you're looking for.</p></div>) :
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">{products.map(product => (
+          products.length === 0 ? <div className="bg-white border border-slate-200 rounded-2xl p-10 sm:p-12 text-center"><div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><Search className="w-8 h-8 text-slate-400" /></div><h3 className="text-lg font-semibold text-slate-900">No live listings found</h3><p className="text-slate-500 mt-2 max-w-md mx-auto">Unique Store will show real published seller products and services here as they become available. No sample stock is displayed.</p></div> : :
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">{products.map(product => (
             <Link key={product.id} to={`/store/product/${product.id}`} className="group flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all">
               <div className="aspect-square bg-slate-100 relative overflow-hidden flex items-center justify-center">
                 {product.images?.length > 0 ? <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <StoreIcon className="w-8 h-8 text-slate-300" />}
@@ -305,9 +204,9 @@ export default function StoreSearchPage() {
                 </button>
                 <div className="absolute bottom-2 left-2 px-2 py-1 bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider rounded text-slate-700">{product.condition}</div>
               </div>
-              <div className="p-4 flex flex-col flex-1">
+              <div className="p-3 sm:p-4 flex flex-col flex-1">
                 <h3 className="text-sm font-medium text-slate-900 line-clamp-2 mb-1 group-hover:text-blue-600 transition-colors">{product.name}</h3>
-                <p className="text-lg font-bold text-slate-900 mt-auto">{product.currency === 'NGN' ? '₦' : '$'}{Number(product.price).toLocaleString()}</p>
+                <p className="text-base sm:text-lg font-bold text-slate-900 mt-auto">{product.currency === 'NGN' ? '₦' : '$'}{Number(product.price).toLocaleString()}</p>
                 <div className="flex items-center gap-1 text-xs text-slate-500 mt-2"><StoreIcon className="w-3 h-3" /><span className="truncate">Seller ID: {product.sellerId || 'Unavailable'}</span></div>
               </div>
             </Link>
