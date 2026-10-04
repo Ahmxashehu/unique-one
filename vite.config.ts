@@ -30,8 +30,8 @@ export default defineConfig(() => ({
             urlPattern: ({ request }) => request.destination === 'document',
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'unique-platform-app-documents-v2',
-              networkTimeoutSeconds: 5,
+              cacheName: 'unique-platform-app-documents-v3',
+              networkTimeoutSeconds: 30,
               expiration: { maxEntries: 20, maxAgeSeconds: 86400 },
             },
           },
