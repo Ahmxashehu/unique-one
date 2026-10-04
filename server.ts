@@ -416,7 +416,7 @@ const app = express();
     }
     next();
   });
-  app.use(express.json({ limit: "1mb" }));
+  app.use(express.json({ limit: "10mb" }));
   app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
   const authenticate = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
@@ -899,12 +899,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         if (!allowedKeys.has(key)) return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
       }
       const location = parseAiLocation(payload.location);
-      const access = await enforceAiAccess(req, res);
-      if (!access) return;
-      const usageStartedAt = Date.now();
+
       const responseText = await generatePublicUniqueAiResponse({ message: payload.message, history: payload.history, preferredLanguage: typeof payload.preferredLanguage === "string" ? payload.preferredLanguage : undefined, location });
-      const updatedAccess = await consumeAiAccess(undefined, typeof req.headers["x-ai-session-id"] === "string" ? req.headers["x-ai-session-id"] : undefined, usageStartedAt);
-      res.setHeader("X-AI-Remaining-Seconds", String(updatedAccess.remainingSeconds));
       return res.status(200).json({
         message: responseText,
         public: true,
@@ -985,8 +981,6 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         preferredLanguage,
         location,
       });
-      const updatedAccess = await consumeAiAccess(uid, undefined, usageStartedAt);
-      res.setHeader("X-AI-Remaining-Seconds", String(updatedAccess.remainingSeconds));
       return res.status(200).json({
         message: responseText,
         readOnly: true,
@@ -999,6 +993,72 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       }
       console.error('Unique AI request failed:', { requestId: resolvedRequestId, error });
       return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Unique AI is temporarily unavailable. Please try again shortly." }, requestId: resolvedRequestId, capabilities: UNIQUE_AI_CAPABILITIES });
+    }
+  });
+
+
+  app.post("/api/ai/public-vision", rateLimit({
+    windowMs: 60_000, limit: 12, standardHeaders: true, legacyHeaders: false,
+    store: createFirestoreRateLimitStore('publicAiVisionRateLimits', 60_000),
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many image analysis requests. Please try again shortly.'),
+  }), async (req, res) => {
+    const resolvedRequestId = resolveAiRequestId(req);
+    res.setHeader("X-Request-ID", resolvedRequestId);
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      if (!isPlainObject(req.body)) return errorResponse(res, 'INVALID_REQUEST', 'The image request body must be a plain object.');
+      const payload = req.body as Record<string, unknown>;
+      const allowedKeys = new Set(['imageData', 'mimeType', 'prompt', 'preferredLanguage']);
+      for (const key of Object.keys(payload)) if (!allowedKeys.has(key)) return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
+      const { analyzeUniqueAiImage } = await import("./src/lib/ai/uniqueAiService");
+      const message = await analyzeUniqueAiImage({
+        image: { data: payload.imageData, mimeType: payload.mimeType },
+        prompt: payload.prompt,
+        preferredLanguage: typeof payload.preferredLanguage === "string" ? payload.preferredLanguage : undefined,
+      });
+      return res.status(200).json({ message, public: true, readOnly: true, requestId: resolvedRequestId });
+    } catch (error) {
+      if (error instanceof UniqueAiValidationError) return res.status(400).json({ error: { code: "INVALID_REQUEST", message: error.message }, requestId: resolvedRequestId });
+      console.error("Public Unique AI vision request failed:", { requestId: resolvedRequestId, error });
+      return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Image analysis is temporarily unavailable. Please try again shortly." }, requestId: resolvedRequestId });
+    }
+  });
+
+  app.post("/api/ai/vision", authenticate, rateLimit({
+    windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false,
+    store: createFirestoreRateLimitStore('aiVisionRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (req, res) => {
+      const requestId = resolveAiRequestId(req);
+      res.setHeader("X-Request-ID", requestId);
+      res.setHeader("Cache-Control", "no-store");
+      return errorResponse(res, 'RATE_LIMITED', 'Too many image analysis requests. Please try again shortly.');
+    },
+  }), async (req, res) => {
+    const resolvedRequestId = resolveAiRequestId(req);
+    res.setHeader("X-Request-ID", resolvedRequestId);
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      if (!isPlainObject(req.body)) return errorResponse(res, 'INVALID_REQUEST', 'The image request body must be a plain object.');
+      const payload = req.body as Record<string, unknown>;
+      const allowedKeys = new Set(['imageData', 'mimeType', 'prompt', 'preferredLanguage']);
+      for (const key of Object.keys(payload)) if (!allowedKeys.has(key)) return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
+      sanitizeRequiredAuthUid((req as any).user?.uid);
+      const { analyzeUniqueAiImage } = await import("./src/lib/ai/uniqueAiService");
+      const message = await analyzeUniqueAiImage({
+        image: { data: payload.imageData, mimeType: payload.mimeType },
+        prompt: payload.prompt,
+        preferredLanguage: typeof payload.preferredLanguage === "string" ? payload.preferredLanguage : undefined,
+      });
+      return res.status(200).json({ message, readOnly: true, requestId: resolvedRequestId });
+    } catch (error) {
+      if (error instanceof UniqueAiValidationError) return res.status(400).json({ error: { code: "INVALID_REQUEST", message: error.message }, requestId: resolvedRequestId });
+      console.error("Unique AI vision request failed:", { requestId: resolvedRequestId, error });
+      return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Image analysis is temporarily unavailable. Please try again shortly." }, requestId: resolvedRequestId });
     }
   });
 
