@@ -9,6 +9,34 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Product, ProductCategory } from '../lib/os/types';
 
+const storeProductsCache = new Map<string, { products: Product[]; expiresAt: number }>();
+const storeProductsRequests = new Map<string, Promise<Product[]>>();
+const STORE_PRODUCTS_CACHE_TTL_MS = 30_000;
+
+async function loadStoreProducts(): Promise<Product[]> {
+  const cacheKey = 'published-store-products';
+  const cached = storeProductsCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.products;
+  const existing = storeProductsRequests.get(cacheKey);
+  if (existing) return existing;
+  const request = (async () => {
+    try {
+      const productsQuery = query(collection(db, 'products'), where('status', '==', 'published'), orderBy('createdAt', 'desc'), limit(24));
+      const snapshot = await getDocs(productsQuery);
+      const products = snapshot.docs.map(d => ({ ...(d.data() as Product), id: d.id }));
+      storeProductsCache.set(cacheKey, { products, expiresAt: Date.now() + STORE_PRODUCTS_CACHE_TTL_MS });
+      return products;
+    } catch {
+      const fallback = await getDocs(query(collection(db, 'products'), where('status', '==', 'published'), limit(24)));
+      const products = fallback.docs.map(d => ({ ...(d.data() as Product), id: d.id }));
+      storeProductsCache.set(cacheKey, { products, expiresAt: Date.now() + STORE_PRODUCTS_CACHE_TTL_MS });
+      return products;
+    }
+  })();
+  storeProductsRequests.set(cacheKey, request);
+  try { return await request; } finally { storeProductsRequests.delete(cacheKey); }
+}
+
 const categories: Array<{ key: ProductCategory; label: string; icon: React.ElementType }> = [
   { key: 'electronics', label: 'Electronics', icon: Smartphone },
   { key: 'phones_accessories', label: 'Phones & Accessories', icon: Smartphone },
@@ -47,33 +75,15 @@ export default function StorePage() {
 
   useEffect(() => {
     let active = true;
-    const loadStore = async () => {
-      setLoading(true);
-      try {
-        const productsQuery = query(
-          collection(db, 'products'),
-          where('status', '==', 'published'),
-          orderBy('createdAt', 'desc'),
-          limit(24)
-        );
-        const snapshot = await getDocs(productsQuery);
-        if (!active) return;
-        setProducts(snapshot.docs.map(d => ({ ...(d.data() as Product), id: d.id })));
-      } catch (err) {
-        try {
-          const fallback = await getDocs(
-            query(collection(db, 'products'), where('status', '==', 'published'), limit(24))
-          );
-          if (active) setProducts(fallback.docs.map(d => ({ ...(d.data() as Product), id: d.id })));
-        } catch (fallbackErr) {
-          console.error('Could not load Store products:', fallbackErr);
-          if (active) setProducts([]);
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    loadStore();
+    setLoading(true);
+    void loadStoreProducts().then((loaded) => {
+      if (active) setProducts(loaded);
+    }).catch((err) => {
+      console.error('Could not load Store products:', err);
+      if (active) setProducts([]);
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
     return () => { active = false; };
   }, []);
 
@@ -139,31 +149,7 @@ export default function StorePage() {
 
   const [buyerCategory,setBuyerCategory]=useState<ProductCategory>(categories[0].key);
   const [buyerQty,setBuyerQty]=useState(1); const [buyerCheckout,setBuyerCheckout]=useState(false); const [buyerAddress,setBuyerAddress]=useState('Add delivery address'); const [editingAddress,setEditingAddress]=useState(false); const [deliveryMethod,setDeliveryMethod]=useState('Platform delivery');
-  const selectedBuyerCategory=categories.find(x=>x.key===buyerCategory)??categories[0];
-  const buyerPrototypes: Record<ProductCategory, { name: string; price: number }> = {
-    electronics: { name: 'Smart LED TV', price: 285000 },
-    phones_accessories: { name: 'Android Smartphone', price: 185000 },
-    fashion: { name: "Men's Clothing Set", price: 45000 },
-    shoes: { name: 'Everyday Sneakers', price: 38000 },
-    beauty: { name: 'Skincare Set', price: 28000 },
-    home_furniture: { name: 'Modern Sofa Set', price: 650000 },
-    building_materials: { name: 'Building Materials Bundle', price: 120000 },
-    cement: { name: 'POP Cement 40kg', price: 12500 },
-    agriculture: { name: 'Farm Produce Basket', price: 75000 },
-    fertilizer: { name: 'A4s / 4Tree Fertilizer', price: 35000 },
-    seeds: { name: 'Certified Seed Pack', price: 18000 },
-    farm_equipment: { name: 'Small Farm Equipment Kit', price: 185000 },
-    food_groceries: { name: 'Family Grocery Basket', price: 65000 },
-    machinery: { name: 'Portable Generator', price: 2450000 },
-    vehicles: { name: 'Used Car', price: 12500000 },
-    property: { name: 'Apartment Listing', price: 8500000 },
-    services: { name: 'Professional Home Service', price: 25000 },
-    digital_products: { name: 'Digital E-book', price: 12000 },
-    other: { name: 'Local Seller Item', price: 25000 },
-  };
-  const buyerPrototype = buyerPrototypes[buyerCategory];
-  const buyerName = buyerPrototype.name;
-  const buyerPrice = buyerPrototype.price;
+  
   const deliveryFee=deliveryMethod==='Customer pickup'?0:2500; const buyerSubtotal=buyerPrice*buyerQty;
 
 
