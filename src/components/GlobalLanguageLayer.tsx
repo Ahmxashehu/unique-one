@@ -235,16 +235,26 @@ export default function GlobalLanguageLayer() {
       apply(document.body, next);
     };
     run(language);
+    let timer: number | null = null;
     const schedule = () => {
-      if (scheduled) return;
+      if (language === "en" || scheduled) return;
       scheduled = true;
-      requestAnimationFrame(() => { scheduled = false; apply(document.body, language); });
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        scheduled = false;
+        timer = null;
+        apply(document.body, language);
+      }, 120);
     };
     const observer = new MutationObserver(schedule);
     observer.observe(document.body,{childList:true,subtree:true,characterData:true});
     const onChange = (e:Event) => run((e as CustomEvent<SupportedLanguage>).detail);
     window.addEventListener("unique-language-change",onChange);
-    return () => { observer.disconnect(); window.removeEventListener("unique-language-change",onChange); };
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("unique-language-change",onChange);
+      if (timer !== null) window.clearTimeout(timer);
+    };
   },[]);
   return null;
 }
