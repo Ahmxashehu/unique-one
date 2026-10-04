@@ -35,19 +35,29 @@ type ChatMessage = {
   role: "user" | "assistant";
   text: string;
   discovery?: DiscoveryResult[];
+  pdfEligible?: boolean;
 };
 
 const shouldLoadDiscovery = (value: string) =>
   /\b(find|search|look for|show me|where can i|where is|available|buy|sell|hire|book|service|product|business|store|marketplace|cement|rice|phone|solar|car|hotel|restaurant|delivery|near me)\b/i.test(value);
 
 function userExplicitlyRequestedPdf(text: string) {
-  return /\\b(create|make|generate|download|export|turn|convert)\\b[\\s-]*(this|that|it|the (answer|response|breakdown|report|document))?[\\s-]*(as|into|to)?[\\s-]*pdf\\b|\\bpdf\\b/i.test(text.trim());
+  return /\b(create|make|generate|download|export|turn|convert)\b[\s-]*(this|that|it|the (answer|response|breakdown|report|document))?[\s-]*(as|into|to)?[\s-]*pdf\b|\bpdf\b/i.test(text.trim());
 }
 
-function shouldOfferPdf(text: string) {
-  const value = text.trim();
-  if (value.length < 350) return false;
-  return /\b(breakdown|detailed analysis|report|proposal|business plan|roadmap|assessment|comparison|strategy|implementation plan|project plan|market analysis|financial analysis|summary|brief|document|guide|specification|requirements)\b/i.test(value);
+function shouldOfferPdfRequest(text: string) {
+  return /\b(detailed|breakdown|report|proposal|business plan|roadmap|assessment|comparison|strategy|implementation plan|project plan|market analysis|financial analysis|brief|document|guide|specification|requirements)\b/i.test(text.trim());
+}
+
+function cleanPdfText(body: string) {
+  const filler = /^(here(?:'s| is)|sure[!.]?$|of course[!.]?$|i(?:'ll| will) explain|i hope (this|that) helps|would you like me to|let me know if you(?:'d| would) like|feel free to ask)/i;
+  return body
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !filler.test(line))
+    .join("\n")
+    .trim();
 }
 
 function downloadAiPdf(title: string, body: string) {
@@ -57,10 +67,14 @@ function downloadAiPdf(title: string, body: string) {
     .replace(/[‘’]/g, "'")
     .replace(/[“”]/g, '"')
     .replace(/[^\x20-\x7E\n]/g, "");
+
   const wrap = (value: string, width = 88) => {
     const output: string[] = [];
     for (const raw of sanitize(value).split(/\r?\n/)) {
-      if (!raw.trim()) { output.push(""); continue; }
+      if (!raw.trim()) {
+        output.push("");
+        continue;
+      }
       let line = raw.trim();
       while (line.length > width) {
         let cut = line.lastIndexOf(" ", width);
@@ -72,13 +86,17 @@ function downloadAiPdf(title: string, body: string) {
     }
     return output;
   };
-  const now = new Date().toLocaleString();
-  const titleText = sanitize(title).slice(0, 120) || "Unique AI Document";
-  const bodyLines = wrap(body);
-  const pageLines = 43;
+
+  const titleText = sanitize(title).slice(0, 120) || "Unique AI Answer";
+  const preparedBody = cleanPdfText(body) || body.trim() || "No answer available.";
+  const bodyLines = wrap(preparedBody);
+  const pageLines = 42;
   const pages: string[][] = [];
-  for (let i = 0; i < bodyLines.length; i += pageLines) pages.push(bodyLines.slice(i, i + pageLines));
+  for (let i = 0; i < bodyLines.length; i += pageLines) {
+    pages.push(bodyLines.slice(i, i + pageLines));
+  }
   if (!pages.length) pages.push([""]);
+
   const objects: string[] = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "PAGES_PLACEHOLDER",
@@ -86,33 +104,57 @@ function downloadAiPdf(title: string, body: string) {
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
   ];
   const pageRefs: number[] = [];
+
   for (const page of pages) {
     const contentNumber = objects.length + 2;
     const pageNumber = objects.length + 1;
     pageRefs.push(pageNumber);
-    const esc = (value: string) => value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+    const esc = (value: string) =>
+      value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+
     const commands = [
       "q","0.05 0.55 0.32 rg","50 755 512 5 re f","Q",
       "BT","/F2 16 Tf","0.06 0.12 0.18 rg","50 720 Td","(" + esc(titleText) + ") Tj",
-      "/F1 8 Tf","0.35 0.40 0.45 rg","0 -18 Td","(UNIQUE PLATFORM  |  UNIQUE AI) Tj","0 -14 Td","(" + esc(now) + ") Tj",
-      "0 -30 Td","/F1 10 Tf","0.12 0.15 0.18 rg",
-      ...page.map((line,index) => "(" + esc(line) + ") Tj" + (index === page.length - 1 ? "" : " 0 -15 Td")),
-      "ET","q","0.06 0.12 0.18 rg","50 35 512 1 re f","Q",
+      "/F1 8 Tf","0.35 0.40 0.45 rg","0 -18 Td","(UNIQUE PLATFORM  |  UNIQUE AI) Tj",
+      "0 -28 Td","/F1 10 Tf","0.12 0.15 0.18 rg",
+      ...page.map((line, index) => "(" + esc(line) + ") Tj" + (index === page.length - 1 ? "" : " 0 -15 Td")),
+      "ET",
+      "q","0.06 0.12 0.18 rg","50 35 512 1 re f","Q",
       "BT","/F1 8 Tf","0.35 0.40 0.45 rg","50 22 Td","(Unique Platform  |  Powered by Unique AI) Tj","ET",
     ].join("\n");
+
     objects.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + contentNumber + " 0 R >>");
     objects.push("<< /Length " + commands.length + " >>\nstream\n" + commands + "\nendstream");
   }
+
   objects[1] = "<< /Type /Pages /Kids [" + pageRefs.map(n => n + " 0 R").join(" ") + "] /Count " + pageRefs.length + " >>";
-  const chunks=["%PDF-1.4\n%UniquePlatform\n"], offsets=[0]; let length=chunks[0].length;
-  objects.forEach((obj,index)=>{ offsets[index+1]=length; const chunk=(index+1)+" 0 obj\n"+obj+"\nendobj\n"; chunks.push(chunk); length+=chunk.length; });
-  const xrefOffset=length;
-  chunks.push("xref\n0 "+(objects.length+1)+"\n0000000000 65535 f \n");
-  for(let i=1;i<=objects.length;i++) chunks.push(String(offsets[i]).padStart(10,"0")+" 00000 n \n");
-  chunks.push("trailer\n<< /Size "+(objects.length+1)+" /Root 1 0 R >>\nstartxref\n"+xrefOffset+"\n%%EOF");
-  const blob=new Blob([chunks.join("")],{type:"application/pdf"}), url=URL.createObjectURL(blob), anchor=document.createElement("a");
-  anchor.href=url; anchor.download=(titleText.replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,70)||"unique-platform-document")+".pdf";
-  document.body.appendChild(anchor); anchor.click(); anchor.remove(); window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const chunks = ["%PDF-1.4\n%UniquePlatform\n"];
+  const offsets = [0];
+  let length = chunks[0].length;
+
+  objects.forEach((obj, index) => {
+    offsets[index + 1] = length;
+    const chunk = (index + 1) + " 0 obj\n" + obj + "\nendobj\n";
+    chunks.push(chunk);
+    length += chunk.length;
+  });
+
+  const xrefOffset = length;
+  chunks.push("xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n");
+  for (let i = 1; i <= objects.length; i++) {
+    chunks.push(String(offsets[i]).padStart(10, "0") + " 00000 n \n");
+  }
+  chunks.push("trailer\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefOffset + "\n%%EOF");
+
+  const blob = new Blob([chunks.join("")], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = (titleText.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 70) || "unique-platform-answer") + ".pdf";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 const QUICK_PROMPTS = [
@@ -152,6 +194,19 @@ const QUICK_PROMPTS = [
   "Show me the most useful thing Unique AI can help me do today.",
 ];
 
+const SMART_OPPORTUNITIES = [
+  { label: "For You", icon: "✦", text: "Find something that matches what I need.", prompt: "Find something that matches what I need and show me the most suitable options." },
+  { label: "Save Money", icon: "₦", text: "Find the cheapest suitable option.", prompt: "Find the cheapest suitable option without sacrificing the things I care about." },
+  { label: "Best Value", icon: "◆", text: "Balance price, quality, and benefits.", prompt: "Show me the best-value option by balancing price, quality, and benefits." },
+  { label: "Premium", icon: "◇", text: "Show me the best premium choices.", prompt: "Show me the best premium options and explain the extra benefits." },
+  { label: "Nearby", icon: "⌖", text: "Find a suitable option near me.", prompt: "Help me find a suitable nearby product, business, or service for what I need." },
+  { label: "Fastest", icon: "→", text: "Find the fastest suitable option.", prompt: "Find the fastest suitable option for what I need." },
+  { label: "Best Rated", icon: "★", text: "Show highly rated choices.", prompt: "Show me the best-rated suitable options and compare them." },
+  { label: "Travel", icon: "✈", text: "Plan and compare my trip.", prompt: "Help me plan my trip and compare the best travel options for my budget." },
+  { label: "Services", icon: "⚒", text: "Find and arrange a service.", prompt: "Help me find, compare, and arrange the right service provider." },
+  { label: "Business", icon: "▦", text: "Find ways to improve my business.", prompt: "Help me find products, services, and ideas that can improve my business." },
+];
+
 export default function UniqueAiPage() {
   const { currentUser } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -162,6 +217,9 @@ export default function UniqueAiPage() {
   const [requestState, setRequestState] = useState<"idle" | "sending" | "retrying">("idle");
   const [lastRequestId, setLastRequestId] = useState<string | null>(null);
   const [suggestedIndex, setSuggestedIndex] = useState(0);
+  const [smartOpportunityIndex, setSmartOpportunityIndex] = useState(0);
+  const [smartOpportunityOpen, setSmartOpportunityOpen] = useState(false);
+  const [smartOpportunityDismissed, setSmartOpportunityDismissed] = useState(false);
   const [language, setLanguage] = useState<SupportedLanguage>(getLanguage());
   const [aiAccess, setAiAccess] = useState<AiAccess | null>(null);
   const [displayRemainingSeconds, setDisplayRemainingSeconds] = useState<number | null>(null);
@@ -223,6 +281,26 @@ export default function UniqueAiPage() {
     }, 6_000);
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    if (smartOpportunityDismissed) return;
+    const showId = window.setTimeout(() => setSmartOpportunityOpen(true), 12_000);
+    return () => window.clearTimeout(showId);
+  }, [smartOpportunityDismissed]);
+
+  useEffect(() => {
+    if (!smartOpportunityOpen || smartOpportunityDismissed) return;
+    const hideId = window.setTimeout(() => setSmartOpportunityOpen(false), 9_000);
+    const rotateId = window.setTimeout(() => {
+      setSmartOpportunityIndex((current) => (current + 1) % SMART_OPPORTUNITIES.length);
+      setSmartOpportunityOpen(true);
+    }, 30_000);
+    return () => {
+      window.clearTimeout(hideId);
+      window.clearTimeout(rotateId);
+    };
+  }, [smartOpportunityOpen, smartOpportunityDismissed]);
+
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -347,7 +425,7 @@ export default function UniqueAiPage() {
 
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", text: payload.message!.trim(), pdfRequested: userExplicitlyRequestedPdf(trimmed), ...(discoveryResults.length ? { discovery: discoveryResults } : {}) },
+        { id: crypto.randomUUID(), role: "assistant", text: payload.message!.trim(), pdfEligible: userExplicitlyRequestedPdf(trimmed) || shouldOfferPdfRequest(trimmed), ...(discoveryResults.length ? { discovery: discoveryResults } : {}) },
       ]);
     } catch (err) {
       setLastFailedMessage(trimmed);
@@ -414,6 +492,13 @@ export default function UniqueAiPage() {
         @keyframes uniqueAiOrbSweep {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .unique-ai-suggestion-motion,
+          .unique-ai-suggestion-motion * {
+            animation: none !important;
+            transition: none !important;
+          }
         }
         @keyframes uniqueAiFlagOrbit {
           0% { transform: rotate(0deg) translateX(34px) rotate(0deg); }
@@ -509,6 +594,51 @@ export default function UniqueAiPage() {
         </div>
       </div>
 
+      {smartOpportunityOpen && !smartOpportunityDismissed && (
+        <div
+          className="unique-ai-suggestion-motion pointer-events-none fixed inset-x-3 bottom-[calc(88px+env(safe-area-inset-bottom,0px))] z-30 flex justify-end sm:inset-x-auto sm:right-5 sm:bottom-24 sm:w-[320px]"
+          aria-live="polite"
+        >
+          <div className="pointer-events-auto w-full rounded-2xl border border-emerald-200/80 bg-white/95 p-2.5 shadow-[0_12px_38px_rgba(15,23,42,.16)] backdrop-blur-xl">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  setMessage(SMART_OPPORTUNITIES[smartOpportunityIndex].prompt);
+                  setSmartOpportunityOpen(false);
+                }}
+                className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                aria-label={`Use Smart Opportunity: ${SMART_OPPORTUNITIES[smartOpportunityIndex].text}`}
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-sm font-bold text-emerald-300">
+                  {SMART_OPPORTUNITIES[smartOpportunityIndex].icon}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                    {SMART_OPPORTUNITIES[smartOpportunityIndex].label}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] font-semibold leading-4 text-slate-700">
+                    {SMART_OPPORTUNITIES[smartOpportunityIndex].text}
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSmartOpportunityOpen(false);
+                  setSmartOpportunityDismissed(true);
+                }}
+                className="shrink-0 rounded-full px-1.5 py-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Dismiss Smart Opportunity"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain p-2.5 sm:p-6">
           {messages.length === 0 ? (
@@ -552,8 +682,8 @@ export default function UniqueAiPage() {
                       </div>
                     )}
                     <div>{item.text}</div>
-                    {item.role === "assistant" && (item.pdfRequested || shouldOfferPdf(item.text)) && (
-                      <button type="button" onClick={() => downloadAiPdf("Unique AI Breakdown", item.text)} className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100" aria-label="Create a professional Unique Platform PDF">
+                    {item.role === "assistant" && item.pdfEligible && (
+                      <button type="button" onClick={() => downloadAiPdf("Unique AI Answer", item.text)} className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100" aria-label="Create a professional Unique Platform PDF">
                         <FileDown className="h-3.5 w-3.5" />
                         Create PDF
                       </button>
