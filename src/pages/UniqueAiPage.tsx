@@ -315,7 +315,7 @@ export default function UniqueAiPage() {
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       setSuggestedIndex((current) => (current + 1) % QUICK_PROMPTS.length);
-    }, 2_000);
+    }, 6_000);
     return () => window.clearInterval(intervalId);
   }, []);
 
@@ -585,7 +585,7 @@ export default function UniqueAiPage() {
             <span className="mb-0.5 block text-[9px] font-bold uppercase tracking-[0.1em] text-emerald-700/80">Suggested prompt</span>
             <span
               className="block min-w-0 whitespace-normal break-words text-[13px] font-semibold leading-[1.4rem] text-slate-800 transition-colors group-hover:text-emerald-800 sm:text-sm"
-              style={{ animation: "uniqueAiSuggestedSlide 500ms cubic-bezier(.22,1,.36,1) both" }}
+              style={{ animation: "uniqueAiSuggestedSlide 900ms cubic-bezier(.22,1,.36,1) both" }}
             >
               {QUICK_PROMPTS[suggestedIndex]}
             </span>
@@ -593,7 +593,7 @@ export default function UniqueAiPage() {
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-emerald-100 bg-white text-sm font-bold text-emerald-700 transition-transform group-hover:translate-x-0.5" aria-hidden="true">↗</span>
         </button>
         <div className="pointer-events-none absolute inset-x-2 bottom-0.5 h-px overflow-hidden bg-emerald-100" aria-hidden="true">
-          <span key={suggestedIndex} className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-emerald-400/80" style={{ animation: "uniqueAiSuggestionSweep 2s linear both" }} />
+          <span key={suggestedIndex} className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-emerald-400/80" style={{ animation: "uniqueAiSuggestionSweep 5.5s linear both" }} />
         </div>
       </div>
 
