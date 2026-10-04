@@ -168,6 +168,7 @@ const StoreCartPage = lazy(() => import("./pages/store/StoreCartPage"));
 const StoreOrdersPage = lazy(() => import("./pages/store/StoreOrdersPage"));
 const StoreProductRequestPage = lazy(() => import("./pages/store/StoreProductRequestPage"));
 const StoreQuoteRequestPage = lazy(() => import("./pages/store/StoreQuoteRequestPage"));
+const StoreCommandCentrePage = lazy(() => import("./pages/store/StoreCommandCentrePage"));
 const CreatePaymentRequestPage = lazy(() => import("./pages/pay/CreatePaymentRequestPage"));
 const CreateInvoicePage = lazy(() => import("./pages/pay/CreateInvoicePage"));
 const ReceiptPage = lazy(() => import("./pages/pay/ReceiptPage"));
@@ -237,6 +238,7 @@ export default function App() {
                 <Route path="/store/orders" element={<StoreOrdersPage />} />
                 <Route path="/store/product-request" element={<StoreProductRequestPage />} />
                 <Route path="/store/quote-request" element={<StoreQuoteRequestPage />} />
+                <Route path="/store/command-centre" element={<StoreCommandCentrePage />} />
               </Route>
               
               <Route path="/conference" element={<Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm font-bold text-emerald-300">Loading Unique Conference…</div>}><ConferencePage /></Suspense>} />
