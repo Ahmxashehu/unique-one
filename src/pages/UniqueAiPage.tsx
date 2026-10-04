@@ -50,11 +50,23 @@ function shouldOfferPdfRequest(text: string) {
 }
 
 function cleanPdfText(body: string) {
-  const filler = /^(here(?:'s| is)|sure[!.]?$|of course[!.]?$|i(?:'ll| will) explain|i hope (this|that) helps|would you like me to|let me know if you(?:'d| would) like|feel free to ask)/i;
-  return body
+  const normalize = (value: string) => value
     .replace(/\r/g, "")
+    .replace(/\*{2,}/g, "")
+    .replace(/_{2,}/g, "")
+    .replace(/#{1,6}\s*/g, "")
+    .replace(/[•●▪◦]/g, "-")
+    .replace(/[–—]/g, "-")
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/\s+$/g, "")
+    .trim();
+
+  const filler = /^(here(?:'s| is)|sure[!.]?$|of course[!.]?$|i(?:'ll| will) explain|i hope (this|that) helps|would you like me to|let me know if you(?:'d| would) like|feel free to ask|if you need anything else)/i;
+
+  return normalize(body)
     .split("\n")
-    .map((line) => line.trim())
+    .map((line) => normalize(line))
     .filter((line) => line && !filler.test(line))
     .join("\n")
     .trim();
@@ -66,65 +78,54 @@ function downloadAiPdf(title: string, body: string) {
     .replace(/[–—]/g, "-")
     .replace(/[‘’]/g, "'")
     .replace(/[“”]/g, '"')
-    .replace(/[•·]/g, "-")
-    .replace(/[*_~#]/g, "")
-    .replace(/[\\u0000-\\u001F\\u007F]/g, " ")
-    .replace(/[^\\x20-\\x7E\\n]/g, "")
-    .replace(/[ \\t]+/g, " ")
-    .replace(/ +\\n/g, "\\n")
-    .trim();
+    .replace(/\*{2,}/g, "")
+    .replace(/_{2,}/g, "")
+    .replace(/#{1,6}\s*/g, "")
+    .replace(/[•●▪◦]/g, "-")
+    .replace(/[^\x20-\x7E\n]/g, "");
 
-  const normalizeLine = (line: string) => line
-    .replace(/^[-•*]+\\s*/, "")
-    .replace(/^\\d+[.)]\\s*/, "")
-    .replace(/^#{1,6}\\s*/, "")
-    .replace(/\\s{2,}/g, " ")
-    .trim();
-
-  const cleanBody = cleanPdfText(body)
-    .split(/\\r?\\n/)
-    .map(normalizeLine)
-    .filter(Boolean)
-    .join("\\n");
-
-  const wrap = (value: string, maxChars: number) => {
+  const wrap = (value: string, width = 88) => {
     const output: string[] = [];
-    for (const raw of sanitize(value).split(/\\r?\\n/)) {
-      const line = raw.trim();
-      if (!line) { output.push(""); continue; }
-      let remaining = line;
-      while (remaining.length > maxChars) {
-        let cut = remaining.lastIndexOf(" ", maxChars);
-        if (cut < Math.floor(maxChars * 0.55)) cut = maxChars;
-        output.push(remaining.slice(0, cut).trim());
-        remaining = remaining.slice(cut).trimStart();
+    for (const raw of sanitize(value).split(/\r?\n/)) {
+      if (!raw.trim()) {
+        output.push("");
+        continue;
       }
-      output.push(remaining);
+      let line = raw.trim();
+      while (line.length > width) {
+        let cut = line.lastIndexOf(" ", width);
+        if (cut < 20) cut = width;
+        output.push(line.slice(0, cut));
+        line = line.slice(cut).trimStart();
+      }
+      output.push(line);
     }
     return output;
   };
 
   const titleText = sanitize(title).slice(0, 120) || "Unique AI Answer";
-  const preparedBody = cleanBody || "No answer available.";
+  const preparedBody = cleanPdfText(body) || "No answer available.";
 
-  // A4 portrait: 595 x 842 points, professional margins, 12 pt body, 1.5 spacing.
-  const PAGE_W = 595;
-  const PAGE_H = 842;
-  const MARGIN_X = 50;
-  const TOP = 72;
-  const BOTTOM = 58;
-  const BODY_SIZE = 12;
-  const LEADING = 18;
-  const BODY_WIDTH = 74;
-  const lines = wrap(preparedBody, BODY_WIDTH);
+  // A4 portrait: 595 x 842 points. Body text is 12 pt with 18 pt leading (1.5 spacing).
+  const pageWidth = 595;
+  const pageHeight = 842;
+  const margin = 57;
+  const contentWidth = pageWidth - margin * 2;
+  const headerY = pageHeight - 48;
+  const titleY = pageHeight - 82;
+  const bodyStartY = pageHeight - 135;
+  const footerY = 30;
+  const lineHeight = 18;
+  const bodyFontSize = 12;
+  const titleFontSize = 17;
+  const subtitleFontSize = 8;
+  const charsPerLine = Math.max(55, Math.floor(contentWidth / 6.1));
+  const bodyLines = wrap(preparedBody, charsPerLine);
+  const maxBodyLines = Math.max(1, Math.floor((bodyStartY - footerY - 18) / lineHeight));
   const pages: string[][] = [];
-  let current: string[] = [];
-  const maxLines = Math.floor((PAGE_H - TOP - BOTTOM) / LEADING);
-  for (const line of lines) {
-    if (current.length >= maxLines) { pages.push(current); current = []; }
-    current.push(line);
+  for (let i = 0; i < bodyLines.length; i += maxBodyLines) {
+    pages.push(bodyLines.slice(i, i + maxBodyLines));
   }
-  if (current.length) pages.push(current);
   if (!pages.length) pages.push([""]);
 
   const objects: string[] = [
@@ -134,41 +135,85 @@ function downloadAiPdf(title: string, body: string) {
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
   ];
   const pageRefs: number[] = [];
-  const esc = (value: string) => value.replace(/\\\\/g, "\\\\\\\\").replace(/\\(/g, "\\\\(").replace(/\\)/g, "\\\\)");
 
-  pages.forEach((page, pageIndex) => {
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+    const page = pages[pageIndex];
     const contentNumber = objects.length + 2;
     const pageNumber = objects.length + 1;
     pageRefs.push(pageNumber);
-    const commands = [
-      "q", "0.05 0.55 0.32 rg", `50 792 495 4 re f`, "Q",
-      "BT", "/F2 17 Tf", "0.06 0.12 0.18 rg", `50 758 Td`, `(${esc(titleText)}) Tj`,
-      "/F1 9 Tf", "0.35 0.40 0.45 rg", "0 -18 Td", "(UNIQUE PLATFORM  |  UNIQUE AI) Tj",
-      "0 -28 Td", `/F1 ${BODY_SIZE} Tf`, "0.12 0.15 0.18 rg",
-      ...page.flatMap((line, index) => index === page.length - 1 ? [`(${esc(line)}) Tj`] : [`(${esc(line)}) Tj`, `0 -${LEADING} Td`]),
-      "ET",
-      "q", "0.06 0.12 0.18 rg", "50 42 495 1 re f", "Q",
-      "BT", "/F1 8 Tf", "0.35 0.40 0.45 rg", "50 27 Td",
-      `(Unique Platform  |  Unique AI  |  Page ${pageIndex + 1} of ${pages.length}) Tj`, "ET",
-    ].join("\\n");
-    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentNumber} 0 R >>`);
-    objects.push(`<< /Length ${commands.length} >>\\nstream\\n${commands}\\nendstream`);
-  });
+    const esc = (value: string) =>
+      value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 
-  objects[1] = `<< /Type /Pages /Kids [${pageRefs.map(n => n + " 0 R").join(" ")}] /Count ${pageRefs.length} >>`;
-  const chunks = ["%PDF-1.4\\n%UniquePlatform\\n"];
+    const commands: string[] = [
+      "q",
+      "0.05 0.55 0.32 rg",
+      margin + " " + (headerY - 4) + " " + contentWidth + " 4 re f",
+      "Q",
+      "BT",
+      "/F2 " + titleFontSize + " Tf",
+      "0.06 0.12 0.18 rg",
+      margin + " " + titleY + " Td",
+      "(" + esc(titleText) + ") Tj",
+      "/F1 " + subtitleFontSize + " Tf",
+      "0.35 0.40 0.45 rg",
+      "0 -18 Td",
+      "(UNIQUE PLATFORM  |  UNIQUE AI) Tj",
+      "ET",
+      "BT",
+      "/F1 " + bodyFontSize + " Tf",
+      "0.12 0.15 0.18 rg",
+      margin + " " + bodyStartY + " Td",
+    ];
+
+    page.forEach((line, index) => {
+      commands.push("(" + esc(line) + ") Tj");
+      if (index < page.length - 1) commands.push("0 -" + lineHeight + " Td");
+    });
+
+    commands.push(
+      "ET",
+      "q",
+      "0.06 0.12 0.18 rg",
+      margin + " " + (footerY + 10) + " " + contentWidth + " 1 re f",
+      "Q",
+      "BT",
+      "/F1 8 Tf",
+      "0.35 0.40 0.45 rg",
+      margin + " " + footerY + " Td",
+      "(Unique Platform  |  Powered by Unique AI) Tj",
+      "ET",
+      "BT",
+      "/F1 8 Tf",
+      "0.35 0.40 0.45 rg",
+      (pageWidth - margin - 45) + " " + footerY + " Td",
+      "(" + (pageIndex + 1) + " / " + pages.length + ") Tj",
+      "ET",
+    );
+
+    const stream = commands.join("\n");
+    objects.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pageWidth + " " + pageHeight + "] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + contentNumber + " 0 R >>");
+    objects.push("<< /Length " + stream.length + " >>\nstream\n" + stream + "\nendstream");
+  }
+
+  objects[1] = "<< /Type /Pages /Kids [" + pageRefs.map((n) => n + " 0 R").join(" ") + "] /Count " + pageRefs.length + " >>";
+  const chunks = ["%PDF-1.4\n%UniquePlatform\n"];
   const offsets = [0];
   let length = chunks[0].length;
+
   objects.forEach((obj, index) => {
     offsets[index + 1] = length;
-    const chunk = (index + 1) + " 0 obj\\n" + obj + "\\nendobj\\n";
+    const chunk = (index + 1) + " 0 obj\n" + obj + "\nendobj\n";
     chunks.push(chunk);
     length += chunk.length;
   });
+
   const xrefOffset = length;
-  chunks.push("xref\\n0 " + (objects.length + 1) + "\\n0000000000 65535 f \\n");
-  for (let i = 1; i <= objects.length; i++) chunks.push(String(offsets[i]).padStart(10, "0") + " 00000 n \\n");
-  chunks.push("trailer\\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\\nstartxref\\n" + xrefOffset + "\\n%%EOF");
+  chunks.push("xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n");
+  for (let i = 1; i <= objects.length; i += 1) {
+    chunks.push(String(offsets[i]).padStart(10, "0") + " 00000 n \n");
+  }
+  chunks.push("trailer\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefOffset + "\n%%EOF");
+
   const blob = new Blob([chunks.join("")], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -357,8 +402,7 @@ export default function UniqueAiPage() {
         "Content-Type": "application/json",
         "X-Request-ID": requestId,
       };
-      if (currentUser) {
-        headers.Authorization = `Bearer ${await currentUser.getIdToken()}`;
+      if (currentUser) {        headers.Authorization = `Bearer ${await currentUser.getIdToken()}`;
       } else if (guestSessionIdRef.current) {
         headers["X-AI-Session-ID"] = guestSessionIdRef.current;
       }
@@ -537,8 +581,7 @@ export default function UniqueAiPage() {
           <div className="min-w-0">
             <div className="font-semibold">
               {aiAccess.mode === "guest" ? "Guest AI access" : aiAccess.mode === "registered" ? "Daily AI access" : "Unique AI Premium"}
-            </div>
-            <div className="truncate opacity-80">
+            </div>            <div className="truncate opacity-80">
               {aiAccess.mode === "guest"
                 ? "Register to unlock 1 hour of Unique AI every day."
                 : aiAccess.mode === "registered"
@@ -717,8 +760,7 @@ export default function UniqueAiPage() {
                         <div className="grid gap-2 sm:grid-cols-2">
                           {item.discovery.map((result) => (
                             <Link
-                              key={`${result.type}-${result.id}`}
-                              to={result.type === "product" ? `/store/search?q=${encodeURIComponent(result.name)}` : `/store/search?q=${encodeURIComponent(result.name)}`}
+                              key={`${result.type}-${result.id}`}                              to={result.type === "product" ? `/store/search?q=${encodeURIComponent(result.name)}` : `/store/search?q=${encodeURIComponent(result.name)}`}
                               className="block rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 text-left transition hover:border-emerald-300 hover:bg-emerald-50/50"
                             >
                               <div className="flex items-center justify-between gap-2">
