@@ -20,6 +20,7 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 import { prototypeStock } from '../store/storePrototype';
+import { scoreSearchMatch } from '../../lib/search/intelligentSearch';
 
 const SEARCH_PLACEHOLDERS = [
   'Search businesses, products, services…',
@@ -54,9 +55,11 @@ export default function SearchPage() {
   const navigate = useNavigate();
   const normalizedQuery = query.trim().toLowerCase();
   const prototypeResults = normalizedQuery
-    ? prototypeStock.filter((item) =>
-        `${item.name} ${item.categoryLabel}`.toLowerCase().includes(normalizedQuery)
-      )
+    ? prototypeStock
+        .map(item => ({ item, score: scoreSearchMatch(query, [item.name, item.categoryLabel]) }))
+        .filter(entry => entry.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(entry => entry.item)
     : [];
 
   useEffect(() => {
