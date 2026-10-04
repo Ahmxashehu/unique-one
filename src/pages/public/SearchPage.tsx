@@ -164,7 +164,6 @@ export default function SearchPage() {
             <Filter className="h-6 w-6" />
           </button>
         </form>
-        </div>
       </div>
 
       <section className="space-y-5" aria-labelledby="discover-heading">
