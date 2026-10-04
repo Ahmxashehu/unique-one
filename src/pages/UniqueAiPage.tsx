@@ -105,8 +105,7 @@ function downloadAiPdf(title: string, body: string) {
 
   const wrap = (value: string, width = 88) => {
     const output: string[] = [];
-    for (const raw of sanitize(value).split(/\r?
-/)) {
+    for (const raw of sanitize(value).split("\n")) {
       if (!raw.trim()) {
         output.push("");
         continue;
