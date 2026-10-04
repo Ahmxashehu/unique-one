@@ -583,6 +583,30 @@ async function writeAiAuditLog(input: {
 
 const READ_ONLY_MUTATION_RESPONSE = "Unique AI is read-only right now and cannot change, send, cancel, approve, create, delete, refund, edit, transfer, pay, or book platform records.";
 
+function shouldUseLocalAiFallback(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /429|503|RESOURCE_EXHAUSTED|UNAVAILABLE|quota|high demand|temporarily unavailable/i.test(message);
+}
+
+function buildLocalAiFallback(prompt: string, intent: ReturnType<typeof buildUniqueAiIntent>, preferredLanguage?: string): string {
+  const route = uniqueAiCapabilitySummary(intent);
+  const language = preferredLanguage ?? "en";
+  if (language === "ha") {
+    return `Na fahimci abin da kake son yi. ${route} A yanzu injin Unique AI yana fuskantar cunkoso, amma zan iya shirya mataki na gaba: nemo bayanai, kwatanta zabuka, ko kai ka zuwa sashen da ya dace. Ka sake gwadawa nan ba da jimawa ba.`;
+  }
+  if (language === "yo") {
+    return `Mo ye abin ti o n wa se. ${route} Ni akoko yii ẹrọ Unique AI n dojukọ iṣoro iṣẹ igba diẹ, ṣugbọn tsarin naa ti gano hanyar da ta dace. Gbiyanju lẹẹkansi laipẹ.`;
+  }
+  if (language === "ig") {
+    return `Aghọtala ihe ị chọrọ ime. ${route} Unique AI na-enwe nnukwu bufee ugbu a, mana tsarin ahụ amatala ụzọ kwesịrị ekwesị. Biko nwaa ọzọ obere oge.`;
+  }
+  if (language === "fr") {
+    return `J'ai compris votre intention. ${route} Unique AI rencontre actuellement une indisponibilité temporaire, mais le système a identifié le parcours approprié. Réessayez dans quelques instants.`;
+  }
+  return `I understand what you're trying to do. ${route} Unique AI is temporarily busy, but its local intelligence has already identified the right path. Please try again shortly; your request does not need to be re-explained.`;
+}
+
+
 function isMutationRequest(message: string): boolean {
   const action = "change|send|cancel|approve|create|delete|refund|edit|update|modify|remove|transfer|pay|book";
   const gerundAction = "changing|sending|cancelling|canceling|approving|creating|deleting|refunding|editing|updating|modifying|removing|transferring|paying|booking";
@@ -844,6 +868,7 @@ export async function generateUniqueAiResponse(input: UniqueAiRequest): Promise<
       errorType: sanitizeAuditErrorType(classifyAiError(error)),
       context,
     });
+    if (shouldUseLocalAiFallback(error)) return buildLocalAiFallback(prompt, intent, preferredLanguage);
     throw error;
   }
 }
