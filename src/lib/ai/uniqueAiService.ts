@@ -918,9 +918,14 @@ export async function generatePublicUniqueAiResponse(input: { message: unknown; 
   }
   const model = configuredModel || DEFAULT_MODEL;
   const ai = new GoogleGenAI({ apiKey });
-  const response = await generateModelResponseWithInstruction(ai, model, contextualPrompt, PUBLIC_AI_SYSTEM_INSTRUCTION);
-  const output = validateAiOutput(response.text, prompt);
-  return `${output}\n\nRegister for Unique One to unlock the full platform experience and personalized AI assistance.`;
+  try {
+    const response = await generateModelResponseWithInstruction(ai, model, contextualPrompt, PUBLIC_AI_SYSTEM_INSTRUCTION);
+    const output = validateAiOutput(response.text, prompt);
+    return `${output}\n\nRegister for Unique One to unlock the full platform experience and personalized AI assistance.`;
+  } catch (error) {
+    if (shouldUseLocalAiFallback(error)) return buildLocalAiFallback(prompt, intent, preferredLanguage);
+    throw error;
+  }
 }
 
 async function generateModelResponseWithInstruction(
