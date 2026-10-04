@@ -102,6 +102,66 @@ export default function StoreSearchPage() {
       { name: 'Traditional Wear', price: '₦75,000', stock: '9 units' },
       { name: 'Kids Clothing Bundle', price: '₦30,000', stock: '22 units' },
     ],
+    phones_accessories: [
+      { name: 'Android Smartphone', price: '₦185,000', stock: '20 units' },
+      { name: 'Fast Charger & Cable', price: '₦12,500', stock: '35 units' },
+    ],
+    shoes: [
+      { name: 'Men’s Sneakers', price: '₦35,000', stock: '18 pairs' },
+      { name: 'Women’s Casual Shoes', price: '₦32,000', stock: '16 pairs' },
+    ],
+    home_furniture: [
+      { name: 'Modern Sofa Set', price: '₦320,000', stock: '6 sets' },
+      { name: 'Dining Table Set', price: '₦185,000', stock: '8 sets' },
+    ],
+    building_materials: [
+      { name: 'POP Ceiling Materials', price: '₦85,000', stock: '20 packs' },
+      { name: 'Quality Paint 20L', price: '₦48,000', stock: '30 tins' },
+    ],
+    cement: [
+      { name: 'POP Cement 40kg', price: '₦12,500', stock: '50 bags' },
+      { name: 'Premium Cement 50kg', price: '₦14,000', stock: '45 bags' },
+    ],
+    agriculture: [
+      { name: 'Maize Seed Pack', price: '₦18,000', stock: '25 packs' },
+      { name: 'Farm Crop Starter Kit', price: '₦65,000', stock: '12 kits' },
+    ],
+    fertilizer: [
+      { name: 'NPK Fertilizer 50kg', price: '₦48,000', stock: '35 bags' },
+      { name: 'Organic Fertilizer 25kg', price: '₦28,000', stock: '22 bags' },
+    ],
+    seeds: [
+      { name: 'Hybrid Maize Seeds', price: '₦22,000', stock: '30 packs' },
+      { name: 'Vegetable Seed Collection', price: '₦15,000', stock: '40 packs' },
+    ],
+    farm_equipment: [
+      { name: 'Knapsack Sprayer', price: '₦45,000', stock: '14 units' },
+      { name: 'Small Farm Tiller', price: '₦380,000', stock: '5 units' },
+    ],
+    food_groceries: [
+      { name: 'Family Grocery Basket', price: '₦75,000', stock: '18 baskets' },
+      { name: 'Rice 50kg', price: '₦78,000', stock: '25 bags' },
+    ],
+    machinery: [
+      { name: 'Portable Generator', price: '₦420,000', stock: '7 units' },
+      { name: 'Industrial Water Pump', price: '₦285,000', stock: '9 units' },
+    ],
+    vehicles: [
+      { name: 'Family Sedan', price: '₦8,500,000', stock: '3 units' },
+      { name: 'Utility Van', price: '₦12,500,000', stock: '2 units' },
+    ],
+    property: [
+      { name: 'Residential Plot', price: '₦6,500,000', stock: '5 plots' },
+      { name: 'Two-Bedroom Apartment', price: '₦35,000,000', stock: '2 units' },
+    ],
+    services: [
+      { name: 'Professional Home Service', price: '₦25,000', stock: '10 slots' },
+      { name: 'Business Support Package', price: '₦50,000', stock: '8 slots' },
+    ],
+    digital_products: [
+      { name: 'Business Template Pack', price: '₦15,000', stock: '50 licenses' },
+      { name: 'Digital Learning Bundle', price: '₦25,000', stock: '40 licenses' },
+    ],
   };
 
   useEffect(() => {
@@ -207,7 +267,7 @@ export default function StoreSearchPage() {
 
         <div className="hidden md:block w-64 shrink-0 space-y-6">
           <div><h3 className="font-semibold text-slate-900 mb-3">Categories</h3><div className="space-y-2">
-            {['electronics', 'fashion', 'agriculture', 'building_materials', 'services', 'vehicles'].map(cat => (
+            {['electronics', 'electricity_power', 'phones_accessories', 'fashion', 'shoes', 'beauty', 'home_furniture', 'building_materials', 'cement', 'agriculture', 'fertilizer', 'farm_equipment', 'food_groceries', 'machinery', 'vehicles', 'property', 'services', 'digital_products'].map(cat => (
               <Link key={cat} to={`/store/search?cat=${cat}`} className={`block text-sm ${filterCat === cat ? 'text-blue-600 font-medium' : 'text-slate-600 hover:text-slate-900'} capitalize`}>{cat.replace('_', ' ')}</Link>
             ))}
             <Link to="/store/search" className="block text-sm text-slate-400 hover:text-slate-600">Clear Category</Link>
