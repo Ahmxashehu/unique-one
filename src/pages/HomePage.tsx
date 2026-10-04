@@ -94,7 +94,7 @@ export default function HomePage() {
       eyebrow: 'UNIQUE AI',
       title: 'Meet the AI that understands your Unique world.',
             action: 'Try Unique AI',
-      href: '/os/ai',
+      href: '/ai',
       icon: Sparkles,
       tone: 'from-emerald-700 via-teal-700 to-slate-900',
     },
@@ -434,7 +434,7 @@ export default function HomePage() {
           </div>
 
           <Link
-            to="/os/ai"
+            to="/ai"
             aria-label="Open Unique AI"
             className="group relative hidden h-10 shrink-0 translate-y-1 items-center gap-1.5 rounded-full border border-emerald-200/80 bg-white/90 px-2.5 text-emerald-800 shadow-[0_0_16px_rgba(16,185,129,0.18)] backdrop-blur-xl transition hover:scale-[1.04] hover:border-emerald-300 hover:shadow-[0_0_22px_rgba(16,185,129,0.3)] sm:inline-flex"
           >
