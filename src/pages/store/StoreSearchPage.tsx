@@ -25,6 +25,7 @@ export default function StoreSearchPage() {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const categoryOptions: Array<[string, string]> = [
     ['electronics', 'Electronics'],
+    ['electricity_power', 'Electricity & Power'],
     ['phones_accessories', 'Phones & Accessories'],
     ['fashion', 'Fashion'],
     ['shoes', 'Shoes'],
@@ -44,6 +45,33 @@ export default function StoreSearchPage() {
     ['digital_products', 'Digital Products'],
     ['other', 'Other'],
   ];
+
+  const prototypeStock: Record<string, Array<{ name: string; price: string; stock: string }>> = {
+    electronics: [
+      { name: 'Smart LED TV', price: '₦285,000', stock: '12 units' },
+      { name: 'Bluetooth Speaker', price: '₦48,000', stock: '24 units' },
+      { name: 'Home Sound System', price: '₦175,000', stock: '8 units' },
+      { name: 'Smart Decoder', price: '₦32,000', stock: '30 units' },
+    ],
+    electricity_power: [
+      { name: 'Solar Inverter 3.5kVA', price: '₦420,000', stock: '6 units' },
+      { name: 'Rechargeable Solar Fan', price: '₦95,000', stock: '15 units' },
+      { name: 'Solar Panel 450W', price: '₦185,000', stock: '10 units' },
+      { name: 'Rechargeable LED Bulb', price: '₦8,500', stock: '40 units' },
+    ],
+    beauty: [
+      { name: 'Skincare Set', price: '₦28,000', stock: '18 units' },
+      { name: 'Hair Care Bundle', price: '₦35,000', stock: '14 units' },
+      { name: 'Perfume Collection', price: '₦42,000', stock: '20 units' },
+      { name: 'Beauty Essentials Kit', price: '₦22,500', stock: '25 units' },
+    ],
+    fashion: [
+      { name: 'Men’s Clothing Set', price: '₦45,000', stock: '16 units' },
+      { name: 'Women’s Casual Set', price: '₦38,000', stock: '20 units' },
+      { name: 'Traditional Wear', price: '₦75,000', stock: '9 units' },
+      { name: 'Kids Clothing Bundle', price: '₦30,000', stock: '22 units' },
+    ],
+  };
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -160,7 +188,17 @@ export default function StoreSearchPage() {
         <div className="flex-1">
           {loading ? <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div> :
           error ? <div className="bg-white border border-red-100 rounded-2xl p-12 text-center"><h3 className="text-xl font-semibold text-slate-900">Could not load products</h3><p className="text-slate-500 mt-2">{error}</p></div> :
-          products.length === 0 ? <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center"><div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><Search className="w-10 h-10 text-slate-400" /></div><h3 className="text-xl font-semibold text-slate-900">No products found</h3><p className="text-slate-500 mt-2 max-w-sm mx-auto">Try adjusting your search terms or filters to find what you're looking for.</p></div> :
+          products.length === 0 ? (filterCat && prototypeStock[filterCat] ? <div className="space-y-4">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">Prototype stock preview</p>
+              <h3 className="mt-1 text-base font-black text-slate-900">{categoryOptions.find(([cat]) => cat === filterCat)?.[1] || 'Category'}</h3>
+              <p className="mt-1 text-xs leading-4 text-slate-600">These are UI test cards only. They are not real seller inventory and cannot be purchased. Real seller listings will appear automatically when published.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">{prototypeStock[filterCat].map(item => <div key={item.name} className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <div className="flex aspect-square items-center justify-center bg-slate-100"><StoreIcon className="h-10 w-10 text-slate-300" /></div>
+              <div className="p-3"><p className="line-clamp-2 text-sm font-semibold text-slate-900">{item.name}</p><p className="mt-2 text-base font-black text-slate-900">{item.price}</p><p className="mt-1 text-[11px] font-bold text-emerald-700">Prototype stock: {item.stock}</p></div>
+            </div>)}</div>
+          </div> : <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center"><div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><Search className="w-10 h-10 text-slate-400" /></div><h3 className="text-xl font-semibold text-slate-900">No products found</h3><p className="text-slate-500 mt-2 max-w-sm mx-auto">Try adjusting your search terms or filters to find what you're looking for.</p></div>) :
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">{products.map(product => (
             <Link key={product.id} to={`/store/product/${product.id}`} className="group flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all">
               <div className="aspect-square bg-slate-100 relative overflow-hidden flex items-center justify-center">
