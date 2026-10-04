@@ -27,8 +27,8 @@ export default defineConfig(() => ({
         globPatterns: ['**/*.{css,html,ico,png,svg,webmanifest,js}'],
         runtimeCaching: [{
           urlPattern: ({ request }) => request.destination === 'script' || request.destination === 'style',
-          handler: 'CacheFirst',
-          options: { cacheName: 'unique-platform-app-assets-v10', expiration: { maxEntries: 100, maxAgeSeconds: 604800 } },
+          handler: 'NetworkFirst',
+          options: { cacheName: 'unique-platform-app-assets-v11', expiration: { maxEntries: 100, maxAgeSeconds: 604800 } },
         }],
         navigateFallback: '/index.html',
         navigateFallbackAllowlist: [/^\/(?!api(?:\/|$)).*/],
