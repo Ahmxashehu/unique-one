@@ -11,13 +11,13 @@ type UniqueAiCapabilities = {
   mutations: string[];
 };
 
-type DiscoveryResult = {
-  type: "product" | "service" | "business";
+type AiLocation = { latitude: number; longitude: number; radiusMeters?: number };\n\ntype DiscoveryResult = {
+  type: "product" | "service" | "business" | "google_place";
   id: string;
   name: string;
   category?: string;
   description?: string;
-  providerName?: string;
+  providerName?: string;\n  address?: string;\n  rating?: number;\n  ratingCount?: number;\n  businessStatus?: string;\n  mapsUrl?: string;\n  source?: "unique_one" | "google_places";
   price?: number;
   currency?: string;
   score: number;
@@ -37,6 +37,24 @@ type ChatMessage = {
   discovery?: DiscoveryResult[];
   pdfEligible?: boolean;
 };
+
+const shouldUseDeviceLocation = (value: string) =>
+  /\\b(near me|nearby|nearest|closest|around me|where is|where are|in my area|close to me)\\b/i.test(value);
+
+async function getDeviceLocation(): Promise<AiLocation | undefined> {
+  if (!navigator.geolocation) return undefined;
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        radiusMeters: 5_000,
+      }),
+      () => resolve(undefined),
+      { enableHighAccuracy: false, maximumAge: 120_000, timeout: 5_000 },
+    );
+  });
+}
 
 const shouldLoadDiscovery = (value: string) =>
   /\b(find|search|look for|show me|where can i|where is|available|buy|sell|hire|book|service|product|business|store|marketplace|cement|rice|phone|solar|car|hotel|restaurant|delivery|near me)\b/i.test(value);
@@ -409,7 +427,7 @@ export default function UniqueAiPage() {
       const response = await fetch(currentUser ? "/api/ai/chat" : "/api/ai/public-chat", {
         method: "POST",
         headers,
-        body: JSON.stringify({ message: trimmed, history, preferredLanguage: language }),
+        body: JSON.stringify({ message: trimmed, history, preferredLanguage: language, ...(location ? { location } : {}) }),
         signal: controller.signal,
       });
 
@@ -474,7 +492,7 @@ export default function UniqueAiPage() {
           const discoveryResponse = await fetch("/api/ai/discovery", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: trimmed }),
+            body: JSON.stringify({ message: trimmed, ...(location ? { location } : {}) }),
             signal: controller.signal,
           });
           if (discoveryResponse.ok) {
