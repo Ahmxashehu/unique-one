@@ -169,14 +169,7 @@ export default function StorePage() {
 
 
   return (
-    <div className="min-h-full space-y-6 pb-8" data-store-experience="buyer-marketplace-v3">
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-300/60 bg-emerald-50 px-3 py-2.5 shadow-sm">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">Buyer marketplace</p>
-          <p className="mt-0.5 text-xs font-semibold text-slate-700">Buy, save, cart and track orders from real published listings. Seller publishing stays in Business Dashboard.</p>
-        </div>
-        <button type="button" onClick={() => document.getElementById('buyer-marketplace-prototype')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="shrink-0 rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-black text-white">Open buyer test</button>
-      </div>
+    <div className="min-h-full space-y-6 pb-8" data-store-experience="buyer-marketplace-v4">
       <style>{`
         @keyframes storeBandLeft { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @keyframes storeBandRight { from { transform: translateX(-50%); } to { transform: translateX(0); } }
@@ -317,7 +310,7 @@ export default function StorePage() {
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-black text-slate-900">Shop real listings</h2>
-            <p className="mt-0.5 text-xs leading-4 text-slate-500">Browse published products and services from verified sellers. No sample inventory is shown.</p>
+            <p className="mt-0.5 text-xs leading-4 text-slate-500">Browse real published products and services. Category pages also show clearly labelled prototype stock cards until sellers publish.</p>
           </div>
           <Link to="/store/search" className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-[11px] font-black text-white">Browse</Link>
         </div>
