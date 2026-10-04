@@ -228,46 +228,49 @@ export default function StorePage() {
             </div>
           </div>
         </div>
-      </section>
 
-      <section className="grid grid-cols-2 gap-3 sm:gap-4" aria-label="Your Store shortcuts">
-        <Link
-          to={currentUser ? '/store/wishlist' : '/login'}
-          className="group relative isolate min-h-[132px] overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-white to-rose-50/70 p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-[0_12px_32px_rgba(244,63,94,0.10)] sm:min-h-[156px] sm:p-5"
-        >
-          <span className="pointer-events-none absolute -right-8 -top-8 -z-10 h-28 w-28 rounded-full bg-rose-200/40 blur-2xl transition-transform duration-500 group-hover:scale-125" />
-          <div className="flex items-start justify-between gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-rose-100 bg-white text-rose-500 shadow-sm transition-transform duration-300 group-hover:scale-105">
-              <Heart className="h-5 w-5" />
-            </span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 transition-all group-hover:border-rose-200 group-hover:text-rose-500">
-              <ArrowRight className="h-4 w-4" />
-            </span>
+
+          <div className="mt-4 border-t border-white/10 pt-4">
+                <section className="grid grid-cols-2 gap-3 sm:gap-4" aria-label="Your Store shortcuts">
+                  <Link
+                    to={currentUser ? '/store/wishlist' : '/login'}
+                    className="group relative isolate min-h-[132px] overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-white to-rose-50/70 p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-[0_12px_32px_rgba(244,63,94,0.10)] sm:min-h-[156px] sm:p-5"
+                  >
+                    <span className="pointer-events-none absolute -right-8 -top-8 -z-10 h-28 w-28 rounded-full bg-rose-200/40 blur-2xl transition-transform duration-500 group-hover:scale-125" />
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-rose-100 bg-white text-rose-500 shadow-sm transition-transform duration-300 group-hover:scale-105">
+                        <Heart className="h-5 w-5" />
+                      </span>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 transition-all group-hover:border-rose-200 group-hover:text-rose-500">
+                        <ArrowRight className="h-4 w-4" />
+                      </span>
+                    </div>
+                    <div className="mt-4">
+                      <p className="text-base font-black tracking-tight text-slate-900 sm:text-lg">Save</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">{currentUser ? `${wishlistCount} saved item${wishlistCount === 1 ? '' : 's'}` : 'Keep favourite finds together'}</p>
+                    </div>
+                  </Link>
+                  <Link
+                    to={currentUser ? '/store/cart' : '/login'}
+                    className="group relative isolate min-h-[132px] overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-white to-emerald-50/80 p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_12px_32px_rgba(16,185,129,0.13)] sm:min-h-[156px] sm:p-5"
+                  >
+                    <span className="pointer-events-none absolute -right-8 -top-8 -z-10 h-28 w-28 rounded-full bg-emerald-200/45 blur-2xl transition-transform duration-500 group-hover:scale-125" />
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-100 bg-white text-emerald-600 shadow-sm transition-transform duration-300 group-hover:scale-105">
+                        <ShoppingBag className="h-5 w-5" />
+                        {currentUser && cartCount > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-emerald-500 px-1 text-[10px] font-black text-white">{cartCount > 99 ? '99+' : cartCount}</span>}
+                      </span>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 transition-all group-hover:border-emerald-200 group-hover:text-emerald-600">
+                        <ArrowRight className="h-4 w-4" />
+                      </span>
+                    </div>
+                    <div className="mt-4">
+                      <p className="text-base font-black tracking-tight text-slate-900 sm:text-lg">Cart</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">{currentUser ? `${cartCount} item${cartCount === 1 ? '' : 's'} ready for checkout` : 'Your picks, ready when you are'}</p>
+                    </div>
+                  </Link>
+                </section>
           </div>
-          <div className="mt-4">
-            <p className="text-base font-black tracking-tight text-slate-900 sm:text-lg">Save</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">{currentUser ? `${wishlistCount} saved item${wishlistCount === 1 ? '' : 's'}` : 'Keep favourite finds together'}</p>
-          </div>
-        </Link>
-        <Link
-          to={currentUser ? '/store/cart' : '/login'}
-          className="group relative isolate min-h-[132px] overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-white to-emerald-50/80 p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_12px_32px_rgba(16,185,129,0.13)] sm:min-h-[156px] sm:p-5"
-        >
-          <span className="pointer-events-none absolute -right-8 -top-8 -z-10 h-28 w-28 rounded-full bg-emerald-200/45 blur-2xl transition-transform duration-500 group-hover:scale-125" />
-          <div className="flex items-start justify-between gap-3">
-            <span className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-100 bg-white text-emerald-600 shadow-sm transition-transform duration-300 group-hover:scale-105">
-              <ShoppingBag className="h-5 w-5" />
-              {currentUser && cartCount > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-emerald-500 px-1 text-[10px] font-black text-white">{cartCount > 99 ? '99+' : cartCount}</span>}
-            </span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 transition-all group-hover:border-emerald-200 group-hover:text-emerald-600">
-              <ArrowRight className="h-4 w-4" />
-            </span>
-          </div>
-          <div className="mt-4">
-            <p className="text-base font-black tracking-tight text-slate-900 sm:text-lg">Cart</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">{currentUser ? `${cartCount} item${cartCount === 1 ? '' : 's'} ready for checkout` : 'Your picks, ready when you are'}</p>
-          </div>
-        </Link>
       </section>
 
       <section>
