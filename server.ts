@@ -750,6 +750,119 @@ const app = express();
     }
   });
 
+const AI_GUEST_LIMIT_SECONDS = 5 * 60;
+const AI_REGISTERED_DAILY_LIMIT_SECONDS = 60 * 60;
+const AI_SUBSCRIBER_LIMIT_SECONDS = 24 * 60 * 60;
+const AI_GUEST_SESSION_TTL_MS = 5 * 60_000;
+const AI_USAGE_GAP_CAP_SECONDS = 5 * 60;
+
+function aiUsageDayKey(now = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+function isActiveAiSubscription(data: Record<string, unknown> | undefined): boolean {
+  if (!data) return false;
+  const status = typeof data.status === "string" ? data.status.toLowerCase() : "";
+  const subscriptionStatus = typeof data.subscriptionStatus === "string" ? data.subscriptionStatus.toLowerCase() : "";
+  const active = status === "active" || subscriptionStatus === "active" || data.active === true;
+  if (!active) return false;
+  const periodEnd = data.currentPeriodEnd ?? data.expiresAt ?? data.endDate;
+  if (periodEnd === undefined || periodEnd === null) return true;
+  const millis = periodEnd instanceof Timestamp ? periodEnd.toMillis() : typeof periodEnd === "number" ? periodEnd : typeof periodEnd === "string" ? Date.parse(periodEnd) : NaN;
+  return !Number.isFinite(millis) || millis > Date.now();
+}
+
+async function getAiAccess(uid: string | undefined, guestSessionId: string | undefined): Promise<{
+  mode: "guest" | "registered" | "subscriber";
+  limitSeconds: number;
+  usedSeconds: number;
+  remainingSeconds: number;
+}> {
+  const now = Date.now();
+  if (!uid) {
+    if (!guestSessionId || !/^[A-Za-z0-9_-]{16,128}$/.test(guestSessionId)) {
+      return { mode: "guest", limitSeconds: AI_GUEST_LIMIT_SECONDS, usedSeconds: 0, remainingSeconds: AI_GUEST_LIMIT_SECONDS };
+    }
+    const ref = adminDb.collection("aiGuestUsage").doc(guestSessionId);
+    const snap = await ref.get();
+    const data = snap.data() as Record<string, unknown> | undefined;
+    const startedAt = typeof data?.startedAt === "number" ? data.startedAt : now;
+    const elapsed = Math.max(0, Math.floor((now - startedAt) / 1000));
+    if (!snap.exists) await ref.set({ startedAt, lastSeenAt: now, createdAt: Timestamp.now() }, { merge: true });
+    return {
+      mode: "guest",
+      limitSeconds: AI_GUEST_LIMIT_SECONDS,
+      usedSeconds: Math.min(AI_GUEST_LIMIT_SECONDS, elapsed),
+      remainingSeconds: Math.max(0, AI_GUEST_LIMIT_SECONDS - elapsed),
+    };
+  }
+  const subscriptionSnap = await adminDb.collection("subscriptions").doc(uid).get();
+  let subscribed = isActiveAiSubscription(subscriptionSnap.data() as Record<string, unknown> | undefined);
+  if (!subscribed) {
+    const userSnap = await adminDb.collection("users").doc(uid).get();
+    subscribed = isActiveAiSubscription(userSnap.data() as Record<string, unknown> | undefined);
+  }
+  if (subscribed) {
+    return { mode: "subscriber", limitSeconds: AI_SUBSCRIBER_LIMIT_SECONDS, usedSeconds: 0, remainingSeconds: AI_SUBSCRIBER_LIMIT_SECONDS };
+  }
+  const dayKey = aiUsageDayKey();
+  const ref = adminDb.collection("aiUsage").doc(uid + "_" + dayKey);
+  const snap = await ref.get();
+  const data = snap.data() as Record<string, unknown> | undefined;
+  const usedSeconds = Number.isSafeInteger(data?.usedSeconds) ? Number(data?.usedSeconds) : 0;
+  return {
+    mode: "registered",
+    limitSeconds: AI_REGISTERED_DAILY_LIMIT_SECONDS,
+    usedSeconds: Math.max(0, Math.min(AI_REGISTERED_DAILY_LIMIT_SECONDS, usedSeconds)),
+    remainingSeconds: Math.max(0, AI_REGISTERED_DAILY_LIMIT_SECONDS - usedSeconds),
+  };
+}
+
+async function consumeAiAccess(uid: string | undefined, guestSessionId: string | undefined, startedAtMs: number): Promise<ReturnType<typeof getAiAccess> extends Promise<infer T> ? T : never> {
+  const now = Date.now();
+  if (!uid) {
+    if (!guestSessionId || !/^[A-Za-z0-9_-]{16,128}$/.test(guestSessionId)) return await getAiAccess(undefined, guestSessionId);
+    const ref = adminDb.collection("aiGuestUsage").doc(guestSessionId);
+    const snap = await ref.get();
+    const data = snap.data() as Record<string, unknown> | undefined;
+    const started = typeof data?.startedAt === "number" ? data.startedAt : startedAtMs;
+    const elapsed = Math.floor((now - started) / 1000);
+    await ref.set({ startedAt: started, lastSeenAt: now, updatedAt: Timestamp.now() }, { merge: true });
+    return getAiAccess(undefined, guestSessionId);
+  }
+  const access = await getAiAccess(uid, undefined);
+  if (access.mode === "subscriber") return access;
+  const dayKey = aiUsageDayKey();
+  const ref = adminDb.collection("aiUsage").doc(uid + "_" + dayKey);
+  const snap = await ref.get();
+  const data = snap.data() as Record<string, unknown> | undefined;
+  const lastRequestAt = typeof data?.lastRequestAt === "number" ? data.lastRequestAt : startedAtMs;
+  const generationSeconds = Math.max(1, Math.ceil((now - startedAtMs) / 1000));
+  const gapSeconds = Math.min(AI_USAGE_GAP_CAP_SECONDS, Math.max(0, Math.ceil((startedAtMs - lastRequestAt) / 1000)));
+  const chargeSeconds = Math.max(1, generationSeconds + gapSeconds);
+  const usedBefore = Number.isSafeInteger(data?.usedSeconds) ? Number(data.usedSeconds) : 0;
+  const usedAfter = Math.min(AI_REGISTERED_DAILY_LIMIT_SECONDS, usedBefore + chargeSeconds);
+  await ref.set({ usedSeconds: usedAfter, lastRequestAt: now, updatedAt: Timestamp.now() }, { merge: true });
+  return getAiAccess(uid, undefined);
+}
+
+async function enforceAiAccess(req: Request, res: Response, uid?: string): Promise<{ mode: "guest" | "registered" | "subscriber"; limitSeconds: number; usedSeconds: number; remainingSeconds: number } | null> {
+  const guestHeader = req.headers["x-ai-session-id"];
+  const guestSessionId = Array.isArray(guestHeader) ? guestHeader[0] : guestHeader;
+  const access = await getAiAccess(uid, typeof guestSessionId === "string" ? guestSessionId : undefined);
+  res.setHeader("X-AI-Access-Mode", access.mode);
+  res.setHeader("X-AI-Remaining-Seconds", String(access.remainingSeconds));
+  res.setHeader("Cache-Control", "no-store");
+  if (access.remainingSeconds <= 0) {
+    res.status(429).json({
+      error: { code: "AI_TIME_LIMIT", message: access.mode === "guest" ? "Your 5-minute guest AI session has ended. Register for 1 hour of Unique AI access every day." : "Your 1-hour daily Unique AI allowance has been used. Subscribe for extended AI access." },
+      aiAccess: access,
+    });
+    return null;
+  }
+  return access;
+}
+
   app.post("/api/ai/public-chat", rateLimit({
     windowMs: 60_000,
     limit: 12,
@@ -769,7 +882,12 @@ const app = express();
       for (const key of Object.keys(payload)) {
         if (!allowedKeys.has(key)) return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
       }
-      const responseText = await generatePublicUniqueAiResponse({ message: payload.message, history: payload.history });
+      const access = await enforceAiAccess(req, res);
+      if (!access) return;
+      const usageStartedAt = Date.now();
+      const responseText = await generatePublicUniqueAiResponse({ message: payload.message, history: payload.history, preferredLanguage: typeof payload.preferredLanguage === "string" ? payload.preferredLanguage : undefined });
+      const updatedAccess = await consumeAiAccess(undefined, typeof req.headers["x-ai-session-id"] === "string" ? req.headers["x-ai-session-id"] : undefined, usageStartedAt);
+      res.setHeader("X-AI-Remaining-Seconds", String(updatedAccess.remainingSeconds));
       return res.status(200).json({
         message: responseText,
         public: true,
@@ -814,7 +932,7 @@ const app = express();
         return errorResponse(res, 'INVALID_REQUEST', 'The AI request body must be a plain object.');
       }
       const payload = req.body as Record<string, unknown>;
-      const allowedKeys = new Set(['message', 'history']);
+      const allowedKeys = new Set(['message', 'history', 'preferredLanguage']);
       for (const key of Object.keys(payload)) {
         if (!allowedKeys.has(key)) {
           return errorResponse(res, 'INVALID_REQUEST', `Unsupported field: ${key}.`);
@@ -826,6 +944,9 @@ const app = express();
       }
       const message = payload.message;
       const history = payload.history;
+      const access = await enforceAiAccess(req, res, uid);
+      if (!access) return;
+      const usageStartedAt = Date.now();
       if (suppliedRequestId !== undefined && (
         typeof suppliedRequestId !== "string" ||
         !/^[A-Za-z0-9._:-]{1,64}$/.test(suppliedRequestId.trim())
@@ -845,6 +966,8 @@ const app = express();
         requestId: resolvedRequestId,
         preferredLanguage,
       });
+      const updatedAccess = await consumeAiAccess(uid, undefined, usageStartedAt);
+      res.setHeader("X-AI-Remaining-Seconds", String(updatedAccess.remainingSeconds));
       return res.status(200).json({
         message: responseText,
         readOnly: true,
