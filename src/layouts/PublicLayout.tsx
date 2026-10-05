@@ -5,6 +5,7 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import AppearanceControls from '../components/AppearanceControls';
 import { getLanguage, t, type SupportedLanguage } from '../lib/i18n';
+import { Settings } from 'lucide-react';
 
 export default function PublicLayout() {
   const { currentUser } = useAuth();
@@ -36,15 +37,10 @@ export default function PublicLayout() {
               <Link to="/about" className="text-sm font-medium text-slate-600 hover:text-slate-900">{t('about', language)}</Link>
               <Link to="/support" className="text-sm font-medium text-slate-600 hover:text-slate-900">{t('support', language)}</Link>
             </nav>
-            <div className="flex items-center gap-3">
-              {currentUser ? (
-                <Link to="/os/dashboard" className="bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-slate-800 transition-colors">{t('dashboard', language)}</Link>
-              ) : (
-                <>
-                  <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">{t('login', language)}</Link>
-                  <Link to="/register" className="bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-slate-800 transition-colors">{t('signUp', language)}</Link>
-                </>
-              )}
+            <div className="flex items-center gap-2">
+              <Link to="/settings" aria-label="Open settings" title="Settings" className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700">
+                <Settings className="h-4 w-4" />
+              </Link>
             </div>
           </div>
         </header>
@@ -91,16 +87,11 @@ export default function PublicLayout() {
                 ))}
               </div>
             </div>
-            <div className="mt-3">
-              {currentUser ? (
+            {currentUser && (
+              <div className="mt-3">
                 <Link to="/os/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">{t('openUniqueOS', language)}</Link>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="rounded-2xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-slate-700">{t('login', language)}</Link>
-                  <Link to="/register" onClick={() => setIsMobileMenuOpen(false)} className="rounded-2xl bg-slate-950 px-4 py-3 text-center text-sm font-bold text-white">{t('register', language)}</Link>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}
