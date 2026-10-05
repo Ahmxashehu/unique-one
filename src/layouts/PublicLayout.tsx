@@ -71,7 +71,8 @@ export default function PublicLayout() {
                 ['Hotels & Events', '/hotels-events'],
                 ['Flights', '/flights'],
                 ['Unique Jobs & Services', '/os/jobs'],
-                ['Unique Travel', '/os/travel'],\n                ['Unique Health & Wellness', '/health-wellness'],
+                ['Unique Travel', '/os/travel'],
+                ['Unique Health & Wellness', '/health-wellness'],
               ].map(([name, path]) => (
                 <Link key={path + name} to={path} onClick={() => setIsMobileMenuOpen(false)} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm">
                   {name}
