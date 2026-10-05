@@ -3,7 +3,6 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import type { Permission, Role } from '../lib/os/types';
 import { ROLE_PERMISSIONS, hasRolePermission } from '../lib/auth/rbac';
 
-const db = getFirestore();
 const ALL_ROLES: Role[] = [
   'customer','buyer','seller','business_owner','staff_member','farmer','service_provider',
   'school_administrator','parent','healthcare_provider','property_owner','hotel_owner','driver',
@@ -25,6 +24,7 @@ export function registerAdminRbacRoutes(
   authenticate: RequestHandler,
   requirePermission: (permission: Permission) => RequestHandler,
 ) {
+  const db = getFirestore();
   app.get('/api/admin/rbac/catalog', authenticate, requirePermission('manage:roles'), async (_req, res) => {
     return res.json({
       roles: ALL_ROLES.map((role) => ({ role, permissions: ROLE_PERMISSIONS[role] || [] })),
