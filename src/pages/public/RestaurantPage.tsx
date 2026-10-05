@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   ArrowLeft, CalendarDays, ChevronDown, Clock3, MapPin, Search, Star,
-  Utensils, Users, X, Navigation, Heart, SlidersHorizontal
+  Utensils, Users, X, Navigation, Heart, SlidersHorizontal, CreditCard, Landmark
 } from 'lucide-react';
 
 type Restaurant = {
@@ -262,7 +262,7 @@ export default function RestaurantPage() {
                 <button onClick={() => saveDraft({...draft, paymentMethod:'uniquepay'})} className="rounded-2xl border border-slate-200 p-3 text-left"><CreditCard className="h-4 w-4 text-emerald-600"/><p className="mt-2 text-xs font-black">UniquePay</p><p className="text-[10px] text-slate-500">Pay directly</p></button>
                 <button onClick={() => saveDraft({...draft, paymentMethod:'bank-transfer'})} className="rounded-2xl border border-slate-200 p-3 text-left"><Landmark className="h-4 w-4 text-emerald-600"/><p className="mt-2 text-xs font-black">Bank transfer</p><p className="text-[10px] text-slate-500">Generate account number</p></button>
               </div>
-              <button disabled={!customerName.trim() || !customerPhone.trim()} onClick={confirmBooking} className="w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-40">{currentUser ? (draft.paymentMethod === 'uniquepay' ? 'Continue to UniquePay' : 'Generate account number') : 'Sign in to continue'}</button>
+              <button disabled={!checkoutReady} onClick={confirmBooking} className="w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-40">{currentUser ? (draft.paymentMethod === 'uniquepay' ? 'Continue to UniquePay' : 'Generate account number') : 'Sign in to continue'}</button>
               {!currentUser && <p className="text-center text-[10px] text-slate-500">Your details and payment choice will remain saved while you sign in.</p>}
             </div>
             {!currentUser && <p className="mt-2 text-center text-[10px] text-slate-500">Your reservation details stay preserved while you sign in.</p>}
