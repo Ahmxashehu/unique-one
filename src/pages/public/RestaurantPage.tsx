@@ -77,6 +77,8 @@ export default function RestaurantPage() {
   const [selected, setSelected] = useState<Restaurant | null>(null);
   const [stage, setStage] = useState<'browse' | 'menu' | 'review' | 'ready'>('browse');
   const [cart, setCart] = useState<Record<string, number>>({});
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
 
   const saveDraft = (next: Draft) => {
     setDraft(next);
@@ -91,6 +93,9 @@ export default function RestaurantPage() {
   ] : [];
   const cartCount = Object.values(cart).reduce((a,b) => a+b, 0);
   const cartTotal = menuItems.reduce((sum, item) => sum + item.price * (cart[item.id] || 0), 0);
+  const deliveryFee = draft.mode === 'delivery' ? 1500 : 0;
+  const serviceFee = cartTotal ? Math.max(300, Math.round(cartTotal * 0.03)) : 0;
+  const finalTotal = cartTotal + deliveryFee + serviceFee;
 
   const openBooking = (restaurant: Restaurant) => {
     setSelected(restaurant);
@@ -239,7 +244,24 @@ export default function RestaurantPage() {
           <section className="w-full max-w-xl rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
             <div className="flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Review</p><h2 className="text-lg font-black text-slate-950">Ready to confirm?</h2></div><button onClick={() => setStage('browse')} className="rounded-full bg-slate-100 p-2"><X className="h-4 w-4" /></button></div>
             <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm"><p className="font-black">{selected.name}</p><p>{draft.date} · {draft.time} · {draft.guests} guest{draft.guests === 1 ? '' : 's'}</p><p>{draft.seating}</p>{draft.notes && <p className="text-slate-500">{draft.notes}</p>}</div>
-            <button onClick={confirmBooking} className="mt-4 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white">{currentUser ? 'Confirm reservation' : 'Sign in to confirm'}</button>
+            <div className="mt-4 space-y-3">
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Customer details</p>
+              <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Full name" className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none" />
+              <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="Phone number" inputMode="tel" className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none" />
+              <div className="rounded-2xl border border-slate-200 p-3 text-sm">
+                <div className="flex justify-between"><span>Food</span><b>₦{cartTotal.toLocaleString()}</b></div>
+                <div className="mt-2 flex justify-between"><span>Delivery</span><b>{deliveryFee ? '₦' + deliveryFee.toLocaleString() : 'Free'}</b></div>
+                <div className="mt-2 flex justify-between"><span>Service fee</span><b>₦{serviceFee.toLocaleString()}</b></div>
+                <div className="mt-3 flex justify-between border-t pt-3 text-base font-black"><span>Total</span><span>₦{finalTotal.toLocaleString()}</span></div>
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Payment</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => saveDraft({...draft, paymentMethod:'uniquepay'})} className="rounded-2xl border border-slate-200 p-3 text-left"><CreditCard className="h-4 w-4 text-emerald-600"/><p className="mt-2 text-xs font-black">UniquePay</p><p className="text-[10px] text-slate-500">Pay directly</p></button>
+                <button onClick={() => saveDraft({...draft, paymentMethod:'bank-transfer'})} className="rounded-2xl border border-slate-200 p-3 text-left"><Landmark className="h-4 w-4 text-emerald-600"/><p className="mt-2 text-xs font-black">Bank transfer</p><p className="text-[10px] text-slate-500">Generate account number</p></button>
+              </div>
+              <button disabled={!customerName.trim() || !customerPhone.trim()} onClick={confirmBooking} className="w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-40">{currentUser ? (draft.paymentMethod === 'uniquepay' ? 'Continue to UniquePay' : 'Generate account number') : 'Sign in to continue'}</button>
+              {!currentUser && <p className="text-center text-[10px] text-slate-500">Your details and payment choice will remain saved while you sign in.</p>}
+            </div>
             {!currentUser && <p className="mt-2 text-center text-[10px] text-slate-500">Your reservation details stay preserved while you sign in.</p>}
           </section>
         </div>
