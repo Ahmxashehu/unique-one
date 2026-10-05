@@ -63,7 +63,7 @@ export default function HomePage() {
     ['Transportation', '/categories'],
     ['Real Estate', '/categories'],
     ['Technology', '/categories'],
-    ['Health & Wellness', '/categories'],
+    ['Unique Health & Wellness', '/health-wellness'],
     ['Food & Dining', '/categories'],
     ['Global Search', '/search'],
     ['Near Me', '/near-me'],
