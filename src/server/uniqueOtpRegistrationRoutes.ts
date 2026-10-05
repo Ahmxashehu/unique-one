@@ -10,6 +10,8 @@ function normalizePhone(value: unknown): string {
   return `+234${value.trim().slice(1)}`;
 }
 
+const AUTH_REQUIRE_OTP = process.env.AUTH_REQUIRE_OTP !== 'false';
+
 function validateName(value: unknown, required: boolean): string {
   const name = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, 80) : '';
   if (required && !name) throw new Error('INVALID_NAME');
@@ -84,8 +86,17 @@ export function registerUniqueOtpRegistrationRoutes(app: Express) {
       } catch (error: any) {
         if (error?.code !== 'auth/user-not-found') throw error;
       }
+      if (!AUTH_REQUIRE_OTP) {
+        const registrationToken = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
+        const now = Timestamp.now();
+        await getFirestore().collection('uniqueOtpRegistrationSessions').doc(hashToken(registrationToken)).set({
+          phone, purpose: 'registration', otpSkipped: true, createdAt: now,
+          expiresAt: Timestamp.fromMillis(Date.now() + 10 * 60_000), consumedAt: null,
+        });
+        return res.json({ ok: true, otpRequired: false, registrationToken, expiresInSeconds: 600 });
+      }
       await getUniqueOtpService('sms').issue({ destination: phone, purpose: 'registration', channel: 'sms' });
-      return res.json({ ok: true, channel: 'sms', expiresInSeconds: 300, resendAfterSeconds: 30 });
+      return res.json({ ok: true, otpRequired: true, channel: 'sms', expiresInSeconds: 300, resendAfterSeconds: 30 });
     } catch (error: any) {
       if (error?.message === 'INVALID_PHONE') return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter a valid phone number.' } });
       if (error?.code === 'auth/phone-number-already-exists') return res.status(409).json({ error: { code: 'PHONE_ALREADY_REGISTERED', message: 'This phone number is already registered. Please log in.' } });
@@ -167,6 +178,7 @@ export function registerUniqueOtpRegistrationRoutes(app: Express) {
       const sessionData = sessionSnapshot.data() as Record<string, unknown>;
       if (
         sessionData.purpose !== 'registration' ||
+        AUTH_REQUIRE_OTP && sessionData.otpSkipped === true ||
         sessionData.consumedAt ||
         !(sessionData.expiresAt instanceof Timestamp) ||
         sessionData.expiresAt.toMillis() <= Date.now() ||
@@ -195,6 +207,7 @@ export function registerUniqueOtpRegistrationRoutes(app: Express) {
           const data = session.data() as Record<string, unknown>;
           if (
             data.purpose !== 'registration' ||
+            AUTH_REQUIRE_OTP && data.otpSkipped === true ||
             data.consumedAt ||
             !(data.expiresAt instanceof Timestamp) ||
             data.expiresAt.toMillis() <= Date.now() ||
