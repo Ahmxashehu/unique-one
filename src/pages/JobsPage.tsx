@@ -266,33 +266,36 @@ export default function JobsPage() {
       { id: 'work', label: 'My Work', description: 'Applications, requests and agreements', icon: CheckCircle2 },
     ];
     return (
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/60 p-0 sm:items-center sm:p-4">
-        <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl border border-white/10 bg-white shadow-2xl sm:rounded-3xl">
-          <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-600">Unique One</p>
-                <h1 className="mt-1 text-2xl font-black text-slate-950">Unique Jobs & Services</h1>
-                <p className="mt-1 text-xs font-semibold text-slate-500">Find a Job • Find a Professional • Hire a Service • Get Work Done</p>
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/65 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+        <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-[2rem] border border-white/10 bg-white shadow-2xl sm:rounded-[2rem]">
+          <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 px-4 py-3.5 backdrop-blur sm:px-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white"><BriefcaseBusiness className="h-4 w-4" /></span>
+                  <div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-600">Unique One</p><h1 className="text-xl font-black text-slate-950 sm:text-2xl">Jobs & Services</h1></div>
+                </div>
+                <p className="mt-2 text-xs font-semibold text-slate-500">Find work • Find professionals • Hire services • Get work done</p>
               </div>
               <button onClick={() => window.history.back()} aria-label="Close" className="rounded-full border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"><X className="h-5 w-5" /></button>
             </div>
           </div>
           <div className="p-4 sm:p-5">
-            <div className="rounded-2xl bg-slate-950 p-4 text-white">
-              <p className="text-sm font-black">Work starts here</p>
-              <p className="mt-1 text-xs leading-5 text-slate-300">Discover real published opportunities, connect with providers, request work and manage your active work lifecycle.</p>
+            <div className="rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-4 text-white sm:p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-300">Your work hub</p>
+              <p className="mt-1 text-lg font-black">What do you need today?</p>
+              <p className="mt-1 text-xs leading-5 text-slate-300">Search real opportunities, connect with verified providers, request work and manage everything from one place.</p>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
               {hubItems.map(({ id, label, description, icon: Icon }) => (
-                <button key={id} onClick={() => id === 'request' ? setShowRequest(true) : openHub(id)} className="group rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md">
+                <button key={id} onClick={() => id === 'request' ? setShowRequest(true) : openHub(id)} className="group rounded-2xl border border-slate-200 bg-white p-3.5 text-left shadow-sm transition active:scale-[0.98] hover:border-emerald-300 hover:bg-emerald-50/40 hover:shadow-md sm:p-4">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><Icon className="h-5 w-5" /></span>
-                  <p className="mt-3 text-sm font-black text-slate-900">{label}</p>
+                  <p className="mt-2.5 text-sm font-black text-slate-900">{label}</p>
                   <p className="mt-1 text-[11px] leading-4 text-slate-500">{description}</p>
                 </button>
               ))}
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-2 text-[11px] font-bold text-slate-600">
+            <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-600">
               <div className="rounded-xl bg-emerald-50 p-3"><span className="text-emerald-700">Free access</span><br />Search, apply, request & hire</div>
               <div className="rounded-xl bg-slate-50 p-3"><span className="text-slate-900">Work lifecycle</span><br />Request → agreement → work → payment → review</div>
             </div>
