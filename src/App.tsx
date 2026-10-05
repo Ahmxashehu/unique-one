@@ -174,7 +174,7 @@ export default function App() {
 
                   <Route path="/os" element={<AuthGuard><AppLayout /></AuthGuard>}>
                     <Route index element={<Navigate to="/os/dashboard" replace />} />
-                    <Route path="dashboard" element={<DashboardPage />} />
+                    <Route path="dashboard" element={<HomePage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="messages/*" element={<MessagesPage />} />
                     <Route path="orders" element={<OrdersPage />} />
