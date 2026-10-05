@@ -21,6 +21,79 @@ export function hasRolePermission(roles: readonly Role[], customPermissions: rea
   return roles.some((role) => ROLE_PERMISSIONS[role]?.includes(permission));
 }
 
+export type DashboardId =
+  | 'personal'
+  | 'uniquepay'
+  | 'store_seller'
+  | 'business'
+  | 'institution'
+  | 'operations'
+  | 'active_edge'
+  | 'unique_ai'
+  | 'finance_settlement'
+  | 'security_risk'
+  | 'platform_admin'
+  | 'super_admin';
+
+/**
+ * Canonical dashboard access policy. This is the source of truth for workspace
+ * visibility; individual actions remain controlled by Permission.
+ */
+export const DASHBOARD_ACCESS_ROLES: Record<DashboardId, readonly Role[]> = {
+  personal: [
+    'customer', 'buyer', 'seller', 'business_owner', 'staff_member', 'farmer',
+    'service_provider', 'school_administrator', 'parent', 'healthcare_provider',
+    'property_owner', 'hotel_owner', 'driver', 'logistics_provider', 'moderator',
+    'administrator', 'partner', 'developer', 'finance_officer', 'risk_security_officer',
+    'platform_admin', 'super_admin',
+  ],
+  uniquepay: [
+    'customer', 'buyer', 'seller', 'business_owner', 'staff_member', 'finance_officer',
+    'platform_admin', 'super_admin', 'administrator',
+  ],
+  store_seller: [
+    'seller', 'business_owner', 'staff_member', 'platform_admin', 'super_admin', 'administrator',
+  ],
+  business: [
+    'business_owner', 'staff_member', 'seller', 'platform_admin', 'super_admin', 'administrator',
+  ],
+  institution: [
+    'school_administrator', 'business_owner', 'staff_member', 'platform_admin', 'super_admin', 'administrator',
+  ],
+  operations: [
+    'service_provider', 'driver', 'logistics_provider', 'staff_member', 'business_owner',
+    'platform_admin', 'super_admin', 'administrator',
+  ],
+  active_edge: [
+    'customer', 'buyer', 'seller', 'business_owner', 'staff_member', 'service_provider',
+    'school_administrator', 'parent', 'healthcare_provider', 'property_owner', 'hotel_owner',
+    'driver', 'logistics_provider', 'moderator', 'partner', 'developer',
+    'platform_admin', 'super_admin', 'administrator',
+  ],
+  unique_ai: [
+    'customer', 'buyer', 'seller', 'business_owner', 'staff_member', 'farmer', 'service_provider',
+    'school_administrator', 'parent', 'healthcare_provider', 'property_owner', 'hotel_owner',
+    'driver', 'logistics_provider', 'moderator', 'partner', 'developer', 'administrator',
+    'platform_admin', 'super_admin',
+  ],
+  finance_settlement: [
+    'finance_officer', 'platform_admin', 'super_admin', 'administrator',
+  ],
+  security_risk: [
+    'risk_security_officer', 'moderator', 'platform_admin', 'super_admin', 'administrator',
+  ],
+  platform_admin: [
+    'platform_admin', 'super_admin', 'administrator',
+  ],
+  super_admin: [
+    'super_admin',
+  ],
+};
+
+export function hasDashboardAccess(roles: readonly Role[], dashboardId: DashboardId): boolean {
+  return roles.some((role) => DASHBOARD_ACCESS_ROLES[dashboardId].includes(role));
+}
+
 export function hasAnyRole(roles: readonly Role[], allowed: readonly Role[]): boolean {
   return roles.some((role) => allowed.includes(role));
 }
