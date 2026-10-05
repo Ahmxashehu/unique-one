@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { DASHBOARD_ACCESS_ROLES } from '../../lib/auth/rbac';
 import {
   LayoutDashboard, Wallet, Store, Building2, Users, BriefcaseBusiness,
   Radio, Bot, Landmark, ShieldCheck, Settings2, Search, ChevronRight,
@@ -13,24 +14,24 @@ type DashboardItem = {
   role: string;
   purpose: string;
   route: string;
-  access: string[];
+  access: readonly string[];
   sensitive: 'Standard' | 'Restricted' | 'High';
   icon: React.ElementType;
 };
 
 const dashboards: DashboardItem[] = [
-  { id:'personal', name:'Personal Dashboard', role:'Everyone', purpose:'Personal activity, orders, bookings, messages, notifications and connected Unique One experiences.', route:'/os/dashboard', access:['customer','buyer'], sensitive:'Standard', icon:LayoutDashboard },
-  { id:'pay', name:'UniquePay Dashboard', role:'Pay customer + Pay Operations', purpose:'Wallet, transfers, bills, transaction activity, settlements and payment operations.', route:'/os/pay', access:['customer','finance'], sensitive:'High', icon:Wallet },
-  { id:'store', name:'Store Seller Dashboard', role:'Seller + Store team', purpose:'Listings, inventory, orders, customers, bookings, payouts and marketplace operations.', route:'/os/business/dashboard', access:['seller','business_owner'], sensitive:'Restricted', icon:Store },
-  { id:'business', name:'Business Dashboard', role:'Business owner / manager', purpose:'Business profile, products, services, staff, customers, payments, marketing and analytics.', route:'/os/business/dashboard', access:['business_owner','staff_member'], sensitive:'Restricted', icon:Building2 },
-  { id:'institution', name:'Institution Dashboard', role:'Institution administrator', purpose:'Organization members, departments, services, communication, finance and reports.', route:'/os/business/members', access:['school_administrator'], sensitive:'Restricted', icon:Landmark },
-  { id:'operations', name:'Operations Dashboard', role:'Service providers + operational staff', purpose:'Requests, schedules, active jobs, fulfilment, customers, payments and reviews.', route:'/os/services', access:['service_provider','driver','logistics_provider'], sensitive:'Restricted', icon:BriefcaseBusiness },
-  { id:'edge', name:'Active Edge Dashboard', role:'Creators, businesses, organizations', purpose:'Posts, status, followers, engagement, campaigns, events and content management.', route:'/os/dashboard', access:['customer','business_owner'], sensitive:'Standard', icon:Radio },
-  { id:'ai', name:'Unique AI Dashboard', role:'Users + authorized operators', purpose:'AI assistants, generated content, documents, images, automations and usage controls.', route:'/os/ai', access:['customer','developer','administrator'], sensitive:'Standard', icon:Bot },
-  { id:'finance', name:'Finance & Settlement Dashboard', role:'Finance officers', purpose:'Reconciliation, merchant and seller settlement, commissions, fees, refunds and disputes.', route:'/admin/transactions', access:['finance'], sensitive:'High', icon:Landmark },
-  { id:'risk', name:'Security & Risk Dashboard', role:'Risk, security and compliance', purpose:'Fraud signals, identity reviews, access events, cases, audit trails and compliance.', route:'/admin/verification', access:['moderator','administrator'], sensitive:'High', icon:ShieldCheck },
-  { id:'admin', name:'Platform Admin Dashboard', role:'Platform administrators', purpose:'Users, businesses, marketplace, services, content, reports, configuration and platform operations.', route:'/admin/users', access:['administrator'], sensitive:'High', icon:Settings2 },
-  { id:'super', name:'Super Admin Control Tower', role:'Authorized super administrators', purpose:'Global platform oversight, executive indicators, critical alerts, governance and controlled configuration.', route:'/admin/control-tower', access:['administrator'], sensitive:'High', icon:Activity },
+  { id:'personal', name:'Personal Dashboard', role:'Everyone', purpose:'Personal activity, orders, bookings, messages, notifications and connected Unique One experiences.', route:'/os/dashboard', access:DASHBOARD_ACCESS_ROLES.personal, sensitive:'Standard', icon:LayoutDashboard },
+  { id:'pay', name:'UniquePay Dashboard', role:'Pay customer + Pay Operations', purpose:'Wallet, transfers, bills, transaction activity, settlements and payment operations.', route:'/os/pay', access:DASHBOARD_ACCESS_ROLES.uniquepay, sensitive:'High', icon:Wallet },
+  { id:'store', name:'Store Seller Dashboard', role:'Seller + Store team', purpose:'Listings, inventory, orders, customers, bookings, payouts and marketplace operations.', route:'/os/business/dashboard', access:DASHBOARD_ACCESS_ROLES.store_seller, sensitive:'Restricted', icon:Store },
+  { id:'business', name:'Business Dashboard', role:'Business owner / manager', purpose:'Business profile, products, services, staff, customers, payments, marketing and analytics.', route:'/os/business/dashboard', access:DASHBOARD_ACCESS_ROLES.business, sensitive:'Restricted', icon:Building2 },
+  { id:'institution', name:'Institution Dashboard', role:'Institution administrator', purpose:'Organization members, departments, services, communication, finance and reports.', route:'/os/business/members', access:DASHBOARD_ACCESS_ROLES.institution, sensitive:'Restricted', icon:Landmark },
+  { id:'operations', name:'Operations Dashboard', role:'Service providers + operational staff', purpose:'Requests, schedules, active jobs, fulfilment, customers, payments and reviews.', route:'/os/services', access:DASHBOARD_ACCESS_ROLES.operations, sensitive:'Restricted', icon:BriefcaseBusiness },
+  { id:'edge', name:'Active Edge Dashboard', role:'Creators, businesses, organizations', purpose:'Posts, status, followers, engagement, campaigns, events and content management.', route:'/os/dashboard', access:DASHBOARD_ACCESS_ROLES.active_edge, sensitive:'Standard', icon:Radio },
+  { id:'ai', name:'Unique AI Dashboard', role:'Users + authorized operators', purpose:'AI assistants, generated content, documents, images, automations and usage controls.', route:'/os/ai', access:DASHBOARD_ACCESS_ROLES.unique_ai, sensitive:'Standard', icon:Bot },
+  { id:'finance', name:'Finance & Settlement Dashboard', role:'Finance officers', purpose:'Reconciliation, merchant and seller settlement, commissions, fees, refunds and disputes.', route:'/admin/transactions', access:DASHBOARD_ACCESS_ROLES.finance_settlement, sensitive:'High', icon:Landmark },
+  { id:'risk', name:'Security & Risk Dashboard', role:'Risk, security and compliance', purpose:'Fraud signals, identity reviews, access events, cases, audit trails and compliance.', route:'/admin/verification', access:DASHBOARD_ACCESS_ROLES.security_risk, sensitive:'High', icon:ShieldCheck },
+  { id:'admin', name:'Platform Admin Dashboard', role:'Platform administrators', purpose:'Users, businesses, marketplace, services, content, reports, configuration and platform operations.', route:'/admin/users', access:DASHBOARD_ACCESS_ROLES.platform_admin, sensitive:'High', icon:Settings2 },
+  { id:'super', name:'Super Admin Control Tower', role:'Authorized super administrators', purpose:'Global platform oversight, executive indicators, critical alerts, governance and controlled configuration.', route:'/admin/control-tower', access:DASHBOARD_ACCESS_ROLES.super_admin, sensitive:'High', icon:Activity },
 ];
 
 const accessColors: Record<DashboardItem['sensitive'], string> = {
