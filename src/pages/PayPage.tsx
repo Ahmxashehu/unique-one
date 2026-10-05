@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ArrowDownLeft, ArrowUpRight, Banknote, ChevronRight, Clock3, Copy,
   History, Landmark, Receipt, ShieldCheck, Smartphone, Users, Wallet,
-  WalletCards, Zap
+  WalletCards, Zap, Wifi, PhoneCall
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -64,6 +64,8 @@ export default function PayPage() {
     { to: '/os/pay/send', icon: ArrowUpRight, title: 'Send money', text: 'UniquePay, bank or supported recipient' },
     { to: '/os/pay/receive', icon: ArrowDownLeft, title: 'Receive money', text: 'Your ID, phone or temporary receiving ID' },
     { to: '/os/payment-requests/new', icon: Receipt, title: 'Request money', text: 'Create a payment request' },
+    { to: '/os/pay', icon: Wifi, title: 'Buy Data', text: 'Mobile data bundles and top-ups' },
+    { to: '/os/pay', icon: PhoneCall, title: 'Buy Airtime', text: 'Recharge any supported mobile line' },
   ];
 
   const tools = [
@@ -96,7 +98,7 @@ export default function PayPage() {
             </div>
           </div>
 
-          <div className="mt-6 rounded-[25px] border border-white/10 bg-white/[0.07] p-5 backdrop-blur-xl md:p-6">
+          <div className="mt-5 rounded-[25px] border border-white/10 bg-white/[0.07] p-5 backdrop-blur-xl md:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-medium text-slate-400">Available balance</p>
@@ -117,9 +119,9 @@ export default function PayPage() {
             )}
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2.5">
+          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             {actions.map(({ to, icon: Icon, title }) => (
-              <Link key={to} to={to} className="group rounded-2xl border border-white/10 bg-white/10 p-3.5 transition hover:-translate-y-0.5 hover:bg-white/15">
+              <Link key={to} to={to} className="group min-h-[102px] rounded-2xl border border-white/10 bg-white/10 p-3.5 transition hover:-translate-y-0.5 hover:bg-white/15 active:scale-[0.98]">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-400 text-slate-950">
                   <Icon className="h-4.5 w-4.5" />
                 </div>
