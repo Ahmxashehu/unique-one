@@ -134,7 +134,12 @@ export default function SendMoneyPage() {
       navigate(`/os/pay/receipts/${payload.id}`);
     } catch (sendError) {
       console.error('Wallet transfer failed:', sendError);
-      setError(sendError instanceof Error ? sendError.message : 'The transfer could not be completed.');
+      const message = sendError instanceof Error ? sendError.message : 'The transfer could not be completed.';
+      if (/biometric|passkey|credential/i.test(message)) {
+        setError(`${message} Open Pay → Security and enable biometric/passkey authorization on this device, then try again.`);
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
