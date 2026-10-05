@@ -84,6 +84,8 @@ export default function RestaurantPage() {
   const [stage, setStage] = useState<'browse' | 'menu' | 'reservation' | 'review' | 'ready'>('browse');
   const [cart, setCart] = useState<Record<string, number>>(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').cart || {}; } catch { return {}; } });
   const [customerName, setCustomerName] = useState(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').customerName || ''; } catch { return ''; } });
+  const [submitting, setSubmitting] = useState(false);
+  const [orderError, setOrderError] = useState('');
   const [customerPhone, setCustomerPhone] = useState(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').customerPhone || ''; } catch { return ''; } });
 
   const saveDraft = (next: Draft) => { setDraft(next); try { sessionStorage.setItem(KEY, JSON.stringify(next)); } catch {} };
@@ -126,12 +128,39 @@ export default function RestaurantPage() {
     setStage('review');
   };
 
-  const confirmBooking = () => {
-    if (currentUser) {
-      setStage('ready');
+  const confirmBooking = async () => {
+    if (!currentUser || !selected || submitting) {
+      if (!currentUser) navigate('/login', { state: { from: location, message: 'Sign in to confirm your restaurant reservation. Your details will be preserved.' } });
       return;
     }
-    navigate('/login', { state: { from: location, message: 'Sign in to confirm your restaurant reservation. Your details will be preserved.' } });
+    setSubmitting(true);
+    setOrderError('');
+    try {
+      const idempotencyKey = `restaurant_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/restaurant/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          idempotencyKey, restaurantId: selected.id, mode: draft.mode, paymentMethod: draft.paymentMethod,
+          customerName, customerPhone, deliveryAddress: draft.deliveryAddress, date: draft.date, time: draft.time,
+          guests: draft.guests, seating: draft.seating, notes: draft.notes, cart,
+          subtotal: cartTotal, deliveryFee, serviceFee, total: finalTotal,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error?.message || 'We could not create your restaurant order.');
+      if (draft.paymentMethod === 'uniquepay') {
+        setOrderError('Order created securely. UniquePay settlement will activate when this restaurant is connected to a verified UniquePay merchant wallet.');
+      } else {
+        setOrderError('Order created securely. A dedicated bank-transfer account will appear when the payment provider is connected.');
+      }
+      setStage('ready');
+    } catch (error) {
+      setOrderError(error instanceof Error ? error.message : 'We could not create your restaurant order.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -295,7 +324,7 @@ export default function RestaurantPage() {
           <section className="w-full max-w-md rounded-3xl bg-white p-6 text-center shadow-2xl">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><Navigation className="h-5 w-5" /></div>
             <h2 className="mt-4 text-xl font-black text-slate-950">Reservation prepared</h2>
-            <p className="mt-2 text-sm text-slate-500">Your reservation request for {selected.name} is ready. Live restaurant confirmation will be connected when the provider is integrated.</p>
+            <p className="mt-2 text-sm text-slate-500">Your request for {selected.name} has been securely recorded. Live restaurant confirmation and payment settlement activate when the provider is connected.</p>{orderError && <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-xs text-amber-800">{orderError}</p>}
             <button onClick={() => setStage('browse')} className="mt-5 w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white">Back to restaurants</button>
           </section>
         </div>
