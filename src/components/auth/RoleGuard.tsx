@@ -2,15 +2,17 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Role, Permission } from '../../lib/os/types';
+import { hasDashboardAccess, type DashboardId } from '../../lib/auth/rbac';
 
 interface RoleGuardProps {
   children: React.ReactNode;
   requiredRole?: Role;
   requiredPermission?: Permission;
+  dashboard?: DashboardId;
   fallback?: React.ReactNode;
 }
 
-export default function RoleGuard({ children, requiredRole, requiredPermission, fallback }: RoleGuardProps) {
+export default function RoleGuard({ children, requiredRole, requiredPermission, dashboard, fallback }: RoleGuardProps) {
   const { loading, isAuthenticated, userData, hasRole, hasPermission } = useAuth();
   const location = useLocation();
 
@@ -26,6 +28,10 @@ export default function RoleGuard({ children, requiredRole, requiredPermission, 
   }
 
   if (requiredPermission && !hasPermission(requiredPermission)) {
+    hasAccess = false;
+  }
+
+  if (dashboard && !hasDashboardAccess(userData.roles ?? [], dashboard)) {
     hasAccess = false;
   }
 
