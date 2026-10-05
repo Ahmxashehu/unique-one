@@ -1,4 +1,4 @@
-import { Home, Compass, MessageSquare, Search, Sparkles, Menu } from "lucide-react";
+import { Home, Compass, Search, Sparkles, Menu } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
 
@@ -17,8 +17,8 @@ const publicItems = [
 const appItems = [
   { name: "Home", path: "/os/dashboard", icon: Home },
   { name: "Active Edge", path: "/discover", icon: Compass },
+  { name: "Search", path: "/search", icon: Search },
   { name: "AI", path: "/os/ai", icon: Sparkles },
-  { name: "Connect", path: "/os/messages", icon: MessageSquare },
 ];
 
 export default function MobileBottomNav({ variant, onMenu }: MobileBottomNavProps) {
