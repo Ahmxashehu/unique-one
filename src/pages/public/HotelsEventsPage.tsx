@@ -35,6 +35,7 @@ export default function HotelsEventsPage() {
   const [message, setMessage] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const [showServicePicker, setShowServicePicker] = useState(false);
+  const [showPreferences, setShowPreferences] = useState(false);
 
   const filteredHotels = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -52,13 +53,31 @@ export default function HotelsEventsPage() {
     setMode(id);
     setMessage('');
     setSelected(null);
+    setShowPreferences(false);
     setShowServicePicker(true);
   };
 
   const selectService = (name: string) => {
     setSelected(name);
     setShowServicePicker(false);
-    setMessage(`${name} selected. Live provider availability will be connected here; this prototype does not invent availability.`);
+    setShowPreferences(false);
+    setMessage(name + ' selected. Preferences are optional and can be added before checkout.');
+  };
+
+  const serviceInventory: Record<Mode, string[]> = {
+    stay: ['Capital View Hotel · Deluxe Room', 'Capital View Hotel · Executive Room', 'City Grand Hotel · Standard Room', 'City Grand Hotel · Executive Suite', 'Lakeside Resort · Lake View Room'],
+    meet: ['Grand Conference Hall · up to 500 guests', 'Executive Boardroom · up to 20 guests', 'Training Space · up to 100 guests'],
+    celebrate: ['Garden Events Pavilion · Wedding', 'Garden Events Pavilion · Birthday', 'Grand Conference Hall · Corporate Event'],
+    dine: ['Hotel Restaurant · À la carte', 'Breakfast & Buffet', 'Private Dining', 'Event Catering'],
+    experience: ['Swimming Pool', 'Spa & Wellness', 'Gym & Fitness', 'Family Activities'],
+    move: ['Airport Pickup', 'Car Hire', 'Driver Service', 'Local Transfer'],
+  };
+
+  const requestNewService = () => {
+    setShowServicePicker(false);
+    setSelected(null);
+    setShowPreferences(false);
+    setMessage('New service request started. Tell the provider what you need.');
   };
 
   const pickerItems: Record<Mode, string[]> = {
