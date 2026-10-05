@@ -70,11 +70,11 @@ export default function MessagesCenter() {
   }, [conversations, activeTab, search]);
 
   return (
-    <div className="relative min-h-full overflow-hidden rounded-[30px] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-3 md:p-5">
+    <div className="relative h-full min-h-0 w-full overflow-hidden bg-slate-50">
       <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-emerald-400/15 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-cyan-400/10 blur-3xl" />
 
-      <div className="relative flex min-h-[calc(100vh-120px)] overflow-hidden rounded-[25px] border border-white/10 bg-white shadow-2xl">
+      <div className="relative flex h-full min-h-0 w-full overflow-hidden bg-white">
         <div className="flex w-full flex-col md:w-96 md:border-r md:border-slate-200">
           <div className="bg-slate-950 p-4 text-white md:p-5">
             <div className="flex items-center justify-between gap-3">
