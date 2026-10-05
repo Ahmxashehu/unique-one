@@ -1499,10 +1499,22 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       .get();
     const isNewRecipient = previousRecipientTransaction.empty;
 
+    const recentTransactionsSnapshot = await adminDb.collection('transactions')
+      .where('senderId', '==', senderUid)
+      .limit(20)
+      .get();
+    const velocityWindowStart = Date.now() - 10 * 60 * 1000;
+    const recentTransactionCount = recentTransactionsSnapshot.docs.reduce((count, doc) => {
+      const createdAt = doc.data().createdAt;
+      const createdAtMs = typeof createdAt?.toMillis === 'function' ? createdAt.toMillis() : 0;
+      return count + (createdAtMs >= velocityWindowStart ? 1 : 0);
+    }, 0);
+
     const authPolicy = getTransactionAuthPolicy({
       amountMinor,
       transactionType: 'transfer',
       isNewRecipient,
+      recentTransactionCount,
     });
     const biometricLevel = authPolicy.biometricLevel;
     const biometricRequired = authPolicy.requiredFactors.includes('biometric');
