@@ -105,7 +105,7 @@ export default function RestaurantPage() {
   const deliveryFee = draft.mode === 'delivery' ? 1500 : 0;
   const serviceFee = cartTotal ? Math.max(300, Math.round(cartTotal * 0.03)) : 0;
   const finalTotal = cartTotal + deliveryFee + serviceFee;
-  const checkoutReady = Boolean(customerName.trim() && customerPhone.trim() && (draft.mode !== 'delivery' || draft.deliveryAddress.trim()) && (draft.mode !== 'dine-in' || (draft.date && draft.time)));
+  const checkoutReady = Boolean(customerName.trim() && customerPhone.trim() && (draft.mode !== 'delivery' || draft.deliveryAddress.trim()) && (draft.mode !== 'dine-in' || (draft.date && draft.time)) && (draft.mode !== 'pickup' || (draft.date && draft.time)));
 
   const openBooking = (restaurant: Restaurant) => { setSelected(restaurant); saveDraft({ ...draft, restaurantId: restaurant.id, cart, customerName, customerPhone }); setBookingOpen(true); setStage('menu'); };
 
