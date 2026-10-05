@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   BriefcaseBusiness, Search, MapPin, Send, Plus, Loader2, Wrench, UserRound,
-  ClipboardList, ArrowRight, CheckCircle2, Clock3, MessageCircle, X
+  ClipboardList, ArrowRight, CheckCircle2, Clock3, MessageCircle, X, ShieldCheck, FileText
 } from 'lucide-react';
 import {
   addDoc, collection, getDocs, query, where, serverTimestamp, doc, setDoc
@@ -57,6 +57,8 @@ export default function JobsPage() {
   const [requests, setRequests] = useState<any[]>([]);
   const [requestingService, setRequestingService] = useState<Service | null>(null);
   const [hireBusy, setHireBusy] = useState(false);
+  const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
+  const [agreementRequest, setAgreementRequest] = useState<any | null>(null);
   const [tab, setTab] = useState<WorkTab>('jobs');
   const [queryText, setQueryText] = useState('');
   const [category, setCategory] = useState('all');
@@ -101,6 +103,8 @@ export default function JobsPage() {
       setApplications(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
       const requestSnap = await getDocs(query(collection(db, 'professionalRequests'), where('requesterUid', '==', currentUser.uid)));
       setRequests(requestSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+      const incomingSnap = await getDocs(query(collection(db, 'serviceRequests'), where('providerUid', '==', currentUser.uid)));
+      setIncomingRequests(incomingSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
     } catch (err: any) {
       setError(err?.message || 'Could not load My Work.');
     }
@@ -346,6 +350,16 @@ export default function JobsPage() {
                   <p className="mt-1 text-xs text-slate-500">{item.status || 'submitted'}</p>
                 </div>
               ))}</div>}
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-emerald-600" /><h2 className="font-black">Provider requests</h2></div>
+            {incomingRequests.length === 0 ? <p className="mt-4 text-sm text-slate-500">Client hire requests will appear here.</p> :
+              <div className="mt-4 space-y-3">{incomingRequests.map(item =>
+                <div key={item.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-start justify-between gap-3"><div><p className="font-bold">{item.serviceTitle || 'Service request'}</p><p className="mt-1 text-xs text-slate-500">Client: {item.requesterName || 'Client'}</p></div><span className="text-xs font-bold">{item.status || 'requested'}</span></div>
+                  {item.status === 'requested' && <div className="mt-3 flex gap-2"><button onClick={async () => { await setDoc(doc(db, 'serviceRequests', item.id), { status: 'accepted', respondedAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true }); await loadMyWork(); setAgreementRequest(item); }} className="flex-1 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Accept</button><button onClick={async () => { await setDoc(doc(db, 'serviceRequests', item.id), { status: 'declined', respondedAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true }); await loadMyWork(); }} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold">Decline</button></div>}
+                  {item.status === 'accepted' && <button onClick={() => setAgreementRequest(item)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white"><FileText className="h-4 w-4" /> Create free agreement</button>}
+                </div>)}</div>}
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <h2 className="font-black">Your work lifecycle</h2>
