@@ -16,6 +16,7 @@ import OfflineIndicator from "./components/OfflineIndicator";
 import { OfflineQueueProvider } from "./contexts/OfflineQueueContext";
 import SyncOverlay from "./components/SyncOverlay";
 import U1Loader from "./components/U1Loader";
+import DashboardPage from "./pages/DashboardPage";
 import { lazy, Suspense, useEffect, useState } from "react";
 
 const ConferencePage = lazy(() => import("./pages/ConferencePage"));
@@ -32,7 +33,7 @@ const FlightsPage = lazy(() => import("./pages/public/FlightsPage"));
 const LoginPage = lazy(() => import("./pages/public/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/public/RegisterPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/public/ForgotPasswordPage"));
-const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+
 const PayPage = lazy(() => import("./pages/PayPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
