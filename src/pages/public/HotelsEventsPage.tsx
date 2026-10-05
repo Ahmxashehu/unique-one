@@ -141,27 +141,31 @@ export default function HotelsEventsPage() {
         </section>
 
         {showServicePicker && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={`${modes.find((m) => m.id === mode)?.label} options`}>
-            <button aria-label="Close service options" onClick={() => setShowServicePicker(false)} className="absolute inset-0 cursor-default" />
-            <div className="relative w-full max-w-xl rounded-t-3xl border border-emerald-100 bg-white p-5 shadow-2xl sm:rounded-3xl">
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Available services">
+            <button aria-label="Close services" onClick={() => setShowServicePicker(false)} className="absolute inset-0 cursor-default" />
+            <div className="relative w-full max-w-2xl rounded-t-3xl border border-emerald-100 bg-white p-5 shadow-2xl sm:rounded-3xl">
               <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200 sm:hidden" />
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Choose an option</p>
+                  <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Available services</p>
                   <h2 className="mt-1 text-xl font-black">{modes.find((m) => m.id === mode)?.label}</h2>
-                  <p className="mt-1 text-xs text-slate-500">Select what you need and continue without scrolling the page.</p>
+                  <p className="mt-1 text-xs text-slate-500">Choose what is available without leaving the current screen.</p>
                 </div>
                 <button onClick={() => setShowServicePicker(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black text-slate-600">Close</button>
               </div>
-              <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {pickerItems[mode].map((item) => (
-                  <button key={item} onClick={() => selectService(item)} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50 active:scale-[.98]">
-                    <span className="block text-sm font-black">{item}</span>
-                    <span className="mt-1 block text-[11px] text-slate-500">Select <ChevronRight className="inline h-3 w-3" /></span>
+              <div className="mt-4 max-h-[58vh] space-y-2 overflow-y-auto pr-1">
+                {serviceInventory[mode].map((item) => (
+                  <button key={item} onClick={() => selectService(item)} className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50 active:scale-[.99]">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-black">{item}</span>
+                      <span className="mt-1 block text-[11px] text-emerald-700">Available option · View details & select</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
                   </button>
                 ))}
               </div>
-              {mode === 'celebrate' && <button onClick={() => { setShowServicePicker(false); setShowPlanner(true); }} className="mt-3 w-full rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-black text-emerald-800">Plan an Event with Unique One</button>}
+              <button onClick={requestNewService} className="mt-3 w-full rounded-2xl border border-dashed border-emerald-300 bg-emerald-50 p-3 text-sm font-black text-emerald-800">+ New Service Request</button>
+              <p className="mt-3 text-center text-[11px] text-slate-400">Provider inventory becomes live as verified partners connect.</p>
             </div>
           </div>
         )}
