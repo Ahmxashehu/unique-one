@@ -101,6 +101,7 @@ const UniqueAiSubscriptionPage = lazy(() => import("./pages/UniqueAiSubscription
 const JobsPage = lazy(() => import("./pages/JobsPage"));
 const ContributionNetworkPage = lazy(() => import("./pages/ContributionNetworkPage"));
 const EducationPage = lazy(() => import("./pages/EducationPage"));
+const EducationHubPage = lazy(() => import("./pages/EducationHubPage"));
 const TravelPage = lazy(() => import("./pages/TravelPage"));
 const HealthWellnessPage = lazy(() => import("./pages/HealthWellnessPage"));
 const CycleAjoPage = lazy(() => import("./pages/pay/CycleAjoPage"));
@@ -144,6 +145,7 @@ export default function App() {
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/support" element={<SupportPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/education-hub" element={<EducationHubPage />} />
       <Route path="/flights" element={<FlightsPage />} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/register" element={<RegisterPage />} />
