@@ -20,11 +20,11 @@
     <link rel="icon" type="image/svg+xml" sizes="512x512" href="/pwa-512x512.svg" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
-      // One-time PWA recovery: remove stale service-worker/app-shell caches only.
-      // This does not touch Firebase auth, localStorage, IndexedDB, or user data.
+      // PWA shell recovery v2: clear only service-worker/app-shell caches once.
+      // Firebase auth, localStorage, IndexedDB, and user data are untouched.
       (async () => {
         try {
-          const refreshKey = 'unique-pwa-refresh-2026-10-05';
+          const refreshKey = 'unique-pwa-refresh-2026-10-05-v2';
           if (sessionStorage.getItem(refreshKey) !== '1' && 'serviceWorker' in navigator) {
             sessionStorage.setItem(refreshKey, '1');
             const registrations = await navigator.serviceWorker.getRegistrations();
