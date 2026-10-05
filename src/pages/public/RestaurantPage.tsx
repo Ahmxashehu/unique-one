@@ -42,6 +42,9 @@ type Draft = {
   guests: number;
   seating: string;
   notes: string;
+  mode: 'dine-in' | 'delivery' | 'pickup';
+  paymentMethod: 'uniquepay' | 'bank-transfer';
+  deliveryAddress: string;
 };
 
 const emptyDraft: Draft = {
@@ -51,6 +54,9 @@ const emptyDraft: Draft = {
   guests: 2,
   seating: 'Standard table',
   notes: '',
+  mode: 'dine-in',
+  paymentMethod: 'uniquepay',
+  deliveryAddress: '',
 };
 
 export default function RestaurantPage() {
