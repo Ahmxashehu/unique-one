@@ -682,6 +682,69 @@ export default function HomePage() {
             </div>
           </div>
 
+          {compactLayers.length > 0 && (
+            <section className="mb-5 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm sm:rounded-3xl" aria-label="Live discovery layers">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 sm:px-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">Live discovery</span>
+                  </div>
+                  <p className="mt-0.5 truncate text-[10px] text-slate-400">Available products, services and opportunities</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-slate-50 px-2 py-1 text-[9px] font-bold text-slate-400">Smart · 3 min</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedLayer(compactLayers[activeLayerIndex] || compactLayers[0])}
+                className="group flex w-full items-stretch text-left transition hover:bg-emerald-50/40 active:scale-[0.995]"
+                aria-label={`Preview ${compactLayers[activeLayerIndex]?.title || 'live discovery'}`}
+              >
+                <div className="min-w-0 flex-1 px-3 py-3 sm:px-4 sm:py-3.5">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                      {compactLayers[activeLayerIndex]?.kind === 'product' ? <ShoppingBag className="h-4 w-4" /> :
+                        compactLayers[activeLayerIndex]?.kind === 'service' ? <BriefcaseIcon className="h-4 w-4" /> :
+                        compactLayers[activeLayerIndex]?.kind === 'business' ? <StoreIcon className="h-4 w-4" /> :
+                        <TrendingUp className="h-4 w-4" />}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700">
+                        {compactLayers[activeLayerIndex]?.kind || 'live'}
+                      </p>
+                      <h3 className="truncate text-sm font-black text-slate-900 sm:text-[15px]">
+                        {compactLayers[activeLayerIndex]?.title}
+                      </h3>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="truncate text-[11px] text-slate-500">{compactLayers[activeLayerIndex]?.subtitle}</span>
+                    {compactLayers[activeLayerIndex]?.price && (
+                      <span className="shrink-0 text-[11px] font-black text-emerald-700">{compactLayers[activeLayerIndex]?.price}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="relative flex w-[34%] max-w-[150px] shrink-0 items-center justify-center overflow-hidden bg-slate-950">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(52,211,153,0.65),transparent_42%),radial-gradient(circle_at_75%_70%,rgba(20,184,166,0.5),transparent_46%)]" />
+                  <div className="absolute -right-5 -top-5 h-16 w-16 rounded-full bg-emerald-400/20 blur-xl animate-pulse" />
+                  <div className="relative flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur">
+                    <Play className="ml-0.5 h-3.5 w-3.5 fill-current" />
+                  </div>
+                  <span className="absolute bottom-1.5 left-2 text-[8px] font-black uppercase tracking-[0.12em] text-white/75">visual preview</span>
+                  <span className="absolute right-2 top-1.5 rounded-full bg-black/30 px-1.5 py-0.5 text-[8px] font-bold text-white/80">LIVE</span>
+                </div>
+                <div className="flex w-9 shrink-0 items-center justify-center text-slate-300 group-hover:text-emerald-600">
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+              </button>
+              <div className="flex gap-1 px-3 pb-2.5 sm:px-4">
+                {compactLayers.map((layer, index) => (
+                  <span key={`${layer.kind}-${layer.title}-${index}`} className={`h-1 flex-1 rounded-full transition-all ${index === activeLayerIndex ? 'bg-emerald-500' : 'bg-slate-100'}`} />
+                ))}
+              </div>
+            </section>
+          )}
+
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
             <div className="space-y-5">
               {loading ? (
@@ -1012,6 +1075,35 @@ export default function HomePage() {
             </aside>
           </div>        </section>
       </div>
+      {selectedLayer && (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-3 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label="Smart preview">
+          <button type="button" className="absolute inset-0 cursor-default" aria-label="Close preview" onClick={() => setSelectedLayer(null)} />
+          <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/20 bg-white shadow-2xl">
+            <div className="relative h-28 overflow-hidden bg-slate-950">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_35%,rgba(52,211,153,0.75),transparent_38%),radial-gradient(circle_at_75%_65%,rgba(20,184,166,0.65),transparent_44%)]" />
+              <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-emerald-300/20 blur-2xl" />
+              <div className="relative flex h-full items-center justify-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur">
+                  <Play className="ml-0.5 h-5 w-5 fill-current" />
+                </span>
+              </div>
+              <button type="button" onClick={() => setSelectedLayer(null)} className="absolute right-3 top-3 rounded-full bg-black/30 px-2.5 py-1 text-[10px] font-bold text-white">Close</button>
+            </div>
+            <div className="p-4 sm:p-5">
+              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">Smart preview · {selectedLayer.kind}</span>
+              <h3 className="mt-1 text-lg font-black text-slate-900">{selectedLayer.title}</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-600">{selectedLayer.subtitle}</p>
+              {selectedLayer.description && <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-500">{selectedLayer.description}</p>}
+              {selectedLayer.price && <p className="mt-3 text-base font-black text-emerald-700">{selectedLayer.price}</p>}
+              <div className="mt-5 flex gap-2">
+                <button type="button" onClick={() => setSelectedLayer(null)} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700">Later</button>
+                <Link to={selectedLayer.href} onClick={() => setSelectedLayer(null)} className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-emerald-700">View now</Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }
