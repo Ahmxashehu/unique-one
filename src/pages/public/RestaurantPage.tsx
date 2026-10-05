@@ -75,17 +75,28 @@ export default function RestaurantPage() {
   });
   const [bookingOpen, setBookingOpen] = useState(false);
   const [selected, setSelected] = useState<Restaurant | null>(null);
-  const [stage, setStage] = useState<'browse' | 'review' | 'ready'>('browse');
+  const [stage, setStage] = useState<'browse' | 'menu' | 'review' | 'ready'>('browse');
+  const [cart, setCart] = useState<Record<string, number>>({});
 
   const saveDraft = (next: Draft) => {
     setDraft(next);
     try { sessionStorage.setItem(KEY, JSON.stringify(next)); } catch {}
   };
 
+  const menuItems = selected ? [
+    { id: `${selected.id}-1`, name: 'Signature Jollof Rice', price: 4500 },
+    { id: `${selected.id}-2`, name: 'Grilled Chicken', price: 6500 },
+    { id: `${selected.id}-3`, name: 'Beef Suya', price: 5000 },
+    { id: `${selected.id}-4`, name: 'Fresh Salad Bowl', price: 3500 },
+  ] : [];
+  const cartCount = Object.values(cart).reduce((a,b) => a+b, 0);
+  const cartTotal = menuItems.reduce((sum, item) => sum + item.price * (cart[item.id] || 0), 0);
+
   const openBooking = (restaurant: Restaurant) => {
     setSelected(restaurant);
     saveDraft({ ...draft, restaurantId: restaurant.id });
     setBookingOpen(true);
+    setStage('browse');
   };
 
   const filtered = useMemo(() => {
@@ -178,6 +189,22 @@ export default function RestaurantPage() {
         </div>
       </main>
 
+
+      {bookingOpen && selected && stage === 'menu' && (
+        <div className="fixed inset-0 z-[82] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+          <section className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur">
+              <div><p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Menu</p><h2 className="text-base font-black text-slate-950">{selected.name}</h2></div>
+              <button onClick={() => setBookingOpen(false)} className="rounded-full bg-slate-100 p-2"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="space-y-2 p-4">
+              {menuItems.map(item => <div key={item.id} className="flex items-center justify-between rounded-2xl border border-slate-200 p-3"><div><p className="text-sm font-black">{item.name}</p><p className="text-xs text-slate-500">Prototype menu item · ₦{item.price.toLocaleString()}</p></div><div className="flex items-center gap-2"><button onClick={() => setCart({...cart,[item.id]:Math.max(0,(cart[item.id]||0)-1)})} className="h-8 w-8 rounded-full border">−</button><span className="w-4 text-center text-xs font-black">{cart[item.id]||0}</span><button onClick={() => setCart({...cart,[item.id]:(cart[item.id]||0)+1})} className="h-8 w-8 rounded-full bg-slate-950 text-white">+</button></div></div>)}
+              <button disabled={!cartCount} onClick={() => { setBookingOpen(false); setStage('review'); }} className="mt-3 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-40">Review order · ₦{cartTotal.toLocaleString()}</button>
+              <p className="text-center text-[10px] text-slate-500">Prototype menu prices are not live restaurant pricing.</p>
+            </div>
+          </section>
+        </div>
+      )}
       {bookingOpen && selected && (
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Restaurant reservation">
           <section className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
@@ -200,7 +227,7 @@ export default function RestaurantPage() {
                 <label className="rounded-2xl border border-slate-200 p-3"><span className="text-[10px] font-bold text-slate-500">Seating</span><select value={draft.seating} onChange={(e) => saveDraft({ ...draft, seating: e.target.value })} className="mt-2 w-full bg-transparent text-sm font-bold outline-none"><option>Standard table</option><option>Outdoor</option><option>Quiet area</option><option>Accessible seating</option></select></label>
               </div>
               <label className="block rounded-2xl border border-slate-200 p-3"><span className="text-[10px] font-bold text-slate-500">Special request</span><textarea value={draft.notes} onChange={(e) => saveDraft({ ...draft, notes: e.target.value })} rows={3} placeholder="Birthday, accessibility, children, dietary needs…" className="mt-2 w-full resize-none text-sm outline-none" /></label>
-              <button disabled={!draft.date || !draft.time} onClick={continueBooking} className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">Review reservation</button>
+              <button disabled={draft.mode === 'dine-in' && (!draft.date || !draft.time) || draft.mode === 'delivery' && !draft.deliveryAddress.trim()} onClick={continueBooking} className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">Review reservation</button>
               <p className="text-center text-[10px] text-slate-500">Prototype reservations do not claim live table availability.</p>
             </div>
           </section>
