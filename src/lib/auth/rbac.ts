@@ -9,11 +9,11 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
   staff_member: ['view:profile', 'edit:profile', 'manage:orders', 'manage:bookings'],
   service_provider: ['view:profile', 'edit:profile', 'manage:bookings', 'manage:orders', 'view:customer_info'],
   school_administrator: ['view:profile', 'edit:profile', 'manage:orders', 'manage:bookings', 'view:transactions'],
-  finance_officer: ['view:profile', 'view:transactions', 'manage:disputes'],
-  risk_security_officer: ['view:profile', 'manage:verification', 'manage:disputes', 'access:admin_tools'],
-  platform_admin: ['view:profile', 'edit:profile', 'create:products', 'edit:products', 'manage:inventory', 'create:invoices', 'send:payment_requests', 'view:customer_info', 'manage:orders', 'manage:bookings', 'manage:business_staff', 'view:transactions', 'manage:verification', 'manage:disputes', 'access:admin_tools'],
-  super_admin: ['view:profile', 'edit:profile', 'create:products', 'edit:products', 'manage:inventory', 'create:invoices', 'send:payment_requests', 'view:customer_info', 'manage:orders', 'manage:bookings', 'manage:business_staff', 'view:transactions', 'manage:verification', 'manage:disputes', 'access:admin_tools'],
-  administrator: ['view:profile', 'edit:profile', 'access:admin_tools'],
+  finance_officer: ['view:profile', 'view:transactions', 'manage:disputes', 'view:audit_logs'],
+  risk_security_officer: ['view:profile', 'manage:verification', 'manage:disputes', 'access:admin_tools', 'view:audit_logs'],
+  platform_admin: ['view:profile', 'edit:profile', 'manage:roles', 'manage:permissions', 'view:audit_logs', 'create:products', 'edit:products', 'manage:inventory', 'create:invoices', 'send:payment_requests', 'view:customer_info', 'manage:orders', 'manage:bookings', 'manage:business_staff', 'view:transactions', 'manage:verification', 'manage:disputes', 'access:admin_tools'],
+  super_admin: ['view:profile', 'edit:profile', 'manage:roles', 'manage:permissions', 'view:audit_logs', 'create:products', 'edit:products', 'manage:inventory', 'create:invoices', 'send:payment_requests', 'view:customer_info', 'manage:orders', 'manage:bookings', 'manage:business_staff', 'view:transactions', 'manage:verification', 'manage:disputes', 'access:admin_tools'],
+  administrator: ['view:profile', 'edit:profile', 'access:admin_tools', 'manage:roles', 'manage:permissions', 'view:audit_logs'],
 };
 
 export function hasRolePermission(roles: readonly Role[], customPermissions: readonly Permission[], permission: Permission): boolean {
