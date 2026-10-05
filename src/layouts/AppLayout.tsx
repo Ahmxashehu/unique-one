@@ -38,7 +38,7 @@ export default function AppLayout() {
     { name: 'Jobs', path: '/os/jobs', icon: Briefcase },
     { name: 'Contributions', path: '/os/contributions', icon: HeartHandshake },
     { name: 'Education', path: '/os/education', icon: GraduationCap },
-    { name: 'Travel', path: '/os/travel', icon: Plane },
+    { name: 'Unique Travel', path: '/os/travel', icon: Plane },
   ];
 
   const businessNav = [
