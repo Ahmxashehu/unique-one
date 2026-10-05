@@ -776,7 +776,7 @@ export default function UniqueAiPage() {
                 <span className="absolute -inset-1.5 rounded-full border border-emerald-300/30" style={{ animation: "uniqueAiOrbPulse 3s ease-in-out infinite" }} />
                 <span className="absolute inset-[-10px] rounded-full border border-emerald-400/20" style={{ animation: "uniqueAiOrbSweep 5.5s linear infinite" }} />
                 <span className="absolute inset-[-4px] flex items-center justify-center">
-                  {Array.from({ length: 8 }, (_, index) => (
+                  {Array.from({ length: 16 }, (_, index) => (
                     <span
                       key={index}
                       className="absolute flex h-5 w-7 items-center justify-center overflow-hidden rounded-[4px] border border-white/70 bg-white text-[14px] leading-none shadow-[0_2px_8px_rgba(15,23,42,.22)]"
