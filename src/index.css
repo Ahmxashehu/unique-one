@@ -597,3 +597,42 @@ button, input, textarea, select {
 .font-black {
   font-weight: 650 !important;
 }
+
+/* UniquePlatform chat wallpaper: subtle WhatsApp-style identity pattern.
+   Decorative only; conversation content and controls remain untouched. */
+.unique-chat-motion {
+  position: relative;
+  background-color: #f4f7f5;
+  background-image:
+    radial-gradient(circle at 18px 18px, rgb(5 150 105 / .075) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 70px 52px, rgb(5 150 105 / .055) 0 14px, transparent 14.5px),
+    radial-gradient(circle at 145px 118px, rgb(5 150 105 / .045) 0 10px, transparent 10.5px),
+    linear-gradient(135deg, transparent 46%, rgb(5 150 105 / .025) 47%, transparent 48%);
+  background-size: 140px 140px, 180px 180px, 210px 210px, 90px 90px;
+  background-attachment: local;
+}
+.unique-chat-motion::after {
+  content: "U1  •  UNIQUEPLATFORM";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-28deg);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  font-size: clamp(1.1rem, 4vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: .16em;
+  color: rgb(5 150 105 / .028);
+  z-index: 0;
+}
+.unique-chat-motion > * { position: relative; z-index: 1; }
+.unique-dark .unique-chat-motion {
+  background-color: #101713;
+  background-image:
+    radial-gradient(circle at 18px 18px, rgb(52 211 153 / .09) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 70px 52px, rgb(52 211 153 / .065) 0 14px, transparent 14.5px),
+    radial-gradient(circle at 145px 118px, rgb(52 211 153 / .05) 0 10px, transparent 10.5px),
+    linear-gradient(135deg, transparent 46%, rgb(52 211 153 / .028) 47%, transparent 48%);
+}
+.unique-dark .unique-chat-motion::after { color: rgb(52 211 153 / .04); }
