@@ -394,7 +394,7 @@ export default function JobsPage() {
         </div>
       )}
 
-      {!canPublish && <p className="text-center text-xs text-slate-400">Public job and service publishing is reserved for Business accounts and Unique One Admin. Personal users can search, apply, request and hire.</p>
+      {!canPublish && <p className="text-center text-xs text-slate-400">Public job and service publishing is reserved for Business accounts and Unique One Admin. Personal users can search, apply, request and hire.</p>}
     </div>
   );
 }
