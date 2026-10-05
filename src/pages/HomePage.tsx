@@ -67,7 +67,7 @@ export default function HomePage() {
     ['Food & Dining', '/categories'],
     ['Global Search', '/search'],
     ['Near Me', '/near-me'],
-    ['Jobs', '/os/jobs'],
+    ['Unique Jobs & Services', '/os/jobs'],
     ['Contributions', '/os/contributions'],
     ['Education', '/os/education'],
     ['Travel', '/os/travel'],
