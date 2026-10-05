@@ -55,7 +55,7 @@ export default function HomePage() {
 
   const experiencePosters = [
     ['Restaurant', '/restaurant'],
-    ['Hotel', '/travel'],
+    ['Hotels & Events', '/hotels-events'],
     ['Flights', '/travel'],
     ['School', '/education'],
     ['Retail & Shopping', '/categories'],
