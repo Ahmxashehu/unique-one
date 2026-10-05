@@ -84,16 +84,9 @@ export default function PublicLayout() {
               </Link>
             </div>
             <div className="mt-6 border-t-2 border-slate-100 pt-6">
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                {[
-                  ['Settings', '/settings'],
-                  ['Suggestions', '/suggestions'],
-                ].map(([name, path]) => (
-                  <Link key={path} to={path} onClick={() => setIsMobileMenuOpen(false)} className="min-w-0 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm">
-                    {name}
-                  </Link>
-                ))}
-              </div>
+              <Link to="/settings" onClick={() => setIsMobileMenuOpen(false)} className="flex min-w-0 items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm">
+                Settings
+              </Link>
             </div>
             {currentUser && (
               <div className="mt-3">
