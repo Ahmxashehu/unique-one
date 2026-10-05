@@ -70,7 +70,7 @@ export default function HomePage() {
     ['Unique Jobs & Services', '/os/jobs'],
     ['Contributions', '/os/contributions'],
     ['Education', '/os/education'],
-    ['Travel', '/os/travel'],
+    ['Unique Travel', '/os/travel'],
   ];
 
   const promotionalPosters = [
