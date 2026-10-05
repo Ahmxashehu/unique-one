@@ -53,7 +53,14 @@ export default function RegisterPage(){
       const r=await fetch('/api/auth/unique-otp/registration/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
       const b=await r.json();
       if(!r.ok)throw new Error(b?.error?.message||'We could not send your UniqueOTP.');
-      setOtpRemaining(Number(b.expiresInSeconds)||300);setResendRemaining(Number(b.resendAfterSeconds)||30);setStep('phone');setMessage('UniqueOTP sent. Check your SMS and enter the 6-digit code.');
+      setOtpRequired(b.otpRequired !== false);
+      if (b.otpRequired === false) {
+        setRegistrationToken(b.registrationToken || '');
+        setOtpRemaining(0); setResendRemaining(0); setStep('details');
+        setMessage('Development mode: OTP is temporarily disabled. Continue with your account details.');
+      } else {
+        setOtpRemaining(Number(b.expiresInSeconds)||300);setResendRemaining(Number(b.resendAfterSeconds)||30);setStep('phone');setMessage('UniqueOTP sent. Check your SMS and enter the 6-digit code.');
+      }
     }catch(e:any){setError(e.message||'Unable to send UniqueOTP.');}finally{setLoading(false);}
   };
 
