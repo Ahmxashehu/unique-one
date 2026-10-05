@@ -68,6 +68,7 @@ class RequestValidationError extends Error {
 if (getApps().length === 0) initializeApp({
   credential: applicationDefault(),
   projectId: "unique-one-9731b",
+  serviceAccountId: process.env.FIREBASE_SERVICE_ACCOUNT_EMAIL || "firebase-adminsdk-fbsvc@unique-one-9731b.iam.gserviceaccount.com",
   storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "unique-one-9731b.firebasestorage.app",
 });
 const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || "(default)";
