@@ -389,6 +389,7 @@ export default function HomePage() {
         href: `/store/product/${product.id}`,
         description: product.description,
         price: formatPrice(product),
+        image: product.images?.[0],
       });
     });
 
@@ -402,6 +403,7 @@ export default function HomePage() {
         price: service.price
           ? (service.currency === 'NGN' ? '₦' : '$') + Number(service.price).toLocaleString()
           : undefined,
+        image: (service as EdgeService & { imageUrl?: string; image?: string }).imageUrl || (service as EdgeService & { image?: string }).image,
       });
     });
 
@@ -412,6 +414,7 @@ export default function HomePage() {
         subtitle: business.category || 'Business nearby',
         href: business.ownerUid ? `/store/seller/${business.ownerUid}` : '/discover',
         description: business.description,
+        image: (business as typeof business & { logoUrl?: string; imageUrl?: string }).logoUrl || (business as typeof business & { imageUrl?: string }).imageUrl,
       });
     });
 
@@ -422,6 +425,7 @@ export default function HomePage() {
         subtitle: job.location || job.category || 'Opportunity',
         href: '/jobs',
         description: job.description,
+        image: (job as typeof job & { imageUrl?: string }).imageUrl,
       });
     });
 
@@ -725,7 +729,17 @@ export default function HomePage() {
                   </div>
                 </div>
                 <div className="relative flex w-[34%] max-w-[150px] shrink-0 items-center justify-center overflow-hidden bg-slate-950">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(52,211,153,0.65),transparent_42%),radial-gradient(circle_at_75%_70%,rgba(20,184,166,0.5),transparent_46%)]" />
+                  {compactLayers[activeLayerIndex]?.image ? (
+                    <img
+                      src={compactLayers[activeLayerIndex]?.image}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover opacity-75 transition-transform duration-700 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(52,211,153,0.65),transparent_42%),radial-gradient(circle_at_75%_70%,rgba(20,184,166,0.5),transparent_46%)]" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/10 to-slate-950/20" />
                   <div className="absolute -right-5 -top-5 h-16 w-16 rounded-full bg-emerald-400/20 blur-xl animate-pulse" />
                   <div className="relative flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur">
                     <Play className="ml-0.5 h-3.5 w-3.5 fill-current" />
