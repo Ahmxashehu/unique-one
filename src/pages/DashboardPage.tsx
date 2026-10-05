@@ -13,7 +13,7 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (authLoading) return;
+    if (!currentUser) return;
 
     let cancelled = false;
 
@@ -68,9 +68,15 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, currentUser]);
+  }, [currentUser]);
 
-  if (authLoading) return null;
+  if (!currentUser && authLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="text-sm font-medium text-slate-500">Loading UniqueOS…</div>
+      </div>
+    );
+  }
   if (!currentUser) return null;
 
   return (
