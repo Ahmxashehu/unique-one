@@ -16,6 +16,7 @@ import { registerIdentityVerificationRoutes } from "./src/server/identityVerific
 import { registerAjoRoutes } from "./src/server/ajoRoutes";
 import { registerUniqueShareRoutes } from "./src/server/uniqueShareRoutes";
 import { getTransactionAuthPolicy } from "./src/server/transactionAuthPolicy";
+import { hasRolePermission } from "./src/lib/auth/rbac";
 
 interface WalletDocument {
   uid: string;
@@ -420,6 +421,25 @@ const app = express();
       return next();
     } catch (_) {
       return errorResponse(res, 'UNAUTHENTICATED', 'The supplied Firebase token is invalid or expired.');
+    }
+  };
+
+  const requirePermission = (permission: import("./src/lib/os/types").Permission) => async (req: Request, res: Response, next: NextFunction) => {
+    const uid = typeof (req as any).user?.uid === 'string' ? (req as any).user.uid : '';
+    if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to access this resource.');
+    try {
+      const snap = await adminDb.collection('users').doc(uid).get();
+      if (!snap.exists) return errorResponse(res, 'FORBIDDEN', 'User access profile was not found.');
+      const data = snap.data() || {};
+      const roles = Array.isArray(data.roles) ? data.roles : [];
+      const customPermissions = Array.isArray(data.permissions) ? data.permissions : [];
+      if (!hasRolePermission(roles, customPermissions, permission)) {
+        return errorResponse(res, 'FORBIDDEN', 'You do not have permission to perform this action.');
+      }
+      return next();
+    } catch (error) {
+      console.error('Permission check failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Permission verification is temporarily unavailable.');
     }
   };
 
