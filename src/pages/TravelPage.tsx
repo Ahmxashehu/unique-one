@@ -81,12 +81,12 @@ export default function TravelPage() {
           <button onClick={submit} className="w-full sm:w-auto rounded-xl bg-emerald-600 text-white px-5 py-3 font-medium flex items-center justify-center gap-2"><Search className="w-4 h-4" /> Search travel</button>
           {message && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{message}</div>}
         </section>
-      ) : (
-        <section className="grid md:grid-cols-2 gap-4">
+      )}
+
+      <section className="grid md:grid-cols-2 gap-4">
           <div className="bg-white border rounded-2xl p-5"><CalendarDays className="w-6 h-6 text-emerald-600" /><h2 className="font-semibold mt-3">Trips</h2><p className="text-sm text-slate-500 mt-1">Your confirmed travel plans will appear here once live travel providers are connected.</p></div>
           <div className="bg-white border rounded-2xl p-5"><MapPinned className="w-6 h-6 text-indigo-600" /><h2 className="font-semibold mt-3">Itinerary</h2><p className="text-sm text-slate-500 mt-1">Flights, stays, transfers, and activities can be organized into one itinerary.</p></div>
         </section>
-      )}
 
       <section className="grid md:grid-cols-3 gap-4">
         <div className="bg-white border rounded-2xl p-5"><ShieldCheck className="w-5 h-5 text-emerald-600" /><h3 className="font-semibold mt-3">Verified providers</h3><p className="text-xs text-slate-500 mt-1">Provider availability and booking status must come from connected travel partners.</p></div>
