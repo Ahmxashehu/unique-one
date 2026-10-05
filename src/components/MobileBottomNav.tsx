@@ -1,5 +1,5 @@
 import { Home, Compass, Search, Sparkles, Menu } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
 
 type MobileBottomNavProps = {
@@ -23,6 +23,7 @@ const appItems = [
 
 export default function MobileBottomNav({ variant, onMenu }: MobileBottomNavProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const items = variant === "public" ? publicItems : appItems;
 
   return (
@@ -38,6 +39,12 @@ export default function MobileBottomNav({ variant, onMenu }: MobileBottomNavProp
             <Link
               key={item.name}
               to={item.path}
+              onClick={(event) => {
+                if (variant === "app" && item.name === "Home") {
+                  event.preventDefault();
+                  navigate("/os/dashboard");
+                }
+              }}
               className={cn("mobile-nav-item", isActive && "mobile-nav-item-active")}
               aria-current={isActive ? "page" : undefined}
             >
