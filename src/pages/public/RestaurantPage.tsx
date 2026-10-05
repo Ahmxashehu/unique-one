@@ -86,6 +86,7 @@ export default function RestaurantPage() {
   const [customerName, setCustomerName] = useState(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').customerName || ''; } catch { return ''; } });
   const [submitting, setSubmitting] = useState(false);
   const [orderError, setOrderError] = useState('');
+  const [transactionPin, setTransactionPin] = useState('');
   const [customerPhone, setCustomerPhone] = useState(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').customerPhone || ''; } catch { return ''; } });
 
   const saveDraft = (next: Draft) => { setDraft(next); try { sessionStorage.setItem(KEY, JSON.stringify(next)); } catch {} };
@@ -105,7 +106,7 @@ export default function RestaurantPage() {
   const deliveryFee = draft.mode === 'delivery' ? 1500 : 0;
   const serviceFee = cartTotal ? Math.max(300, Math.round(cartTotal * 0.03)) : 0;
   const finalTotal = cartTotal + deliveryFee + serviceFee;
-  const checkoutReady = Boolean(customerName.trim() && customerPhone.trim() && (draft.mode !== 'delivery' || draft.deliveryAddress.trim()) && (draft.mode !== 'dine-in' || (draft.date && draft.time)) && (draft.mode !== 'pickup' || (draft.date && draft.time)));
+  const checkoutReady = Boolean(customerName.trim() && customerPhone.trim() && (draft.paymentMethod !== 'uniquepay' || /^\\d{4}$/.test(transactionPin)) && (draft.mode !== 'delivery' || draft.deliveryAddress.trim()) && (draft.mode !== 'dine-in' || (draft.date && draft.time)) && (draft.mode !== 'pickup' || (draft.date && draft.time)));
 
   const openBooking = (restaurant: Restaurant) => { setSelected(restaurant); saveDraft({ ...draft, restaurantId: restaurant.id, cart, customerName, customerPhone }); setBookingOpen(true); setStage('menu'); };
 
@@ -151,7 +152,25 @@ export default function RestaurantPage() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error?.message || 'We could not create your restaurant order.');
       if (draft.paymentMethod === 'uniquepay') {
-        setOrderError('Order created securely. UniquePay settlement will activate when this restaurant is connected to a verified UniquePay merchant wallet.');
+        const paymentResponse = await fetch('/api/restaurant/pay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            orderId: data.orderId,
+            idempotencyKey: `restaurant_pay_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+            transactionPin,
+          }),
+        });
+        const paymentData = await paymentResponse.json().catch(() => ({}));
+        if (!paymentResponse.ok) {
+          if (paymentResponse.status === 503 || paymentData?.error?.code === 'UNAVAILABLE') {
+            setOrderError('Order created securely, but this restaurant is not yet connected to a verified UniquePay merchant wallet. No money was debited.');
+            setStage('ready');
+            return;
+          }
+          throw new Error(paymentData?.error?.message || 'UniquePay payment could not be completed. No money was debited.');
+        }
+        setOrderError('Payment confirmed. Your restaurant order has been recorded.');
       } else {
         setOrderError('Order created securely. A dedicated bank-transfer account will appear when the payment provider is connected.');
       }
@@ -308,9 +327,16 @@ export default function RestaurantPage() {
               </div>
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Payment</p>
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => saveDraft({...draft, paymentMethod:'uniquepay'})} className="rounded-2xl border border-slate-200 p-3 text-left"><CreditCard className="h-4 w-4 text-emerald-600"/><p className="mt-2 text-xs font-black">UniquePay</p><p className="text-[10px] text-slate-500">Pay directly</p></button>
-                <button onClick={() => saveDraft({...draft, paymentMethod:'bank-transfer'})} className="rounded-2xl border border-slate-200 p-3 text-left"><Landmark className="h-4 w-4 text-emerald-600"/><p className="mt-2 text-xs font-black">Bank transfer</p><p className="text-[10px] text-slate-500">Generate account number</p></button>
+                <button onClick={() => { setTransactionPin(''); saveDraft({...draft, paymentMethod:'uniquepay'}); }} className={`rounded-2xl border p-3 text-left ${draft.paymentMethod === 'uniquepay' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200'}`}><CreditCard className="h-4 w-4 text-emerald-600"/><p className="mt-2 text-xs font-black">UniquePay</p><p className="text-[10px] text-slate-500">Pay directly</p></button>
+                <button onClick={() => saveDraft({...draft, paymentMethod:'bank-transfer'})} className={`rounded-2xl border p-3 text-left ${draft.paymentMethod === 'bank-transfer' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200'}`}><Landmark className="h-4 w-4 text-emerald-600"/><p className="mt-2 text-xs font-black">Bank transfer</p><p className="text-[10px] text-slate-500">Generate account number</p></button>
               </div>
+              {draft.paymentMethod === 'uniquepay' && currentUser && (
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Transaction PIN</label>
+                  <input value={transactionPin} onChange={e => setTransactionPin(e.target.value.replace(/\\D/g, '').slice(0, 4))} type="password" inputMode="numeric" maxLength={4} placeholder="4-digit PIN" className="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm font-bold outline-none focus:border-emerald-500" />
+                  <p className="mt-1 text-[10px] text-slate-500">Your PIN is verified securely and is never stored with the order.</p>
+                </div>
+              )}
               <button disabled={!checkoutReady} onClick={confirmBooking} className="w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-40">{currentUser ? (draft.paymentMethod === 'uniquepay' ? 'Continue to UniquePay' : 'Generate account number') : 'Sign in to continue'}</button>
               {!currentUser && <p className="text-center text-[10px] text-slate-500">Your details and payment choice will remain saved while you sign in.</p>}
             </div>
