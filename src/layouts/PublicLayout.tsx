@@ -5,7 +5,7 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import AppearanceControls from '../components/AppearanceControls';
 import { getLanguage, t, type SupportedLanguage } from '../lib/i18n';
-import { Settings } from 'lucide-react';
+import { Settings, GraduationCap, Sparkles } from 'lucide-react';
 
 export default function PublicLayout() {
   const { currentUser } = useAuth();
@@ -74,6 +74,14 @@ export default function PublicLayout() {
                   {name}
                 </Link>
               ))}
+            </div>
+            <div className="mt-2">
+              <Link to="/education-hub" onClick={() => setIsMobileMenuOpen(false)} className="group relative flex min-h-[76px] items-center overflow-hidden rounded-2xl border border-emerald-300/40 bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 px-3 py-3 text-white shadow-[0_0_24px_rgba(16,185,129,0.16)] transition active:scale-[0.98]">
+                <span className="absolute -right-8 -top-8 h-20 w-20 rounded-full bg-emerald-400/20 blur-2xl animate-pulse" />
+                <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-300/30 bg-emerald-400/10"><GraduationCap className="h-5 w-5 text-emerald-300" /></span>
+                <span className="relative ml-3 min-w-0 flex-1"><span className="block text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300">Special experience</span><span className="mt-0.5 block text-sm font-black">UniqueEducationHub</span><span className="block text-[10px] text-slate-300">Learn • Teach • Contribute • Grow</span></span>
+                <Sparkles className="relative h-4 w-4 shrink-0 text-emerald-300" />
+              </Link>
             </div>
             <div className="mt-6 border-t-2 border-slate-100 pt-6">
               <div className="grid grid-cols-2 gap-2 sm:gap-3">
