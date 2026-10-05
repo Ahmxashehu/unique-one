@@ -4,7 +4,7 @@ import { createHash, randomUUID } from "crypto";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import rateLimit, { ipKeyGenerator, type Store } from "express-rate-limit";
-import { applicationDefault, initializeApp, getApps } from "firebase-admin/app";
+import { applicationDefault, cert, initializeApp, getApps } from "firebase-admin/app";
 import { getAuth, type UserRecord } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
@@ -65,10 +65,38 @@ class RequestValidationError extends Error {
     this.code = code;
   }
 }
+function getFirebaseAdminCredential() {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!raw) return applicationDefault();
+
+  try {
+    const serviceAccount = JSON.parse(raw) as {
+      project_id?: unknown;
+      client_email?: unknown;
+      private_key?: unknown;
+    };
+    if (
+      typeof serviceAccount.project_id !== "string" ||
+      typeof serviceAccount.client_email !== "string" ||
+      typeof serviceAccount.private_key !== "string"
+    ) {
+      throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON is missing required service-account fields.");
+    }
+    return cert({
+      projectId: serviceAccount.project_id,
+      clientEmail: serviceAccount.client_email,
+      privateKey: serviceAccount.private_key,
+    });
+  } catch (error) {
+    throw new Error(
+      `Invalid FIREBASE_SERVICE_ACCOUNT_JSON: ${error instanceof Error ? error.message : "unable to parse credential"}`,
+    );
+  }
+}
+
 if (getApps().length === 0) initializeApp({
-  credential: applicationDefault(),
+  credential: getFirebaseAdminCredential(),
   projectId: "unique-one-9731b",
-  serviceAccountId: process.env.FIREBASE_SERVICE_ACCOUNT_EMAIL || "firebase-adminsdk-fbsvc@unique-one-9731b.iam.gserviceaccount.com",
   storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "unique-one-9731b.firebasestorage.app",
 });
 const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || "(default)";
