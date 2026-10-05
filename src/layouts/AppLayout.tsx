@@ -10,6 +10,7 @@ import { cn } from '../lib/utils';
 import MobileBottomNav from '../components/MobileBottomNav';
 import { useAuth } from '../contexts/AuthContext';
 import AppearanceControls from '../components/AppearanceControls';
+import AppErrorBoundary from '../components/AppErrorBoundary';
 
 export default function AppLayout() {
   const location = useLocation();
@@ -197,12 +198,14 @@ export default function AppLayout() {
       <div className="flex-1 flex flex-col h-full min-w-0 w-full overflow-hidden">
         <main className="mobile-scroll-padding flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pt-4 md:p-8 w-full pb-20 md:pb-8">
           <div className="mx-auto max-w-5xl h-full w-full">
-            <Outlet />
+            <AppErrorBoundary>
+              <Outlet />
+            </AppErrorBoundary>
           </div>
         </main>
 
         <MobileBottomNav variant="app" onMenu={() => setIsMobileMenuOpen(true)} />
- </div>
+      </div>
     </div>
   );
 }
