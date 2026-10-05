@@ -15,6 +15,7 @@ import { getLiveDiscoveryContext } from "./src/lib/ai/aiTools";
 import { registerIdentityVerificationRoutes } from "./src/server/identityVerificationRoutes";
 import { registerAjoRoutes } from "./src/server/ajoRoutes";
 import { registerUniqueShareRoutes } from "./src/server/uniqueShareRoutes";
+import { getTransactionAuthPolicy } from "./src/server/transactionAuthPolicy";
 
 interface WalletDocument {
   uid: string;
@@ -44,15 +45,6 @@ const MAX_CONVERSATION_MEMBER_COUNT = 50;
 const PASSKEY_CHALLENGE_TTL_MS = 5 * 60_000;
 const PASSKEY_COLLECTION = 'passkeys';
 const PASSKEY_CHALLENGES_COLLECTION = 'passkeyChallenges';
-const BIOMETRIC_THRESHOLD_1_MINOR = 5_000_000; // ₦50,000
-const BIOMETRIC_THRESHOLD_2_MINOR = 20_000_000; // ₦200,000
-const BIOMETRIC_THRESHOLD_3_MINOR = 50_000_000; // ₦500,000
-function biometricStepUpLevel(amountMinor: number): 0 | 1 | 2 | 3 {
-  if (amountMinor >= BIOMETRIC_THRESHOLD_3_MINOR) return 3;
-  if (amountMinor >= BIOMETRIC_THRESHOLD_2_MINOR) return 2;
-  if (amountMinor >= BIOMETRIC_THRESHOLD_1_MINOR) return 1;
-  return 0;
-}
 const CONVERSATION_CREATE_WINDOW_MS = 60_000;
 const MAX_CONVERSATION_CREATES_PER_WINDOW = 10;
 const COMMUNICATION_CONVERSATION_TYPES = new Set<ConversationType>(['direct', 'group', 'business']);
@@ -1500,16 +1492,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       console.error('Transaction PIN verification failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to verify the Transaction PIN right now.');
     }
-    const biometricLevel = biometricStepUpLevel(amountMinor);
-    let hasPreviousTransaction = false;
-    if (biometricLevel === 0) {
-      const previousTransactionSnapshot = await adminDb.collection('transactions')
-        .where('senderId', '==', senderUid)
-        .limit(1)
-        .get();
-      hasPreviousTransaction = !previousTransactionSnapshot.empty;
-    }
-    const biometricRequired = biometricLevel > 0 || !hasPreviousTransaction;
+    const authPolicy = getTransactionAuthPolicy({
+      amountMinor,
+      transactionType: 'transfer',
+    });
+    const biometricLevel = authPolicy.biometricLevel;
+    const biometricRequired = authPolicy.requiredFactors.includes('biometric');
     if (biometricRequired) {
       const biometricAssertion = req.body?.biometricAssertion;
       if (!biometricAssertion?.challengeId || !biometricAssertion?.credentialId || !biometricAssertion?.clientDataJSON || !biometricAssertion?.authenticatorData || !biometricAssertion?.signature) return errorResponse(res, 'BIOMETRIC_REQUIRED', biometricLevel >= 3 ? 'Biometric verification is required for transfers of ₦500,000 or more.' : biometricLevel >= 2 ? 'Biometric verification is required for transfers of ₦200,000 or more.' : biometricLevel >= 1 ? 'Biometric verification is required for transfers of ₦50,000 or more.' : 'Biometric verification is required for your first wallet transaction.');
@@ -3215,13 +3203,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const amountMinor = Math.round(totalAmountNaira * 100);
       if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) return errorResponse(res, 'INVALID_AMOUNT', 'The Store payment amount is invalid.');
 
-      const biometricLevel = biometricStepUpLevel(amountMinor);
-      let hasPreviousTransaction = false;
-      if (biometricLevel === 0) {
-        const previousTransactionSnapshot = await adminDb.collection('transactions').where('senderId', '==', uid).limit(1).get();
-        hasPreviousTransaction = !previousTransactionSnapshot.empty;
-      }
-      const biometricRequired = biometricLevel > 0 || !hasPreviousTransaction;
+      const authPolicy = getTransactionAuthPolicy({
+        amountMinor,
+        transactionType: 'merchant_payment',
+      });
+      const biometricLevel = authPolicy.biometricLevel;
+      const biometricRequired = authPolicy.requiredFactors.includes('biometric');
       if (biometricRequired) {
         const assertion = isPlainObject(paymentBody.biometricAssertion) ? paymentBody.biometricAssertion : null;
         if (!assertion?.challengeId || !assertion?.credentialId || !assertion?.clientDataJSON || !assertion?.authenticatorData || !assertion?.signature) {
