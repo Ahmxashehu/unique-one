@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, Users, ShoppingBag, ArrowUpRight, Loader2 } from 'lucide-react';
+import { Activity, Users, ShoppingBag } from 'lucide-react';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,7 +9,7 @@ export default function DashboardPage() {
   const [balanceMinor, setBalanceMinor] = useState(0);
   const [activeOrders, setActiveOrders] = useState(0);
   const [connections, setConnections] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -17,13 +17,16 @@ export default function DashboardPage() {
 
     let cancelled = false;
 
+    // Never block the Home screen on secondary Firestore reads. The route must
+    // render immediately; wallet/orders/connections hydrate in the background.
+    setLoading(false);
+
     const loadDashboard = async () => {
       if (!currentUser) {
         setLoading(false);
         return;
       }
 
-      setLoading(true);
       setError('');
 
       try {
@@ -56,7 +59,7 @@ export default function DashboardPage() {
         console.error('Unable to load dashboard data:', loadError);
         if (!cancelled) setError('Some dashboard data could not be loaded.');
       } finally {
-        if (!cancelled) setLoading(false);
+        // Data loading is intentionally non-blocking for Home navigation.
       }
     };
 
@@ -67,14 +70,7 @@ export default function DashboardPage() {
     };
   }, [authLoading, currentUser]);
 
-  if (authLoading || loading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-      </div>
-    );
-  }
-
+  if (authLoading) return null;
   if (!currentUser) return null;
 
   return (
