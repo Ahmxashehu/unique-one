@@ -106,46 +106,47 @@ export default function AppLayout() {
   return (
     <div className="flex h-full bg-slate-50 overflow-hidden w-full max-w-[100vw]">
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="More UniquePlatform">
+        <div className="md:hidden fixed inset-0 z-[100] isolate" role="dialog" aria-modal="true" aria-label="More UniquePlatform">
           <button
             type="button"
             aria-label="Close menu"
-            className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+            className="absolute inset-0 h-full w-full bg-slate-950/60 backdrop-blur-md"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          <div className="absolute inset-x-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-h-[72dvh] overflow-y-auto overscroll-contain rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl sm:inset-x-3 sm:p-4">
+          <div className="absolute inset-x-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-h-[76dvh] overflow-y-auto overscroll-contain rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl sm:inset-x-3 sm:p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-600">UniquePlatform</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600">UniquePlatform</p>
                 <h2 className="text-lg font-black text-slate-900">More experiences</h2>
               </div>
-              <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">
+              <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">
                 Close
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               {[
-                ['Restaurant', '/restaurant'],
-                ['Hotels & Events', '/hotels-events'],
-                ['Flights', '/flights'],
-                ['Unique Jobs & Services', '/jobs'],
-                ['Unique Travel', '/os/travel'],
-                ['Unique Health & Wellness', '/health-wellness'],
-                ['Unique Store', '/store'],
-                ['Communication', '/os/messages'],
-                ['Orders', '/os/orders'],
-                ['Bookings', '/os/bookings'],
-                ['Contributions', '/os/contributions'],
-                ['Education', '/os/education'],
-              ].map(([name, path]) => (
+                ['Restaurant', '/restaurant', Store],
+                ['Hotels & Events', '/hotels-events', Calendar],
+                ['Flights', '/flights', Plane],
+                ['Unique Jobs & Services', '/jobs', Briefcase],
+                ['Unique Travel', '/os/travel', Plane],
+                ['Unique Health & Wellness', '/health-wellness', Activity],
+                ['Unique Store', '/store', ShoppingCart],
+                ['Communication', '/os/messages', MessageSquare],
+                ['Orders', '/os/orders', ClipboardList],
+                ['Bookings', '/os/bookings', Calendar],
+                ['Contributions', '/os/contributions', HeartHandshake],
+                ['Education', '/os/education', GraduationCap],
+              ].map(([name, path, Icon]) => (
                 <Link
-                  key={path}
-                  to={path}
+                  key={path as string}
+                  to={path as string}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm"
+                  className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm"
                 >
-                  {name}
+                  {typeof Icon === 'function' && <Icon className="h-4 w-4 shrink-0 text-emerald-600" />}
+                  <span className="min-w-0 truncate">{name as string}</span>
                 </Link>
               ))}
             </div>
