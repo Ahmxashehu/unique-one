@@ -16,6 +16,7 @@ import { registerIdentityVerificationRoutes } from "./src/server/identityVerific
 import { registerAjoRoutes } from "./src/server/ajoRoutes";
 import { registerUniqueShareRoutes } from "./src/server/uniqueShareRoutes";
 import { getTransactionAuthPolicy } from "./src/server/transactionAuthPolicy";
+import { registerAdminRbacRoutes } from "./src/server/adminRbacRoutes";
 import { hasRolePermission } from "./src/lib/auth/rbac";
 
 interface WalletDocument {
@@ -738,6 +739,7 @@ const app = express();
   registerIdentityVerificationRoutes(app, authenticate);
   registerAjoRoutes(app, authenticate);
   registerUniqueShareRoutes(app, authenticate);
+  registerAdminRbacRoutes(app, authenticate, requirePermission);
 
   app.post("/api/ai/discovery", rateLimit({
     windowMs: 60_000,
