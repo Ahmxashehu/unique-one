@@ -67,7 +67,7 @@ export default function HomePage() {
     ['Food & Dining', '/categories'],
     ['Global Search', '/search'],
     ['Near Me', '/near-me'],
-    ['Unique Jobs & Services', '/os/jobs'],
+    ['Unique Jobs & Services', '/jobs'],
     ['Contributions', '/os/contributions'],
     ['Education', '/os/education'],
     ['Unique Travel', '/os/travel'],
@@ -807,7 +807,7 @@ export default function HomePage() {
                       </div>
                       {job.description && <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-500">{job.description}</p>}
                       <div className="mt-5 flex flex-wrap gap-2">
-                        <Link to="/os/jobs" className="rounded-full bg-slate-950 px-4 py-2 text-xs font-bold text-white">Apply / Explore</Link>
+                        <Link to="/jobs" className="rounded-full bg-slate-950 px-4 py-2 text-xs font-bold text-white">Apply / Explore</Link>
                         <button type="button" onClick={() => navigator.share?.({ title: job.title || 'Unique opportunity', text: job.description || job.title || '' })} className="rounded-full border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700">Share</button>
                       </div>
                     </article>
