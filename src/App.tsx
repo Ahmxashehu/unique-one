@@ -74,7 +74,7 @@ const AdminRequestsPage = lazy(() => import("./pages/admin/AdminRequestsPage"));
 const AdminReportsPage = lazy(() => import("./pages/admin/AdminReportsPage"));
 const AdminVerificationPage = lazy(() => import("./pages/admin/AdminVerificationPage"));
 const AdminTransactionsPage = lazy(() => import("./pages/admin/AdminTransactionsPage"));
-const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage"));
+const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage"));\nconst AdminControlTowerPage = lazy(() => import("./pages/admin/AdminControlTowerPage"));
 const StoreDiscoverPage = lazy(() => import("./pages/store/StoreDiscoverPage"));
 const StorePage = lazy(() => import("./pages/StorePage"));
 const StoreCategoriesPage = lazy(() => import("./pages/store/StoreCategoriesPage"));
@@ -233,7 +233,7 @@ export default function App() {
 
                   <Route path="/admin/login" element={<AdminLoginPage />} />
                   <Route path="/admin" element={<RoleGuard requiredRole="administrator"><AdminLayout /></RoleGuard>}>
-                    <Route index element={<Navigate to="/admin/users" replace />} />
+                    <Route index element={<Navigate to="/admin/control-tower" replace />} />\n                    <Route path="control-tower" element={<AdminControlTowerPage />} />
                     <Route path="users" element={<AdminUsersPage />} />
                     <Route path="businesses" element={<AdminBusinessesPage />} />
                     <Route path="products" element={<AdminProductsPage />} />
