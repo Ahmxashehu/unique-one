@@ -36,13 +36,13 @@ export default function MobileBottomNav({ variant, onMenu }: MobileBottomNavProp
               ? location.pathname === "/"
               : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
           return (
-            <Link
+            <a
               key={item.name}
-              to={item.path}
+              href={item.path}
               onClick={(event) => {
                 if (variant === "app" && item.name === "Home") {
                   event.preventDefault();
-                  navigate("/os/dashboard");
+                  window.location.assign("/os/dashboard");
                 }
               }}
               className={cn("mobile-nav-item", isActive && "mobile-nav-item-active")}
@@ -50,7 +50,7 @@ export default function MobileBottomNav({ variant, onMenu }: MobileBottomNavProp
             >
               <Icon className="h-5 w-5" aria-hidden="true" />
               <span>{item.name}</span>
-            </Link>
+            </a>
           );
         })}
         <button type="button" onClick={onMenu} className="mobile-nav-item" aria-label="Open UniqueOS menu">
