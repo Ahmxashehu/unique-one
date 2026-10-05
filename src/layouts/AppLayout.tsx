@@ -126,29 +126,31 @@ export default function AppLayout() {
 
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               {[
-                ['Restaurant', '/restaurant', Store],
-                ['Hotels & Events', '/hotels-events', Calendar],
-                ['Flights', '/flights', Plane],
-                ['Unique Jobs & Services', '/jobs', Briefcase],
-                ['Unique Travel', '/os/travel', Plane],
-                ['Unique Health & Wellness', '/health-wellness', Activity],
-                ['Unique Store', '/store', ShoppingCart],
-                ['Communication', '/os/messages', MessageSquare],
-                ['Orders', '/os/orders', ClipboardList],
-                ['Bookings', '/os/bookings', Calendar],
-                ['Contributions', '/os/contributions', HeartHandshake],
-                ['Education', '/os/education', GraduationCap],
-              ].map(([name, path, Icon]) => (
+                { name: 'Restaurant', path: '/restaurant', icon: Store },
+                { name: 'Hotels & Events', path: '/hotels-events', icon: Calendar },
+                { name: 'Flights', path: '/flights', icon: Plane },
+                { name: 'Unique Jobs & Services', path: '/jobs', icon: Briefcase },
+                { name: 'Unique Travel', path: '/os/travel', icon: Plane },
+                { name: 'Unique Health & Wellness', path: '/health-wellness', icon: Activity },
+                { name: 'Unique Store', path: '/store', icon: ShoppingCart },
+                { name: 'Communication', path: '/os/messages', icon: MessageSquare },
+                { name: 'Orders', path: '/os/orders', icon: ClipboardList },
+                { name: 'Bookings', path: '/os/bookings', icon: Calendar },
+                { name: 'Contributions', path: '/os/contributions', icon: HeartHandshake },
+                { name: 'Education', path: '/os/education', icon: GraduationCap },
+              ].map((item) => {
+                const Icon = item.icon;
                 <Link
-                  key={path as string}
-                  to={path as string}
+                  key={item.path}
+                  to={item.path}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm"
                 >
-                  {typeof Icon === 'function' && <Icon className="h-4 w-4 shrink-0 text-emerald-600" />}
-                  <span className="min-w-0 truncate">{name as string}</span>
+                  <Icon className="h-4 w-4 shrink-0 text-emerald-600" />
+                  <span className="min-w-0 truncate">{item.name}</span>
                 </Link>
-              ))}
+              );
+              })}
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2">
