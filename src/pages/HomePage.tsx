@@ -54,7 +54,7 @@ export default function HomePage() {
   const [smartLocation, setSmartLocation] = useState('Abuja, FCT');
 
   const experiencePosters = [
-    ['Restaurant', '/categories'],
+    ['Restaurant', '/restaurant'],
     ['Hotel', '/travel'],
     ['Flights', '/travel'],
     ['School', '/education'],
