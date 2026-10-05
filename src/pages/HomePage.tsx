@@ -1094,7 +1094,12 @@ export default function HomePage() {
           <button type="button" className="absolute inset-0 cursor-default" aria-label="Close preview" onClick={() => setSelectedLayer(null)} />
           <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/20 bg-white shadow-2xl">
             <div className="relative h-28 overflow-hidden bg-slate-950">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_35%,rgba(52,211,153,0.75),transparent_38%),radial-gradient(circle_at_75%_65%,rgba(20,184,166,0.65),transparent_44%)]" />
+              {selectedLayer.image ? (
+                <img src={selectedLayer.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              ) : (
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_35%,rgba(52,211,153,0.75),transparent_38%),radial-gradient(circle_at_75%_65%,rgba(20,184,166,0.65),transparent_44%)]" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/15 to-slate-950/20" />
               <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-emerald-300/20 blur-2xl" />
               <div className="relative flex h-full items-center justify-center">
                 <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur">
@@ -1111,7 +1116,7 @@ export default function HomePage() {
               {selectedLayer.price && <p className="mt-3 text-base font-black text-emerald-700">{selectedLayer.price}</p>}
               <div className="mt-5 flex gap-2">
                 <button type="button" onClick={() => setSelectedLayer(null)} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700">Later</button>
-                <Link to={selectedLayer.href} onClick={() => setSelectedLayer(null)} className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-emerald-700">View now</Link>
+                <Link to={selectedLayer.href} onClick={() => setSelectedLayer(null)} className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-emerald-700">{selectedLayer.kind === 'product' ? 'View product' : selectedLayer.kind === 'service' ? 'Explore service' : 'View now'}</Link>
               </div>
             </div>
           </div>
