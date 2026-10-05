@@ -110,62 +110,53 @@ export default function AppLayout() {
           <button
             type="button"
             aria-label="Close menu"
-            className="absolute inset-0 h-full w-full bg-slate-950/60 backdrop-blur-md"
+            className="absolute inset-0 h-full w-full bg-slate-950/45 backdrop-blur-sm"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          <div className="absolute inset-x-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-h-[76dvh] overflow-y-auto overscroll-contain rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl sm:inset-x-3 sm:p-4">
+          <div className="absolute inset-x-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-h-[72dvh] overflow-y-auto overscroll-contain rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl sm:inset-x-3 sm:p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600">UniquePlatform</p>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-600">UniquePlatform</p>
                 <h2 className="text-lg font-black text-slate-900">More experiences</h2>
               </div>
-              <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">
-                Close
-              </button>
+              <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">Close</button>
             </div>
-
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               {[
-                { name: 'Restaurant', path: '/restaurant', icon: Store },
-                { name: 'Hotels & Events', path: '/hotels-events', icon: Calendar },
-                { name: 'Flights', path: '/flights', icon: Plane },
-                { name: 'Unique Jobs & Services', path: '/jobs', icon: Briefcase },
-                { name: 'Unique Travel', path: '/os/travel', icon: Plane },
-                { name: 'Unique Health & Wellness', path: '/health-wellness', icon: Activity },
-                { name: 'Unique Store', path: '/store', icon: ShoppingCart },
-                { name: 'Communication', path: '/os/messages', icon: MessageSquare },
-                { name: 'Orders', path: '/os/orders', icon: ClipboardList },
-                { name: 'Bookings', path: '/os/bookings', icon: Calendar },
-                { name: 'Contributions', path: '/os/contributions', icon: HeartHandshake },
-                { name: 'Education', path: '/os/education', icon: GraduationCap },
-              ].map((item) => {
-                const Icon = item.icon;
+                ['Restaurant', '/restaurant', Store],
+                ['Hotels & Events', '/hotels-events', Calendar],
+                ['Flights', '/flights', Plane],
+                ['Unique Jobs & Services', '/jobs', Briefcase],
+                ['Unique Travel', '/os/travel', Plane],
+                ['Unique Health & Wellness', '/health-wellness', Activity],
+              ].map(([name, path, Icon]) => {
+                const ExperienceIcon = Icon as React.ComponentType<{ className?: string }>;
                 return (
-                  <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm"
-                >
-                  <Icon className="h-4 w-4 shrink-0 text-emerald-600" />
-                  <span className="min-w-0 truncate">{item.name}</span>
+                  <Link key={String(path) + String(name)} to={String(path)} onClick={() => setIsMobileMenuOpen(false)} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm">
+                    <span className="flex items-center gap-2">
+                      <ExperienceIcon className="h-4 w-4 shrink-0 text-emerald-600" />
+                      <span className="truncate">{String(name)}</span>
+                    </span>
                   </Link>
                 );
               })}
             </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Link to="/os/profile" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-800">
-                Profile
+            <div className="mt-2">
+              <Link to="/education-hub" onClick={() => setIsMobileMenuOpen(false)} className="group relative flex min-h-[76px] items-center overflow-hidden rounded-2xl border border-emerald-300/40 bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 px-3 py-3 text-white shadow-[0_0_24px_rgba(16,185,129,0.16)] transition active:scale-[0.98]">
+                <span className="absolute -right-8 -top-8 h-20 w-20 rounded-full bg-emerald-400/20 blur-2xl animate-pulse" />
+                <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-300/30 bg-emerald-400/10"><GraduationCap className="h-5 w-5 text-emerald-300" /></span>
+                <span className="relative ml-3 min-w-0 flex-1"><span className="block text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300">Special experience</span><span className="mt-0.5 block text-sm font-black">UniqueEducationHub</span><span className="block text-[10px] text-slate-300">Learn • Teach • Contribute • Grow</span></span>
+                <Sparkles className="relative h-4 w-4 shrink-0 text-emerald-300" />
               </Link>
-              <Link to="/os/settings" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-800">
+            </div>
+            <div className="mt-6 border-t-2 border-slate-100 pt-6">
+              <Link to="/os/settings" onClick={() => setIsMobileMenuOpen(false)} className="flex min-w-0 items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm">
                 Settings
               </Link>
             </div>
           </div>
         </div>
       )}
-
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 shrink-0 h-full overflow-y-auto">
         <div className="h-16 flex items-center px-6 border-b border-slate-100 shrink-0 sticky top-0 bg-white z-10">
           <div className="font-bold text-xl tracking-tight text-slate-900">UniqueOS</div>
