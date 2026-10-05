@@ -15,6 +15,7 @@ export default function RegisterPage(){
   const [step,setStep]=useState<'phone'|'details'|'security'>('phone');
   const [phone,setPhone]=useState('');
   const [code,setCode]=useState('');
+  const [otpRequired,setOtpRequired]=useState(true);
   const [registrationToken,setRegistrationToken]=useState('');
   const [otpRemaining,setOtpRemaining]=useState(0);
   const [resendRemaining,setResendRemaining]=useState(0);
