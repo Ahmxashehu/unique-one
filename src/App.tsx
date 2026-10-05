@@ -151,6 +151,7 @@ export default function App() {
                     <Route path="/ai/premium" element={<UniqueAiSubscriptionPage />} />
                     <Route path="/media" element={<UniqueMediaPage />} />
                     <Route path="/unique-media" element={<UniqueMediaPage />} />
+                    <Route path="/jobs" element={<JobsPage />} />
                     <Route path="/store" element={<StorePage />} />
                     <Route path="/store/categories" element={<StoreCategoriesPage />} />
                     <Route path="/store/product/:id" element={<StoreProductPage />} />
@@ -182,7 +183,7 @@ export default function App() {
                     <Route path="ai/premium" element={<UniqueAiSubscriptionPage />} />
                     <Route path="master-vision" element={<MasterVisionPage />} />
                     <Route path="unique-share" element={<UniqueSharePage />} />
-                    <Route path="jobs" element={<JobsPage />} />
+                    <Route path="jobs" element={<Navigate to="/jobs" replace />} />
                     <Route path="contributions" element={<ContributionNetworkPage />} />
                     <Route path="education" element={<EducationPage />} />
                     <Route path="travel" element={<TravelPage />} />
