@@ -1492,9 +1492,17 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       console.error('Transaction PIN verification failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to verify the Transaction PIN right now.');
     }
+    const previousRecipientTransaction = await adminDb.collection('transactions')
+      .where('senderId', '==', senderUid)
+      .where('recipientId', '==', recipientId)
+      .limit(1)
+      .get();
+    const isNewRecipient = previousRecipientTransaction.empty;
+
     const authPolicy = getTransactionAuthPolicy({
       amountMinor,
       transactionType: 'transfer',
+      isNewRecipient,
     });
     const biometricLevel = authPolicy.biometricLevel;
     const biometricRequired = authPolicy.requiredFactors.includes('biometric');
