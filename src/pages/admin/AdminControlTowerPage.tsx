@@ -72,7 +72,7 @@ export default function AdminControlTowerPage() {
         setRbacMessage(error instanceof Error ? error.message : 'Permission centre could not be loaded.');
       }
     })();
-  }, [currentUser, hasPermission]);
+  }, [currentUser]);
 
   useEffect(() => {
     const selected = rbacUsers.find(user => user.uid === selectedUid);
@@ -109,7 +109,7 @@ export default function AdminControlTowerPage() {
     const matchesFilter = filter === 'All' || d.sensitive === filter;
     const matchesRole = selectedRole === 'All roles' || d.access.includes(selectedRole);
     return matchesText && matchesFilter && matchesRole;
-  }), [query, filter]);
+  }), [query, filter, selectedRole]);
 
   return (
     <div className="space-y-6 pb-12">
