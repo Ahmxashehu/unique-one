@@ -7,6 +7,7 @@ export interface TransactionAuthPolicyInput {
   isNewRecipient?: boolean;
   isNewDevice?: boolean;
   unusualActivity?: boolean;
+  recentTransactionCount?: number;
 }
 
 export interface TransactionAuthPolicyDecision {
@@ -40,7 +41,8 @@ export function getTransactionAuthPolicy(input: TransactionAuthPolicyInput): Tra
     amount >= 20_000_000 ? 2 :
     amount >= 5_000_000 ? 1 : 0;
 
-  const riskSignal = Boolean(input.isNewRecipient || input.isNewDevice || input.unusualActivity);
+  const velocityRisk = (input.recentTransactionCount ?? 0) >= 4;
+  const riskSignal = Boolean(input.isNewRecipient || input.isNewDevice || input.unusualActivity || velocityRisk);
 
   if (riskSignal && biometricLevel === 0) {
     return {
