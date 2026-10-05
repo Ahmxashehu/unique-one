@@ -70,7 +70,7 @@ export default function PublicLayout() {
                 ['Restaurant', '/restaurant'],
                 ['Hotels & Events', '/hotels-events'],
                 ['Flights', '/flights'],
-                ['Unique Jobs & Services', '/os/jobs'],
+                ['Unique Jobs & Services', '/jobs'],
                 ['Unique Travel', '/os/travel'],
                 ['Unique Health & Wellness', '/health-wellness'],
               ].map(([name, path]) => (
