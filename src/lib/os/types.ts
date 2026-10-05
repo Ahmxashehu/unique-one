@@ -2,14 +2,16 @@ export type Role =
   | 'customer' | 'buyer' | 'seller' | 'business_owner' | 'staff_member' 
   | 'farmer' | 'service_provider' | 'school_administrator' | 'parent' 
   | 'healthcare_provider' | 'property_owner' | 'hotel_owner' | 'driver' 
-  | 'logistics_provider' | 'moderator' | 'administrator' | 'partner' | 'developer';
+  | 'logistics_provider' | 'moderator' | 'administrator' | 'partner' | 'developer'
+  | 'finance_officer' | 'risk_security_officer' | 'platform_admin' | 'super_admin';
 
 export type Permission = 
   | 'view:profile' | 'edit:profile' | 'create:products' | 'edit:products' 
   | 'manage:inventory' | 'create:invoices' | 'send:payment_requests' 
   | 'view:customer_info' | 'manage:orders' | 'manage:bookings' 
   | 'manage:business_staff' | 'view:transactions' | 'manage:verification' 
-  | 'manage:disputes' | 'access:admin_tools';
+  | 'manage:disputes' | 'access:admin_tools' | 'manage:roles' | 'manage:permissions' 
+  | 'view:audit_logs';
 
 export interface UniqueUser {
   uid: string;
