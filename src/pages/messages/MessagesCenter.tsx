@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Plus, MessageSquare, Loader2, VolumeX } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Plus, MessageSquare, Loader2, VolumeX, UsersRound, Sparkles, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Conversation } from '../../lib/os/communication-types';
@@ -18,25 +18,15 @@ export default function MessagesCenter() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (!currentUser) {
-        setConversations([]);
-        setLoading(false);
-        return;
-      }
+      if (!currentUser) { setConversations([]); setLoading(false); return; }
       if (conversations.length === 0) setLoading(true);
       setError('');
       try {
         const token = await currentUser.getIdToken();
-        const response = await fetch('/api/communication/conversations', {
-          headers: { Authorization: 'Bearer ' + token },
-        });
+        const response = await fetch('/api/communication/conversations', { headers: { Authorization: 'Bearer ' + token } });
         const payload = await response.json().catch(() => null);
-        if (!response.ok || !Array.isArray(payload?.conversations)) {
-          throw new Error(payload?.error?.message ?? 'Failed to load messages.');
-        }
-        if (!cancelled) {
-          setConversations(payload.conversations);
-        }
+        if (!response.ok || !Array.isArray(payload?.conversations)) throw new Error(payload?.error?.message ?? 'Failed to load messages.');
+        if (!cancelled) setConversations(payload.conversations);
       } catch (err) {
         console.error(err);
         if (!cancelled) setError('Failed to load messages.');
@@ -46,19 +36,12 @@ export default function MessagesCenter() {
     }
     void load();
     const refreshTimer = window.setInterval(() => { void load(); }, 5000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(refreshTimer);
-    };
+    return () => { cancelled = true; window.clearInterval(refreshTimer); };
   }, [currentUser, conversations.length]);
 
   useEffect(() => {
     const term = search.trim();
-    if (!currentUser || term.length < 2) {
-      setUserResults([]);
-      setUserSearchLoading(false);
-      return;
-    }
+    if (!currentUser || term.length < 2) { setUserResults([]); setUserSearchLoading(false); return; }
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setUserSearchLoading(true);
@@ -87,84 +70,98 @@ export default function MessagesCenter() {
   }, [conversations, activeTab, search]);
 
   return (
-    <div className="flex h-[calc(100vh-64px)] -m-4 md:-m-6 lg:-m-8 bg-white md:bg-transparent">
-      <div className="w-full md:w-80 lg:w-96 flex flex-col border-r border-slate-200 bg-white md:rounded-l-3xl md:h-[calc(100vh-100px)]">
-        <div className="p-4 border-b border-slate-100">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-xl font-bold text-slate-900">Messages</h1>
-            <button onClick={() => navigate('/os/messages/add')} aria-label="Add user" title="Add user" className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-full">
-              <Plus className="w-5 h-5 text-slate-700" />
-            </button>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search messages..." className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-          </div>
-        </div>
+    <div className="relative min-h-full overflow-hidden rounded-[30px] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-3 md:p-5">
+      <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-emerald-400/15 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-cyan-400/10 blur-3xl" />
 
-        <div className="flex border-b border-slate-100 px-2 pt-2">
-          {(['all', 'business'] as const).map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeTab === tab ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500'}`}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </button>
-          ))}
-        </div>
-
-        {search.trim().length >= 2 && (userSearchLoading || userResults.length > 0) && (
-          <div className="border-b border-slate-100 bg-white p-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">People</h3>
-            {userSearchLoading && <div className="flex justify-center py-2"><Loader2 className="w-4 h-4 animate-spin text-slate-400" /></div>}
-            <div className="space-y-2">
-              {userResults.map((user) => (
-                <div key={user.uid} className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50">
-                  {user.profilePhotoUrl ? <img src={user.profilePhotoUrl} alt="" className="w-10 h-10 rounded-full object-cover" /> : <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-semibold text-slate-500">{user.fullName.charAt(0).toUpperCase()}</div>}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">{user.fullName}</p>
-                    <p className="text-xs text-slate-500 truncate">{user.username ? '@' + user.username : user.uniqueOneId ?? 'Unique One user'}</p>
-                  </div>
-                  <button onClick={() => navigate('/os/messages/add?q=' + encodeURIComponent(user.uniqueOneId ?? user.username ?? user.fullName))} className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs">Add</button>
+      <div className="relative flex min-h-[calc(100vh-120px)] overflow-hidden rounded-[25px] border border-white/10 bg-white shadow-2xl">
+        <div className="flex w-full flex-col md:w-96 md:border-r md:border-slate-200">
+          <div className="bg-slate-950 p-4 text-white md:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-900/30">
+                  <MessageSquare className="h-5 w-5" />
                 </div>
-              ))}
+                <div>
+                  <p className="text-[10px] font-bold tracking-[0.2em] text-emerald-300">UNIQUE COMMUNICATION</p>
+                  <h1 className="text-xl font-black">Connect</h1>
+                </div>
+              </div>
+              <button onClick={() => navigate('/os/messages/add')} aria-label="Add user" title="Add user" className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 hover:bg-white/15">
+                <Plus className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-slate-300">Your conversations, people and business chats in one focused space.</p>
+            <div className="mt-4 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search people or conversations" className="w-full rounded-xl border border-white/10 bg-white/10 py-2.5 pl-9 pr-4 text-sm text-white outline-none placeholder:text-slate-400 focus:border-emerald-400/60" />
             </div>
           </div>
-        )}
 
-                <div className="flex-1 overflow-y-auto">
-          {loading && <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>}
-          {!loading && error && <div className="p-8 text-center text-sm text-red-600">{error}</div>}
-          {!loading && !error && filtered.map((conv) => (
-            <button key={conv.id} onClick={() => navigate(`/os/messages/${conv.id}`)} className="w-full text-left flex items-start gap-3 p-4 border-b border-slate-50 hover:bg-slate-50">
-              <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center text-lg font-bold text-slate-500 shrink-0 overflow-hidden">
-                {conv.avatarUrl ? (
-                  <img src={conv.avatarUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  (conv.title ?? 'U').charAt(0).toUpperCase()
-                )}
+          <div className="flex border-b border-slate-100 bg-white px-3 pt-2">
+            {(['all', 'business'] as const).map((tab) => (
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2.5 text-sm font-bold border-b-2 ${activeTab === tab ? 'border-emerald-500 text-slate-900' : 'border-transparent text-slate-400'}`}>
+                {tab === 'all' ? 'All chats' : 'Business'}
+              </button>
+            ))}
+          </div>
+
+          {search.trim().length >= 2 && (userSearchLoading || userResults.length > 0) && (
+            <div className="border-b border-slate-100 bg-white p-3">
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400"><UsersRound className="h-3.5 w-3.5" /> People</div>
+              {userSearchLoading && <div className="flex justify-center py-2"><Loader2 className="h-4 w-4 animate-spin text-slate-400" /></div>}
+              <div className="space-y-2">
+                {userResults.map((user) => (
+                  <div key={user.uid} className="flex items-center gap-3 rounded-xl p-2 hover:bg-slate-50">
+                    {user.profilePhotoUrl ? <img src={user.profilePhotoUrl} alt="" className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 font-bold text-emerald-700">{user.fullName.charAt(0).toUpperCase()}</div>}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-slate-900">{user.fullName}</p>
+                      <p className="truncate text-xs text-slate-500">{user.username ? '@' + user.username : user.uniqueOneId ?? 'Unique One user'}</p>
+                    </div>
+                    <button onClick={() => navigate('/os/messages/add?q=' + encodeURIComponent(user.uniqueOneId ?? user.username ?? user.fullName))} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white">Add</button>
+                  </div>
+                ))}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between gap-2">
-                  <h4 className="font-semibold text-slate-900 truncate">{conv.title ?? 'Messages'}</h4>
-                  <span className="text-xs text-slate-500 whitespace-nowrap">{conv.lastMessageAt ? new Date(conv.lastMessageAt).toLocaleDateString() : ''}</span>
-                </div>
-                <div className="flex items-center gap-2 mt-0.5"><p className="text-sm text-slate-500 truncate">{conv.type === 'business' ? 'Business conversation' : 'Tap to open chat'}</p>{conv.muted && <VolumeX className="w-3.5 h-3.5 text-slate-400 shrink-0" />}{(conv.unreadCount ?? 0) > 0 && <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">{(conv.unreadCount ?? 0) > 99 ? '99+' : conv.unreadCount}</span>}</div>
-              </div>
-            </button>
-          ))}
-          {!loading && !error && filtered.length === 0 && (
-            <div className="p-8 text-center text-slate-500">
-              <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No messages found.</p>
             </div>
           )}
-        </div>
-      </div>
 
-      <div className="hidden md:flex flex-1 flex-col bg-slate-50 md:rounded-r-3xl md:h-[calc(100vh-100px)] items-center justify-center">
-        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4">
-          <MessageSquare className="w-8 h-8 text-slate-300" />
+          <div className="flex-1 overflow-y-auto bg-white">
+            {loading && <div className="flex justify-center p-10"><Loader2 className="h-5 w-5 animate-spin text-emerald-500" /></div>}
+            {!loading && error && <div className="p-8 text-center text-sm text-red-600">{error}</div>}
+            {!loading && !error && filtered.map((conv) => (
+              <button key={conv.id} onClick={() => navigate(`/os/messages/${conv.id}`)} className="group flex w-full items-start gap-3 border-b border-slate-50 p-4 text-left transition hover:bg-emerald-50/50">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 text-lg font-black text-slate-500">
+                  {conv.avatarUrl ? <img src={conv.avatarUrl} alt="" className="h-full w-full object-cover" /> : (conv.title ?? 'U').charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="truncate text-sm font-bold text-slate-900">{conv.title ?? 'Messages'}</h4>
+                    <span className="whitespace-nowrap text-[10px] text-slate-400">{conv.lastMessageAt ? new Date(conv.lastMessageAt).toLocaleDateString() : ''}</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <p className="truncate text-xs text-slate-500">{conv.type === 'business' ? 'Business conversation' : 'Conversation'}</p>
+                    {conv.muted && <VolumeX className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
+                    {(conv.unreadCount ?? 0) > 0 && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-black text-white">{(conv.unreadCount ?? 0) > 99 ? '99+' : conv.unreadCount}</span>}
+                  </div>
+                </div>
+                <ChevronRight className="mt-2 hidden h-4 w-4 text-slate-300 group-hover:block" />
+              </button>
+            ))}
+            {!loading && !error && filtered.length === 0 && (
+              <div className="p-10 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100"><MessageSquare className="h-7 w-7 text-slate-300" /></div>
+                <p className="mt-3 text-sm font-bold text-slate-800">No conversations yet</p>
+                <p className="mt-1 text-xs text-slate-500">Search for a person or start a new conversation.</p>
+              </div>
+            )}
+          </div>
         </div>
-        <h3 className="text-lg font-semibold text-slate-900">Your Messages</h3>
-        <p className="text-slate-500 text-sm mt-1">Select a conversation to start messaging</p>
+
+        <div className="hidden flex-1 flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50 md:flex">
+          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white shadow-lg"><Sparkles className="h-7 w-7 text-emerald-500" /></div>
+          <h3 className="mt-4 text-xl font-black text-slate-900">Your communication space</h3>
+          <p className="mt-1 max-w-sm text-center text-sm text-slate-500">Select a conversation to continue, or use the + button to find a person.</p>
+        </div>
       </div>
     </div>
   );
