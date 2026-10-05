@@ -598,41 +598,65 @@ button, input, textarea, select {
   font-weight: 650 !important;
 }
 
-/* UniquePlatform chat wallpaper: subtle WhatsApp-style identity pattern.
-   Decorative only; conversation content and controls remain untouched. */
+/* UniquePlatform chat wallpaper: visible but restrained, WhatsApp-inspired identity.
+   Decorative only; conversation content, controls and scrolling remain untouched. */
 .unique-chat-motion {
   position: relative;
-  background-color: #f4f7f5;
+  isolation: isolate;
+  background-color: #eef5f1;
   background-image:
-    radial-gradient(circle at 18px 18px, rgb(5 150 105 / .075) 0 2px, transparent 2.5px),
-    radial-gradient(circle at 70px 52px, rgb(5 150 105 / .055) 0 14px, transparent 14.5px),
-    radial-gradient(circle at 145px 118px, rgb(5 150 105 / .045) 0 10px, transparent 10.5px),
-    linear-gradient(135deg, transparent 46%, rgb(5 150 105 / .025) 47%, transparent 48%);
-  background-size: 140px 140px, 180px 180px, 210px 210px, 90px 90px;
+    radial-gradient(circle at 20px 20px, rgb(5 150 105 / .14) 0 2.5px, transparent 3px),
+    radial-gradient(circle at 78px 58px, rgb(5 150 105 / .075) 0 18px, transparent 18.5px),
+    radial-gradient(circle at 148px 126px, rgb(5 150 105 / .065) 0 13px, transparent 13.5px),
+    linear-gradient(135deg, transparent 44%, rgb(5 150 105 / .045) 45%, transparent 46%),
+    linear-gradient(45deg, transparent 48%, rgb(5 150 105 / .035) 49%, transparent 50%);
+  background-size: 120px 120px, 190px 190px, 230px 230px, 86px 86px, 110px 110px;
   background-attachment: local;
 }
-.unique-chat-motion::after {
-  content: "U1  •  UNIQUEPLATFORM";
+.unique-chat-motion::before {
+  content: "U1";
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) rotate(-28deg);
+  width: min(42vw, 260px);
+  height: min(42vw, 260px);
+  transform: translate(-50%, -50%) rotate(-14deg);
+  display: grid;
+  place-items: center;
+  border: 2px solid rgb(5 150 105 / .075);
+  border-radius: 9999px;
+  color: rgb(5 150 105 / .075);
+  font-size: clamp(3.5rem, 16vw, 7rem);
+  font-weight: 900;
+  letter-spacing: -.08em;
+  pointer-events: none;
+  user-select: none;
+  z-index: -1;
+}
+.unique-chat-motion::after {
+  content: "UNIQUEPLATFORM  •  PRIVATE CHAT";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, 90px) rotate(-14deg);
   pointer-events: none;
   user-select: none;
   white-space: nowrap;
-  font-size: clamp(1.1rem, 4vw, 2.2rem);
+  font-size: clamp(.55rem, 2vw, .8rem);
   font-weight: 800;
-  letter-spacing: .16em;
-  color: rgb(5 150 105 / .028);
-  z-index: 0;
+  letter-spacing: .18em;
+  color: rgb(5 150 105 / .10);
+  z-index: -1;
 }
 .unique-chat-motion > * { position: relative; z-index: 1; }
 .unique-dark .unique-chat-motion {
-  background-color: #101713;
+  background-color: #0d1712;
   background-image:
-    radial-gradient(circle at 18px 18px, rgb(52 211 153 / .09) 0 2px, transparent 2.5px),
-    radial-gradient(circle at 70px 52px, rgb(52 211 153 / .065) 0 14px, transparent 14.5px),
-    radial-gradient(circle at 145px 118px, rgb(52 211 153 / .05) 0 10px, transparent 10.5px),
-    linear-gradient(135deg, transparent 46%, rgb(52 211 153 / .028) 47%, transparent 48%);
+    radial-gradient(circle at 20px 20px, rgb(52 211 153 / .16) 0 2.5px, transparent 3px),
+    radial-gradient(circle at 78px 58px, rgb(52 211 153 / .085) 0 18px, transparent 18.5px),
+    radial-gradient(circle at 148px 126px, rgb(52 211 153 / .075) 0 13px, transparent 13.5px),
+    linear-gradient(135deg, transparent 44%, rgb(52 211 153 / .05) 45%, transparent 46%),
+    linear-gradient(45deg, transparent 48%, rgb(52 211 153 / .04) 49%, transparent 50%);
 }
-.unique-dark .unique-chat-motion::after { color: rgb(52 211 153 / .04); }
+.unique-dark .unique-chat-motion::before { border-color: rgb(52 211 153 / .09); color: rgb(52 211 153 / .08); }
+.unique-dark .unique-chat-motion::after { color: rgb(52 211 153 / .12); }
