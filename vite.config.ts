@@ -24,14 +24,15 @@ export default defineConfig(() => ({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       workbox: {
+        cacheId: 'unique-platform-v2026-10-05-restaurant-refresh',
         globPatterns: ['**/*.{css,html,ico,png,svg,webmanifest,js}'],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === 'document',
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'unique-platform-app-documents-v4',
-              networkTimeoutSeconds: 30,
+              cacheName: 'unique-platform-app-documents-v5',
+              networkTimeoutSeconds: 10,
               expiration: { maxEntries: 20, maxAgeSeconds: 86400 },
             },
           },
@@ -39,7 +40,8 @@ export default defineConfig(() => ({
             urlPattern: ({ request }) => request.destination === 'script' || request.destination === 'style',
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'unique-platform-app-assets-v15',
+              cacheName: 'unique-platform-app-assets-v16',
+              networkTimeoutSeconds: 10,
               expiration: { maxEntries: 100, maxAgeSeconds: 604800 },
             },
           },
@@ -64,6 +66,7 @@ export default defineConfig(() => ({
       },
     }),
   ],
-  resolve: { alias: { '@': path.resolve(__dirname, '.') } },
+  resolve: { alias: { '@': path.resolve(__dirname, '.') },
+  },
   server: { hmr: process.env.DISABLE_HMR !== 'true', watch: process.env.DISABLE_HMR === 'true' ? null : {} },
 }));
