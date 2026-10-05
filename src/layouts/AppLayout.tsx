@@ -140,7 +140,8 @@ export default function AppLayout() {
                 { name: 'Education', path: '/os/education', icon: GraduationCap },
               ].map((item) => {
                 const Icon = item.icon;
-                <Link
+                return (
+                  <Link
                   key={item.path}
                   to={item.path}
                   onClick={() => setIsMobileMenuOpen(false)}
@@ -148,8 +149,8 @@ export default function AppLayout() {
                 >
                   <Icon className="h-4 w-4 shrink-0 text-emerald-600" />
                   <span className="min-w-0 truncate">{item.name}</span>
-                </Link>
-              );
+                  </Link>
+                );
               })}
             </div>
 
