@@ -17,6 +17,7 @@ export default function PayPage() {
   const [balanceMinor, setBalanceMinor] = useState<number | null>(null);
   const [walletLoading, setWalletLoading] = useState(true);
   const [walletError, setWalletError] = useState('');
+  const [walletRetry, setWalletRetry] = useState(0);
 
   useEffect(() => {
     if (authLoading) return;
@@ -26,8 +27,12 @@ export default function PayPage() {
       setWalletLoading(true);
       setWalletError('');
       try {
-        const token = await currentUser.getIdToken();
-        const response = await fetch('/api/wallet', { headers: { Authorization: 'Bearer ' + token } });
+        let token = await currentUser.getIdToken();
+        let response = await fetch('/api/wallet', { headers: { Authorization: 'Bearer ' + token } });
+        if (response.status === 401) {
+          token = await currentUser.getIdToken(true);
+          response = await fetch('/api/wallet', { headers: { Authorization: 'Bearer ' + token } });
+        }
         if (response.status === 404) {
           const initializeResponse = await fetch('/api/wallet', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
           if (!initializeResponse.ok) throw new Error('Unable to initialize wallet');
@@ -51,7 +56,7 @@ export default function PayPage() {
     };
     void loadWallet();
     return () => { cancelled = true; };
-  }, [authLoading, currentUser]);
+  }, [authLoading, currentUser, walletRetry]);
 
   if (authLoading) return null;
 
@@ -104,7 +109,12 @@ export default function PayPage() {
                 <Banknote className="h-6 w-6 text-emerald-300" />
               </div>
             </div>
-            {walletError && <p className="mt-3 rounded-xl bg-amber-400/10 px-3 py-2 text-xs text-amber-200">{walletError}</p>}
+            {walletError && (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
+                <span>{walletError}</span>
+                <button type="button" onClick={() => setWalletRetry((value) => value + 1)} className="shrink-0 rounded-lg bg-white/10 px-2.5 py-1.5 font-bold text-white hover:bg-white/15">Retry</button>
+              </div>
+            )}
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-2.5">
