@@ -7,6 +7,7 @@ import {
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { UniqueUser, Role, Permission } from '../lib/os/types';
+import { hasRolePermission } from '../lib/auth/rbac';
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -95,9 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasPermission = (permission: Permission) => {
     if (!userData) return false;
-    // Admins have all permissions
-    if (userData.roles.includes('administrator')) return true;
-    return userData.permissions?.includes(permission) || false;
+    return hasRolePermission(userData.roles, userData.permissions ?? [], permission);
   };
 
   const isAuthenticated = Boolean(currentUser);
