@@ -2965,6 +2965,73 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.post("/api/restaurant/pay", authenticate, rateLimit({
+    windowMs: 60_000, limit: 15, standardHeaders: true, legacyHeaders: false,
+    store: createFirestoreRateLimitStore('restaurantPaymentRateLimits', 60_000),
+    keyGenerator: (req) => { const uid = (req as any).user?.uid; return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip); },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Restaurant payment attempts. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!isPlainObject(req.body) || !isSafeIdempotencyKey(req.body.idempotencyKey) ||
+          typeof req.body.transactionPin !== 'string' || !/^\\d{4}$/.test(req.body.transactionPin) ||
+          typeof req.body.orderId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(req.body.orderId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid order ID, payment idempotency key and 4-digit Transaction PIN are required.');
+      }
+      if (!(await verifyTransactionPin(uid, req.body.transactionPin))) return errorResponse(res, 'FORBIDDEN', 'Incorrect Transaction PIN.');
+      const orderId = req.body.orderId.trim(), idempotencyKey = req.body.idempotencyKey.trim();
+      const idempotencyRef = adminDb.collection('restaurantPaymentIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const existing = await transaction.get(idempotencyRef);
+        if (existing.exists) {
+          const data = existing.data() || {};
+          if (data.requestFingerprint !== uid + '|' + orderId) throw new RequestValidationError('INVALID_REQUEST', 'This payment idempotency key was already used with different payment data.');
+          return data.result;
+        }
+        const orderRef = adminDb.collection('restaurantOrders').doc(orderId);
+        const orderSnap = await transaction.get(orderRef);
+        if (!orderSnap.exists) throw new RequestValidationError('NOT_FOUND', 'Restaurant order could not be found.');
+        const order = orderSnap.data() as Record<string, any>;
+        if (order.customerId !== uid) throw new RequestValidationError('FORBIDDEN', 'You can only pay for your own restaurant order.');
+        if (order.currency !== 'NGN' || order.paymentMethod !== 'uniquepay') throw new RequestValidationError('INVALID_REQUEST', 'This order is not configured for UniquePay.');
+        if (order.paymentStatus === 'paid') return { orderId, paymentStatus: 'paid', status: order.status, replayed: true };
+        if (order.status !== 'pending_payment') throw new RequestValidationError('INVALID_REQUEST', 'This restaurant order is no longer awaiting payment.');
+        const amountMinor = Number(order.totalMinor);
+        if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) throw new RequestValidationError('INVALID_AMOUNT', 'The restaurant payment amount is invalid.');
+        const restaurantRef = adminDb.collection('restaurants').doc(String(order.restaurantId));
+        const restaurantSnap = await transaction.get(restaurantRef);
+        if (!restaurantSnap.exists) throw new RequestValidationError('UNAVAILABLE', 'This restaurant is not yet connected to a verified UniquePay merchant wallet.');
+        const restaurant = restaurantSnap.data() as Record<string, any>;
+        const merchantWalletId = typeof restaurant.merchantWalletId === 'string' && isSafeFirebaseUid(restaurant.merchantWalletId) ? restaurant.merchantWalletId : '';
+        if (!merchantWalletId || restaurant.uniquePayStatus !== 'verified') throw new RequestValidationError('UNAVAILABLE', 'This restaurant is not yet connected to a verified UniquePay merchant wallet.');
+        if (merchantWalletId === uid) throw new RequestValidationError('INVALID_REQUEST', 'A customer cannot pay their own wallet.');
+        const customerWalletRef = adminDb.collection('wallets').doc(uid), merchantWalletRef = adminDb.collection('wallets').doc(merchantWalletId);
+        const [customerSnap, merchantSnap] = await Promise.all([transaction.get(customerWalletRef), transaction.get(merchantWalletRef)]);
+        if (!customerSnap.exists || !merchantSnap.exists) throw new RequestValidationError('UNAVAILABLE', 'The UniquePay wallet connection is not available.');
+        const customerWallet = validateWalletDocument(customerSnap.data(), uid), merchantWallet = validateWalletDocument(merchantSnap.data(), merchantWalletId);
+        if (customerWallet.status !== 'active' || merchantWallet.status !== 'active') throw new RequestValidationError('UNAVAILABLE', 'The UniquePay wallets are not available.');
+        if (customerWallet.availableBalanceMinor < amountMinor) throw new RequestValidationError('INSUFFICIENT_FUNDS', 'Your UniquePay balance is insufficient for this order.');
+        const now = Timestamp.now(), transactionId = adminDb.collection('transactions').doc().id, reference = 'UP-RS-' + transactionId;
+        const transactionRef = adminDb.collection('transactions').doc(transactionId);
+        transaction.create(transactionRef, { id: transactionId, reference, senderId: uid, recipientId: merchantWalletId, amount: amountMinor, currency: 'NGN', type: 'merchant_payment', sourceModule: 'unique_restaurant.checkout', provider: 'unique_pay_internal_wallet', status: 'completed', relatedOrderIds: [orderId], createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' });
+        const debitRef = adminDb.collection('ledgerEntries').doc(), creditRef = adminDb.collection('ledgerEntries').doc();
+        transaction.create(debitRef, { id: debitRef.id, transactionId, reference, uid, direction: 'debit', amountMinor, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now });
+        transaction.create(creditRef, { id: creditRef.id, transactionId, reference, uid: merchantWalletId, direction: 'credit', amountMinor, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now });
+        transaction.update(customerWalletRef, { availableBalanceMinor: customerWallet.availableBalanceMinor - amountMinor, updatedAt: now });
+        transaction.update(merchantWalletRef, { availableBalanceMinor: merchantWallet.availableBalanceMinor + amountMinor, updatedAt: now });
+        transaction.update(orderRef, { paymentStatus: 'paid', status: 'paid', paidAt: now, updatedAt: now, paymentTransactionId: transactionId, orderTimeline: [...(Array.isArray(order.orderTimeline) ? order.orderTimeline : []), { status: 'paid', at: now }] });
+        const paymentResult = { orderId, paymentStatus: 'paid', status: 'paid', transactionId, reference };
+        transaction.create(idempotencyRef, { uid, idempotencyKey, requestFingerprint: uid + '|' + orderId, result: paymentResult, createdAt: now, updatedAt: now });
+        return paymentResult;
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Restaurant UniquePay payment failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Restaurant payment could not be completed. Your order remains protected.');
+    }
+  });
+
   app.post("/api/store/checkout", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 20,
