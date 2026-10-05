@@ -1,4 +1,4 @@
-import { Home, Compass, Search, MapPin, Sparkles, LayoutDashboard, Store, Wallet, ShoppingCart, Menu } from "lucide-react";
+import { Home, Compass, MessageSquare, Search, Sparkles, Menu } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
 
@@ -15,10 +15,10 @@ const publicItems = [
 ];
 
 const appItems = [
-  { name: "Dashboard", path: "/os/dashboard", icon: LayoutDashboard },
-  { name: "Store", path: "/store", icon: Store },
-  { name: "Pay", path: "/os/pay", icon: Wallet },
-  { name: "Orders", path: "/os/orders", icon: ShoppingCart },
+  { name: "Home", path: "/os/dashboard", icon: Home },
+  { name: "Active Edge", path: "/discover", icon: Compass },
+  { name: "AI", path: "/os/ai", icon: Sparkles },
+  { name: "Connect", path: "/os/messages", icon: MessageSquare },
 ];
 
 export default function MobileBottomNav({ variant, onMenu }: MobileBottomNavProps) {
@@ -26,10 +26,7 @@ export default function MobileBottomNav({ variant, onMenu }: MobileBottomNavProp
   const items = variant === "public" ? publicItems : appItems;
 
   return (
-    <nav
-      aria-label="Mobile navigation"
-      className="mobile-bottom-nav md:hidden"
-    >
+    <nav aria-label="Mobile navigation" className="mobile-bottom-nav">
       <div className="mobile-bottom-nav-inner">
         {items.map((item) => {
           const Icon = item.icon;
@@ -49,7 +46,7 @@ export default function MobileBottomNav({ variant, onMenu }: MobileBottomNavProp
             </Link>
           );
         })}
-        <button type="button" onClick={onMenu} className="mobile-nav-item">
+        <button type="button" onClick={onMenu} className="mobile-nav-item" aria-label="Open UniqueOS menu">
           <Menu className="h-5 w-5" aria-hidden="true" />
           <span>Menu</span>
         </button>
