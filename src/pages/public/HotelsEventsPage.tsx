@@ -36,6 +36,8 @@ export default function HotelsEventsPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [showServicePicker, setShowServicePicker] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
+  const [showStayDetails, setShowStayDetails] = useState(false);
+  const [selectedHotel, setSelectedHotel] = useState<string | null>(null);
 
   const filteredHotels = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -55,6 +57,13 @@ export default function HotelsEventsPage() {
     setSelected(null);
     setShowPreferences(false);
     setShowServicePicker(true);
+  };
+
+  const openStayDetails = (hotelName: string) => {
+    setSelectedHotel(hotelName);
+    setShowServicePicker(false);
+    setShowStayDetails(true);
+    setMessage('');
   };
 
   const selectService = (name: string) => {
@@ -155,7 +164,7 @@ export default function HotelsEventsPage() {
               </div>
               <div className="mt-4 max-h-[58vh] space-y-2 overflow-y-auto pr-1">
                 {serviceInventory[mode].map((item) => (
-                  <button key={item} onClick={() => selectService(item)} className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50 active:scale-[.99]">
+                  <button key={item} onClick={() => mode === 'stay' ? openStayDetails(item) : selectService(item)} className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50 active:scale-[.99]">
                     <span className="min-w-0">
                       <span className="block text-sm font-black">{item}</span>
                       <span className="mt-1 block text-[11px] text-emerald-700">Available option · View details & select</span>
@@ -166,6 +175,26 @@ export default function HotelsEventsPage() {
               </div>
               <button onClick={requestNewService} className="mt-3 w-full rounded-2xl border border-dashed border-emerald-300 bg-emerald-50 p-3 text-sm font-black text-emerald-800">+ New Service Request</button>
               <p className="mt-3 text-center text-[11px] text-slate-400">Provider inventory becomes live as verified partners connect.</p>
+            </div>
+          </div>
+        )}
+
+        {showStayDetails && (
+          <div className="fixed inset-0 z-[55] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Hotel and room details">
+            <button aria-label="Close hotel details" onClick={() => setShowStayDetails(false)} className="absolute inset-0 cursor-default" />
+            <div className="relative w-full max-w-2xl rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
+              <div className="flex items-start justify-between gap-3">
+                <div><p className="text-xs font-black uppercase tracking-wider text-emerald-700">Stay details</p><h2 className="mt-1 text-xl font-black">{selectedHotel}</h2><p className="mt-1 text-xs text-slate-500">Choose your dates, guests and room preference before checkout.</p></div>
+                <button onClick={() => setShowStayDetails(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black text-slate-600">Close</button>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <label className="rounded-xl border border-slate-200 p-3 text-xs font-bold">Check-in<input type="date" className="mt-1 block w-full bg-transparent text-sm outline-none" /></label>
+                <label className="rounded-xl border border-slate-200 p-3 text-xs font-bold">Check-out<input type="date" className="mt-1 block w-full bg-transparent text-sm outline-none" /></label>
+                <label className="rounded-xl border border-slate-200 p-3 text-xs font-bold">Guests<select className="mt-1 block w-full bg-transparent text-sm outline-none"><option>1 guest</option><option>2 guests</option><option>3 guests</option><option>4 guests</option><option>5+ guests</option></select></label>
+                <label className="rounded-xl border border-slate-200 p-3 text-xs font-bold">Room type<select className="mt-1 block w-full bg-transparent text-sm outline-none"><option>Standard / available</option><option>Deluxe Room</option><option>Executive Room</option><option>Family Suite</option></select></label>
+              </div>
+              <div className="mt-4 rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">Live availability, exact room inventory and final pricing will be supplied by the connected provider.</div>
+              <button onClick={() => { setShowStayDetails(false); setSelected(selectedHotel); setMessage('Stay details saved. Preferences remain optional before checkout.'); }} className="mt-3 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white">Select stay & continue</button>
             </div>
           </div>
         )}
