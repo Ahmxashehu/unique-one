@@ -40,12 +40,15 @@ const accessColors: Record<DashboardItem['sensitive'], string> = {
 
 export default function AdminControlTowerPage() {
   const [query, setQuery] = useState('');
+  const [selectedRole, setSelectedRole] = useState('All roles');
   const [filter, setFilter] = useState<'All'|'Standard'|'Restricted'|'High'>('All');
+  const roles = useMemo(() => ['All roles', ...Array.from(new Set(dashboards.flatMap(d => d.access)))], []);
   const visible = useMemo(() => dashboards.filter(d => {
     const q = query.trim().toLowerCase();
     const matchesText = !q || [d.name,d.role,d.purpose,...d.access].join(' ').toLowerCase().includes(q);
     const matchesFilter = filter === 'All' || d.sensitive === filter;
-    return matchesText && matchesFilter;
+    const matchesRole = selectedRole === 'All roles' || d.access.includes(selectedRole);
+    return matchesText && matchesFilter && matchesRole;
   }), [query, filter]);
 
   return (
@@ -74,6 +77,9 @@ export default function AdminControlTowerPage() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search dashboards, roles or responsibilities…" className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none focus:border-emerald-400" />
           </div>
+          <select value={selectedRole} onChange={e=>setSelectedRole(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-600 outline-none">
+            {roles.map(role=><option key={role}>{role}</option>)}
+          </select>
           <div className="flex gap-2 overflow-x-auto">
             {(['All','Standard','Restricted','High'] as const).map(item => (
               <button key={item} onClick={()=>setFilter(item)} className={`whitespace-nowrap rounded-xl px-3 py-2 text-xs font-black ${filter===item?'bg-slate-950 text-white':'bg-slate-100 text-slate-600'}`}>{item}</button>
@@ -111,8 +117,8 @@ export default function AdminControlTowerPage() {
         <div className="flex gap-3">
           <ClipboardCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700"/>
           <div>
-            <h2 className="text-sm font-black text-slate-900">Architecture rule</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-600">Role grants dashboard access; permissions grant individual actions. Sensitive actions should use step-up authentication and create an audit event. This page is the management map and does not grant new privileges by itself.</p>
+            <h2 className="text-sm font-black text-slate-900">Role & Permission Centre — foundation</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-600">Role grants dashboard access; permissions grant individual actions. Use this map as the foundation for granular View, Create, Edit, Approve, Execute and Administer permissions. Sensitive actions should use step-up authentication and create an audit event. This page is the management map and does not grant new privileges by itself.</p>
           </div>
         </div>
       </section>
