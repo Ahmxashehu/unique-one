@@ -182,9 +182,9 @@ export default function App() {
                     <Route path="bookings" element={<BookingsPage />} />
                     <Route path="wishlist" element={<WishlistPage />} />
                     <Route path="requests" element={<UserRequestsPage />} />
-                    <Route path="pay" element={<PayPage />} />
+                    <Route path="pay" element={<RoleGuard dashboard="uniquepay"><PayPage /></RoleGuard>} />
                     <Route path="store" element={<StorePage />} />
-                    <Route path="ai" element={<UniqueAiPage />} />
+                    <Route path="ai" element={<RoleGuard dashboard="unique_ai"><UniqueAiPage /></RoleGuard>} />
                     <Route path="ai/premium" element={<UniqueAiSubscriptionPage />} />
                     <Route path="master-vision" element={<MasterVisionPage />} />
                     <Route path="unique-share" element={<UniqueSharePage />} />
@@ -193,7 +193,7 @@ export default function App() {
                     <Route path="education" element={<EducationPage />} />
                     <Route path="travel" element={<TravelPage />} />
                     <Route path="business/register" element={<BusinessRegisterPage />} />
-                    <Route path="business/dashboard" element={<SellerDashboardPage />} />
+                    <Route path="business/dashboard" element={<RoleGuard dashboard="business"><SellerDashboardPage /></RoleGuard>} />
                     <Route path="business/settings" element={<BusinessSettingsPage />} />
                     <Route path="business/staff" element={<StaffPage />} />
                     <Route path="business/branches" element={<BranchesPage />} />
@@ -209,8 +209,8 @@ export default function App() {
                     <Route path="business/reports" element={<ReportsPage />} />
                     <Route path="business/activity" element={<ActivityPage />} />
                     <Route path="business/profile" element={<BusinessProfilePage />} />
-                    <Route path="business/members" element={<OrganizationMembersPage />} />
-                    <Route path="services" element={<ServicesPage />} />
+                    <Route path="business/members" element={<RoleGuard dashboard="institution"><OrganizationMembersPage /></RoleGuard>} />
+                    <Route path="services" element={<RoleGuard dashboard="operations"><ServicesPage /></RoleGuard>} />
                     <Route path="customers" element={<CustomersPage />} />
                     <Route path="invoices" element={<InvoicesPage />} />
                     <Route path="payment-requests" element={<PaymentRequestsPage />} />
@@ -233,16 +233,16 @@ export default function App() {
                   </Route>
 
                   <Route path="/admin/login" element={<AdminLoginPage />} />
-                  <Route path="/admin" element={<RoleGuard requiredRole="administrator"><AdminLayout /></RoleGuard>}>
+                  <Route path="/admin" element={<RoleGuard dashboard="platform_admin"><AdminLayout /></RoleGuard>}>
                     <Route index element={<Navigate to="/admin/control-tower" replace />} />
-                    <Route path="control-tower" element={<AdminControlTowerPage />} />
+                    <Route path="control-tower" element={<RoleGuard dashboard="super_admin"><AdminControlTowerPage /></RoleGuard>} />
                     <Route path="users" element={<AdminUsersPage />} />
                     <Route path="businesses" element={<AdminBusinessesPage />} />
                     <Route path="products" element={<AdminProductsPage />} />
                     <Route path="requests" element={<AdminRequestsPage />} />
                     <Route path="reports" element={<AdminReportsPage />} />
-                    <Route path="verification" element={<AdminVerificationPage />} />
-                    <Route path="transactions" element={<AdminTransactionsPage />} />
+                    <Route path="verification" element={<RoleGuard dashboard="security_risk"><AdminVerificationPage /></RoleGuard>} />
+                    <Route path="transactions" element={<RoleGuard dashboard="finance_settlement"><AdminTransactionsPage /></RoleGuard>} />
                     <Route path="settings" element={<AdminSettingsPage />} />
                   </Route>
 
