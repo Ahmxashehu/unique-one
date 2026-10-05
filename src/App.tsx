@@ -101,7 +101,8 @@ const UniqueAiSubscriptionPage = lazy(() => import("./pages/UniqueAiSubscription
 const JobsPage = lazy(() => import("./pages/JobsPage"));
 const ContributionNetworkPage = lazy(() => import("./pages/ContributionNetworkPage"));
 const EducationPage = lazy(() => import("./pages/EducationPage"));
-const TravelPage = lazy(() => import("./pages/TravelPage"));\nconst HealthWellnessPage = lazy(() => import("./pages/HealthWellnessPage"));
+const TravelPage = lazy(() => import("./pages/TravelPage"));
+const HealthWellnessPage = lazy(() => import("./pages/HealthWellnessPage"));
 const CycleAjoPage = lazy(() => import("./pages/pay/CycleAjoPage"));
 const VerificationCenterPage = lazy(() => import("./pages/pay/VerificationCenterPage"));
 const MasterVisionPage = lazy(() => import("./pages/MasterVisionPage"));
@@ -183,7 +184,8 @@ export default function App() {
                     <Route path="jobs" element={<JobsPage />} />
                     <Route path="contributions" element={<ContributionNetworkPage />} />
                     <Route path="education" element={<EducationPage />} />
-                    <Route path="travel" element={<TravelPage />} />\n                    <Route path="health-wellness" element={<HealthWellnessPage />} />
+                    <Route path="travel" element={<TravelPage />} />
+                    <Route path="health-wellness" element={<HealthWellnessPage />} />
                     <Route path="business/register" element={<BusinessRegisterPage />} />
                     <Route path="business/dashboard" element={<SellerDashboardPage />} />
                     <Route path="business/settings" element={<BusinessSettingsPage />} />
