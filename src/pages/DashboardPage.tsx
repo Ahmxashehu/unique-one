@@ -70,14 +70,15 @@ export default function DashboardPage() {
     };
   }, [currentUser]);
 
-  if (!currentUser && authLoading) {
+  if (!currentUser) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-sm font-medium text-slate-500">Loading UniqueOS…</div>
+        <div className="text-sm font-medium text-slate-500">
+          {authLoading ? 'Loading UniqueOS…' : 'Returning to UniqueOS…'}
+        </div>
       </div>
     );
   }
-  if (!currentUser) return null;
 
   return (
     <div className="space-y-6">
