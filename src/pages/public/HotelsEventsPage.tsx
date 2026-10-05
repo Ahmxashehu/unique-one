@@ -34,6 +34,7 @@ export default function HotelsEventsPage() {
   const [showPlanner, setShowPlanner] = useState(false);
   const [message, setMessage] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
+  const [showServicePicker, setShowServicePicker] = useState(false);
 
   const filteredHotels = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -47,9 +48,26 @@ export default function HotelsEventsPage() {
     return venues.filter((v) => [v.name, v.location, v.extras].some((x) => x.toLowerCase().includes(q)));
   }, [search]);
 
+  const openServicePicker = (id: Mode) => {
+    setMode(id);
+    setMessage('');
+    setSelected(null);
+    setShowServicePicker(true);
+  };
+
   const selectService = (name: string) => {
     setSelected(name);
+    setShowServicePicker(false);
     setMessage(`${name} selected. Live provider availability will be connected here; this prototype does not invent availability.`);
+  };
+
+  const pickerItems: Record<Mode, string[]> = {
+    stay: ['Hotel', 'Room', 'Resort', 'Apartment'],
+    meet: ['Conference Hall', 'Meeting Room', 'Boardroom', 'Training Space'],
+    celebrate: ['Wedding', 'Birthday', 'Corporate Event', 'Conference', 'Engagement', 'Party', 'Other Event'],
+    dine: ['Restaurant', 'Buffet', 'Catering', 'Private Dining'],
+    experience: ['Swimming Pool', 'Spa & Wellness', 'Gym & Fitness', 'Family Activities'],
+    move: ['Airport Pickup', 'Car Hire', 'Driver Service', 'Local Transfer'],
   };
 
   return (
@@ -79,7 +97,7 @@ export default function HotelsEventsPage() {
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
             {modes.map(({ id, label, sub, icon: Icon }) => (
-              <button key={id} onClick={() => { setMode(id); setMessage(''); }} className={`rounded-2xl border p-3 text-left transition ${mode === id ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-slate-200 bg-white hover:border-emerald-200'}`}>
+              <button key={id} onClick={() => openServicePicker(id)} className={`rounded-2xl border p-3 text-left transition ${mode === id ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-slate-200 bg-white hover:border-emerald-200'}`}>
                 <Icon className={`h-5 w-5 ${mode === id ? 'text-emerald-700' : 'text-slate-500'}`} />
                 <div className="mt-2 text-sm font-black">{label}</div>
                 <div className="mt-0.5 text-[11px] text-slate-500">{sub}</div>
@@ -102,6 +120,32 @@ export default function HotelsEventsPage() {
             </div>
           )}
         </section>
+
+        {showServicePicker && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={`${modes.find((m) => m.id === mode)?.label} options`}>
+            <button aria-label="Close service options" onClick={() => setShowServicePicker(false)} className="absolute inset-0 cursor-default" />
+            <div className="relative w-full max-w-xl rounded-t-3xl border border-emerald-100 bg-white p-5 shadow-2xl sm:rounded-3xl">
+              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200 sm:hidden" />
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Choose an option</p>
+                  <h2 className="mt-1 text-xl font-black">{modes.find((m) => m.id === mode)?.label}</h2>
+                  <p className="mt-1 text-xs text-slate-500">Select what you need and continue without scrolling the page.</p>
+                </div>
+                <button onClick={() => setShowServicePicker(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black text-slate-600">Close</button>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {pickerItems[mode].map((item) => (
+                  <button key={item} onClick={() => selectService(item)} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50 active:scale-[.98]">
+                    <span className="block text-sm font-black">{item}</span>
+                    <span className="mt-1 block text-[11px] text-slate-500">Select <ChevronRight className="inline h-3 w-3" /></span>
+                  </button>
+                ))}
+              </div>
+              {mode === 'celebrate' && <button onClick={() => { setShowServicePicker(false); setShowPlanner(true); }} className="mt-3 w-full rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-black text-emerald-800">Plan an Event with Unique One</button>}
+            </div>
+          </div>
+        )}
 
         {mode === 'stay' && (
           <section className="mt-6">
