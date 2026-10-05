@@ -91,10 +91,10 @@ export default function MessagesCenter() {
                 <Plus className="h-5 w-5" />
               </button>
             </div>
-            <p className="mt-3 text-xs leading-5 text-slate-300">Your conversations, people and business chats in one focused space.</p>
+            <p className="mt-3 text-xs leading-5 text-slate-300">Private messaging, people, groups and business communication — all in one place.</p>
             <div className="mt-4 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search people or conversations" className="w-full rounded-xl border border-white/10 bg-white/10 py-2.5 pl-9 pr-4 text-sm text-white outline-none placeholder:text-slate-400 focus:border-emerald-400/60" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search people, Unique ID or conversations" className="w-full rounded-xl border border-white/10 bg-white/10 py-2.5 pl-9 pr-4 text-sm text-white outline-none placeholder:text-slate-400 focus:border-emerald-400/60" />
             </div>
           </div>
 
