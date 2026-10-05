@@ -21,7 +21,7 @@ export const UI: Record<SupportedLanguage, Record<Phrase, string>> = {
     Details:"Bayanai", "Search...":"Bincika...", "Search products":"Bincika kayayyaki", "Add to cart":"Ƙara zuwa kwando",
     "Buy now":"Saya yanzu", Remove:"Cire", Delete:"Share", Update:"Sabunta", Create:"Ƙirƙira", Done:"An gama", Yes:"Eh", No:"A'a",
     Restaurant:"Gidan abinci", Hotel:"Otal", Flights:"Jirage", School:"Makaranta", Transportation:"Sufuri", "Real Estate":"Gidaje",
-    "Global Search":"Bincike na duniya", Jobs:"Ayyuka", Contributions:"Gudummawa", Education:"Ilimi", Travel:"Tafiya",
+    "Global Search":"Bincike na duniya", Jobs:"Ayyuka", Contributions:"Gudummawa", Education:"Ilimi", Travel:"Unique Travel",
     "Open UniqueOS":"Buɗe UniqueOS", "More experiences":"Ƙarin ayyuka",
     "Refresh":"Sabunta", "View":"Duba", "Edit":"Gyara", "Open":"Buɗe", "Apply":"Aika", "Post a job":"Sanya aiki", "All categories":"Duk rukuni", "No published jobs found":"Ba a sami ayyukan da aka wallafa ba", "Copy link":"Kwafi mahaɗi", "Reshare to chat":"Sake rabawa zuwa hira", "Message Seller":"Tura saƙo ga mai sayarwa", "Open Store":"Buɗe shago", "Connect phone media":"Haɗa kafofin wayar", "Open UniqueShare":"Buɗe UniqueShare", "Backup":"Ajiye madadin", "Restore latest":"Mayar da na baya-bayan nan", "Institution":"Cibiyar", "Course":"Darasi", "Enroll":"Yi rajista", "Add Customer":"Ƙara abokin ciniki", "Invite Member":"Gayyaci memba", "Upload Documents":"Loda takardu", "Go to Dashboard":"Je zuwa Dashboard", "Change Login PIN":"Canja PIN na shiga", "Save Draft":"Ajiye daftari", "Send Request":"Aika buƙata", "Create Another Request":"Ƙirƙiri wata buƙata", "Search messages":"Bincika saƙonni", "Voice calls coming soon":"Kiran murya zai zo nan ba da jimawa ba", "Enable biometric security":"Kunna tsaron biometric", "Setting up…":"Ana saitawa…", "Publishing...":"Ana wallafawa...", "Publish Service":"Wallafa sabis", "All Invoices":"Duk rasit", "Drafts":"Daftari", "Connect":"Haɗa", "Employer not specified":"Ba a bayyana ma'aikaci ba"
   },
@@ -45,7 +45,7 @@ export const UI: Record<SupportedLanguage, Record<Phrase, string>> = {
     "Add to cart":"Ajouter au panier", "Buy now":"Acheter maintenant", Remove:"Supprimer", Delete:"Supprimer", Update:"Mettre à jour",
     Create:"Créer", Done:"Terminé", Yes:"Oui", No:"Non", Restaurant:"Restaurant", Hotel:"Hôtel", Flights:"Vols", School:"École",
     Transportation:"Transport", "Real Estate":"Immobilier", "Global Search":"Recherche globale", Jobs:"Emplois", Contributions:"Contributions",
-    Education:"Éducation", Travel:"Voyage", "Open UniqueOS":"Ouvrir UniqueOS", "More experiences":"Plus d’expériences"
+    Education:"Éducation", Travel:"Unique Travel", "Open UniqueOS":"Ouvrir UniqueOS", "More experiences":"Plus d’expériences"
   },
   ig: {
     Home:"Ụlọ", Search:"Chọọ", AI:"AI", Language:"Asụsụ", "Light mode":"Ọnọdụ ọkụ", "Dark mode":"Ọnọdụ ọchịchịrị",
