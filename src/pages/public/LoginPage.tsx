@@ -50,18 +50,18 @@ export default function LoginPage(){
     finally{setLoading(false);}
   };
 
-  return <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-8 sm:py-12">
-    <div className="up-auth-card bg-white shadow-lg border border-slate-200">
+  return <div className="login-page min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-8 sm:py-10">
+    <div className="w-full max-w-2xl bg-white rounded-3xl p-5 sm:p-8 shadow-xl border border-slate-100">
       <div className="text-center mb-7">
         <div className="inline-flex rounded-xl bg-slate-900 text-white px-3.5 py-1.5 text-xs font-medium tracking-wide mb-4">UNIQUE ID + UNIQUEPAY</div>
         <h1 className="up-auth-title text-slate-900">Welcome back</h1>
         <p className="up-auth-subtitle text-slate-500 mt-2">Sign in with your phone number, Unique ID, or verified email.</p>
       </div>
 
-      {error&&<div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-700 rounded-lg text-sm" role="alert">{error}</div>}
-      {message&&<div className="mb-4 p-3 bg-green-50 border border-green-100 text-green-700 rounded-lg text-sm" role="status">{message}</div>}
+      {error&&<div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-700 rounded-xl text-sm" role="alert">{error}</div>}
+      {message&&<div className="mb-4 p-3 bg-green-50 border border-green-100 text-green-700 rounded-xl text-sm" role="status">{message}</div>}
 
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 mb-6 flex items-start gap-3">
+      <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 mb-6 flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-green-600 shrink-0 mt-0.5"/>
         <div className="min-w-0">
           <p className="text-sm font-medium text-slate-900">Recommended login</p>
@@ -70,11 +70,11 @@ export default function LoginPage(){
       </div>
 
       <form onSubmit={login} className="space-y-4">
-        <div className="up-auth-section">
-          <label className="up-auth-label text-slate-700" htmlFor="login-identifier">Phone number, Unique ID, or verified email</label>
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-slate-700" htmlFor="login-identifier">Phone number, Unique ID, or verified email</label>
           <div className="relative">
             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none"/>
-            <input id="login-identifier" value={identifier} onChange={e=>setIdentifier(e.target.value)} className="up-auth-input w-full pl-10 pr-4 border border-slate-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-500/15 outline-none" placeholder="08012345678 / 8012345678 / email" autoComplete="username" required/>
+            <input id="login-identifier" value={identifier} onChange={e=>setIdentifier(e.target.value)} className="up-auth-input w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-500/15 outline-none" placeholder="08012345678 / 8012345678 / email" autoComplete="username" required/>
           </div>
         </div>
 
@@ -86,17 +86,17 @@ export default function LoginPage(){
           </div>
         </div>
 
-        <button disabled={loading} className="up-auth-button w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white rounded-lg flex items-center justify-center gap-2 transition-colors">
+        <button disabled={loading} className="up-auth-button w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white rounded-xl flex items-center justify-center gap-2 transition-colors">
           {loading?<Loader2 className="w-5 h-5 animate-spin"/>:<>Log in <ArrowRight className="w-4 h-4"/></>}
         </button>
       </form>
 
-      <div className="flex items-center justify-between gap-4 mt-5 pt-1">
+      <div className="flex items-center justify-between gap-4 mt-6 pt-4 border-t border-slate-100">
         <Link to="/forgot-password" className="text-sm font-medium text-green-700 hover:text-green-800 inline-flex items-center gap-1">Forgot password? <KeyRound className="w-4 h-4"/></Link>
         <Link to="/register" className="text-sm font-medium text-slate-700 hover:text-slate-900 text-right">Create account</Link>
       </div>
 
-      <p className="text-center up-auth-helper text-slate-500 mt-5 pt-4 border-t border-slate-100">Secure access to your UniquePlatform account.</p>
+      <p className="text-center text-xs text-slate-500 mt-5">Your Unique One account is protected with your verified login credentials.</p>
     </div>
   </div>;
 }
