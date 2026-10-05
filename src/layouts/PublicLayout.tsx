@@ -68,7 +68,7 @@ export default function PublicLayout() {
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               {[
                 ['Restaurant', '/restaurant'],
-                ['Hotel', '/travel'],
+                ['Hotels & Events', '/hotels-events'],
                 ['Flights', '/flights'],
                 ['Jobs', '/os/jobs'],
                 ['Travel', '/os/travel'],
