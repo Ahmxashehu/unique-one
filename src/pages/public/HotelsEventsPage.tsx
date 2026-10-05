@@ -40,6 +40,8 @@ export default function HotelsEventsPage() {
   const [selectedHotel, setSelectedHotel] = useState<string | null>(null);
   const [showMeetDetails, setShowMeetDetails] = useState(false);
   const [selectedMeet, setSelectedMeet] = useState<string | null>(null);
+  const [showCelebrateDetails, setShowCelebrateDetails] = useState(false);
+  const [selectedCelebrate, setSelectedCelebrate] = useState<string | null>(null);
 
   const filteredHotels = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -72,6 +74,13 @@ export default function HotelsEventsPage() {
     setSelectedMeet(name);
     setShowServicePicker(false);
     setShowMeetDetails(true);
+    setMessage('');
+  };
+
+  const openCelebrateDetails = (name: string) => {
+    setSelectedCelebrate(name);
+    setShowServicePicker(false);
+    setShowCelebrateDetails(true);
     setMessage('');
   };
 
@@ -173,7 +182,7 @@ export default function HotelsEventsPage() {
               </div>
               <div className="mt-4 max-h-[58vh] space-y-2 overflow-y-auto pr-1">
                 {serviceInventory[mode].map((item) => (
-                  <button key={item} onClick={() => mode === 'stay' ? openStayDetails(item) : mode === 'meet' ? openMeetDetails(item) : selectService(item)} className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50 active:scale-[.99]">
+                  <button key={item} onClick={() => mode === 'stay' ? openStayDetails(item) : mode === 'meet' ? openMeetDetails(item) : mode === 'celebrate' ? openCelebrateDetails(item) : selectService(item)} className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50 active:scale-[.99]">
                     <span className="min-w-0">
                       <span className="block text-sm font-black">{item}</span>
                       <span className="mt-1 block text-[11px] text-emerald-700">Available option · View details & select</span>
@@ -231,6 +240,29 @@ export default function HotelsEventsPage() {
           </div>
         )}
 
+        {showCelebrateDetails && (
+          <div className="fixed inset-0 z-[55] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Event details">
+            <button aria-label="Close event details" onClick={() => setShowCelebrateDetails(false)} className="absolute inset-0 cursor-default" />
+            <div className="relative w-full max-w-2xl rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
+              <div className="flex items-start justify-between gap-3">
+                <div><p className="text-xs font-black uppercase tracking-wider text-emerald-700">Event details</p><h2 className="mt-1 text-xl font-black">{selectedCelebrate}</h2><p className="mt-1 text-xs text-slate-500">Set the essential event requirements now. Extra preferences remain optional before checkout.</p></div>
+                <button onClick={() => setShowCelebrateDetails(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black text-slate-600">Close</button>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <label className="rounded-xl border border-slate-200 p-3 text-xs font-bold">Event date<input type="date" className="mt-1 block w-full bg-transparent text-sm outline-none" /></label>
+                <label className="rounded-xl border border-slate-200 p-3 text-xs font-bold">Start time<input type="time" className="mt-1 block w-full bg-transparent text-sm outline-none" /></label>
+                <label className="rounded-xl border border-slate-200 p-3 text-xs font-bold">Guests<select className="mt-1 block w-full bg-transparent text-sm outline-none"><option>Up to 50</option><option>51–100</option><option>101–250</option><option>251–500</option><option>500+</option></select></label>
+                <label className="rounded-xl border border-slate-200 p-3 text-xs font-bold">Event type<select className="mt-1 block w-full bg-transparent text-sm outline-none"><option>Wedding</option><option>Birthday</option><option>Corporate event</option><option>Engagement</option><option>Party</option><option>Other event</option></select></label>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {['Catering / refreshments','Decoration','Sound / music','Parking','Accommodation','Transport','Photography / recording','Special accessibility needs'].map((item) => <label key={item} className="flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-700"><input type="checkbox" className="accent-emerald-600" />{item}</label>)}
+              </div>
+              <div className="mt-4 rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">Live venue availability, package inventory and final pricing will be supplied by the connected provider.</div>
+              <button onClick={() => { setShowCelebrateDetails(false); setSelected(selectedCelebrate); setMessage('Event details saved. Preferences remain optional before checkout.'); }} className="mt-3 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white">Select event & continue</button>
+            </div>
+          </div>
+        )}
+
         {mode === 'stay' && (
           <section className="mt-6">
             <div className="mb-3 flex items-center justify-between"><div><h2 className="text-lg font-black">Featured Hotels & Partners</h2><p className="text-xs text-slate-500">Prototype network — provider inventory will become live as partners connect.</p></div></div>
@@ -243,7 +275,7 @@ export default function HotelsEventsPage() {
           <section className="mt-6">
             <h2 className="text-lg font-black">{mode === 'meet' ? 'Conference & Meeting Spaces' : 'Event Venues'}</h2>
             <p className="mt-1 text-xs text-slate-500">Compare capacity, facilities and prototype pricing before live providers are connected.</p>
-            <div className="mt-3 grid gap-3 md:grid-cols-3">{filteredVenues.map((venue) => <article key={venue.name} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-start justify-between"><span className="rounded-xl bg-emerald-50 p-2 text-emerald-700"><Building2 className="h-5 w-5" /></span><span className="text-xs font-bold text-slate-500">{venue.capacity} guests</span></div><h3 className="mt-3 font-black">{venue.name}</h3><p className="mt-1 text-xs text-slate-500"><MapPin className="mr-1 inline h-3 w-3" />{venue.location}</p><p className="mt-3 text-sm font-black">{venue.price}</p><p className="mt-1 text-xs text-slate-500">{venue.extras}</p><button onClick={() => mode === 'meet' ? openMeetDetails(venue.name) : selectService(venue.name)} className="mt-4 w-full rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-black text-white">Check booking</button></article>)}</div>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">{filteredVenues.map((venue) => <article key={venue.name} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-start justify-between"><span className="rounded-xl bg-emerald-50 p-2 text-emerald-700"><Building2 className="h-5 w-5" /></span><span className="text-xs font-bold text-slate-500">{venue.capacity} guests</span></div><h3 className="mt-3 font-black">{venue.name}</h3><p className="mt-1 text-xs text-slate-500"><MapPin className="mr-1 inline h-3 w-3" />{venue.location}</p><p className="mt-3 text-sm font-black">{venue.price}</p><p className="mt-1 text-xs text-slate-500">{venue.extras}</p><button onClick={() => mode === 'meet' ? openMeetDetails(venue.name) : openCelebrateDetails(venue.name)} className="mt-4 w-full rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-black text-white">Check booking</button></article>)}</div>
           </section>
         )}
 
