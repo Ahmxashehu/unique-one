@@ -234,7 +234,8 @@ export default function App() {
 
                   <Route path="/admin/login" element={<AdminLoginPage />} />
                   <Route path="/admin" element={<RoleGuard requiredRole="administrator"><AdminLayout /></RoleGuard>}>
-                    <Route index element={<Navigate to="/admin/control-tower" replace />} />\n                    <Route path="control-tower" element={<AdminControlTowerPage />} />
+                    <Route index element={<Navigate to="/admin/control-tower" replace />} />
+                    <Route path="control-tower" element={<AdminControlTowerPage />} />
                     <Route path="users" element={<AdminUsersPage />} />
                     <Route path="businesses" element={<AdminBusinessesPage />} />
                     <Route path="products" element={<AdminProductsPage />} />
