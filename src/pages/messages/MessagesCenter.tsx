@@ -7,7 +7,7 @@ import type { Conversation } from '../../lib/os/communication-types';
 export default function MessagesCenter() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'all' | 'business'>('all');
+  const [activeTab, setActiveTab] = useState<'users' | 'groups'>('users');
   const [search, setSearch] = useState('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +64,7 @@ export default function MessagesCenter() {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return conversations
-      .filter((c) => activeTab === 'all' || c.type === 'business')
+      .filter((c) => activeTab === 'groups' ? (c.type === 'group' || c.type === 'groups') : (c.type !== 'group' && c.type !== 'groups'))
       .filter((c) => !term || (c.title ?? '').toLowerCase().includes(term))
       .sort((a, b) => new Date(b.lastMessageAt ?? b.updatedAt).getTime() - new Date(a.lastMessageAt ?? a.updatedAt).getTime());
   }, [conversations, activeTab, search]);
@@ -99,9 +99,9 @@ export default function MessagesCenter() {
           </div>
 
           <div className="flex border-b border-slate-100 bg-white px-3 pt-2">
-            {(['all', 'business'] as const).map((tab) => (
+            {(['users', 'groups'] as const).map((tab) => (
               <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2.5 text-sm font-bold border-b-2 ${activeTab === tab ? 'border-emerald-500 text-slate-900' : 'border-transparent text-slate-400'}`}>
-                {tab === 'all' ? 'All chats' : 'Business'}
+                {tab === 'users' ? 'Users' : 'Groups'}
               </button>
             ))}
           </div>
@@ -139,7 +139,7 @@ export default function MessagesCenter() {
                     <span className="whitespace-nowrap text-[10px] text-slate-400">{conv.lastMessageAt ? new Date(conv.lastMessageAt).toLocaleDateString() : ''}</span>
                   </div>
                   <div className="mt-1 flex items-center gap-2">
-                    <p className="truncate text-xs text-slate-500">{conv.type === 'business' ? 'Business conversation' : 'Conversation'}</p>
+                    <p className="truncate text-xs text-slate-500">{conv.type === 'group' || conv.type === 'groups' ? 'Group conversation' : conv.type === 'business' ? 'Business conversation' : 'User conversation'}</p>
                     {conv.muted && <VolumeX className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
                     {(conv.unreadCount ?? 0) > 0 && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-black text-white">{(conv.unreadCount ?? 0) > 99 ? '99+' : conv.unreadCount}</span>}
                   </div>
