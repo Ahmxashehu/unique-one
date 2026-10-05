@@ -106,7 +106,7 @@ export default function RestaurantPage() {
   const deliveryFee = draft.mode === 'delivery' ? 1500 : 0;
   const serviceFee = cartTotal ? Math.max(300, Math.round(cartTotal * 0.03)) : 0;
   const finalTotal = cartTotal + deliveryFee + serviceFee;
-  const checkoutReady = Boolean(customerName.trim() && customerPhone.trim() && (draft.paymentMethod !== 'uniquepay' || /^\\d{4}$/.test(transactionPin)) && (draft.mode !== 'delivery' || draft.deliveryAddress.trim()) && (draft.mode !== 'dine-in' || (draft.date && draft.time)) && (draft.mode !== 'pickup' || (draft.date && draft.time)));
+  const checkoutReady = Boolean(customerName.trim() && customerPhone.trim() && (draft.paymentMethod !== 'uniquepay' || /^\d{4}$/.test(transactionPin)) && (draft.mode !== 'delivery' || draft.deliveryAddress.trim()) && (draft.mode !== 'dine-in' || (draft.date && draft.time)) && (draft.mode !== 'pickup' || (draft.date && draft.time)));
 
   const openBooking = (restaurant: Restaurant) => { setSelected(restaurant); saveDraft({ ...draft, restaurantId: restaurant.id, cart, customerName, customerPhone }); setBookingOpen(true); setStage('menu'); };
 
@@ -333,7 +333,7 @@ export default function RestaurantPage() {
               {draft.paymentMethod === 'uniquepay' && currentUser && (
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Transaction PIN</label>
-                  <input value={transactionPin} onChange={e => setTransactionPin(e.target.value.replace(/\\D/g, '').slice(0, 4))} type="password" inputMode="numeric" maxLength={4} placeholder="4-digit PIN" className="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm font-bold outline-none focus:border-emerald-500" />
+                  <input value={transactionPin} onChange={e => setTransactionPin(e.target.value.replace(/\D/g, '').slice(0, 4))} type="password" inputMode="numeric" maxLength={4} placeholder="4-digit PIN" className="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm font-bold outline-none focus:border-emerald-500" />
                   <p className="mt-1 text-[10px] text-slate-500">Your PIN is verified securely and is never stored with the order.</p>
                 </div>
               )}
