@@ -81,7 +81,7 @@ export default function RestaurantPage() {
   });
   const [bookingOpen, setBookingOpen] = useState(false);
   const [selected, setSelected] = useState<Restaurant | null>(null);
-  const [stage, setStage] = useState<'browse' | 'menu' | 'review' | 'ready'>('browse');
+  const [stage, setStage] = useState<'browse' | 'menu' | 'reservation' | 'review' | 'ready'>('browse');
   const [cart, setCart] = useState<Record<string, number>>(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').cart || {}; } catch { return {}; } });
   const [customerName, setCustomerName] = useState(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').customerName || ''; } catch { return ''; } });
   const [customerPhone, setCustomerPhone] = useState(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').customerPhone || ''; } catch { return ''; } });
@@ -118,10 +118,12 @@ export default function RestaurantPage() {
   }, [city, cuisine, query]);
 
   const continueBooking = () => {
-    if (!selected || !draft.date || !draft.time || draft.guests < 1) return;
+    if (!selected) return;
+    if (draft.mode === 'dine-in' && (!draft.date || !draft.time || draft.guests < 1)) return;
+    if (draft.mode === 'delivery' && !draft.deliveryAddress.trim()) return;
+    if (draft.mode === 'pickup' && (!draft.date || !draft.time)) return;
     setBookingOpen(false);
     setStage('review');
-    if (!currentUser) return;
   };
 
   const confirmBooking = () => {
@@ -207,7 +209,7 @@ export default function RestaurantPage() {
             </div>
             <div className="space-y-2 p-4">
               {menuItems.map(item => <div key={item.id} className="flex items-center justify-between rounded-2xl border border-slate-200 p-3"><div><p className="text-sm font-black">{item.name}</p><p className="text-xs text-slate-500">Prototype menu item · ₦{item.price.toLocaleString()}</p></div><div className="flex items-center gap-2"><button onClick={() => updateCart({...cart,[item.id]:Math.max(0,(cart[item.id]||0)-1)})} className="h-8 w-8 rounded-full border">−</button><span className="w-4 text-center text-xs font-black">{cart[item.id]||0}</span><button onClick={() => updateCart({...cart,[item.id]:(cart[item.id]||0)+1})} className="h-8 w-8 rounded-full bg-slate-950 text-white">+</button></div></div>)}
-              <button disabled={!cartCount} onClick={() => { setBookingOpen(false); setStage('review'); }} className="mt-3 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-40">Review order · ₦{cartTotal.toLocaleString()}</button>
+              <button disabled={!cartCount} onClick={() => { setStage('reservation'); setBookingOpen(true); }} className="mt-3 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-40">Review order · ₦{cartTotal.toLocaleString()}</button>
               <p className="text-center text-[10px] text-slate-500">Prototype menu prices are not live restaurant pricing.</p>
             </div>
           </section>
@@ -228,14 +230,32 @@ export default function RestaurantPage() {
                 <p className="text-xs font-bold text-slate-900">{selected.cuisine} · {selected.area}, {selected.city}</p>
                 <p className="mt-1 text-xs text-slate-500">{selected.description}</p>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="rounded-2xl border border-slate-200 p-3"><span className="flex items-center gap-1 text-[10px] font-bold text-slate-500"><CalendarDays className="h-3 w-3" />Date</span><input type="date" value={draft.date} onChange={(e) => saveDraft({ ...draft, date: e.target.value })} className="mt-2 w-full text-sm font-bold outline-none" /></label>
-                <label className="rounded-2xl border border-slate-200 p-3"><span className="flex items-center gap-1 text-[10px] font-bold text-slate-500"><Clock3 className="h-3 w-3" />Time</span><input type="time" value={draft.time} onChange={(e) => saveDraft({ ...draft, time: e.target.value })} className="mt-2 w-full text-sm font-bold outline-none" /></label>
-                <label className="rounded-2xl border border-slate-200 p-3"><span className="flex items-center gap-1 text-[10px] font-bold text-slate-500"><Users className="h-3 w-3" />Guests</span><input type="number" min="1" max="20" value={draft.guests} onChange={(e) => saveDraft({ ...draft, guests: Math.max(1, Number(e.target.value) || 1) })} className="mt-2 w-full text-sm font-bold outline-none" /></label>
-                <label className="rounded-2xl border border-slate-200 p-3"><span className="text-[10px] font-bold text-slate-500">Seating</span><select value={draft.seating} onChange={(e) => saveDraft({ ...draft, seating: e.target.value })} className="mt-2 w-full bg-transparent text-sm font-bold outline-none"><option>Standard table</option><option>Outdoor</option><option>Quiet area</option><option>Accessible seating</option></select></label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['dine-in', 'delivery', 'pickup'] as const).map((mode) => (
+                  <button key={mode} type="button" onClick={() => saveDraft({ ...draft, mode })} className={`rounded-2xl border px-2.5 py-2.5 text-left text-[11px] font-black ${draft.mode === mode ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'}`}>
+                    {mode === 'dine-in' ? 'Dine-in' : mode === 'delivery' ? 'Delivery' : 'Pickup'}
+                  </button>
+                ))}
               </div>
+              {draft.mode === 'dine-in' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="rounded-2xl border border-slate-200 p-3"><span className="flex items-center gap-1 text-[10px] font-bold text-slate-500"><CalendarDays className="h-3 w-3" />Date</span><input type="date" value={draft.date} onChange={(e) => saveDraft({ ...draft, date: e.target.value })} className="mt-2 w-full text-sm font-bold outline-none" /></label>
+                  <label className="rounded-2xl border border-slate-200 p-3"><span className="flex items-center gap-1 text-[10px] font-bold text-slate-500"><Clock3 className="h-3 w-3" />Time</span><input type="time" value={draft.time} onChange={(e) => saveDraft({ ...draft, time: e.target.value })} className="mt-2 w-full text-sm font-bold outline-none" /></label>
+                  <label className="rounded-2xl border border-slate-200 p-3"><span className="flex items-center gap-1 text-[10px] font-bold text-slate-500"><Users className="h-3 w-3" />Guests</span><input type="number" min="1" max="20" value={draft.guests} onChange={(e) => saveDraft({ ...draft, guests: Math.max(1, Number(e.target.value) || 1) })} className="mt-2 w-full text-sm font-bold outline-none" /></label>
+                  <label className="rounded-2xl border border-slate-200 p-3"><span className="text-[10px] font-bold text-slate-500">Seating</span><select value={draft.seating} onChange={(e) => saveDraft({ ...draft, seating: e.target.value })} className="mt-2 w-full bg-transparent text-sm font-bold outline-none"><option>Standard table</option><option>Outdoor</option><option>Quiet area</option><option>Accessible seating</option></select></label>
+                </div>
+              )}
+              {draft.mode === 'delivery' && (
+                <label className="block rounded-2xl border border-slate-200 p-3"><span className="flex items-center gap-1 text-[10px] font-bold text-slate-500"><MapPin className="h-3 w-3" />Delivery address</span><textarea value={draft.deliveryAddress} onChange={(e) => saveDraft({ ...draft, deliveryAddress: e.target.value })} rows={2} placeholder="House number, street, area, city" className="mt-2 w-full resize-none text-sm outline-none" /></label>
+              )}
+              {draft.mode === 'pickup' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="rounded-2xl border border-slate-200 p-3"><span className="flex items-center gap-1 text-[10px] font-bold text-slate-500"><CalendarDays className="h-3 w-3" />Pickup date</span><input type="date" value={draft.date} onChange={(e) => saveDraft({ ...draft, date: e.target.value })} className="mt-2 w-full text-sm font-bold outline-none" /></label>
+                  <label className="rounded-2xl border border-slate-200 p-3"><span className="flex items-center gap-1 text-[10px] font-bold text-slate-500"><Clock3 className="h-3 w-3" />Pickup time</span><input type="time" value={draft.time} onChange={(e) => saveDraft({ ...draft, time: e.target.value })} className="mt-2 w-full text-sm font-bold outline-none" /></label>
+                </div>
+              )}
               <label className="block rounded-2xl border border-slate-200 p-3"><span className="text-[10px] font-bold text-slate-500">Special request</span><textarea value={draft.notes} onChange={(e) => saveDraft({ ...draft, notes: e.target.value })} rows={3} placeholder="Birthday, accessibility, children, dietary needs…" className="mt-2 w-full resize-none text-sm outline-none" /></label>
-              <button disabled={draft.mode === 'dine-in' && (!draft.date || !draft.time) || draft.mode === 'delivery' && !draft.deliveryAddress.trim()} onClick={continueBooking} className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">Review reservation</button>
+              <button disabled={(draft.mode === 'dine-in' && (!draft.date || !draft.time)) || (draft.mode === 'delivery' && !draft.deliveryAddress.trim()) || (draft.mode === 'pickup' && (!draft.date || !draft.time))} onClick={continueBooking} className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">Review reservation</button>
               <p className="text-center text-[10px] text-slate-500">Prototype reservations do not claim live table availability.</p>
             </div>
           </section>
@@ -246,7 +266,7 @@ export default function RestaurantPage() {
         <div className="fixed inset-0 z-[85] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
           <section className="w-full max-w-xl rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
             <div className="flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Review</p><h2 className="text-lg font-black text-slate-950">Ready to confirm?</h2></div><button onClick={() => setStage('browse')} className="rounded-full bg-slate-100 p-2"><X className="h-4 w-4" /></button></div>
-            <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm"><p className="font-black">{selected.name}</p><p>{draft.date} · {draft.time} · {draft.guests} guest{draft.guests === 1 ? '' : 's'}</p><p>{draft.seating}</p>{draft.notes && <p className="text-slate-500">{draft.notes}</p>}</div>
+            <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm"><p className="font-black">{selected.name}</p><p>{draft.mode === 'dine-in' ? `Dine-in · ${draft.date} · ${draft.time} · ${draft.guests} guest${draft.guests === 1 ? '' : 's'}` : draft.mode === 'pickup' ? `Pickup · ${draft.date} · ${draft.time}` : `Delivery · ${draft.deliveryAddress}`}</p>{draft.mode === 'dine-in' && <p>{draft.seating}</p>}{draft.notes && <p className="text-slate-500">{draft.notes}</p>}</div>
             <div className="mt-4 space-y-3">
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Customer details</p>
               <input value={customerName} onChange={e => updateCustomerName(e.target.value)} placeholder="Full name" className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none" />
