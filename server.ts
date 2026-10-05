@@ -2887,6 +2887,84 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.post("/api/restaurant/orders", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('restaurantOrderRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many restaurant order attempts. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!isPlainObject(req.body) || !isSafeIdempotencyKey(req.body.idempotencyKey)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid restaurant order idempotency key is required.');
+      }
+      const body = req.body as Record<string, unknown>;
+      const idempotencyKey = String(body.idempotencyKey).trim();
+      const restaurantId = typeof body.restaurantId === 'string' ? body.restaurantId.trim() : '';
+      const mode = body.mode;
+      const paymentMethod = body.paymentMethod;
+      const customerName = typeof body.customerName === 'string' ? body.customerName.trim().slice(0, 120) : '';
+      const customerPhone = typeof body.customerPhone === 'string' ? body.customerPhone.trim().slice(0, 30) : '';
+      const deliveryAddress = typeof body.deliveryAddress === 'string' ? body.deliveryAddress.trim().slice(0, 500) : '';
+      const date = typeof body.date === 'string' ? body.date.trim() : '';
+      const time = typeof body.time === 'string' ? body.time.trim() : '';
+      const seating = typeof body.seating === 'string' ? body.seating.trim().slice(0, 80) : '';
+      const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 500) : '';
+      const cart = body.cart;
+      const subtotal = body.subtotal;
+      const deliveryFee = body.deliveryFee;
+      const serviceFee = body.serviceFee;
+      const total = body.total;
+      if (!restaurantId || !['dine-in', 'delivery', 'pickup'].includes(String(mode)) ||
+          !['uniquepay', 'bank-transfer'].includes(String(paymentMethod)) ||
+          !customerName || !customerPhone || !isPlainObject(cart) ||
+          ![subtotal, deliveryFee, serviceFee, total].every((v) => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Restaurant order details are incomplete or invalid.');
+      }
+      if (mode === 'delivery' && !deliveryAddress) return errorResponse(res, 'INVALID_REQUEST', 'A delivery address is required.');
+      if (mode === 'dine-in' && (!date || !time)) return errorResponse(res, 'INVALID_REQUEST', 'Date and time are required for dine-in.');
+      if (mode === 'pickup' && (!date || !time)) return errorResponse(res, 'INVALID_REQUEST', 'Pickup date and time are required.');
+      if (total !== subtotal + deliveryFee + serviceFee || total <= 0) return errorResponse(res, 'INVALID_AMOUNT', 'The restaurant order total is invalid.');
+      const items = Object.entries(cart).map(([itemId, quantity]) => ({ itemId, quantity })).filter((item) => Number.isSafeInteger(item.quantity) && Number(item.quantity) > 0);
+      if (!items.length) return errorResponse(res, 'INVALID_REQUEST', 'Add at least one menu item before checkout.');
+      const fingerprint = createHash('sha256').update(JSON.stringify({ uid, restaurantId, mode, paymentMethod, customerName, customerPhone, deliveryAddress, date, time, seating, notes, items, subtotal, deliveryFee, serviceFee, total })).digest('hex');
+      const idempotencyRef = adminDb.collection('restaurantOrderIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const existing = await transaction.get(idempotencyRef);
+        if (existing.exists) {
+          const data = existing.data() || {};
+          if (data.requestFingerprint !== fingerprint) throw new RequestValidationError('INVALID_REQUEST', 'This order idempotency key was already used with different order data.');
+          return data.result;
+        }
+        const orderRef = adminDb.collection('restaurantOrders').doc();
+        const now = Timestamp.now();
+        const order = {
+          id: orderRef.id, customerId: uid, restaurantId, mode, paymentMethod,
+          customerName, customerPhone, deliveryAddress, date, time, seating, notes, items,
+          subtotalMinor: subtotal, deliveryFeeMinor: deliveryFee, serviceFeeMinor: serviceFee, totalMinor: total,
+          currency: 'NGN', paymentStatus: 'pending', status: 'pending_payment',
+          createdAt: now, updatedAt: now,
+          orderTimeline: [{ status: 'pending_payment', at: now }],
+        };
+        transaction.create(orderRef, order);
+        const result = { orderId: orderRef.id, status: 'pending_payment', paymentStatus: 'pending', paymentMethod, totalMinor: total };
+        transaction.create(idempotencyRef, { uid, idempotencyKey, requestFingerprint: fingerprint, result, createdAt: now, updatedAt: now });
+        return result;
+      });
+      return res.status(201).json(result);
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Restaurant order creation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Restaurant order could not be created. Your checkout details were not lost.');
+    }
+  });
+
   app.post("/api/store/checkout", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 20,
