@@ -54,6 +54,9 @@ export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [applications, setApplications] = useState<any[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [requestingService, setRequestingService] = useState<Service | null>(null);
+  const [hireBusy, setHireBusy] = useState(false);
   const [tab, setTab] = useState<WorkTab>('jobs');
   const [queryText, setQueryText] = useState('');
   const [category, setCategory] = useState('all');
@@ -96,6 +99,8 @@ export default function JobsPage() {
         where('applicantUid', '==', currentUser.uid),
       ));
       setApplications(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+      const requestSnap = await getDocs(query(collection(db, 'professionalRequests'), where('requesterUid', '==', currentUser.uid)));
+      setRequests(requestSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
     } catch (err: any) {
       setError(err?.message || 'Could not load My Work.');
     }
@@ -183,6 +188,15 @@ export default function JobsPage() {
     } catch (err: any) {
       setError(err?.message || 'Could not publish the job.');
     }
+  };
+
+  const hireService = async () => {
+    if (!currentUser || !requestingService) { window.location.href = '/login'; return; }
+    setHireBusy(true); setError('');
+    try {
+      await addDoc(collection(db, 'serviceRequests'), { requesterUid: currentUser.uid, requesterName: userData?.fullName || '', providerUid: requestingService.ownerUid || '', serviceId: requestingService.id, serviceTitle: requestingService.title || 'Service request', providerName: requestingService.providerName || '', status: 'requested', paymentStatus: 'unpaid', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      setRequestingService(null); setTab('work'); setError('Hire request sent. The provider can respond before work begins.'); await loadMyWork();
+    } catch (err: any) { setError(err?.message || 'Could not send the hire request.'); } finally { setHireBusy(false); }
   };
 
   const submitRequest = async (event: React.FormEvent) => {
@@ -318,7 +332,7 @@ export default function JobsPage() {
           ))}
         </section>
       ) : tab === 'services' ? (
-        <ServiceGrid services={filteredServices} onRequest={() => setShowRequest(true)} />
+        <ServiceGrid services={filteredServices} onRequest={(service) => setRequestingService(service)} />
       ) : tab === 'professionals' ? (
         <ServiceGrid services={professionals} onRequest={() => setShowRequest(true)} professionalMode />
       ) : tab === 'work' ? (
@@ -370,12 +384,22 @@ export default function JobsPage() {
         </div>
       )}
 
-      {!canPublish && <p className="text-center text-xs text-slate-400">Public job and service publishing is reserved for Business accounts and Unique One Admin. Personal users can search, apply, request and hire.</p>}
+      {requestingService && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/60 p-0 sm:items-center sm:p-4">
+          <div className="w-full max-w-lg rounded-t-3xl bg-white p-5 sm:rounded-3xl">
+            <div className="flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-wider text-emerald-600">Hire request</p><h2 className="mt-1 text-xl font-black">{requestingService.title || 'Service'}</h2><p className="mt-1 text-sm text-slate-500">{requestingService.providerName || 'Provider'}</p></div><button onClick={() => setRequestingService(null)}><X /></button></div>
+            <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm"><p>Request this provider first. They can accept, decline or respond before any work or payment starts.</p><p className="mt-2 font-bold">Payment is not taken at this stage.</p></div>
+            <button disabled={hireBusy} onClick={() => void hireService()} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 font-bold text-white">{hireBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Send hire request</button>
+          </div>
+        </div>
+      )}
+
+      {!canPublish && <p className="text-center text-xs text-slate-400">Public job and service publishing is reserved for Business accounts and Unique One Admin. Personal users can search, apply, request and hire.</p>
     </div>
   );
 }
 
-function ServiceGrid({ services, onRequest, professionalMode = false }: { services: Service[]; onRequest: () => void; professionalMode?: boolean }) {
+function ServiceGrid({ services, onRequest, professionalMode = false }: { services: Service[]; onRequest: (service: Service) => void; professionalMode?: boolean }) {
   return <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
     {services.map(service => (
       <article key={service.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -388,7 +412,7 @@ function ServiceGrid({ services, onRequest, professionalMode = false }: { servic
         <p className="mt-3 text-xs text-slate-500">{service.category || 'Professional Services'}</p>
         {service.description && <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-500">{service.description}</p>}
         <div className="mt-5 flex items-center justify-between"><span className="font-black text-emerald-700">{service.price ? `${service.currency === 'NGN' ? '₦' : '$'}${Number(service.price).toLocaleString()}` : 'Request quote'}</span>{service.durationHours ? <span className="inline-flex items-center gap-1 text-xs text-slate-500"><Clock3 className="h-3.5 w-3.5" />{service.durationHours}h</span> : null}</div>
-        <div className="mt-5 flex gap-2"><button onClick={onRequest} className="flex-1 rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white">Request / Hire</button>{service.ownerUid && <button onClick={() => window.location.href = '/os/messages'} className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-700">Message</button>}</div>
+        <div className="mt-5 flex gap-2"><button onClick={() => onRequest(service)} className="flex-1 rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white">Request / Hire</button>{service.ownerUid && <button onClick={() => window.location.href = '/os/messages'} className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-700">Message</button>}</div>
       </article>
     ))}
   </section>;
