@@ -139,6 +139,7 @@ export default function App() {
                     <Route path="/categories" element={<CategoriesPage />} />
                     <Route path="/restaurant" element={<RestaurantPage />} />
                     <Route path="/hotels-events" element={<HotelsEventsPage />} />
+                    <Route path="/health-wellness" element={<HealthWellnessPage />} />
                     <Route path="/near-me" element={<NearMePage />} />
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/support" element={<SupportPage />} />
@@ -185,7 +186,6 @@ export default function App() {
                     <Route path="contributions" element={<ContributionNetworkPage />} />
                     <Route path="education" element={<EducationPage />} />
                     <Route path="travel" element={<TravelPage />} />
-                    <Route path="health-wellness" element={<HealthWellnessPage />} />
                     <Route path="business/register" element={<BusinessRegisterPage />} />
                     <Route path="business/dashboard" element={<SellerDashboardPage />} />
                     <Route path="business/settings" element={<BusinessSettingsPage />} />
