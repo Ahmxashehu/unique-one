@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Shield, Key, Bell, LogOut, ChevronRight, GraduationCap, Sparkles } from 'lucide-react';
+import { User, Shield, Key, Bell, LogOut, Lightbulb, ChevronRight } from 'lucide-react';
 
 export default function SettingsPage() {
   const { currentUser, userData, logout } = useAuth();
@@ -52,15 +52,13 @@ export default function SettingsPage() {
           <SettingRow icon={<Shield className="h-5 w-5 text-slate-400" />} title="Privacy & Security" description="Control account security and permissions" />
           <SettingRow icon={<Key className="h-5 w-5 text-slate-400" />} title="Verification" description="Manage identity verification when required" />
         </div>
-        <Link to="/education-hub" className="group relative block overflow-hidden rounded-3xl border border-emerald-300/30 bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 p-5 text-white shadow-[0_0_28px_rgba(16,185,129,0.14)]">
-          <span className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-emerald-400/20 blur-2xl transition group-hover:bg-emerald-300/30" />
-          <span className="absolute inset-0 rounded-3xl border border-emerald-300/10 animate-pulse" />
-          <div className="relative flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-300/30 bg-emerald-400/10 shadow-[0_0_24px_rgba(52,211,153,0.22)]"><GraduationCap className="h-6 w-6 text-emerald-300" /></div>
-            <div className="min-w-0 flex-1"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300">New experience</p><h2 className="mt-1 text-base font-black">UniqueEducationHub</h2><p className="mt-1 text-xs leading-5 text-slate-300">Learn • Teach • Contribute • Grow</p></div>
-            <div className="rounded-xl bg-white/10 p-2 transition group-hover:translate-x-0.5"><ChevronRight className="h-5 w-5 text-emerald-300" /></div>
+        <div className="rounded-3xl border border-emerald-100 bg-emerald-50/70 p-5">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-white p-2.5 shadow-sm"><Lightbulb className="h-5 w-5 text-emerald-600" /></div>
+            <div className="min-w-0 flex-1"><h2 className="text-sm font-black text-slate-900">Help shape Unique One</h2><p className="mt-1 text-sm text-slate-600">Have an idea, missing service or better way to do something? Send us your suggestion.</p></div>
           </div>
-        </Link>
+          <button type="button" className="mt-4 flex w-full items-center justify-between rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-left text-sm font-black text-slate-800"><span>Suggest an improvement</span><ChevronRight className="h-4 w-4 text-slate-400" /></button>
+        </div>
         {currentUser && <button onClick={() => void logout()} className="flex items-center gap-2 rounded-2xl px-4 py-3 font-bold text-red-600 hover:bg-red-50"><LogOut className="h-5 w-5" /> Sign Out of UniqueOS</button>}
       </div>
     </div>
