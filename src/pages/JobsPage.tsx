@@ -61,6 +61,7 @@ export default function JobsPage() {
   const [agreementRequest, setAgreementRequest] = useState<any | null>(null);
   const [agreements, setAgreements] = useState<any[]>([]);
   const [tab, setTab] = useState<WorkTab>('jobs');
+  const [showHub, setShowHub] = useState(true);
   const [queryText, setQueryText] = useState('');
   const [category, setCategory] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -251,8 +252,65 @@ export default function JobsPage() {
     { id: 'work', label: 'My Work', icon: CheckCircle2 },
   ];
 
+  const openHub = (nextTab: WorkTab) => {
+    setTab(nextTab);
+    setShowHub(false);
+  };
+
+  if (showHub) {
+    const hubItems: Array<{ id: WorkTab; label: string; description: string; icon: React.ElementType }> = [
+      { id: 'jobs', label: 'Find Jobs', description: 'Discover published opportunities', icon: BriefcaseBusiness },
+      { id: 'services', label: 'Find Services', description: 'Hire a service for what you need', icon: Wrench },
+      { id: 'professionals', label: 'Find Professionals', description: 'Find skilled people and providers', icon: UserRound },
+      { id: 'request', label: 'Request a Professional', description: 'Tell providers what you need', icon: ClipboardList },
+      { id: 'work', label: 'My Work', description: 'Applications, requests and agreements', icon: CheckCircle2 },
+    ];
+    return (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/60 p-0 sm:items-center sm:p-4">
+        <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl border border-white/10 bg-white shadow-2xl sm:rounded-3xl">
+          <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-600">Unique One</p>
+                <h1 className="mt-1 text-2xl font-black text-slate-950">Unique Jobs & Services</h1>
+                <p className="mt-1 text-xs font-semibold text-slate-500">Find a Job • Find a Professional • Hire a Service • Get Work Done</p>
+              </div>
+              <button onClick={() => window.history.back()} aria-label="Close" className="rounded-full border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"><X className="h-5 w-5" /></button>
+            </div>
+          </div>
+          <div className="p-4 sm:p-5">
+            <div className="rounded-2xl bg-slate-950 p-4 text-white">
+              <p className="text-sm font-black">Work starts here</p>
+              <p className="mt-1 text-xs leading-5 text-slate-300">Discover real published opportunities, connect with providers, request work and manage your active work lifecycle.</p>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {hubItems.map(({ id, label, description, icon: Icon }) => (
+                <button key={id} onClick={() => id === 'request' ? setShowRequest(true) : openHub(id)} className="group rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><Icon className="h-5 w-5" /></span>
+                  <p className="mt-3 text-sm font-black text-slate-900">{label}</p>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">{description}</p>
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-[11px] font-bold text-slate-600">
+              <div className="rounded-xl bg-emerald-50 p-3"><span className="text-emerald-700">Free access</span><br />Search, apply, request & hire</div>
+              <div className="rounded-xl bg-slate-50 p-3"><span className="text-slate-900">Work lifecycle</span><br />Request → agreement → work → payment → review</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-5 pb-12">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/60 p-0 sm:items-center sm:p-4">
+      <div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-t-3xl bg-slate-50 shadow-2xl sm:rounded-3xl">
+        <div className="sticky top-0 z-40 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+          <button onClick={() => setShowHub(true)} className="inline-flex items-center gap-2 rounded-xl px-2 py-2 text-xs font-black text-slate-700 hover:bg-slate-100"><span>←</span> All Jobs & Services</button>
+          <button onClick={() => window.history.back()} aria-label="Close" className="rounded-full p-2 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="p-4 sm:p-6">
+          <div className="space-y-5 pb-12">
       <section className="rounded-3xl bg-slate-950 p-5 text-white md:p-8">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
@@ -467,6 +525,9 @@ export default function JobsPage() {
       )}
 
       {!canPublish && <p className="text-center text-xs text-slate-400">Public job and service publishing is reserved for Business accounts and Unique One Admin. Personal users can search, apply, request and hire.</p>}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
