@@ -173,28 +173,7 @@ export default function AppLayout() {
       </aside>
 
       <div className="flex-1 flex flex-col h-full min-w-0 w-full overflow-hidden">
-        <header className="md:hidden h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 shrink-0 w-full">
-          <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-slate-600 touch-manipulation">
-            <Menu className="w-6 h-6" />
-          </button>
-          <div className="font-bold text-lg text-slate-900">UniqueOS</div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('/os/profile')}
-              aria-label="Open profile"
-              className="text-slate-600 p-1 touch-manipulation"
-            >
-              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center uppercase">
-                <span className="text-sm font-medium text-slate-700">{userData?.fullName?.charAt(0) || 'U'}</span>
-              </div>
-            </button>
-            <button onClick={handleLogout} aria-label="Log out" className="p-1 text-slate-400 hover:text-red-600 touch-manipulation">
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-        </header>
-
-        <main className="mobile-scroll-padding flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-8 w-full pb-20 md:pb-8">
+        <main className="mobile-scroll-padding flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pt-4 md:p-8 w-full pb-20 md:pb-8">
           <div className="mx-auto max-w-5xl h-full w-full">
             <Outlet />
           </div>
