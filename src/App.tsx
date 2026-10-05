@@ -24,6 +24,7 @@ const DiscoverPage = lazy(() => import("./pages/public/DiscoverPage"));
 const SearchPage = lazy(() => import("./pages/public/SearchPage"));
 const CategoriesPage = lazy(() => import("./pages/public/CategoriesPage"));
 const RestaurantPage = lazy(() => import("./pages/public/RestaurantPage"));
+const HotelsEventsPage = lazy(() => import("./pages/public/HotelsEventsPage"));
 const NearMePage = lazy(() => import("./pages/public/NearMePage"));
 const AboutPage = lazy(() => import("./pages/public/AboutPage"));
 const SupportPage = lazy(() => import("./pages/public/SupportPage"));
@@ -136,6 +137,7 @@ export default function App() {
                     <Route path="/search" element={<SearchPage />} />
                     <Route path="/categories" element={<CategoriesPage />} />
                     <Route path="/restaurant" element={<RestaurantPage />} />
+                    <Route path="/hotels-events" element={<HotelsEventsPage />} />
                     <Route path="/near-me" element={<NearMePage />} />
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/support" element={<SupportPage />} />
