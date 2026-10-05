@@ -911,8 +911,25 @@ export default function HomePage() {
                   <Sparkles className="mt-0.5 h-5 w-5 shrink-0" />
                   <span className="min-w-0 break-words text-sm leading-5 sm:text-base">One platform, many experiences</span>
                 </div>
-                <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 text-[11px] font-semibold text-emerald-900 sm:mt-4 sm:text-xs">
-                  <Link to="/os" className="rounded-2xl bg-white/80 p-3">UniqueCycle/Aju</Link>
+                <div className="mt-3 sm:mt-4">
+                  <Link
+                    to="/os/pay/ajo"
+                    className="group relative block overflow-hidden rounded-2xl border border-emerald-200/80 bg-white p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_10px_30px_rgba(16,185,129,0.14)] active:scale-[0.99]"
+                    aria-label="Open Unique Cycle Aju"
+                  >
+                    <span className="pointer-events-none absolute -right-8 -top-8 h-20 w-20 rounded-full bg-emerald-300/20 blur-2xl transition group-hover:bg-emerald-300/30" />
+                    <span className="pointer-events-none absolute -bottom-10 left-1/3 h-16 w-28 rounded-full bg-teal-300/15 blur-2xl" />
+                    <div className="relative flex items-center gap-3">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm transition group-hover:scale-105">
+                        <WalletCards className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-black text-slate-900">Unique Cycle / Aju</span>
+                        <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">Create a trusted group savings cycle, set contributions and manage the payout order.</span>
+                      </span>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-emerald-600 transition group-hover:translate-x-1" />
+                    </div>
+                  </Link>
                 </div>
               </div>
             </aside>
