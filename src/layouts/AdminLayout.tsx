@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { 
   Users, Building2, Package, Inbox, BarChart3, 
-  ShieldCheck, Activity, Settings, LogOut 
+  ShieldCheck, Activity, Settings, LogOut, Network 
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -11,7 +11,7 @@ export default function AdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const adminNav = [
-    { name: 'Users', path: '/admin/users', icon: Users },
+    { name: 'Control Tower', path: '/admin/control-tower', icon: Network },\n    { name: 'Users', path: '/admin/users', icon: Users },
     { name: 'Businesses', path: '/admin/businesses', icon: Building2 },
     { name: 'Products', path: '/admin/products', icon: Package },
     { name: 'Requests', path: '/admin/requests', icon: Inbox },
