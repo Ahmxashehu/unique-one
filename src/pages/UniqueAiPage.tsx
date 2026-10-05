@@ -39,6 +39,13 @@ type ChatMessage = {
   pdfEligible?: boolean;
 };
 
+type AiAccess = {
+  mode: "guest" | "registered" | "subscriber";
+  limitSeconds: number;
+  usedSeconds: number;
+  remainingSeconds: number;
+};
+
 const shouldUseDeviceLocation = (value: string) =>
   /\b(near me|nearby|nearest|closest|around me|where is|where are|in my area|close to me)\b/i.test(value);
 
@@ -307,6 +314,9 @@ export default function UniqueAiPage() {
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
   const [requestState, setRequestState] = useState<"idle" | "sending" | "retrying">("idle");
   const [lastRequestId, setLastRequestId] = useState<string | null>(null);
+  const [aiAccess, setAiAccess] = useState<AiAccess | null>(null);
+  const [displayRemainingSeconds, setDisplayRemainingSeconds] = useState<number | null>(null);
+  const [premiumNoticeOpen, setPremiumNoticeOpen] = useState(false);
   const [suggestedIndex, setSuggestedIndex] = useState(0);
   const [smartOpportunityIndex, setSmartOpportunityIndex] = useState(0);
   const [smartOpportunityOpen, setSmartOpportunityOpen] = useState(false);
