@@ -11,7 +11,8 @@ export default function AdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const adminNav = [
-    { name: 'Control Tower', path: '/admin/control-tower', icon: Network },\n    { name: 'Users', path: '/admin/users', icon: Users },
+    { name: 'Control Tower', path: '/admin/control-tower', icon: Network },
+    { name: 'Users', path: '/admin/users', icon: Users },
     { name: 'Businesses', path: '/admin/businesses', icon: Building2 },
     { name: 'Products', path: '/admin/products', icon: Package },
     { name: 'Requests', path: '/admin/requests', icon: Inbox },
