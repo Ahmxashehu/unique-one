@@ -45,6 +45,9 @@ type Draft = {
   mode: 'dine-in' | 'delivery' | 'pickup';
   paymentMethod: 'uniquepay' | 'bank-transfer';
   deliveryAddress: string;
+  customerName: string;
+  customerPhone: string;
+  cart: Record<string, number>;
 };
 
 const emptyDraft: Draft = {
@@ -57,6 +60,9 @@ const emptyDraft: Draft = {
   mode: 'dine-in',
   paymentMethod: 'uniquepay',
   deliveryAddress: '',
+  customerName: '',
+  customerPhone: '',
+  cart: {},
 };
 
 export default function RestaurantPage() {
@@ -76,14 +82,15 @@ export default function RestaurantPage() {
   const [bookingOpen, setBookingOpen] = useState(false);
   const [selected, setSelected] = useState<Restaurant | null>(null);
   const [stage, setStage] = useState<'browse' | 'menu' | 'review' | 'ready'>('browse');
-  const [cart, setCart] = useState<Record<string, number>>({});
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [cart, setCart] = useState<Record<string, number>>(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').cart || {}; } catch { return {}; } });
+  const [customerName, setCustomerName] = useState(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').customerName || ''; } catch { return ''; } });
+  const [customerPhone, setCustomerPhone] = useState(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').customerPhone || ''; } catch { return ''; } });
 
-  const saveDraft = (next: Draft) => {
-    setDraft(next);
-    try { sessionStorage.setItem(KEY, JSON.stringify(next)); } catch {}
-  };
+  const saveDraft = (next: Draft) => { setDraft(next); try { sessionStorage.setItem(KEY, JSON.stringify(next)); } catch {} };
+  const persistCheckout = (nextCart = cart, nextName = customerName, nextPhone = customerPhone) => { try { sessionStorage.setItem(KEY, JSON.stringify({ ...draft, cart: nextCart, customerName: nextName, customerPhone: nextPhone })); } catch {} };
+  const updateCart = (nextCart: Record<string, number>) => { setCart(nextCart); persistCheckout(nextCart); };
+  const updateCustomerName = (value: string) => { setCustomerName(value); persistCheckout(cart, value, customerPhone); };
+  const updateCustomerPhone = (value: string) => { setCustomerPhone(value); persistCheckout(cart, customerName, value); };
 
   const menuItems = selected ? [
     { id: `${selected.id}-1`, name: 'Signature Jollof Rice', price: 4500 },
@@ -96,13 +103,9 @@ export default function RestaurantPage() {
   const deliveryFee = draft.mode === 'delivery' ? 1500 : 0;
   const serviceFee = cartTotal ? Math.max(300, Math.round(cartTotal * 0.03)) : 0;
   const finalTotal = cartTotal + deliveryFee + serviceFee;
+  const checkoutReady = Boolean(customerName.trim() && customerPhone.trim() && (draft.mode !== 'delivery' || draft.deliveryAddress.trim()) && (draft.mode !== 'dine-in' || (draft.date && draft.time)));
 
-  const openBooking = (restaurant: Restaurant) => {
-    setSelected(restaurant);
-    saveDraft({ ...draft, restaurantId: restaurant.id });
-    setBookingOpen(true);
-    setStage('browse');
-  };
+  const openBooking = (restaurant: Restaurant) => { setSelected(restaurant); saveDraft({ ...draft, restaurantId: restaurant.id, cart, customerName, customerPhone }); setBookingOpen(true); setStage('menu'); };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -203,7 +206,7 @@ export default function RestaurantPage() {
               <button onClick={() => setBookingOpen(false)} className="rounded-full bg-slate-100 p-2"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-2 p-4">
-              {menuItems.map(item => <div key={item.id} className="flex items-center justify-between rounded-2xl border border-slate-200 p-3"><div><p className="text-sm font-black">{item.name}</p><p className="text-xs text-slate-500">Prototype menu item · ₦{item.price.toLocaleString()}</p></div><div className="flex items-center gap-2"><button onClick={() => setCart({...cart,[item.id]:Math.max(0,(cart[item.id]||0)-1)})} className="h-8 w-8 rounded-full border">−</button><span className="w-4 text-center text-xs font-black">{cart[item.id]||0}</span><button onClick={() => setCart({...cart,[item.id]:(cart[item.id]||0)+1})} className="h-8 w-8 rounded-full bg-slate-950 text-white">+</button></div></div>)}
+              {menuItems.map(item => <div key={item.id} className="flex items-center justify-between rounded-2xl border border-slate-200 p-3"><div><p className="text-sm font-black">{item.name}</p><p className="text-xs text-slate-500">Prototype menu item · ₦{item.price.toLocaleString()}</p></div><div className="flex items-center gap-2"><button onClick={() => updateCart({...cart,[item.id]:Math.max(0,(cart[item.id]||0)-1)})} className="h-8 w-8 rounded-full border">−</button><span className="w-4 text-center text-xs font-black">{cart[item.id]||0}</span><button onClick={() => updateCart({...cart,[item.id]:(cart[item.id]||0)+1})} className="h-8 w-8 rounded-full bg-slate-950 text-white">+</button></div></div>)}
               <button disabled={!cartCount} onClick={() => { setBookingOpen(false); setStage('review'); }} className="mt-3 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-40">Review order · ₦{cartTotal.toLocaleString()}</button>
               <p className="text-center text-[10px] text-slate-500">Prototype menu prices are not live restaurant pricing.</p>
             </div>
@@ -246,8 +249,8 @@ export default function RestaurantPage() {
             <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm"><p className="font-black">{selected.name}</p><p>{draft.date} · {draft.time} · {draft.guests} guest{draft.guests === 1 ? '' : 's'}</p><p>{draft.seating}</p>{draft.notes && <p className="text-slate-500">{draft.notes}</p>}</div>
             <div className="mt-4 space-y-3">
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Customer details</p>
-              <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Full name" className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none" />
-              <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="Phone number" inputMode="tel" className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none" />
+              <input value={customerName} onChange={e => updateCustomerName(e.target.value)} placeholder="Full name" className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none" />
+              <input value={customerPhone} onChange={e => updateCustomerPhone(e.target.value)} placeholder="Phone number" inputMode="tel" className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none" />
               <div className="rounded-2xl border border-slate-200 p-3 text-sm">
                 <div className="flex justify-between"><span>Food</span><b>₦{cartTotal.toLocaleString()}</b></div>
                 <div className="mt-2 flex justify-between"><span>Delivery</span><b>{deliveryFee ? '₦' + deliveryFee.toLocaleString() : 'Free'}</b></div>
