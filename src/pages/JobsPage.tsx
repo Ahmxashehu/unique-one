@@ -59,6 +59,7 @@ export default function JobsPage() {
   const [hireBusy, setHireBusy] = useState(false);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [agreementRequest, setAgreementRequest] = useState<any | null>(null);
+  const [agreements, setAgreements] = useState<any[]>([]);
   const [tab, setTab] = useState<WorkTab>('jobs');
   const [queryText, setQueryText] = useState('');
   const [category, setCategory] = useState('all');
@@ -105,6 +106,10 @@ export default function JobsPage() {
       setRequests(requestSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
       const incomingSnap = await getDocs(query(collection(db, 'serviceRequests'), where('providerUid', '==', currentUser.uid)));
       setIncomingRequests(incomingSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+      const agreementSnap = await getDocs(query(collection(db, 'workAgreements'), where('clientUid', '==', currentUser.uid)));
+      const providerAgreementSnap = await getDocs(query(collection(db, 'workAgreements'), where('providerUid', '==', currentUser.uid)));
+      const merged = [...agreementSnap.docs, ...providerAgreementSnap.docs].map(d => ({ id: d.id, ...(d.data() as any) }));
+      setAgreements(Array.from(new Map(merged.map(item => [item.id, item])).values()));
     } catch (err: any) {
       setError(err?.message || 'Could not load My Work.');
     }
@@ -362,6 +367,21 @@ export default function JobsPage() {
                 </div>)}</div>}
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center justify-between gap-3"><h2 className="font-black">Work agreements</h2><FileText className="h-5 w-5 text-emerald-600" /></div>
+            {agreements.length === 0 ? <p className="mt-4 text-sm text-slate-500">Your agreements will appear here after a provider accepts a hire request.</p> :
+              <div className="mt-4 space-y-3">{agreements.map(item => {
+                const isProvider = item.providerUid === currentUser?.uid;
+                const myAccepted = isProvider ? item.providerAccepted : item.clientAccepted;
+                const otherAccepted = isProvider ? item.clientAccepted : item.providerAccepted;
+                return <div key={item.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-start justify-between gap-3"><div><p className="font-bold">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.currency || 'NGN'} {item.price}</p></div><span className="text-xs font-bold">{item.status || 'pending_acceptance'}</span></div>
+                  <p className="mt-2 text-xs text-slate-500">{myAccepted ? 'You accepted' : 'Your acceptance pending'} · {otherAccepted ? 'Other party accepted' : 'Other party pending'}</p>
+                  {!myAccepted && <button onClick={async () => { await setDoc(doc(db, 'workAgreements', item.id), { [isProvider ? 'providerAccepted' : 'clientAccepted']: true, updatedAt: serverTimestamp(), status: otherAccepted ? 'active' : 'pending_acceptance' }, { merge: true }); await loadMyWork(); }} className="mt-3 w-full rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Accept agreement</button>}
+                  {myAccepted && otherAccepted && <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-800">Agreement active — work can begin. Payment can be arranged through UniquePay after the agreed terms are confirmed.</div>}
+                </div>;
+              })}</div>}
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <h2 className="font-black">Your work lifecycle</h2>
             <div className="mt-4 space-y-3">{['Application / Request', 'Communication', 'Agreement & scope', 'Work / milestones', 'Completion', 'UniquePay settlement', 'Review & reputation'].map((item, i) =>
               <div key={item} className="flex items-center gap-3 rounded-xl border border-slate-100 p-3"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-xs font-black text-emerald-700">{i + 1}</span><span className="text-sm font-semibold">{item}</span></div>
@@ -424,7 +444,7 @@ export default function JobsPage() {
                 serviceId: agreementRequest.serviceId, title, scope, price, currency: String(form.get('currency') || 'NGN'),
                 startDate: String(form.get('startDate') || ''), completionDate: String(form.get('completionDate') || ''),
                 responsibilities: String(form.get('responsibilities') || '').trim(), cancellationTerms: String(form.get('cancellationTerms') || '').trim(),
-                status: 'pending_acceptance', createdByUid: currentUser.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+                status: 'pending_acceptance', clientAccepted: false, providerAccepted: false, createdByUid: currentUser.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
               });
               setAgreementRequest(null); setTab('work'); setError('Free agreement created. Both parties should accept it before work or payment begins.');
             } catch (err: any) { setError(err?.message || 'Could not create the agreement.'); }
