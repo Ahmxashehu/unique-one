@@ -408,6 +408,44 @@ export default function JobsPage() {
         </div>
       )}
 
+      {agreementRequest && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/60 p-0 sm:items-center sm:p-4">
+          <form onSubmit={async (event) => {
+            event.preventDefault();
+            if (!currentUser || !agreementRequest) return;
+            const form = new FormData(event.currentTarget);
+            const title = String(form.get('title') || '').trim();
+            const scope = String(form.get('scope') || '').trim();
+            const price = String(form.get('price') || '').trim();
+            if (!title || !scope || !price) { setError('Add the agreement title, scope and agreed price.'); return; }
+            try {
+              await addDoc(collection(db, 'workAgreements'), {
+                serviceRequestId: agreementRequest.id, clientUid: agreementRequest.requesterUid, providerUid: agreementRequest.providerUid,
+                serviceId: agreementRequest.serviceId, title, scope, price, currency: String(form.get('currency') || 'NGN'),
+                startDate: String(form.get('startDate') || ''), completionDate: String(form.get('completionDate') || ''),
+                responsibilities: String(form.get('responsibilities') || '').trim(), cancellationTerms: String(form.get('cancellationTerms') || '').trim(),
+                status: 'pending_acceptance', createdByUid: currentUser.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+              });
+              setAgreementRequest(null); setTab('work'); setError('Free agreement created. Both parties should accept it before work or payment begins.');
+            } catch (err: any) { setError(err?.message || 'Could not create the agreement.'); }
+          }} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-5 sm:rounded-3xl">
+            <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-600">Free agreement</p><h2 className="mt-1 text-2xl font-black">Agree the work before payment</h2><p className="mt-2 text-sm text-slate-500">No subscription or agreement fee. Set scope, price and responsibilities clearly.</p></div><button type="button" onClick={() => setAgreementRequest(null)}><X className="h-5 w-5" /></button></div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <input name="title" required placeholder="Agreement title" className="rounded-xl border border-slate-200 p-3 sm:col-span-2" />
+              <textarea name="scope" required rows={4} placeholder="Scope of work / deliverables" className="rounded-xl border border-slate-200 p-3 sm:col-span-2" />
+              <input name="price" required placeholder="Agreed price e.g. 35000" className="rounded-xl border border-slate-200 p-3" />
+              <select name="currency" className="rounded-xl border border-slate-200 p-3"><option>NGN</option><option>USD</option><option>GBP</option></select>
+              <input name="startDate" type="date" className="rounded-xl border border-slate-200 p-3" />
+              <input name="completionDate" type="date" className="rounded-xl border border-slate-200 p-3" />
+              <textarea name="responsibilities" rows={3} placeholder="Responsibilities / materials / access" className="rounded-xl border border-slate-200 p-3 sm:col-span-2" />
+              <textarea name="cancellationTerms" rows={3} placeholder="Cancellation or change terms" className="rounded-xl border border-slate-200 p-3 sm:col-span-2" />
+            </div>
+            <div className="mt-4 rounded-xl bg-emerald-50 p-3 text-xs text-emerald-800">Free to create. Payment should only proceed after the agreement is accepted.</div>
+            <button className="mt-4 w-full rounded-xl bg-slate-950 px-4 py-3 font-bold text-white">Create free agreement</button>
+          </form>
+        </div>
+      )}
+
       {!canPublish && <p className="text-center text-xs text-slate-400">Public job and service publishing is reserved for Business accounts and Unique One Admin. Personal users can search, apply, request and hire.</p>}
     </div>
   );
