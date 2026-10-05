@@ -128,6 +128,28 @@ export default function PayPage() {
               </Link>
             ))}
           </div>
+
+          <Link
+            to="/os/payment-requests/new"
+            className="group relative mt-3 block overflow-hidden rounded-2xl border border-emerald-300/20 bg-gradient-to-r from-emerald-400/15 via-white/10 to-cyan-400/10 p-3.5 shadow-[0_0_28px_rgba(52,211,153,0.10)] transition duration-300 hover:-translate-y-0.5 hover:border-emerald-300/35 hover:shadow-[0_0_34px_rgba(52,211,153,0.18)] active:scale-[0.99]"
+          >
+            <span className="pointer-events-none absolute -left-8 -top-10 h-24 w-24 animate-pulse rounded-full bg-emerald-300/15 blur-2xl" />
+            <span className="pointer-events-none absolute -right-8 -bottom-12 h-28 w-28 animate-pulse rounded-full bg-cyan-300/10 blur-3xl [animation-delay:700ms]" />
+            <span className="pointer-events-none absolute left-1/3 top-1/2 h-16 w-32 -translate-y-1/2 animate-pulse rounded-full bg-white/5 blur-2xl [animation-duration:3.5s]" />
+            <div className="relative flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-300/15 text-emerald-200 transition duration-300 group-hover:scale-105 group-hover:rotate-2">
+                <Receipt className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-200">Request money</p>
+                  <span className="rounded-full bg-emerald-300/10 px-2 py-0.5 text-[9px] font-bold text-emerald-100">Quick request</span>
+                </div>
+                <p className="mt-0.5 text-[11px] leading-4 text-slate-300">Send a payment request to a person or customer.</p>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-emerald-200 transition group-hover:translate-x-1" />
+            </div>
+          </Link>
         </div>
       </section>
 
