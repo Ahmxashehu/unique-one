@@ -1,5 +1,5 @@
 import { Home, Compass, Search, Sparkles, Menu } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
 
 type MobileBottomNavProps = {
@@ -23,7 +23,6 @@ const appItems = [
 
 export default function MobileBottomNav({ variant, onMenu }: MobileBottomNavProps) {
   const location = useLocation();
-  const navigate = useNavigate();
   const items = variant === "public" ? publicItems : appItems;
 
   return (
@@ -35,22 +34,30 @@ export default function MobileBottomNav({ variant, onMenu }: MobileBottomNavProp
             item.path === "/"
               ? location.pathname === "/"
               : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+          if (variant === "app" && item.name === "Home") {
+            return (
+              <Link
+                key={item.name}
+                to="/os/dashboard"
+                className={cn("mobile-nav-item", isActive && "mobile-nav-item-active")}
+                aria-current={isActive ? "page" : undefined}
+              >
+                <Icon className="h-5 w-5" aria-hidden="true" />
+                <span>{item.name}</span>
+              </Link>
+            );
+          }
+
           return (
-            <a
+            <Link
               key={item.name}
-              href={item.path}
-              onClick={(event) => {
-                if (variant === "app" && item.name === "Home") {
-                  event.preventDefault();
-                  window.location.assign("/os/dashboard");
-                }
-              }}
+              to={item.path}
               className={cn("mobile-nav-item", isActive && "mobile-nav-item-active")}
               aria-current={isActive ? "page" : undefined}
             >
               <Icon className="h-5 w-5" aria-hidden="true" />
               <span>{item.name}</span>
-            </a>
+            </Link>
           );
         })}
         <button type="button" onClick={onMenu} className="mobile-nav-item" aria-label="Open UniqueOS menu">
