@@ -260,11 +260,8 @@ export default function SearchPage() {
               </button>
             ))}
           </div>
-          </div>
         </div>
       </section>
-
-      )}
     </div>
   );
 }
