@@ -1828,6 +1828,20 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         transaction.set(senderLedgerRef, senderLedgerEntry);
         transaction.set(recipientLedgerRef, recipientLedgerEntry);
         transaction.set(idempotencyRef, { senderUid, recipientId, amountMinor, currency, description: description ?? '', requestFingerprint: fingerprint, status: 'completed', result: completedResult, createdAt: now, updatedAt: now });
+        const auditRef = adminDb.collection('audit_logs').doc();
+        transaction.create(auditRef, {
+          action: 'wallet.transfer.completed',
+          actorUid: senderUid,
+          targetUid: recipientId,
+          resource: 'wallet_transfer',
+          resourceId: transactionId,
+          transactionId,
+          reference,
+          amountMinor,
+          currency,
+          idempotencyKey,
+          timestamp: now,
+        });
         return completedResult;
       });
       if ((transactionResult as TransferErrorResponse | undefined)?.error) { const { code, message } = (transactionResult as TransferErrorResponse).error; return errorResponse(res, code, message, transferErrorStatus[code] ?? 500); }
