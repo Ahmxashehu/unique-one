@@ -2,6 +2,7 @@ import type { Express, RequestHandler } from 'express';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import type { Permission, Role } from '../lib/os/types';
 import { ROLE_PERMISSIONS, hasRolePermission } from '../lib/auth/rbac';
+import { registerBusinessAccessRoutes } from './businessAccessRoutes';
 
 const ALL_ROLES: Role[] = [
   'customer','buyer','seller','business_owner','staff_member','farmer','service_provider',
@@ -98,4 +99,7 @@ export function registerAdminRbacRoutes(
       return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'The role update could not be saved.' } });
     }
   });
+
+  // Business Platform access/security is registered alongside the central RBAC routes.
+  registerBusinessAccessRoutes(app, authenticate, db);
 }
