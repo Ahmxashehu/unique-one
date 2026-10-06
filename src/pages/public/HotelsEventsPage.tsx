@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import {
   Building2, CalendarDays, Car, CheckCircle2, ChevronRight, Coffee,
