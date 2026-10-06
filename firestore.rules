@@ -240,16 +240,7 @@ service cloud.firestore {
     }
     match /quotes/{quoteId} {
       allow read: if isAdmin() || (isAuthenticated() && (resource.data.sellerId == request.auth.uid || (exists(/databases/$(database)/documents/productRequests/$(resource.data.requestId)) && get(/databases/$(database)/documents/productRequests/$(resource.data.requestId)).data.customerId == request.auth.uid)));
-      allow create: if isAuthenticated()
-        && request.resource.data.sellerId == request.auth.uid
-        && request.resource.data.currency == 'NGN'
-        && request.resource.data.customerIdentifier is string
-        && request.resource.data.issueDate is string
-        && request.resource.data.items is list
-        && request.resource.data.subtotal is number
-        && request.resource.data.total is number
-        && request.resource.data.total == request.resource.data.subtotal
-        && request.resource.data.keys().hasOnly(['sellerId','customerIdentifier','issueDate','dueDate','items','subtotal','total','currency','status','createdAt','updatedAt']);
+      allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid;
       allow update: if isAuthenticated()
         && request.resource.data.sellerId == resource.data.sellerId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
@@ -280,7 +271,16 @@ service cloud.firestore {
     }
     match /invoices/{invId} {
       allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin();
-      allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.sellerId == request.auth.uid
+        && request.resource.data.currency == 'NGN'
+        && request.resource.data.customerIdentifier is string
+        && request.resource.data.issueDate is string
+        && request.resource.data.items is list
+        && request.resource.data.subtotal is number
+        && request.resource.data.total is number
+        && request.resource.data.total == request.resource.data.subtotal
+        && request.resource.data.keys().hasOnly(['sellerId','customerIdentifier','issueDate','dueDate','items','subtotal','total','currency','status','createdAt','updatedAt']);
       allow update: if isAuthenticated()
         && request.resource.data.sellerId == resource.data.sellerId
         && request.resource.data.customerId == resource.data.customerId
