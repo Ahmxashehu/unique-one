@@ -24,11 +24,20 @@ export default function BookingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/calendar/events', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      // The token issued by Google Identity Services is a Google OAuth
+      // access token, not a Firebase ID token. Call Google Calendar directly
+      // instead of forwarding the OAuth token through the Firebase-auth API.
+      const response = await fetch(
+        'https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=' +
+          encodeURIComponent(new Date().toISOString()) +
+          '&maxResults=10&singleEvents=true&orderBy=startTime',
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        },
+      );
       
       if (!response.ok) {
         throw new Error('Failed to fetch calendar events');
