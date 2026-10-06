@@ -234,9 +234,10 @@ service cloud.firestore {
         && request.resource.data.customerId == request.auth.uid
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
-        && request.resource.data.title.size() <= 160
+        && request.resource.data.title.size() <= 120
         && request.resource.data.description is string
-        && request.resource.data.description.size() <= 3000
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 2000
         && request.resource.data.quantity is int
         && request.resource.data.quantity >= 1
         && request.resource.data.quantity <= 1000000
@@ -246,15 +247,15 @@ service cloud.firestore {
         && request.resource.data.requiredDate is string
         && request.resource.data.isPublic is bool
         && request.resource.data.expiryDate is string
-        && request.resource.data.status in ['draft','pending','published']
-        && request.resource.data.createdAt is string
+        && request.resource.data.status in ['draft','published']
         && request.resource.data.keys().hasOnly(['id','customerId','title','description','quantity','budget','location','requiredDate','isPublic','expiryDate','status','createdAt']);
-      allow update: if isAuthenticated()
-        && resource.data.customerId == request.auth.uid
-        && request.resource.data.customerId == resource.data.customerId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-        && request.resource.data.status in ['draft', 'pending', 'published', 'cancelled', 'closed']
-        || isAdmin();
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && resource.data.customerId == request.auth.uid
+          && request.resource.data.customerId == resource.data.customerId
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && request.resource.data.status in ['draft', 'published', 'cancelled', 'closed']);
       allow delete: if isAdmin();
     }
     match /quotes/{quoteId} {
