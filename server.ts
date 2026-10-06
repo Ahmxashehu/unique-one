@@ -1603,7 +1603,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const clientDataJSON = base64UrlToBuffer(String(req.body?.clientDataJSON || ''));
       const authenticatorData = base64UrlToBuffer(String(req.body?.authenticatorData || ''));
       const publicKey = base64UrlToBuffer(String(req.body?.publicKey || ''));
-      if (!challengeId || !credentialId || clientDataJSON.length > 4096 || authenticatorData.length < 37 || publicKey.length < 32 || publicKey.length > 4096) return errorResponse(res, 'INVALID_REQUEST', 'The passkey registration response is invalid.');
+      if (!challengeId || !credentialId || !/^[A-Za-z0-9_-]{16,1024}$/.test(credentialId) || clientDataJSON.length > 4096 || authenticatorData.length < 37 || publicKey.length < 32 || publicKey.length > 4096) return errorResponse(res, 'INVALID_REQUEST', 'The passkey registration response is invalid.');
       const challengeRef = adminDb.collection(PASSKEY_CHALLENGES_COLLECTION).doc(challengeId);
       const challengeSnap = await challengeRef.get();
       if (!challengeSnap.exists) return errorResponse(res, 'FORBIDDEN', 'The passkey setup challenge is invalid or expired.');
@@ -1618,7 +1618,18 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (!authenticatorData.subarray(0, 32).equals(crypto.createHash('sha256').update(rpId).digest())) return errorResponse(res, 'FORBIDDEN', 'The passkey relying-party binding is invalid.');
       const flags = authenticatorData[32];
       if ((flags & 0x45) !== 0x45) return errorResponse(res, 'FORBIDDEN', 'Biometric/user verification is required to register this credential.');
-      await adminDb.collection('authCredentials').doc(uid).collection(PASSKEY_COLLECTION).doc(credentialId).set({
+      const credentialRef = adminDb.collection('authCredentials').doc(uid).collection(PASSKEY_COLLECTION).doc(credentialId);
+      const existingCredential = await credentialRef.get();
+      if (existingCredential.exists) return errorResponse(res, 'INVALID_REQUEST', 'This biometric credential is already registered.');
+      let parsedPublicKey: ReturnType<typeof crypto.createPublicKey>;
+      try {
+        parsedPublicKey = crypto.createPublicKey({ key: publicKey, format: 'der', type: 'spki' });
+        const keyDetails = parsedPublicKey.asymmetricKeyDetails;
+        if (parsedPublicKey.asymmetricKeyType !== 'ec' || keyDetails?.namedCurve !== 'prime256v1') throw new Error('unsupported credential key');
+      } catch {
+        return errorResponse(res, 'INVALID_REQUEST', 'The biometric credential key is invalid.');
+      }
+      await credentialRef.create({
         credentialId, publicKey: publicKey.toString('base64'), algorithm: -7, signCount: authenticatorData.readUInt32BE(33),
         createdAt: Timestamp.now(), lastUsedAt: Timestamp.now(), origin, rpId
       });
