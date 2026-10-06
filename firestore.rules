@@ -630,10 +630,18 @@ service cloud.firestore {
         && request.resource.data.description is string
         && request.resource.data.description.size() > 0
         && request.resource.data.description.size() <= 2000
+        && request.resource.data.category is string
+        && request.resource.data.category.size() > 0
+        && request.resource.data.category.size() <= 80
         && request.resource.data.price is number
         && request.resource.data.price >= 0
+        && request.resource.data.currency == 'NGN'
         && request.resource.data.durationHours is number
-        && request.resource.data.durationHours > 0;
+        && request.resource.data.durationHours > 0
+        && request.resource.data.keys().hasOnly([
+          'ownerUid','providerName','title','category','description','price',
+          'currency','durationHours','status','createdAt','updatedAt'
+        ]);
       allow update: if isAdmin()
         || (isAuthenticated()
           && resource.data.ownerUid == request.auth.uid
