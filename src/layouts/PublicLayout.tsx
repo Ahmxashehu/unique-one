@@ -5,7 +5,30 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import AppearanceControls from '../components/AppearanceControls';
 import { getLanguage, t, type SupportedLanguage } from '../lib/i18n';
-import { Settings, GraduationCap, Sparkles } from 'lucide-react';
+import {
+  Settings, GraduationCap, Sparkles, Store, Calendar, Plane, ShoppingCart,
+  Briefcase, Building2, Globe, Activity, Search, HeartHandshake
+} from 'lucide-react';
+
+const platformExperiences = [
+  ['Restaurant', '/restaurant', Store],
+  ['Hotels & Events', '/hotels-events', Calendar],
+  ['Flights', '/flights', Plane],
+  ['School & Education', '/education-hub', GraduationCap],
+  ['Retail & Shopping', '/store', ShoppingCart],
+  ['Professional Services', '/search?category=Professional%20Services', Briefcase],
+  ['Transportation', '/search?category=Transportation', Plane],
+  ['Real Estate', '/search?category=Real%20Estate', Building2],
+  ['Technology', '/search?category=Technology', Globe],
+  ['Health & Wellness', '/health-wellness', Activity],
+  ['Food & Dining', '/restaurant', Store],
+  ['Global Search', '/search', Search],
+  ['Near Me', '/near-me', Globe],
+  ['Jobs', '/jobs', Briefcase],
+  ['Contributions', '/os/contributions', HeartHandshake],
+  ['Education', '/os/education', GraduationCap],
+  ['Travel', '/os/travel', Plane],
+] as const;
 
 export default function PublicLayout() {
   const { currentUser } = useAuth();
@@ -51,8 +74,13 @@ export default function PublicLayout() {
       </main>
 
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="More UniquePlatform">
-          <button type="button" aria-label="Close menu" className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
+        <div className="md:hidden fixed inset-0 z-[100] isolate" role="dialog" aria-modal="true" aria-label="More UniquePlatform">
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="absolute inset-0 h-full w-full bg-slate-950/45 backdrop-blur-sm"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
           <div className="absolute inset-x-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-h-[72dvh] overflow-y-auto overscroll-contain rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl sm:inset-x-3 sm:p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
@@ -61,20 +89,23 @@ export default function PublicLayout() {
               </div>
               <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">{t('close', language)}</button>
             </div>
+
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
-              {[
-                ['Restaurant', '/restaurant'],
-                ['Hotels & Events', '/hotels-events'],
-                ['Flights', '/flights'],
-                ['Unique Jobs & Services', '/jobs'],
-                ['Unique Travel', '/os/travel'],
-                ['Unique Health & Wellness', '/health-wellness'],
-              ].map(([name, path]) => (
-                <Link key={path + name} to={path} onClick={() => setIsMobileMenuOpen(false)} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm">
-                  {name}
+              {platformExperiences.map(([name, path, Icon]) => (
+                <Link
+                  key={path + name}
+                  to={path}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm"
+                >
+                  <span className="flex items-center gap-2">
+                    <Icon className="h-4 w-4 shrink-0 text-emerald-600" />
+                    <span className="truncate">{name}</span>
+                  </span>
                 </Link>
               ))}
             </div>
+
             <div className="mt-2">
               <Link to="/education-hub" onClick={() => setIsMobileMenuOpen(false)} className="group relative flex min-h-[76px] items-center overflow-hidden rounded-2xl border border-emerald-300/40 bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 px-3 py-3 text-white shadow-[0_0_24px_rgba(16,185,129,0.16)] transition active:scale-[0.98]">
                 <span className="absolute -right-8 -top-8 h-20 w-20 rounded-full bg-emerald-400/20 blur-2xl animate-pulse" />
@@ -83,11 +114,13 @@ export default function PublicLayout() {
                 <Sparkles className="relative h-4 w-4 shrink-0 text-emerald-300" />
               </Link>
             </div>
+
             <div className="mt-6 border-t-2 border-slate-100 pt-6">
               <Link to="/settings" onClick={() => setIsMobileMenuOpen(false)} className="flex min-w-0 items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-800 active:scale-[0.98] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:px-4 sm:py-3.5 sm:text-sm">
                 Settings
               </Link>
             </div>
+
             {currentUser && (
               <div className="mt-3">
                 <Link to="/os/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">{t('openUniqueOS', language)}</Link>
@@ -96,6 +129,7 @@ export default function PublicLayout() {
           </div>
         </div>
       )}
+
       <MobileBottomNav variant="public" onMenu={() => setIsMobileMenuOpen(true)} />
     </div>
   );
