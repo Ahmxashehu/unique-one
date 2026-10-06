@@ -247,14 +247,20 @@ service cloud.firestore {
     match /reviews/{reviewId} { allow read: if true; allow create: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5 && request.resource.data.targetId is string && request.resource.data.targetType in ['product', 'seller'] && request.resource.data.verifiedPurchase == false; allow update, delete: if isAdmin(); }
     match /payment_requests/{reqId} {
       allow read: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isAdmin();
-      allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
-      allow update: if isAuthenticated()
-        && request.resource.data.senderId == resource.data.senderId
-        && request.resource.data.recipientId == resource.data.recipientId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-        && request.resource.data.status in ['draft', 'sent', 'viewed', 'pending_approval', 'approved', 'rejected', 'cancelled', 'expired']
-        && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid)
-        || isAdmin();
+      // Payment requests are created only through the authenticated server API, which resolves the recipient and writes the audit record.
+      allow create: if false;
+      // Keep sender and recipient state transitions separated so one party cannot impersonate the other's approval/rejection.
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && request.resource.data.senderId == resource.data.senderId
+          && request.resource.data.recipientId == resource.data.recipientId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && (
+            (resource.data.senderId == request.auth.uid
+              && request.resource.data.status in ['draft', 'sent', 'cancelled'])
+            || (resource.data.recipientId == request.auth.uid
+              && request.resource.data.status in ['viewed', 'pending_approval', 'approved', 'rejected'])
+          ));
       allow delete: if isAdmin();
     }
     match /invoices/{invId} {
