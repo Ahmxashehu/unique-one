@@ -59,6 +59,7 @@ export default function HomePage() {
     href: string;
     description?: string;
     price?: string;
+    image?: string;
   } | null>(null);
 
   const experiencePosters = [
