@@ -164,13 +164,13 @@ export default function RestaurantPage() {
         let paymentData = await paymentResponse.json().catch(() => ({}));
         if (!paymentResponse.ok && paymentData?.error?.code === 'BIOMETRIC_REQUIRED') {
           const { createBiometricAssertion } = await import('../../components/security/PasskeySecurityCard');
-          const biometricAssertion = await createBiometricAssertion(currentUser, `restaurant_payment|\${currentUser.uid}|\${data.orderId}|\${data.totalMinor}|NGN`);
+          const biometricAssertion = await createBiometricAssertion(currentUser, `restaurant_payment|${currentUser.uid}|${data.orderId}|${data.totalMinor}|NGN`);
           const retryResponse = await fetch('/api/restaurant/pay', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer \${token}` },
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify({
               orderId: data.orderId,
-              idempotencyKey: `restaurant_pay_\${Date.now()}_\${Math.random().toString(36).slice(2, 10)}`,
+              idempotencyKey: `restaurant_pay_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
               transactionPin,
               biometricAssertion,
             }),
