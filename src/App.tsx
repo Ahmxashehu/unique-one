@@ -283,7 +283,7 @@ export default function App() {
 
                   <Route path="/admin/login" element={<AdminLoginPage />} />
                   <Route path="/admin" element={<AdminLayout />}>
-                    <Route index element={<Navigate to="/admin/control-tower" replace />} />
+                    <Route index element={<Navigate to="/admin/workspace/super" replace />} />
                     <Route path="control-tower" element={<RoleGuard dashboard="super_admin"><AdminControlTowerPage /></RoleGuard>} />
                     <Route path="workspace/finance" element={<RoleGuard dashboard="finance_settlement"><WorkspaceDashboardPage dashboard="finance_settlement" /></RoleGuard>} />
                     <Route path="workspace/risk" element={<RoleGuard dashboard="security_risk"><WorkspaceDashboardPage dashboard="security_risk" /></RoleGuard>} />
