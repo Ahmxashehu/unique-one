@@ -13,7 +13,9 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
   risk_security_officer: ['view:profile', 'manage:verification', 'manage:disputes', 'access:admin_tools', 'view:audit_logs'],
   platform_admin: ['view:profile', 'edit:profile', 'manage:roles', 'manage:permissions', 'view:audit_logs', 'create:products', 'edit:products', 'manage:inventory', 'create:invoices', 'send:payment_requests', 'view:customer_info', 'manage:orders', 'manage:bookings', 'manage:business_staff', 'view:transactions', 'manage:verification', 'manage:disputes', 'access:admin_tools'],
   super_admin: ['view:profile', 'edit:profile', 'manage:roles', 'manage:permissions', 'view:audit_logs', 'create:products', 'edit:products', 'manage:inventory', 'create:invoices', 'send:payment_requests', 'view:customer_info', 'manage:orders', 'manage:bookings', 'manage:business_staff', 'view:transactions', 'manage:verification', 'manage:disputes', 'access:admin_tools'],
-  administrator: ['view:profile', 'edit:profile', 'access:admin_tools', 'manage:roles', 'manage:permissions', 'view:audit_logs'],
+  // Administrator is a standard administrative role, not a platform or Super Admin role.
+  // RBAC-management permissions remain exclusive to platform_admin/super_admin.
+  administrator: ['view:profile', 'edit:profile', 'access:admin_tools', 'view:audit_logs'],
 };
 
 export function hasRolePermission(roles: readonly Role[], customPermissions: readonly Permission[], permission: Permission): boolean {
@@ -77,13 +79,13 @@ export const DASHBOARD_ACCESS_ROLES: Record<DashboardId, readonly Role[]> = {
     'platform_admin', 'super_admin',
   ],
   finance_settlement: [
-    'finance_officer', 'platform_admin', 'super_admin', 'administrator',
+    'finance_officer', 'platform_admin', 'super_admin',
   ],
   security_risk: [
-    'risk_security_officer', 'moderator', 'platform_admin', 'super_admin', 'administrator',
+    'risk_security_officer', 'moderator', 'platform_admin', 'super_admin',
   ],
   platform_admin: [
-    'platform_admin', 'super_admin', 'administrator',
+    'platform_admin', 'super_admin',
   ],
   super_admin: [
     'super_admin',
