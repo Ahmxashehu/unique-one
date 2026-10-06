@@ -1536,6 +1536,17 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         amount: Math.round(amount * 100) / 100, currency: 'NGN', description,
         ...(dueDate ? { dueDate } : {}), status, createdAt: now, updatedAt: now,
       });
+      await adminDb.collection('audit_logs').add({
+        action: 'payment_request.created',
+        actorUid: senderId,
+        targetUid: recipientDoc.id,
+        resource: 'payment_request',
+        resourceId: ref.id,
+        amount: Math.round(amount * 100) / 100,
+        currency: 'NGN',
+        status,
+        timestamp: Timestamp.fromDate(new Date(now)),
+      });
       return res.status(201).json({ id: ref.id, recipientId: recipientDoc.id, status });
     } catch (error) {
       console.error('Payment request creation failed:', error);
