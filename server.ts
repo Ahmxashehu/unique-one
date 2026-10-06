@@ -3587,10 +3587,20 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           return errorResponse(res, 'BIOMETRIC_REQUIRED', biometricLevel >= 3 ? 'Biometric verification is required for Store payments of ₦500,000 or more.' : biometricLevel >= 2 ? 'Biometric verification is required for Store payments of ₦200,000 or more.' : biometricLevel >= 1 ? 'Biometric verification is required for Store payments of ₦50,000 or more.' : 'Biometric verification is required for your first wallet transaction.');
         }
         const challengeRef = adminDb.collection(PASSKEY_CHALLENGES_COLLECTION).doc(String(assertion.challengeId));
-        const challengeSnap = await challengeRef.get();
-        if (!challengeSnap.exists) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification is required. Please try again.');
-        const challengeData = challengeSnap.data()!;
-        await challengeRef.delete();
+        let challengeData: FirebaseFirestore.DocumentData | undefined;
+        try {
+          challengeData = await adminDb.runTransaction(async transaction => {
+            const challengeSnap = await transaction.get(challengeRef);
+            if (!challengeSnap.exists) return undefined;
+            const data = challengeSnap.data();
+            transaction.delete(challengeRef);
+            return data;
+          });
+        } catch (error) {
+          console.error('Store biometric challenge consumption failed:', error);
+          return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Biometric verification could not be completed safely. Please try again.');
+        }
+        if (!challengeData) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification is required. Please try again.');
         const { origin, rpId } = requestWebAuthnOrigin(req);
         const clientDataJSON = base64UrlToBuffer(String(assertion.clientDataJSON));
         const authenticatorData = base64UrlToBuffer(String(assertion.authenticatorData));
@@ -3615,6 +3625,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const previousCount = Number(credential.signCount || 0);
         if (previousCount > 0 && signCount > 0 && signCount <= previousCount) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'The biometric credential counter is invalid.');
         await credentialRef.update({ signCount, lastUsedAt: Timestamp.now() });
+        const expectedBinding = 'store_payment|' + uid + '|' + orderIds.join(',') + '|' + amountMinor + '|NGN';
+        if (challengeData.transactionBinding !== expectedBinding) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'This biometric approval is not bound to this Store payment.');
       }
 
       const idempotencyRef = adminDb.collection('storePaymentIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
