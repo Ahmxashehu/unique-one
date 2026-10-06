@@ -66,18 +66,11 @@ export default function HomePage() {
     ['Hotels & Events', '/hotels-events'],
     ['Flights', '/travel'],
     ['School', '/education'],
-    ['Retail & Shopping', '/categories'],
-    ['Professional Services', '/categories'],
-    ['Transportation', '/categories'],
-    ['Real Estate', '/categories'],
-    ['Technology', '/categories'],
     ['Unique Health & Wellness', '/health-wellness'],
-    ['Food & Dining', '/categories'],
     ['Global Search', '/search'],
     ['Near Me', '/near-me'],
     ['Unique Jobs & Services', '/jobs'],
     ['Contributions', '/os/contributions'],
-    ['Education', '/os/education'],
     ['Unique Travel', '/os/travel'],
   ];
 
