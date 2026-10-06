@@ -21,6 +21,7 @@ service cloud.firestore {
     match /educationInstitutions/{institutionId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isAdmin();
       allow create: if isAuthenticated()
+        && request.resource.data.id == serviceId
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.status in ['draft','published'];
       allow update: if isAuthenticated()
