@@ -59,8 +59,8 @@ const transferErrorStatus: Record<TransferErrorCode, number> = {
   SERVICE_UNAVAILABLE: 503, NOT_FOUND: 404, BLOCKED: 403, FORBIDDEN: 403, INSUFFICIENT_STOCK: 409,
 };
 class RequestValidationError extends Error {
-  code: 'UNAUTHENTICATED' | 'INVALID_REQUEST';
-  constructor(code: 'UNAUTHENTICATED' | 'INVALID_REQUEST', message: string) {
+  code: TransferErrorCode;
+  constructor(code: TransferErrorCode, message: string) {
     super(message);
     this.name = 'RequestValidationError';
     this.code = code;
@@ -942,7 +942,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
   if (radiusMeters !== undefined && (typeof radiusMeters !== 'number' || !Number.isFinite(radiusMeters) || radiusMeters < 100 || radiusMeters > 50_000)) {
     throw new RequestValidationError('INVALID_REQUEST', 'location radius is invalid.');
   }
-  return { latitude, longitude, ...(radiusMeters !== undefined ? { radiusMeters } : {}) };
+  return { latitude, longitude, ...(typeof radiusMeters === 'number' ? { radiusMeters } : {}) };
 }
 
   app.post("/api/ai/public-chat", rateLimit({
@@ -3270,14 +3270,13 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const subtotal = body.subtotal;
       if (!restaurantId || !['dine-in', 'delivery', 'pickup'].includes(String(mode)) ||
           !['uniquepay', 'bank-transfer'].includes(String(paymentMethod)) ||
-          !customerName || !customerPhone || !isPlainObject(cart) ||
-          ![subtotal, deliveryFee, serviceFee, total].every((v) => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0)) {
+          !customerName || !customerPhone || !isPlainObject(cart)) {
         return errorResponse(res, 'INVALID_REQUEST', 'Restaurant order details are incomplete or invalid.');
       }
       if (mode === 'delivery' && !deliveryAddress) return errorResponse(res, 'INVALID_REQUEST', 'A delivery address is required.');
       if (mode === 'dine-in' && (!date || !time)) return errorResponse(res, 'INVALID_REQUEST', 'Date and time are required for dine-in.');
       if (mode === 'pickup' && (!date || !time)) return errorResponse(res, 'INVALID_REQUEST', 'Pickup date and time are required.');
-      if (!Number.isSafeInteger(subtotal) || subtotal <= 0) return errorResponse(res, 'INVALID_AMOUNT', 'The restaurant subtotal is invalid.');
+      if (typeof subtotal !== 'number' || !Number.isSafeInteger(subtotal) || subtotal <= 0) return errorResponse(res, 'INVALID_AMOUNT', 'The restaurant subtotal is invalid.');
       const deliveryFee = mode === 'delivery' ? 1500 : 0;
       const serviceFee = Math.max(300, Math.round(subtotal * 0.03));
       const total = subtotal + deliveryFee + serviceFee;
