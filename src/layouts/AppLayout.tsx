@@ -23,6 +23,7 @@ export default function AppLayout() {
     navigate('/login');
   };
 
+  // Shared account navigation plus the same UniquePlatform experience catalog used by mobile.
   const userNav = [
     { name: 'Dashboard', path: '/os/dashboard', icon: LayoutDashboard },
     { name: 'Profile', path: '/os/profile', icon: User },
@@ -31,15 +32,26 @@ export default function AppLayout() {
     { name: 'Bookings', path: '/os/bookings', icon: Calendar },
     { name: 'Wishlist', path: '/os/wishlist', icon: Heart },
     { name: 'My Requests', path: '/os/requests', icon: ClipboardList },
-    { name: 'UniquePay', path: '/os/pay', icon: Wallet },
-    { name: 'Cycle Ajo', path: '/os/pay/ajo', icon: HeartHandshake },
-    { name: 'Verification Center', path: '/os/pay/verification', icon: Shield },
-    { name: 'Unique AI', path: '/os/ai', icon: Sparkles },
-    { name: 'Master Vision', path: '/os/master-vision', icon: Landmark },
-    { name: 'Jobs', path: '/os/jobs', icon: Briefcase },
+  ];
+
+  const platformNav = [
+    { name: 'Restaurant', path: '/restaurant', icon: Store },
+    { name: 'Hotels & Events', path: '/hotels-events', icon: Calendar },
+    { name: 'Flights', path: '/flights', icon: Plane },
+    { name: 'School & Education', path: '/education-hub', icon: GraduationCap },
+    { name: 'Retail & Shopping', path: '/store', icon: ShoppingCart },
+    { name: 'Professional Services', path: '/search?category=Professional%20Services', icon: Briefcase },
+    { name: 'Transportation', path: '/search?category=Transportation', icon: Plane },
+    { name: 'Real Estate', path: '/search?category=Real%20Estate', icon: Building2 },
+    { name: 'Technology', path: '/search?category=Technology', icon: Globe },
+    { name: 'Health & Wellness', path: '/health-wellness', icon: Activity },
+    { name: 'Food & Dining', path: '/restaurant', icon: Store },
+    { name: 'Global Search', path: '/search', icon: Search },
+    { name: 'Near Me', path: '/near-me', icon: Globe },
+    { name: 'Jobs', path: '/jobs', icon: Briefcase },
     { name: 'Contributions', path: '/os/contributions', icon: HeartHandshake },
     { name: 'Education', path: '/os/education', icon: GraduationCap },
-    { name: 'Unique Travel', path: '/os/travel', icon: Plane },
+    { name: 'Travel', path: '/os/travel', icon: Plane },
   ];
 
   const businessNav = [
@@ -171,12 +183,16 @@ export default function AppLayout() {
       )}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 shrink-0 h-full overflow-y-auto">
         <div className="h-16 flex items-center px-6 border-b border-slate-100 shrink-0 sticky top-0 bg-white z-10">
-          <div className="font-bold text-xl tracking-tight text-slate-900">UniqueOS</div>
+          <div className="flex items-center gap-2"><div className="font-black text-xl tracking-tight text-slate-900">UniquePlatform</div><span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.65)]" /></div>
         </div>
         <nav className="flex-1 py-4 px-3">
           <div className="mb-6">
-            <p className="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">User Account</p>
+            <p className="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">My Account</p>
             {renderNavItems(userNav)}
+          </div>
+          <div className="mb-6">
+            <p className="px-3 text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-2">UniquePlatform</p>
+            {renderNavItems(platformNav)}
           </div>
           <div className="mb-6">
             <p className="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
