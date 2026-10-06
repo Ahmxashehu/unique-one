@@ -3575,6 +3575,71 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.get("/api/store/orders/:orderId/settlement", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('storeSettlementReadRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many settlement status requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const orderId = req.params.orderId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The order ID is invalid.');
+      }
+
+      const orderRef = adminDb.collection('orders').doc(orderId);
+      const orderSnap = await orderRef.get();
+      if (!orderSnap.exists) return errorResponse(res, 'NOT_FOUND', 'The Store order was not found.');
+
+      const order = orderSnap.data() as Record<string, unknown>;
+      const customerId = typeof order.customerId === 'string' ? order.customerId : '';
+      const sellerId = typeof order.sellerId === 'string' ? order.sellerId : '';
+      if (uid !== customerId && uid !== sellerId) {
+        return errorResponse(res, 'FORBIDDEN', 'You are not permitted to view this settlement.');
+      }
+
+      const txSnap = await adminDb.collection('transactions')
+        .where('relatedOrderIds', 'array-contains', orderId)
+        .where('recordKind', '==', 'financial')
+        .where('amountUnit', '==', 'minor')
+        .limit(20)
+        .get();
+
+      const settlements = txSnap.docs.map((doc) => {
+        const data = doc.data() as Record<string, unknown>;
+        return {
+          id: doc.id,
+          reference: typeof data.reference === 'string' ? data.reference : null,
+          senderId: typeof data.senderId === 'string' ? data.senderId : null,
+          recipientId: typeof data.recipientId === 'string' ? data.recipientId : null,
+          amountMinor: Number.isSafeInteger(data.amount) ? data.amount : null,
+          currency: data.currency === 'NGN' ? 'NGN' : null,
+          status: typeof data.status === 'string' ? data.status : null,
+          type: typeof data.type === 'string' ? data.type : null,
+          createdAt: typeof data.createdAt?.toDate === 'function' ? data.createdAt.toDate().toISOString() : null,
+        };
+      });
+
+      return res.status(200).json({
+        orderId,
+        paymentStatus: order.paymentStatus === 'paid' ? 'paid' : 'unpaid',
+        orderStatus: typeof order.status === 'string' ? order.status : null,
+        settlements,
+        reconciled: order.paymentStatus === 'paid' && settlements.some((tx) => tx.status === 'completed'),
+      });
+    } catch (error) {
+      console.error('Store settlement reconciliation read failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Settlement status is temporarily unavailable.');
+    }
+  });
+
   app.get("/api/calendar/events", authenticate, async (req, res) => {
     try {
       const authHeader = req.headers.authorization; if (!authHeader) return res.status(401).json({ error: "No authorization header" });
