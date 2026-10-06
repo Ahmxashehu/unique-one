@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Store, Wallet, Calendar, Bell, Settings,
   Briefcase, ShoppingCart, Users, FileText, HeartHandshake,
   User, MessageSquare, Heart, ClipboardList, Globe, Shield,
-  Building2, Activity, PlusCircle, Menu, X, LogOut, Sparkles, GraduationCap, Plane, Landmark, Search, ArrowRight
+  Building2, Activity, PlusCircle, Menu, X, LogOut, Sparkles, GraduationCap, Plane, Landmark, Search, ArrowRight, Image, Video
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import MobileBottomNav from '../components/MobileBottomNav';
@@ -35,6 +35,12 @@ export default function AppLayout() {
   ];
 
   const platformNav = [
+    { name: 'UniquePay', path: '/os/pay', icon: Wallet },
+    { name: 'Unique Store', path: '/store', icon: ShoppingCart },
+    { name: 'Communication', path: '/os/messages', icon: MessageSquare },
+    { name: 'Unique AI', path: '/os/ai', icon: Sparkles },
+    { name: 'UniqueMedia', path: '/media', icon: Image },
+    { name: 'Online Conference', path: '/conference', icon: Video },
     { name: 'Restaurant', path: '/restaurant', icon: Store },
     { name: 'Hotels & Events', path: '/hotels-events', icon: Calendar },
     { name: 'Flights', path: '/flights', icon: Plane },
@@ -136,6 +142,12 @@ export default function AppLayout() {
             </div>
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               {[
+                ['UniquePay', '/os/pay', Wallet],
+                ['Unique Store', '/store', ShoppingCart],
+                ['Communication', '/os/messages', MessageSquare],
+                ['Unique AI', '/os/ai', Sparkles],
+                ['UniqueMedia', '/media', Image],
+                ['Online Conference', '/conference', Video],
                 ['Restaurant', '/restaurant', Store],
                 ['Hotels & Events', '/hotels-events', Calendar],
                 ['Flights', '/flights', Plane],
