@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, Search, Loader2, AlertCircle } from 'lucide-react';
+import { Activity, Search, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
@@ -40,6 +40,32 @@ export default function AdminTransactionsPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refreshTransactions = async () => {
+    setRefreshing(true);
+    setError('');
+    try {
+      const snapshot = await getDocs(collection(db, 'transactions'));
+      const rows = snapshot.docs
+        .map(item => ({ id: item.id, ...item.data() } as AdminTransaction))
+        .filter(item => item.recordKind === 'financial' && item.schemaVersion === 2 && item.amountUnit === 'minor')
+        .sort((a, b) => {
+          const getMillis = (value: unknown) => {
+            if (value && typeof value === 'object' && 'toMillis' in value && typeof (value as { toMillis?: unknown }).toMillis === 'function') return (value as { toMillis: () => number }).toMillis();
+            const parsed = typeof value === 'string' || typeof value === 'number' ? new Date(value).getTime() : 0;
+            return Number.isFinite(parsed) ? parsed : 0;
+          };
+          return getMillis(b.createdAt) - getMillis(a.createdAt);
+        });
+      setTransactions(rows);
+    } catch (loadError) {
+      console.error('Failed to refresh admin transactions:', loadError);
+      setError('Unable to refresh transactions. Check administrator access and try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -95,7 +121,7 @@ export default function AdminTransactionsPage() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Global Ledger</h1>
           <p className="text-sm text-slate-500 mt-1">Read-only view of financial transactions recorded by UniquePay.</p>
         </div>
-        <div className="relative w-full sm:w-80">
+        <div className="flex gap-2 w-full sm:w-auto"><button type="button" onClick={() => void refreshTransactions()} disabled={refreshing} className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"><RefreshCw className={refreshing ? "w-4 h-4 animate-spin" : "w-4 h-4"} /> Refresh</button><div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
@@ -104,6 +130,7 @@ export default function AdminTransactionsPage() {
             placeholder="Search reference, user, status..."
             className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
           />
+          </div>
         </div>
       </div>
 
