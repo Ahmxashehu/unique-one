@@ -64,7 +64,7 @@ export default function MessagesCenter() {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return conversations
-      .filter((c) => activeTab === 'groups' ? (c.type === 'group' || c.type === 'groups') : (c.type !== 'group' && c.type !== 'groups'))
+      .filter((c) => activeTab === 'groups' ? c.type === 'group' : c.type !== 'group')
       .filter((c) => !term || (c.title ?? '').toLowerCase().includes(term))
       .sort((a, b) => new Date(b.lastMessageAt ?? b.updatedAt).getTime() - new Date(a.lastMessageAt ?? a.updatedAt).getTime());
   }, [conversations, activeTab, search]);
@@ -139,7 +139,7 @@ export default function MessagesCenter() {
                     <span className="whitespace-nowrap text-[10px] text-slate-400">{conv.lastMessageAt ? new Date(conv.lastMessageAt).toLocaleDateString() : ''}</span>
                   </div>
                   <div className="mt-1 flex items-center gap-2">
-                    <p className="truncate text-xs text-slate-500">{conv.type === 'group' || conv.type === 'groups' ? 'Group conversation' : conv.type === 'business' ? 'Business conversation' : 'User conversation'}</p>
+                    <p className="truncate text-xs text-slate-500">{conv.type === 'group' ? 'Group conversation' : conv.type === 'business' ? 'Business conversation' : 'User conversation'}</p>
                     {conv.muted && <VolumeX className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
                     {(conv.unreadCount ?? 0) > 0 && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-black text-white">{(conv.unreadCount ?? 0) > 99 ? '99+' : conv.unreadCount}</span>}
                   </div>
