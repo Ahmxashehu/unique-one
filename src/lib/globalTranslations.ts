@@ -1,5 +1,7 @@
 import type { SupportedLanguage } from "./i18n";
 
+type Phrase = string;
+
 export const UI: Record<SupportedLanguage, Record<Phrase, string>> = {
   en: {},
   ha: {
