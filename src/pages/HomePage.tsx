@@ -631,7 +631,6 @@ export default function HomePage() {
                 to="/os/notifications"
                 className="flex shrink-0 items-center gap-1.5 rounded-xl bg-slate-950 px-2.5 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-white sm:px-3 sm:text-[11px]"
               >
-                <Bell className="h-3.5 w-3.5" />
                 Updates
               </Link>
 
