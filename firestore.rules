@@ -11,7 +11,11 @@ service cloud.firestore {
       return isAuthenticated() &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data != null &&
              'roles' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
-             'administrator' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles;
+             (
+               'administrator' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles ||
+               'platform_admin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles ||
+               'super_admin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles
+             );
     }
 
     match /educationInstitutions/{institutionId} {
