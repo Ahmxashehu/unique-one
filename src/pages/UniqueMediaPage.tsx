@@ -22,7 +22,7 @@ const kindForFile = (file: File): Exclude<MediaKind, 'all'> | null => {
   return null;
 };
 
-const iconForKind = (kind: Exclude<MediaKind, 'all'>) => {
+const iconForKind = (kind: Exclude<MediaKind, 'all'> | 'other' | 'document') => {
   if (kind === 'video') return Play;
   if (kind === 'audio') return Music2;
   if (kind === 'image') return ImageIcon;
@@ -855,7 +855,7 @@ export default function UniqueMediaPage() {
           ) : search.trim() ? (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {searchResults.map((item) => {
-                const ItemIcon = iconForKind(item.kind);
+                const ItemIcon = iconForKind(item.kind === 'other' ? 'pdf' : item.kind === 'document' ? 'pdf' : item.kind);
                 const itemLabel = categories.find(([value]) => value === item.kind)?.[1] || 'Media';
                 return (
                   <article key={item.id} className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-emerald-200 hover:shadow-md">
