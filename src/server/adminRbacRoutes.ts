@@ -85,7 +85,7 @@ export function registerAdminRbacRoutes(
     try {
       const now = Timestamp.now();
       await ref.update({ roles, permissions, rbacUpdatedAt: now, rbacUpdatedBy: actorUid });
-      await db.collection('auditLogs').add({
+      await db.collection('audit_logs').add({
         uid: actorUid,
         action: 'rbac.update',
         resource: 'user',
@@ -101,5 +101,5 @@ export function registerAdminRbacRoutes(
   });
 
   // Business Platform access/security is registered alongside the central RBAC routes.
-  registerBusinessAccessRoutes(app, authenticate, db);
+  registerBusinessAccessRoutes(app, authenticate, db, requirePermission);
 }
