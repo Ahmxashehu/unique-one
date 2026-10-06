@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import AppearanceControls from '../components/AppearanceControls';
 import { getLanguage, t, type SupportedLanguage } from '../lib/i18n';
 import {
-  Settings, GraduationCap, Sparkles, Store, Calendar, Plane, ShoppingCart,
+  Settings, GraduationCap, Sparkles, Store, Calendar, Plane, ShoppingCart, ArrowRight,
   Briefcase, Building2, Globe, Activity, Search, HeartHandshake, Wallet, MessageSquare, Video, Image
 } from 'lucide-react';
 
@@ -51,13 +51,7 @@ export default function PublicLayout() {
                 UniquePlatform
               </span>
             </Link>
-            <nav className="hidden md:flex gap-6 items-center">
-              <Link to="/discover" className="text-sm font-medium text-slate-600 hover:text-slate-900">{t('activeEdge', language)}</Link>
-              <Link to="/categories" className="text-sm font-medium text-slate-600 hover:text-slate-900">{t('categories', language)}</Link>
-              <Link to="/near-me" className="text-sm font-medium text-slate-600 hover:text-slate-900">{t('nearMe', language)}</Link>
-              <Link to="/about" className="text-sm font-medium text-slate-600 hover:text-slate-900">{t('about', language)}</Link>
-              <Link to="/support" className="text-sm font-medium text-slate-600 hover:text-slate-900">{t('support', language)}</Link>
-            </nav>
+            <div className="flex-1" aria-hidden="true" />
             <div className="flex items-center gap-2">
               <Link to="/settings" aria-label="Open settings" title="Settings" className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700">
                 <Settings className="h-4 w-4" />
@@ -127,6 +121,16 @@ export default function PublicLayout() {
           </div>
         </div>
       )}
+
+      <Link
+        to="/admin/login"
+        aria-label="Authorized access"
+        title="Authorized access"
+        className="fixed bottom-3 left-3 z-[90] hidden md:flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/70 bg-white/55 text-slate-300 shadow-sm backdrop-blur-sm transition-all duration-200 hover:h-8 hover:w-8 hover:border-emerald-300 hover:bg-white hover:text-emerald-600 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+      >
+        <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.25} />
+        <span className="sr-only">Authorized access</span>
+      </Link>
 
       <MobileBottomNav variant="public" onMenu={() => setIsMobileMenuOpen(true)} />
     </div>
