@@ -119,7 +119,7 @@ export default function AppLayout() {
   return (
     <div className="flex h-full bg-slate-50 overflow-hidden w-full max-w-[100vw]">
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-[100] isolate" role="dialog" aria-modal="true" aria-label="More UniquePlatform">
+        <div className="lg:hidden fixed inset-0 z-[100] isolate" role="dialog" aria-modal="true" aria-label="More UniquePlatform">
           <button
             type="button"
             aria-label="Close menu"
@@ -181,7 +181,7 @@ export default function AppLayout() {
           </div>
         </div>
       )}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 shrink-0 h-full overflow-y-auto">
+      <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-200 shrink-0 h-full overflow-y-auto">
         <div className="h-16 flex items-center px-6 border-b border-slate-100 shrink-0 sticky top-0 bg-white z-10">
           <div className="flex items-center gap-2"><div className="font-black text-xl tracking-tight text-slate-900">UniquePlatform</div><span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.65)]" /></div>
         </div>
@@ -233,7 +233,7 @@ export default function AppLayout() {
       </Link>
 
       <div className="flex-1 flex flex-col h-full min-w-0 w-full overflow-hidden">
-        <main className="mobile-scroll-padding flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pt-4 md:p-8 w-full pb-20 md:pb-8">
+        <main className="mobile-scroll-padding flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pt-4 lg:p-8 w-full pb-20 lg:pb-8">
           <div className="mx-auto max-w-5xl h-full w-full">
             <AppErrorBoundary>
               <Outlet />
