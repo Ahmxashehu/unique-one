@@ -12,7 +12,7 @@ export function registerAdminAuditRoutes(app: Express, authenticate: RequestHand
       const logs = snapshot.docs.map((doc) => {
         const data = doc.data();
         const timestamp = typeof data.timestamp?.toDate === 'function' ? data.timestamp.toDate().toISOString() : null;
-        return { id: doc.id, action: data.action ?? 'unknown', resource: data.resource ?? null, resourceId: data.resourceId ?? null, actorUid: data.uid ?? null, details: data.details ?? null, timestamp };
+        return { id: doc.id, action: data.action ?? 'unknown', resource: data.resource ?? null, resourceId: data.resourceId ?? null, actorUid: data.actorUid ?? data.uid ?? null, details: data.details ?? null, timestamp };
       });
       return res.json({ logs });
     } catch (error) {
