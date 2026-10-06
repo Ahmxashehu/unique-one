@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
+import { BarChart3, TrendingUp, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { collection, getDocs, getCountFromServer } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
@@ -18,6 +18,29 @@ export default function AdminReportsPage() {
   const [stats, setStats] = useState<ReportStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refreshReports = async () => {
+    setRefreshing(true);
+    setError('');
+    try {
+      const [users, businesses, products, transactions] = await Promise.all([
+        getCountFromServer(collection(db, 'users')),
+        getCountFromServer(collection(db, 'businesses')),
+        getCountFromServer(collection(db, 'products')),
+        getDocs(collection(db, 'transactions')),
+      ]);
+      let transactionVolumeMinor = 0;
+      transactions.forEach(item => {
+        const data = item.data();
+        if (data.recordKind === 'financial' && data.amountUnit === 'minor' && data.currency === 'NGN' && data.status === 'completed' && typeof data.amount === 'number' && Number.isSafeInteger(data.amount)) transactionVolumeMinor += data.amount;
+      });
+      setStats({ users: users.data().count, businesses: businesses.data().count, products: products.data().count, transactionVolumeMinor });
+    } catch (loadError) {
+      console.error('Failed to refresh admin reports:', loadError);
+      setError('Unable to refresh platform reports. Check administrator access and try again.');
+    } finally { setRefreshing(false); }
+  };
 
   useEffect(() => {
     let active = true;
