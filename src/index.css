@@ -42,6 +42,7 @@ a {
 }
 
 .mobile-bottom-nav {
+  display: block;
   position: fixed;
   left: 0;
   right: 0;
@@ -52,6 +53,12 @@ a {
   border-top: 1px solid rgb(226 232 240);
   box-shadow: 0 -8px 24px rgb(15 23 42 / 0.06);
   backdrop-filter: blur(18px);
+}
+
+@media (min-width: 768px) {
+  .mobile-bottom-nav {
+    display: none;
+  }
 }
 
 .mobile-bottom-nav-inner {
