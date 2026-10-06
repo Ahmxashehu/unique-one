@@ -65,7 +65,6 @@ export default function HomePage() {
     ['Restaurant', '/restaurant'],
     ['Hotels & Events', '/hotels-events'],
     ['Flights', '/travel'],
-    ['School', '/education'],
     ['Unique Health & Wellness', '/health-wellness'],
     ['Global Search', '/search'],
     ['Near Me', '/near-me'],
