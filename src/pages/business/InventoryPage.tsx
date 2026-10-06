@@ -28,9 +28,10 @@ export default function InventoryPage() {
     setBusy(product.id+direction);setError('');
     try{
       const token=await currentUser.getIdToken();
-      const response=await fetch('/api/business/inventory/adjust',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({productId:product.id,direction,quantity})});
+      const businessSession=localStorage.getItem('unique_business_session')||'';
+      const response=await fetch('/api/business/inventory/adjust',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`,'X-Business-Session':businessSession},body:JSON.stringify({productId:product.id,direction,quantity})});
       const data=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(data?.message||'Inventory adjustment failed.');
+      if(!response.ok)throw new Error(data?.message||data?.error?.message||'Inventory adjustment failed.');
       await load();
     }catch(e){console.error(e);setError(e instanceof Error?e.message:'Inventory adjustment failed.');}finally{setBusy('');}
   };
