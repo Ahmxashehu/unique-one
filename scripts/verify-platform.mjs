@@ -20,8 +20,9 @@ assert(!/window\.location\.reload\s*\(/.test(i18n), "language switching does not
 assert(i18n.includes("unique-language-change"), "language switching emits the global change event");
 
 const globalLanguage = read("src/components/GlobalLanguageLayer.tsx");
+const globalTranslations = read("src/lib/globalTranslations.ts");
 for (const phrase of ["Home", "Search", "Log in", "Sign Up", "Checkout", "Wallet", "Transactions", "Delivery", "Add to cart", "Buy now"]) {
-  assert(globalLanguage.includes(phrase), `global language coverage includes: ${phrase}`);
+  assert(globalTranslations.includes(phrase + ":"), `global language coverage includes: ${phrase}`);
 }
 assert(globalLanguage.includes("MutationObserver"), "dynamic UI text is observed for translation");
 assert(globalLanguage.includes("placeholder"), "form placeholders are included in translation handling");
