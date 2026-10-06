@@ -7,10 +7,16 @@ import AppearanceControls from '../components/AppearanceControls';
 import { getLanguage, t, type SupportedLanguage } from '../lib/i18n';
 import {
   Settings, GraduationCap, Sparkles, Store, Calendar, Plane, ShoppingCart,
-  Briefcase, Building2, Globe, Activity, Search, HeartHandshake
+  Briefcase, Building2, Globe, Activity, Search, HeartHandshake, Wallet, MessageSquare, Video, Image
 } from 'lucide-react';
 
 const platformExperiences = [
+  ['UniquePay', '/os/pay', Wallet],
+  ['Unique Store', '/store', ShoppingCart],
+  ['Communication', '/os/messages', MessageSquare],
+  ['Unique AI', '/os/ai', Sparkles],
+  ['UniqueMedia', '/media', Image],
+  ['Online Conference', '/conference', Video],
   ['Restaurant', '/restaurant', Store],
   ['Hotels & Events', '/hotels-events', Calendar],
   ['Flights', '/flights', Plane],
