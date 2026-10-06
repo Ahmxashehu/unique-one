@@ -389,7 +389,7 @@ service cloud.firestore {
           request.resource.data.branchName == resource.data.branchName &&
           request.resource.data.createdAt == resource.data.createdAt &&
           request.resource.data.invitedAt == resource.data.invitedAt &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status in ['accepted','declined']));
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status in ['accepted','declined']);
       allow delete: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
     }
     match /staffMembers/{staffId} { allow read: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.uid == request.auth.uid); allow create, update, delete: if false; }
