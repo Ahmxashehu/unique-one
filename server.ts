@@ -3323,6 +3323,57 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       }
       if (!(await verifyTransactionPin(uid, req.body.transactionPin))) return errorResponse(res, 'FORBIDDEN', 'Incorrect Transaction PIN.');
       const orderId = req.body.orderId.trim(), idempotencyKey = req.body.idempotencyKey.trim();
+      const preflightOrder = await adminDb.collection('restaurantOrders').doc(orderId).get();
+      if (!preflightOrder.exists) return errorResponse(res, 'NOT_FOUND', 'Restaurant order could not be found.');
+      const preflightData = preflightOrder.data() as Record<string, any>;
+      if (preflightData.customerId !== uid || preflightData.currency !== 'NGN' || preflightData.paymentMethod !== 'uniquepay' || preflightData.status !== 'pending_payment') return errorResponse(res, 'INVALID_REQUEST', 'This restaurant order is not available for UniquePay payment.');
+      const preflightAmountMinor = Number(preflightData.totalMinor);
+      if (!Number.isSafeInteger(preflightAmountMinor) || preflightAmountMinor <= 0) return errorResponse(res, 'INVALID_AMOUNT', 'The restaurant payment amount is invalid.');
+      const preflightPolicy = getTransactionAuthPolicy({ amountMinor: preflightAmountMinor, transactionType: 'merchant_payment' });
+      if (preflightPolicy.requiredFactors.includes('biometric')) {
+        const assertion = isPlainObject(req.body.biometricAssertion) ? req.body.biometricAssertion : null;
+        if (!assertion?.challengeId || !assertion?.credentialId || !assertion?.clientDataJSON || !assertion?.authenticatorData || !assertion?.signature) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification is required to complete this restaurant payment.');
+        const challengeRef = adminDb.collection(PASSKEY_CHALLENGES_COLLECTION).doc(String(assertion.challengeId));
+        let challengeData: FirebaseFirestore.DocumentData | undefined;
+        try {
+          challengeData = await adminDb.runTransaction(async transaction => {
+            const snap = await transaction.get(challengeRef);
+            if (!snap.exists) return undefined;
+            const data = snap.data();
+            transaction.delete(challengeRef);
+            return data;
+          });
+        } catch (error) {
+          console.error('Restaurant biometric challenge consumption failed:', error);
+          return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Biometric verification could not be completed safely. Please try again.');
+        }
+        if (!challengeData) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification is required. Please try again.');
+        const { origin, rpId } = requestWebAuthnOrigin(req);
+        try {
+          const clientDataJSON = base64UrlToBuffer(String(assertion.clientDataJSON));
+          const authenticatorData = base64UrlToBuffer(String(assertion.authenticatorData));
+          const signature = base64UrlToBuffer(String(assertion.signature));
+          const clientData = JSON.parse(clientDataJSON.toString('utf8'));
+          const crypto = require('crypto');
+          if (challengeData.uid !== uid || challengeData.type !== 'assertion' || challengeData.expiresAt.toMillis() < Date.now() || challengeData.origin !== origin || challengeData.rpId !== rpId || clientData.type !== 'webauthn.get' || clientData.challenge !== challengeData.challenge || clientData.origin !== origin) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification could not be verified.');
+          if (!authenticatorData.subarray(0, 32).equals(crypto.createHash('sha256').update(rpId).digest()) || (authenticatorData[32] & 0x05) !== 0x05) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification requires user verification.');
+          const credentialRef = adminDb.collection('authCredentials').doc(uid).collection(PASSKEY_COLLECTION).doc(String(assertion.credentialId));
+          const credentialSnap = await credentialRef.get();
+          if (!credentialSnap.exists) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'This biometric credential is not registered.');
+          const credential = credentialSnap.data()!;
+          const publicKey = crypto.createPublicKey({ key: Buffer.from(String(credential.publicKey), 'base64'), format: 'der', type: 'spki' });
+          const signedData = Buffer.concat([authenticatorData, crypto.createHash('sha256').update(clientDataJSON).digest()]);
+          if (!crypto.verify('sha256', signedData, publicKey, signature)) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification failed.');
+          const signCount = authenticatorData.readUInt32BE(33);
+          const previousCount = Number(credential.signCount || 0);
+          if (previousCount > 0 && signCount > 0 && signCount <= previousCount) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'The biometric credential counter is invalid.');
+          await credentialRef.update({ signCount, lastUsedAt: Timestamp.now() });
+          const expectedBinding = 'restaurant_payment|' + uid + '|' + orderId + '|' + preflightAmountMinor + '|NGN';
+          if (challengeData.transactionBinding !== expectedBinding) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'This biometric approval is not bound to this restaurant payment.');
+        } catch {
+          return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification could not be verified.');
+        }
+      }
       const idempotencyRef = adminDb.collection('restaurantPaymentIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
       const result = await adminDb.runTransaction(async (transaction) => {
         const existing = await transaction.get(idempotencyRef);
