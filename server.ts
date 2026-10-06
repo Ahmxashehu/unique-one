@@ -1417,7 +1417,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const adminSnapshot = await adminDb.collection('users').doc(adminUid).get();
       const adminData = adminSnapshot.data() as Record<string, unknown> | undefined;
       const roles = Array.isArray(adminData?.roles) ? adminData.roles : [];
-      if (!roles.includes('administrator')) return errorResponse(res, 'BLOCKED', 'Administrator access is required.', 403);
+      if (!roles.some((role) => role === 'administrator' || role === 'platform_admin' || role === 'super_admin')) return errorResponse(res, 'BLOCKED', 'Administrator access is required.', 403);
 
       const body = req.body as Record<string, unknown>;
       const uid = typeof body?.uid === 'string' ? body.uid.trim() : '';
