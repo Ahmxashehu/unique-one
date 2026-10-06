@@ -99,6 +99,7 @@ export default function AdminUsersPage() {
             className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
           />
         </div>
+        </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
