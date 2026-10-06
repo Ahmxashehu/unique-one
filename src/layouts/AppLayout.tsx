@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Store, Wallet, Calendar, Bell, Settings,
   Briefcase, ShoppingCart, Users, FileText, HeartHandshake,
   User, MessageSquare, Heart, ClipboardList, Globe, Shield,
-  Building2, Activity, PlusCircle, Menu, X, LogOut, Sparkles, GraduationCap, Plane, Landmark, Search
+  Building2, Activity, PlusCircle, Menu, X, LogOut, Sparkles, GraduationCap, Plane, Landmark, Search, ArrowRight
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import MobileBottomNav from '../components/MobileBottomNav';
@@ -205,6 +205,16 @@ export default function AppLayout() {
           </button>
         </div>
       </aside>
+
+      <Link
+        to="/admin/login"
+        aria-label="Authorized access"
+        title="Authorized access"
+        className="fixed bottom-3 left-3 z-[90] hidden md:flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/70 bg-white/55 text-slate-300 shadow-sm backdrop-blur-sm transition-all duration-200 hover:h-8 hover:w-8 hover:border-emerald-300 hover:bg-white hover:text-emerald-600 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+      >
+        <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.25} />
+        <span className="sr-only">Authorized access</span>
+      </Link>
 
       <div className="flex-1 flex flex-col h-full min-w-0 w-full overflow-hidden">
         <main className="mobile-scroll-padding flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pt-4 md:p-8 w-full pb-20 md:pb-8">
