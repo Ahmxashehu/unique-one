@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { addDoc, collection, getDocs, limit, orderBy, query, updateDoc, where, doc } from 'firebase/firestore';
+import { setDoc, addDoc, collection, getDocs, limit, orderBy, query, updateDoc, where, doc } from 'firebase/firestore';
 import { BookOpen, GraduationCap, Plus, School, Users } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
