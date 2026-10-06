@@ -2161,6 +2161,14 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         updatedAt: nowIso,
       };
       await requestRef.create(request);
+      await adminDb.collection('audit_logs').add({
+        action: 'communication.message_request.created',
+        actorUid: fromUid,
+        targetUid: toUid,
+        resource: 'message_request',
+        resourceId: requestRef.id,
+        timestamp: now,
+      });
       return res.status(201).json({ request });
     } catch (error) {
       if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
