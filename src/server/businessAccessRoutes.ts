@@ -120,6 +120,7 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
       '/access/setup',
       '/access/login',
       '/access/logout',
+      '/access/step-up',
       '/staff/accept-invite',
     ]);
     if (exempt.has(req.path)) return next();
@@ -225,6 +226,31 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
     } catch (error) {
       console.error('Business access login failed:', error);
       return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to sign in to the Business Platform.', 503);
+    }
+  });
+
+  app.post('/api/business/access/step-up', loginLimiter, authenticate, async (req, res) => {
+    const uid = String((req as any).user?.uid || '');
+    const businessId = typeof req.body?.businessId === 'string' ? req.body.businessId.trim() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const token = typeof req.headers['x-business-session'] === 'string' ? req.headers['x-business-session'] : '';
+    if (!uid || !businessId || !password || !token) return fail(res, 'INVALID_REQUEST', 'Business session, business and password are required.');
+    try {
+      const session = await getActiveSession(db, uid, token);
+      if (!session || session.businessId !== businessId) return fail(res, 'BUSINESS_AUTH_REQUIRED', 'Business Platform authentication is required.', 401);
+      const credentialSnap = await db.collection('businessAccessCredentials').doc(credentialId(uid, businessId)).get();
+      if (!credentialSnap.exists || credentialSnap.data()?.status !== 'active') return fail(res, 'SETUP_REQUIRED', 'Business password setup is required.', 409);
+      const credential = credentialSnap.data() || {};
+      const expected = Buffer.from(String(credential.hash || ''), 'hex');
+      const actual = scryptSync(password, String(credential.salt || ''), 64);
+      if (!expected.length || expected.length !== actual.length || !timingSafeEqual(expected, actual)) return fail(res, 'FORBIDDEN', 'Incorrect Business Platform password.', 403);
+      const now = Timestamp.now();
+      await db.collection('businessAccessSessions').doc(hashToken(token)).update({ stepUpVerifiedAt: now, stepUpExpiresAt: Timestamp.fromMillis(Date.now() + 10 * 60 * 1000), lastUsedAt: now });
+      await db.collection('audit_logs').add({ action: 'business_step_up_verified', actorUid: uid, businessId, createdAt: now });
+      return res.json({ ok: true, expiresInSeconds: 600 });
+    } catch (error) {
+      console.error('Business step-up failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to verify Business Platform step-up access.', 503);
     }
   });
 
