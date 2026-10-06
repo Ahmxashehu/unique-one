@@ -3268,9 +3268,6 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 500) : '';
       const cart = body.cart;
       const subtotal = body.subtotal;
-      const requestedDeliveryFee = body.deliveryFee;
-      const requestedServiceFee = body.serviceFee;
-      const requestedTotal = body.total;
       if (!restaurantId || !['dine-in', 'delivery', 'pickup'].includes(String(mode)) ||
           !['uniquepay', 'bank-transfer'].includes(String(paymentMethod)) ||
           !customerName || !customerPhone || !isPlainObject(cart) ||
