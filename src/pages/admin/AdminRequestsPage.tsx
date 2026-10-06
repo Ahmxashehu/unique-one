@@ -16,6 +16,7 @@ type Application = {
   businessId?: string | null;
   applicant?: { uid?: string; fullName?: string; email?: string; phone?: string; uniqueOneId?: string };
   reviewNote?: string;
+  contactEmail?: string | null;
 };
 
 export default function AdminRequestsPage() {
