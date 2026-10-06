@@ -90,7 +90,7 @@ export default function SendMoneyPage() {
       let biometricAssertion: BiometricAssertion | undefined;
       if (amountMinor >= 5_000_000) {
         setBiometricBusy(true);
-        try { biometricAssertion = await createBiometricAssertion(currentUser); }
+        try { biometricAssertion = await createBiometricAssertion(currentUser, `wallet_transfer|${currentUser.uid}|${recipient.uid}|${amountMinor}|NGN|${description.trim()}`); }
         finally { setBiometricBusy(false); }
       }
 
@@ -119,7 +119,7 @@ export default function SendMoneyPage() {
       if (!response.ok && payload?.error?.code === 'BIOMETRIC_REQUIRED' && !biometricAssertion) {
         setBiometricBusy(true);
         try {
-          biometricAssertion = await createBiometricAssertion(currentUser);
+          biometricAssertion = await createBiometricAssertion(currentUser, `wallet_transfer|${currentUser.uid}|${recipient.uid}|${amountMinor}|NGN|${description.trim()}`);
         } finally {
           setBiometricBusy(false);
         }
