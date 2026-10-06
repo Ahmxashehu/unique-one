@@ -22,12 +22,14 @@ export default function AdminLoginPage() {
       const userSnapshot = await getDoc(doc(db, 'users', credential.user.uid));
       const roles = userSnapshot.exists() ? userSnapshot.data().roles : [];
 
-      if (!Array.isArray(roles) || !roles.includes('administrator')) {
+      const adminRoles = ['super_admin', 'platform_admin', 'administrator'];
+      if (!Array.isArray(roles) || !roles.some((role: unknown) => adminRoles.includes(String(role)))) {
         await signOut(auth);
-        throw new Error('This account does not have administrator access.');
+        throw new Error('This account does not have authorized Control Tower access.');
       }
 
-      navigate('/admin/users', { replace: true });
+      const destination = roles.includes('super_admin') ? '/admin/control-tower' : roles.includes('platform_admin') ? '/admin/workspace/platform' : '/admin/requests';
+      navigate(destination, { replace: true });
     } catch (loginError) {
       console.error('Admin login failed:', loginError);
       setError(loginError instanceof Error ? loginError.message : 'Unable to sign in to the admin portal.');
@@ -42,8 +44,8 @@ export default function AdminLoginPage() {
         <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mb-6">
           <Lock className="w-6 h-6 text-slate-900" />
         </div>
-        <h1 className="text-2xl font-bold text-slate-900">Admin Portal</h1>
-        <p className="text-slate-500 mt-2">Sign in with an administrator account.</p>
+        <h1 className="text-2xl font-bold text-slate-900">Unique Control Tower</h1>
+        <p className="text-slate-500 mt-2">Secure access for authorized platform administrators.</p>
 
         {error && <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</div>}
 
