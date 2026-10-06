@@ -28,14 +28,16 @@ export type BiometricAssertion = {
   signature: string;
 };
 
-export async function createBiometricAssertion(currentUser: any): Promise<BiometricAssertion> {
+export async function createBiometricAssertion(currentUser: any, transactionBinding?: string): Promise<BiometricAssertion> {
   if (!window.PublicKeyCredential || !navigator.credentials) {
     throw new Error('Biometric/passkey security is not available on this device or browser.');
   }
 
   const token = await currentUser.getIdToken();
   const start = await fetch('/api/auth/passkey/assertion-options', {
-    headers: { Authorization: 'Bearer ' + token },
+    method: transactionBinding ? 'POST' : 'GET',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    ...(transactionBinding ? { body: JSON.stringify({ transactionBinding }) } : {}),
   });
   const options = await start.json().catch(() => null);
 
