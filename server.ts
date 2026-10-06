@@ -1414,10 +1414,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     const adminUid = (req as any).user?.uid as string | undefined;
     if (!adminUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
     try {
-      const adminSnapshot = await adminDb.collection('users').doc(adminUid).get();
-      const adminData = adminSnapshot.data() as Record<string, unknown> | undefined;
-      const roles = Array.isArray(adminData?.roles) ? adminData.roles : [];
-      if (!roles.some((role) => role === 'administrator' || role === 'platform_admin' || role === 'super_admin')) return errorResponse(res, 'BLOCKED', 'Administrator access is required.', 403);
+      // Access is enforced centrally by requirePermission('manage:verification').
+      // Keep this handler role-neutral so risk_security_officer can use the permission it is granted.
 
       const body = req.body as Record<string, unknown>;
       const uid = typeof body?.uid === 'string' ? body.uid.trim() : '';
