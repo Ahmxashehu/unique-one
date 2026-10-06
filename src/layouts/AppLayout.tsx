@@ -127,9 +127,20 @@ export default function AppLayout() {
                 ['Restaurant', '/restaurant', Store],
                 ['Hotels & Events', '/hotels-events', Calendar],
                 ['Flights', '/flights', Plane],
-                ['Unique Jobs & Services', '/jobs', Briefcase],
-                ['Unique Travel', '/os/travel', Plane],
-                ['Unique Health & Wellness', '/health-wellness', Activity],
+                ['School & Education', '/education-hub', GraduationCap],
+                ['Retail & Shopping', '/store', ShoppingCart],
+                ['Professional Services', '/search?category=Professional%20Services', Briefcase],
+                ['Transportation', '/search?category=Transportation', Plane],
+                ['Real Estate', '/search?category=Real%20Estate', Building2],
+                ['Technology', '/search?category=Technology', Globe],
+                ['Health & Wellness', '/health-wellness', Activity],
+                ['Food & Dining', '/restaurant', Store],
+                ['Global Search', '/search', Search],
+                ['Near Me', '/near-me', Globe],
+                ['Jobs', '/jobs', Briefcase],
+                ['Contributions', '/os/contributions', HeartHandshake],
+                ['Education', '/education-hub', GraduationCap],
+                ['Travel', '/os/travel', Plane],
               ].map(([name, path, Icon]) => {
                 const ExperienceIcon = Icon as React.ComponentType<{ className?: string }>;
                 return (
