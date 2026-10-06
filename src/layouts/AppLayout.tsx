@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Store, Wallet, Calendar, Bell, Settings,
   Briefcase, ShoppingCart, Users, FileText, HeartHandshake,
   User, MessageSquare, Heart, ClipboardList, Globe, Shield,
-  Building2, Activity, PlusCircle, Menu, X, LogOut, Sparkles, GraduationCap, Plane, Landmark
+  Building2, Activity, PlusCircle, Menu, X, LogOut, Sparkles, GraduationCap, Plane, Landmark, Search
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import MobileBottomNav from '../components/MobileBottomNav';
