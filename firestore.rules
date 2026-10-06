@@ -62,12 +62,14 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && (!('roles' in request.resource.data) || !('administrator' in request.resource.data.roles));
-      allow update: if (isOwner(userId)
+      // User role/permission/status changes are server-controlled. Do not let
+      // an authenticated admin client mutate the control-plane user document
+      // directly; privileged changes go through authenticated server RBAC routes.
+      allow update: if isOwner(userId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'firstName','otherName','lastName','fullName','username','preferredLanguage',
           'profilePhotoUrl','address','shippingAddresses','communicationProfile'
-        ]))
-        || isAdmin();
+        ]);
       allow delete: if isAdmin();
     }
     match /profiles/{userId} {
