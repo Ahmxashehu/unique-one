@@ -72,7 +72,10 @@ export function BusinessAccessGuard({ children }: { children: React.ReactNode })
       });
       const result = await response.json().catch(() => null);
       if (!response.ok) throw new Error(result?.error?.message || 'Business access could not be completed.');
-      if (mode === 'login' && result?.token) localStorage.setItem(SESSION_KEY, result.token);
+      if (mode === 'login' && result?.token) {
+        localStorage.setItem(SESSION_KEY, result.token);
+        localStorage.setItem('unique_business_id', businessId);
+      }
       setPassword('');
       setConfirmPassword('');
       await load();
