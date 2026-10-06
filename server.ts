@@ -426,6 +426,8 @@ async function startServer() {
 const app = express();
   const PORT = Number(process.env.PORT) || 3000;
   const httpServer = http.createServer(app);
+  // Bind the Render web-service port immediately so the platform can detect the listener while the remaining routes initialize.
+  httpServer.listen(PORT, "0.0.0.0", () => console.log(`UniqueOS Server listening on port ${PORT}`));
   // Codespaces forwards requests through a trusted proxy and supplies X-Forwarded-For.
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
@@ -3428,6 +3430,6 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
-  httpServer.listen(PORT, "0.0.0.0", () => console.log(`UniqueOS Server running on http://localhost:${PORT}`));
+  console.log(`UniqueOS Server ready on http://localhost:${PORT}`);
 }
 startServer();
