@@ -839,7 +839,7 @@ export default function UniqueMediaPage() {
             <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
               <div className="mx-auto flex max-w-xl flex-col items-center text-center">
                 <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                  {search.trim() ? <Search className="h-7 w-7" /> : React.createElement(iconForKind(activeKind), { className: 'h-7 w-7' })}
+                  {search.trim() ? <Search className="h-7 w-7" /> : React.createElement(iconForKind(activeKind === 'all' ? 'pdf' : activeKind), { className: 'h-7 w-7' })}
                 </span>
                 <h3 className="mt-4 text-xl font-black text-slate-950">{search.trim() ? 'No matching media found' : 'No ' + (categories.find(([value]) => value === activeKind)?.[1]?.toLowerCase() || 'media') + ' found'}</h3>
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -855,7 +855,7 @@ export default function UniqueMediaPage() {
           ) : search.trim() ? (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {searchResults.map((item) => {
-                const ItemIcon = iconForKind(item.kind === 'other' ? 'pdf' : item.kind === 'document' ? 'pdf' : item.kind);
+                const ItemIcon = iconForKind(item.kind);
                 const itemLabel = categories.find(([value]) => value === item.kind)?.[1] || 'Media';
                 return (
                   <article key={item.id} className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-emerald-200 hover:shadow-md">
