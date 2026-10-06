@@ -1046,7 +1046,6 @@ export default function HomePage() {
                       <div className="grid grid-cols-2 gap-2">
                         {[
                           ['Business Dashboard', '/os/business/dashboard'],
-                          ['Pros Near Me', '/discover?mode=services'],
                         ].map(([label, href]) => (
                           <Link key={label} to={href} className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 sm:rounded-2xl sm:p-3">
                             <ArrowRight className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
