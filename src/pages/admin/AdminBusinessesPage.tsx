@@ -26,7 +26,7 @@ function formatDate(value: unknown) {
   return '—';
 }
 
-export default function AdminBusinessesPage() {
+export default function AdminBusinesssPage() {
   const [businesses, setBusinesses] = useState<AdminBusiness[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -60,7 +60,7 @@ export default function AdminBusinessesPage() {
     setError('');
     try {
       const snapshot = await getDocs(collection(db, 'businesses'));
-      setBusinesses(snapshot.docs.map(item => ({ id: item.id, ...item.data() }) as AdminBusinesse));
+      setBusinesses(snapshot.docs.map(item => ({ id: item.id, ...item.data() }) as AdminBusiness));
     } catch (loadError) {
       console.error('Failed to refresh businesses:', loadError);
       setError('Unable to refresh businesses. Check administrator access and try again.');
