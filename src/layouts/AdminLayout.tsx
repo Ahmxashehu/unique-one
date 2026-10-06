@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { 
   Users, Building2, Package, Inbox, BarChart3, 
-  ShieldCheck, Activity, Settings, LogOut, Network 
+  ShieldCheck, Activity, Settings, LogOut, Network, Crown, Wallet 
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -11,7 +11,11 @@ export default function AdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const adminNav = [
+    { name: 'Super Admin Dashboard', path: '/admin/workspace/super', icon: Crown },
     { name: 'Control Tower', path: '/admin/control-tower', icon: Network },
+    { name: 'Finance & Settlement', path: '/admin/workspace/finance', icon: Wallet },
+    { name: 'Security & Risk', path: '/admin/workspace/risk', icon: ShieldCheck },
+    { name: 'Platform Operations', path: '/admin/workspace/platform', icon: Activity },
     { name: 'Users', path: '/admin/users', icon: Users },
     { name: 'Businesses', path: '/admin/businesses', icon: Building2 },
     { name: 'Products', path: '/admin/products', icon: Package },
