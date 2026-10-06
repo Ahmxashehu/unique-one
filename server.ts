@@ -1684,11 +1684,20 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const signature = base64UrlToBuffer(String(req.body?.signature || ''));
       if (!challengeId || !credentialId || clientDataJSON.length > 4096 || authenticatorData.length < 37 || signature.length < 32) return errorResponse(res, 'INVALID_REQUEST', 'The biometric response is invalid.');
       const challengeRef = adminDb.collection(PASSKEY_CHALLENGES_COLLECTION).doc(challengeId);
-      const challengeSnap = await challengeRef.get();
-      if (!challengeSnap.exists) return errorResponse(res, 'FORBIDDEN', 'The biometric challenge is invalid or expired.');
-      const challengeData = challengeSnap.data()!;
-      await challengeRef.delete();
-      if (challengeData.uid !== uid || challengeData.type !== 'assertion' || challengeData.expiresAt.toMillis() < Date.now()) return errorResponse(res, 'FORBIDDEN', 'The biometric challenge is invalid or expired.');
+      let challengeData: FirebaseFirestore.DocumentData | undefined;
+      try {
+        challengeData = await adminDb.runTransaction(async transaction => {
+          const challengeSnap = await transaction.get(challengeRef);
+          if (!challengeSnap.exists) return undefined;
+          const data = challengeSnap.data();
+          transaction.delete(challengeRef);
+          return data;
+        });
+      } catch (error) {
+        console.error('Passkey challenge consumption failed:', error);
+        return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Biometric verification could not be completed safely. Please try again.');
+      }
+      if (!challengeData || challengeData.uid !== uid || challengeData.type !== 'assertion' || challengeData.expiresAt.toMillis() < Date.now()) return errorResponse(res, 'FORBIDDEN', 'The biometric challenge is invalid or expired.');
       const { origin, rpId } = requestWebAuthnOrigin(req);
       let clientData: any;
       try { clientData = JSON.parse(clientDataJSON.toString('utf8')); } catch { return errorResponse(res, 'INVALID_REQUEST', 'The biometric client data is invalid.'); }
@@ -1785,10 +1794,20 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const biometricAssertion = req.body?.biometricAssertion;
       if (!biometricAssertion?.challengeId || !biometricAssertion?.credentialId || !biometricAssertion?.clientDataJSON || !biometricAssertion?.authenticatorData || !biometricAssertion?.signature) return errorResponse(res, 'BIOMETRIC_REQUIRED', biometricLevel >= 3 ? 'Biometric verification is required for transfers of ₦500,000 or more.' : biometricLevel >= 2 ? 'Biometric verification is required for transfers of ₦200,000 or more.' : biometricLevel >= 1 ? 'Biometric verification is required for transfers of ₦50,000 or more.' : 'Biometric verification is required for your first wallet transaction.');
       const challengeRef = adminDb.collection(PASSKEY_CHALLENGES_COLLECTION).doc(String(biometricAssertion.challengeId));
-      const challengeSnap = await challengeRef.get();
-      if (!challengeSnap.exists) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification is required. Please try again.');
-      const challengeData = challengeSnap.data()!;
-      await challengeRef.delete();
+      let challengeData: FirebaseFirestore.DocumentData | undefined;
+      try {
+        challengeData = await adminDb.runTransaction(async transaction => {
+          const challengeSnap = await transaction.get(challengeRef);
+          if (!challengeSnap.exists) return undefined;
+          const data = challengeSnap.data();
+          transaction.delete(challengeRef);
+          return data;
+        });
+      } catch (error) {
+        console.error('Biometric challenge consumption failed:', error);
+        return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Biometric verification could not be completed safely. Please try again.');
+      }
+      if (!challengeData) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification is required. Please try again.');
       const { origin, rpId } = requestWebAuthnOrigin(req);
       const clientDataJSON = base64UrlToBuffer(String(biometricAssertion.clientDataJSON));
       const authenticatorData = base64UrlToBuffer(String(biometricAssertion.authenticatorData));
