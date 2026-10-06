@@ -131,7 +131,7 @@ export default function StoreCartPage() {
       if (result.response.status === 403 && result.body?.error?.code === 'BIOMETRIC_REQUIRED') {
         setError('');
         setPaymentBusy(true);
-        biometricAssertion = await createBiometricAssertion(currentUser);
+        biometricAssertion = await createBiometricAssertion(currentUser, `store_payment|${currentUser.uid}|${orderIds.join(',')}|${totalMinor}|NGN`);
         result = await requestPayment();
       }
       if (!result.response.ok) throw new Error(result.body?.error?.message || 'UniquePay payment could not be completed.');
