@@ -55,12 +55,6 @@ a {
   backdrop-filter: blur(18px);
 }
 
-@media (min-width: 768px) {
-  .mobile-bottom-nav {
-    display: none;
-  }
-}
-
 .mobile-bottom-nav-inner {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
