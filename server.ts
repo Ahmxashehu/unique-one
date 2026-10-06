@@ -3575,6 +3575,90 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.post("/api/store/orders/:orderId/cancel", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('storeOrderCancelRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Store order cancellation requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const orderId = req.params.orderId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The order ID is invalid.');
+      }
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const orderRef = adminDb.collection('orders').doc(orderId);
+        const orderSnap = await transaction.get(orderRef);
+        if (!orderSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
+        const order = orderSnap.data() as Record<string, unknown>;
+        if (order.customerId !== uid) throw new RequestValidationError('FORBIDDEN', 'You can only cancel your own Store orders.');
+        if (order.currency !== 'NGN') throw new RequestValidationError('INVALID_REQUEST', 'Only NGN Store orders can be cancelled here.');
+        if (order.paymentStatus === 'paid' || order.status === 'confirmed') {
+          throw new RequestValidationError('INVALID_REQUEST', 'A paid Store order cannot be cancelled through the unpaid-order flow.');
+        }
+        if (order.status !== 'pending') {
+          return { orderId, cancelled: false, replayed: true };
+        }
+        const items = Array.isArray(order.items) ? order.items : [];
+        const quantities = new Map<string, number>();
+        for (const item of items) {
+          if (!item || typeof item !== 'object') throw new RequestValidationError('INVALID_REQUEST', 'The Store order contains invalid inventory data.');
+          const productId = typeof (item as any).productId === 'string' ? (item as any).productId : '';
+          const quantity = Number((item as any).quantity);
+          if (!productId || !Number.isSafeInteger(quantity) || quantity <= 0) {
+            throw new RequestValidationError('INVALID_REQUEST', 'The Store order contains invalid inventory data.');
+          }
+          quantities.set(productId, (quantities.get(productId) || 0) + quantity);
+        }
+        const productSnaps = await Promise.all(Array.from(quantities.keys()).map((id) => transaction.get(adminDb.collection('products').doc(id))));
+        const now = Timestamp.now().toDate().toISOString();
+        productSnaps.forEach((snap, index) => {
+          if (!snap.exists) return;
+          const product = snap.data() as Record<string, unknown>;
+          const currentQuantity = Number(product.quantity);
+          const restoreQuantity = quantities.get(Array.from(quantities.keys())[index]) || 0;
+          if (!Number.isSafeInteger(currentQuantity) || currentQuantity < 0 || !Number.isSafeInteger(restoreQuantity)) {
+            throw new RequestValidationError('INVALID_REQUEST', 'Inventory data is invalid; cancellation was not applied.');
+          }
+          transaction.update(snap.ref, {
+            quantity: currentQuantity + restoreQuantity,
+            status: product.status === 'out_of_stock' ? 'published' : product.status,
+            updatedAt: now,
+          });
+        });
+        transaction.update(orderRef, {
+          status: 'cancelled',
+          paymentStatus: 'unpaid',
+          cancelledAt: now,
+          updatedAt: now,
+        });
+        const auditRef = adminDb.collection('audit_logs').doc();
+        transaction.create(auditRef, {
+          action: 'store.order.cancelled',
+          actorUid: uid,
+          targetUid: uid,
+          resource: 'store_order',
+          resourceId: orderId,
+          reason: 'unpaid_order_inventory_release',
+          createdAt: now,
+        });
+        return { orderId, cancelled: true, replayed: false };
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Store order cancellation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The Store order could not be cancelled safely.');
+    }
+  });
+
   app.get("/api/store/orders/:orderId/settlement", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 60,
