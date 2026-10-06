@@ -1317,7 +1317,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
-  app.patch("/api/admin/business-applications/:id", authenticate, async (req, res) => {
+  app.patch("/api/admin/business-applications/:id", authenticate, requirePermission('access:admin_tools'), async (req, res) => {
     const adminUid = (req as any).user?.uid as string | undefined;
     if (!adminUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
     try {
@@ -1410,7 +1410,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
-  app.patch("/api/admin/users/verification", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+  app.patch("/api/admin/users/verification", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), authenticate, requirePermission('manage:verification'), async (req, res) => {
     const adminUid = (req as any).user?.uid as string | undefined;
     if (!adminUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
     try {
