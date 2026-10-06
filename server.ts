@@ -3255,6 +3255,22 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         transaction.update(orderRef, { paymentStatus: 'paid', status: 'paid', paidAt: now, updatedAt: now, paymentTransactionId: transactionId, orderTimeline: [...(Array.isArray(order.orderTimeline) ? order.orderTimeline : []), { status: 'paid', at: now }] });
         const paymentResult = { orderId, paymentStatus: 'paid', status: 'paid', transactionId, reference };
         transaction.create(idempotencyRef, { uid, idempotencyKey, requestFingerprint: uid + '|' + orderId, result: paymentResult, createdAt: now, updatedAt: now });
+        const auditRef = adminDb.collection('audit_logs').doc();
+        transaction.create(auditRef, {
+          action: 'restaurant.payment.completed',
+          actorUid: uid,
+          targetUid: merchantWalletId,
+          resource: 'restaurant_order_payment',
+          resourceId: orderId,
+          orderId,
+          transactionId,
+          reference,
+          amountMinor,
+          currency: 'NGN',
+          idempotencyKey,
+          createdAt: now,
+          timestamp: now,
+        });
         return paymentResult;
       });
       return res.status(200).json(result);
