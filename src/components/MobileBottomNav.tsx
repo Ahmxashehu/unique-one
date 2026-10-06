@@ -26,7 +26,7 @@ export default function MobileBottomNav({ variant, onMenu }: MobileBottomNavProp
   const items = variant === "public" ? publicItems : appItems;
 
   return (
-    <nav aria-label="Mobile navigation" className="mobile-bottom-nav">
+    <nav aria-label="Mobile navigation" className={cn("mobile-bottom-nav", variant === "public" && "platform-bottom-nav")}>
       <div className="mobile-bottom-nav-inner">
         {items.map((item) => {
           const Icon = item.icon;
