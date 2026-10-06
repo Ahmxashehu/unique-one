@@ -72,8 +72,30 @@ service cloud.firestore {
     }
     match /educationEnrollments/{enrollmentId} {
       allow read: if isAuthenticated() && resource.data.studentUid == request.auth.uid || isAdmin();
-      allow create: if isAuthenticated() && request.resource.data.studentUid == request.auth.uid && request.resource.data.status == 'active';
-      allow update: if isAuthenticated() && resource.data.studentUid == request.auth.uid && request.resource.data.studentUid == resource.data.studentUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['programme','level','status','updatedAt']) && request.resource.data.status in ['active','completed','withdrawn'] || isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.id == enrollmentId
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.institutionId is string
+        && exists(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId))
+        && get(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId)).data.status == 'published'
+        && request.resource.data.status == 'active'
+        && request.resource.data.keys().hasOnly(['id','studentUid','institutionId','courseId','programme','level','status','createdAt','updatedAt'])
+        && (!('courseId' in request.resource.data) || (
+          request.resource.data.courseId is string
+          && exists(/databases/$(database)/documents/educationCourses/$(request.resource.data.courseId))
+          && get(/databases/$(database)/documents/educationCourses/$(request.resource.data.courseId)).data.status == 'published'
+          && get(/databases/$(database)/documents/educationCourses/$(request.resource.data.courseId)).data.institutionId == request.resource.data.institutionId
+        ))
+        && (!('programme' in request.resource.data) || request.resource.data.programme is string)
+        && (!('level' in request.resource.data) || request.resource.data.level is string);
+      allow update: if isAuthenticated()
+        && resource.data.studentUid == request.auth.uid
+        && request.resource.data.studentUid == resource.data.studentUid
+        && request.resource.data.institutionId == resource.data.institutionId
+        && request.resource.data.courseId == resource.data.courseId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['programme','level','status','updatedAt'])
+        && request.resource.data.status in ['active','completed','withdrawn']
+        || isAdmin();
       allow delete: if isAdmin();
     }
     match /authCredentials/{userId} { allow read, write: if false; }
