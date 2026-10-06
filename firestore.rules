@@ -1,14 +1,562 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
     function isAuthenticated() { return request.auth != null; }
-    function isAdmin() { return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && ('roles' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles) && ('administrator' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles || 'platform_admin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles || 'super_admin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles); }
+    function isOwner(uid) { return isAuthenticated() && request.auth.uid == uid; }
+    function conversationMemberId(conversationId, uid) { return conversationId + '_' + uid; }
+    function isConversationMember(conversationId) {
+      return isAuthenticated() && exists(/databases/$(database)/documents/conversationMembers/$(conversationMemberId(conversationId, request.auth.uid)));
+    }
+    function isAdmin() {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data != null &&
+             'roles' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+             (
+               'administrator' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles ||
+               'platform_admin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles ||
+               'super_admin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles
+             );
+    }
+
+    match /educationInstitutions/{institutionId} {
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status in ['draft','published'];
+      allow update: if isAuthenticated()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','type','location','description','status','updatedAt'])
+        && request.resource.data.status in ['draft','published','suspended']
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /educationCourses/{courseId} {
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.institutionId is string
+        && exists(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId))
+        && get(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId)).data.ownerUid == request.auth.uid;
+      allow update: if isAuthenticated()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.institutionId == resource.data.institutionId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','level','status','updatedAt'])
+        && request.resource.data.status in ['draft','published','archived']
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /educationEnrollments/{enrollmentId} {
+      allow read: if isAuthenticated() && resource.data.studentUid == request.auth.uid || isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.status == 'active';
+      allow update: if isAuthenticated()
+        && resource.data.studentUid == request.auth.uid
+        && request.resource.data.studentUid == resource.data.studentUid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['programme','level','status','updatedAt'])
+        && request.resource.data.status in ['active','completed','withdrawn']
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /educationInstitutions/{institutionId} {
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.status in ['draft','published'];
+      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','type','location','description','status','updatedAt']) && request.resource.data.status in ['draft','published','suspended'] || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /educationCourses/{courseId} {
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.institutionId is string && exists(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId)) && get(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId)).data.ownerUid == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.institutionId == resource.data.institutionId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','level','status','updatedAt']) && request.resource.data.status in ['draft','published','archived'] || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /educationEnrollments/{enrollmentId} {
+      allow read: if isAuthenticated() && resource.data.studentUid == request.auth.uid || isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.studentUid == request.auth.uid && request.resource.data.status == 'active';
+      allow update: if isAuthenticated() && resource.data.studentUid == request.auth.uid && request.resource.data.studentUid == resource.data.studentUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['programme','level','status','updatedAt']) && request.resource.data.status in ['active','completed','withdrawn'] || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /authCredentials/{userId} { allow read, write: if false; }
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && (!('roles' in request.resource.data) || !('administrator' in request.resource.data.roles));
+      allow update: if (isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'firstName','otherName','lastName','fullName','username','preferredLanguage',
+          'profilePhotoUrl','address','shippingAddresses','communicationProfile'
+        ]))
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /profiles/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId)
+        && request.resource.data.diff({}).affectedKeys().hasOnly([
+          'uid','firstName','otherName','lastName','fullName','profilePhotoUrl',
+          'preferredLanguage','communicationProfile'
+        ])
+        && request.resource.data.uid == userId;
+      allow update: if (isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'firstName','otherName','lastName','fullName','profilePhotoUrl',
+          'preferredLanguage','communicationProfile'
+        ])
+        && request.resource.data.uid == resource.data.uid)
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /jobs/{jobId} {
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.employerUid == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.employerUid == request.auth.uid && request.resource.data.status in ['draft','published'];
+      allow update: if isAuthenticated() && resource.data.employerUid == request.auth.uid && request.resource.data.employerUid == resource.data.employerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','companyName','category','location','employmentType','description','status','updatedAt']) && request.resource.data.status in ['draft','published','closed'];
+      allow delete: if isAdmin();
+    }
+    match /jobApplications/{applicationId} {
+      allow read: if isAuthenticated() && (resource.data.applicantUid == request.auth.uid || resource.data.employerUid == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.applicantUid == request.auth.uid
+        && request.resource.data.status == 'submitted'
+        && request.resource.data.jobId is string
+        && exists(/databases/$(database)/documents/jobs/$(request.resource.data.jobId))
+        && get(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)).data.status == 'published'
+        && request.resource.data.employerUid == get(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)).data.employerUid;
+      allow update: if isAuthenticated() && resource.data.employerUid == request.auth.uid && request.resource.data.applicantUid == resource.data.applicantUid && request.resource.data.jobId == resource.data.jobId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt']) && request.resource.data.status in ['submitted','reviewing','shortlisted','rejected','accepted','withdrawn'];
+      allow delete: if isAdmin();
+    }
+    match /contributionRequests/{requestId} {
+      allow read: if isAdmin()
+        || resource.data.status == 'published'
+        || (isAuthenticated() && resource.data.requesterUid == request.auth.uid);
+      allow create: if isAuthenticated()
+        && request.resource.data.requesterUid == request.auth.uid
+        && request.resource.data.status == 'published'
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.category is string
+        && request.resource.data.category in ['Household','Community','Education','Agriculture','Health','Business','Emergency','Other']
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 1000;
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && resource.data.requesterUid == request.auth.uid
+          && request.resource.data.requesterUid == resource.data.requesterUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','category','description','status','updatedAt'])
+          && request.resource.data.status in ['published','closed','cancelled']);
+      allow delete: if isAdmin();
+    }
+    match /contributionOffers/{offerId} {
+      allow read: if isAdmin()
+        || (isAuthenticated() && (resource.data.contributorUid == request.auth.uid || resource.data.requesterUid == request.auth.uid));
+      allow create: if isAuthenticated()
+        && request.resource.data.contributorUid == request.auth.uid
+        && request.resource.data.requesterUid is string
+        && request.resource.data.requesterUid != request.auth.uid
+        && request.resource.data.requestId is string
+        && request.resource.data.status == 'pending'
+        && exists(/databases/$(database)/documents/contributionRequests/$(request.resource.data.requestId))
+        && get(/databases/$(database)/documents/contributionRequests/$(request.resource.data.requestId)).data.requesterUid == request.resource.data.requesterUid
+        && get(/databases/$(database)/documents/contributionRequests/$(request.resource.data.requestId)).data.status == 'published';
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && request.resource.data.contributorUid == resource.data.contributorUid
+          && request.resource.data.requesterUid == resource.data.requesterUid
+          && request.resource.data.requestId == resource.data.requestId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt'])
+          && (
+            (resource.data.contributorUid == request.auth.uid && request.resource.data.status in ['pending','withdrawn'])
+            || (resource.data.requesterUid == request.auth.uid && request.resource.data.status in ['accepted','rejected'])
+          ));
+      allow delete: if isAdmin();
+    }
+    match /businesses/{businessId} {
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() ||
+        (isAuthenticated()
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.verificationStatus == resource.data.verificationStatus
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name','registrationNumber','description','contactEmail','contactPhone','categories'
+          ]));
+      allow delete: if isAdmin();
+    }
+    match /roles/{roleId} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
+    match /organizations/{orgId} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
+    match /sessions/{sessionId} { allow read: if isOwner(resource.data.uid) || isAdmin(); allow create, update, delete: if false; }
+    match /notifications/{notificationId} { allow read: if isOwner(resource.data.uid); allow update: if isOwner(resource.data.uid) && request.resource.data.uid == resource.data.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']); allow create, delete: if isAdmin(); }
+    match /audit_logs/{logId} { allow read: if isAdmin(); allow create, update, delete: if false; }
+    // Unique AI audit logs are server-managed through the Firebase Admin SDK. Clients have no access.
+    match /aiAuditLogs/{logId} { allow read, create, update, delete: if false; }
+    match /products/{productId} {
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.keys().hasOnly([
+          'id','sellerId','businessId','name','description','category','images','hasVideo',
+          'price','currency','discount','condition','quantity','minOrderQuantity',
+          'wholesalePrice','bulkPrice','variants','location','deliveryOptions',
+          'pickupOptions','status','createdAt','updatedAt'
+        ])
+        && request.resource.data.id == productId
+        && request.resource.data.sellerId == request.auth.uid
+        && request.resource.data.status in ['draft','published','out_of_stock']
+        && request.resource.data.price is number
+        && request.resource.data.quantity is number
+        && request.resource.data.minOrderQuantity is number;
+      allow update: if isAuthenticated()
+        && resource.data.sellerId == request.auth.uid
+        && request.resource.data.sellerId == resource.data.sellerId
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'businessId','name','description','category','images','hasVideo','price','currency',
+          'discount','condition','quantity','minOrderQuantity','wholesalePrice','bulkPrice',
+          'variants','location','deliveryOptions','pickupOptions','status','updatedAt'
+        ])
+        && request.resource.data.status in ['draft','published','out_of_stock']
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.sellerId == request.auth.uid) || isAdmin();
+            allow create: if false;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /productRequests/{requestId} {
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.customerId == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
+      allow update: if isAuthenticated()
+        && resource.data.customerId == request.auth.uid
+        && request.resource.data.customerId == resource.data.customerId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status in ['draft', 'pending', 'published', 'cancelled', 'closed']
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /quotes/{quoteId} {
+      allow read: if isAdmin() || (isAuthenticated() && (resource.data.sellerId == request.auth.uid || (exists(/databases/$(database)/documents/productRequests/$(resource.data.requestId)) && get(/databases/$(database)/documents/productRequests/$(resource.data.requestId)).data.customerId == request.auth.uid)));
+      allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid;
+      allow update: if isAuthenticated()
+        && request.resource.data.sellerId == resource.data.sellerId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status in ['pending', 'accepted', 'rejected', 'negotiating']
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /carts/{cartId} { allow read: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow update: if isAuthenticated() && resource.data.customerId == request.auth.uid && request.resource.data.customerId == resource.data.customerId; allow delete: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid; }
+    match /wishlists/{wishlistId} { allow read: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow update: if isAuthenticated() && resource.data.customerId == request.auth.uid && request.resource.data.customerId == resource.data.customerId; allow delete: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid; }
+    match /reviews/{reviewId} { allow read: if true; allow create: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5 && request.resource.data.targetId is string && request.resource.data.targetType in ['product', 'seller'] && request.resource.data.verifiedPurchase == false; allow update, delete: if isAdmin(); }
+    match /payment_requests/{reqId} {
+      allow read: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isAdmin();
+      // Payment requests are created only through the authenticated server API, which resolves the recipient and writes the audit record.
+      allow create: if false;
+      // Keep sender and recipient state transitions separated so one party cannot impersonate the other's approval/rejection.
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && request.resource.data.senderId == resource.data.senderId
+          && request.resource.data.recipientId == resource.data.recipientId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && (
+            (resource.data.senderId == request.auth.uid
+              && request.resource.data.status in ['draft', 'sent', 'cancelled'])
+            || (resource.data.recipientId == request.auth.uid
+              && request.resource.data.status in ['viewed', 'pending_approval', 'approved', 'rejected'])
+          ));
+      allow delete: if isAdmin();
+    }
+    match /invoices/{invId} {
+      allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.sellerId == request.auth.uid
+        && request.resource.data.currency == 'NGN'
+        && request.resource.data.customerIdentifier is string
+        && request.resource.data.issueDate is string
+        && request.resource.data.items is list
+        && request.resource.data.subtotal is number
+        && request.resource.data.total is number
+        && request.resource.data.total == request.resource.data.subtotal
+        && request.resource.data.keys().hasOnly(['sellerId','customerIdentifier','issueDate','dueDate','items','subtotal','total','currency','status','createdAt','updatedAt']);
+      allow update: if isAuthenticated()
+        && request.resource.data.sellerId == resource.data.sellerId
+        && request.resource.data.customerId == resource.data.customerId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status in ['draft', 'sent', 'viewed', 'overdue', 'cancelled', 'disputed']
+        && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid)
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /receipts/{recId} { allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin(); allow create, update, delete: if false; }
+    match /transactions/{txId} { allow read: if isAdmin() || (isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid)); allow create, update, delete: if false; }
+    match /wallets/{uid} { allow read, create, update, delete: if false; }
+    match /walletIdempotency/{idempotencyId} { allow read, create, update, delete: if false; }
+    match /ledgerEntries/{ledgerId} { allow read, create, update, delete: if false; }
+
     match /staffInvites/{inviteId} {
       allow read: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.inviteeEmail == request.auth.token.email);
       allow create: if isAuthenticated() && request.resource.data.businessOwnerUid == request.auth.uid && request.resource.data.status == 'pending' && request.resource.data.role in ['admin','manager','sales','cashier','accountant','inventory','support','delivery','branch_manager','viewer'] && request.resource.data.inviteeEmail is string && request.resource.data.inviteeEmail.size() > 0 && request.resource.data.keys().hasOnly(['businessOwnerUid','inviteeEmail','role','branchName','status','createdAt','invitedAt']);
-      allow update: if isAdmin() || (isAuthenticated() && resource.data.inviteeEmail == request.auth.token.email && request.resource.data.businessOwnerUid == resource.data.businessOwnerUid && request.resource.data.inviteeEmail == resource.data.inviteeEmail && request.resource.data.role == resource.data.role && request.resource.data.branchName == resource.data.branchName && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.invitedAt == resource.data.invitedAt && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status in ['accepted','declined']);
+      allow update: if isAdmin() ||
+        (isAuthenticated() &&
+          resource.data.inviteeEmail == request.auth.token.email &&
+          request.resource.data.businessOwnerUid == resource.data.businessOwnerUid &&
+          request.resource.data.inviteeEmail == resource.data.inviteeEmail &&
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.branchName == resource.data.branchName &&
+          request.resource.data.createdAt == resource.data.createdAt &&
+          request.resource.data.invitedAt == resource.data.invitedAt &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
       allow delete: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
+    }
+    match /staffMembers/{staffId} { allow read: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.uid == request.auth.uid); allow create, update, delete: if false; }
+    match /branches/{branchId} {
+      allow read: if isAuthenticated()
+        && resource.data.ownerUid == request.auth.uid
+        && resource.data.businessId is string
+        && exists(/databases/$(database)/documents/businesses/$(resource.data.businessId))
+        && get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.ownerUid == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.businessId is string
+        && exists(/databases/$(database)/documents/businesses/$(request.resource.data.businessId))
+        && get(/databases/$(database)/documents/businesses/$(request.resource.data.businessId)).data.ownerUid == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.type in ['headquarters','branch','warehouse','farm_site','storefront']
+        && request.resource.data.status == 'active';
+      allow update: if isAuthenticated()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.businessId == resource.data.businessId
+        && exists(/databases/$(database)/documents/businesses/$(resource.data.businessId))
+        && get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.ownerUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','type','address','phone','status','updatedAt'])
+        && request.resource.data.type in ['headquarters','branch','warehouse','farm_site','storefront']
+        && request.resource.data.status in ['active','inactive'];
+      allow delete: if isAuthenticated()
+        && resource.data.ownerUid == request.auth.uid
+        && exists(/databases/$(database)/documents/businesses/$(resource.data.businessId))
+        && get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.ownerUid == request.auth.uid;
+    }
+    match /suppliers/{supplierId} {
+      allow read: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.businessOwnerUid == request.auth.uid
+        && request.resource.data.outstandingAmount == 0
+        && request.resource.data.verificationStatus == 'unverified'
+        && request.resource.data.keys().hasOnly(['businessOwnerUid','name','companyName','phone','email','address','category','outstandingAmount','verificationStatus','createdAt']);
+      allow update: if isAuthenticated()
+        && resource.data.businessOwnerUid == request.auth.uid
+        && request.resource.data.businessOwnerUid == resource.data.businessOwnerUid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','companyName','phone','email','address','category']);
+      allow delete: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
+    }
+
+    match /edgePosts/{postId} {
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.authorUid == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.status == 'published'
+        && request.resource.data.actorType in ['user','business','institution']
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 5000
+        && request.resource.data.audience in ['public','followers']
+        && request.resource.data.allowComments is bool
+        && request.resource.data.allowReshare is bool
+        && (
+          request.resource.data.actorType == 'user'
+          || (request.resource.data.actorType == 'business'
+            && exists(/databases/$(database)/documents/businesses/$(request.resource.data.actorId))
+            && get(/databases/$(database)/documents/businesses/$(request.resource.data.actorId)).data.ownerUid == request.auth.uid)
+          || (request.resource.data.actorType == 'institution'
+            && exists(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.actorId))
+            && get(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.actorId)).data.ownerUid == request.auth.uid)
+        );
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && resource.data.authorUid == request.auth.uid
+          && request.resource.data.authorUid == resource.data.authorUid
+          && request.resource.data.actorType == resource.data.actorType
+          && request.resource.data.actorId == resource.data.actorId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text','audience','allowComments','allowReshare','updatedAt']));
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
+
+      match /likes/{uid} {
+        allow read: if true;
+        allow create: if isAuthenticated() && uid == request.auth.uid;
+        allow delete: if isAuthenticated() && uid == request.auth.uid;
+        allow update: if false;
+      }
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuthenticated()
+          && request.resource.data.authorUid == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000;
+        allow update: if isAuthenticated()
+          && resource.data.authorUid == request.auth.uid
+          && request.resource.data.authorUid == resource.data.authorUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text','updatedAt'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000;
+        allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
+      }
+    }
+    match /edgeStatuses/{statusId} {
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.authorUid == request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.status == 'published'
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 500;
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && resource.data.authorUid == request.auth.uid
+          && request.resource.data.authorUid == resource.data.authorUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text','updatedAt'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 500);
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
+    }
+    match /edgePreferences/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['defaultAudience','allowComments','allowReshare','updatedAt']);
+      allow delete: if isAdmin() || isOwner(userId);
+    }
+    match /conversations/{conversationId} { allow read: if isConversationMember(conversationId); allow create, update, delete: if false; }
+    match /conversationMembers/{memberId} { allow read: if isAuthenticated() && resource.data.uid == request.auth.uid; allow create, update, delete: if false; }
+    match /messages/{messageId} { allow read: if isConversationMember(resource.data.conversationId); allow create, update, delete: if false; }
+    match /messageDeliveries/{deliveryId} { allow read: if isAuthenticated() && resource.data.uid == request.auth.uid; allow create, update, delete: if false; }
+    match /messageRequests/{requestId} { allow read: if isAuthenticated() && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid); allow create, update, delete: if false; }
+    match /userPresence/{uid} { allow read: if isAuthenticated() && request.auth.uid == uid; allow create, update, delete: if false; }
+    match /locations/{locationId} {
+      // Personal coordinates must never be publicly readable. Business/service coordinates may remain discoverable for Near Me.
+      allow read: if isAdmin()
+        || (isAuthenticated() && resource.data.referenceId == request.auth.uid)
+        || (resource.data.referenceId is string
+          && exists(/databases/$(database)/documents/businesses/$(resource.data.referenceId)));
+      allow create: if isAuthenticated()
+        && request.resource.data.keys().hasOnly(['referenceId', 'lat', 'lng'])
+        && request.resource.data.referenceId is string
+        && request.resource.data.lat is number
+        && request.resource.data.lng is number
+        && request.resource.data.lat >= -90
+        && request.resource.data.lat <= 90
+        && request.resource.data.lng >= -180
+        && request.resource.data.lng <= 180
+        && (request.resource.data.referenceId == request.auth.uid
+          || (exists(/databases/$(database)/documents/businesses/$(request.resource.data.referenceId))
+            && get(/databases/$(database)/documents/businesses/$(request.resource.data.referenceId)).data.ownerUid == request.auth.uid));
+      allow update: if isAuthenticated()
+        && (resource.data.referenceId == request.auth.uid
+          || (exists(/databases/$(database)/documents/businesses/$(resource.data.referenceId))
+            && get(/databases/$(database)/documents/businesses/$(resource.data.referenceId)).data.ownerUid == request.auth.uid))
+        && request.resource.data.referenceId == resource.data.referenceId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lat', 'lng'])
+        && request.resource.data.lat is number
+        && request.resource.data.lng is number
+        && request.resource.data.lat >= -90
+        && request.resource.data.lat <= 90
+        && request.resource.data.lng >= -180
+        && request.resource.data.lng <= 180;
+      allow delete: if isAdmin();
+    }
+    match /conferences/{conferenceId} {
+      allow read: if isAuthenticated() && (
+        resource.data.hostUid == request.auth.uid
+        || (resource.data.public == true && request.auth.token.conferenceGuest != true)
+        || (request.auth.token.conferenceGuest == true && request.auth.token.conferenceId == conferenceId)
+      );
+      allow create: if isAuthenticated()
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.public == true
+        && request.resource.data.status == 'live';
+      allow update: if isAuthenticated()
+        && resource.data.hostUid == request.auth.uid
+        && request.resource.data.hostUid == resource.data.hostUid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','public','status','updatedAt'])
+        && request.resource.data.status in ['live','ended'];
+      allow delete: if isAuthenticated() && resource.data.hostUid == request.auth.uid;
+
+      match /participants/{uid} {
+        allow read: if isAuthenticated()
+          && (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid
+            || (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.public == true && request.auth.token.conferenceGuest != true)
+            || (request.auth.token.conferenceGuest == true && request.auth.token.conferenceId == conferenceId));
+        allow create, update: if isAuthenticated()
+          && uid == request.auth.uid
+          && (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid
+            || request.auth.token.conferenceGuest == true && request.auth.token.conferenceId == conferenceId)
+          && request.resource.data.uid == request.auth.uid;
+        allow delete: if isAuthenticated() && (uid == request.auth.uid || get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid);
+      }
+
+      match /chat/{messageId} {
+        allow read: if isAuthenticated() && (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.hostUid == request.auth.uid
+          || (get(/databases/$(database)/documents/conferences/$(conferenceId)).data.public == true && request.auth.token.conferenceGuest != true)
+          || (request.auth.token.conferenceGuest == true && request.auth.token.conferenceId == conferenceId));
+        allow create: if isAuthenticated()
+          && exists(/databases/$(database)/documents/conferences/$(conferenceId)/participants/$(request.auth.uid))
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.displayName is string
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000;
+        allow update, delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      }
+
+      match /signals/{signalId} {
+        allow read: if isAuthenticated() && resource.data.to == request.auth.uid;
+        allow create: if isAuthenticated()
+          && (request.auth.token.conferenceGuest != true || request.auth.token.conferenceId == conferenceId)
+          && request.resource.data.from == request.auth.uid
+          && request.resource.data.to is string
+          && request.resource.data.type in ['offer','answer','ice']
+          && exists(/databases/$(database)/documents/conferences/$(conferenceId)/participants/$(request.auth.uid))
+          && exists(/databases/$(database)/documents/conferences/$(conferenceId)/participants/$(request.resource.data.to));
+        allow delete: if isAuthenticated() && resource.data.to == request.auth.uid;
+      }
+    }
+    match /services/{serviceId} {
+      allow read: if resource.data.status == 'published'
+        || (isAuthenticated() && resource.data.ownerUid == request.auth.uid)
+        || isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status in ['draft','published']
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 2000
+        && request.resource.data.price is number
+        && request.resource.data.price >= 0
+        && request.resource.data.durationHours is number
+        && request.resource.data.durationHours > 0;
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'providerName','title','category','description','price','currency','durationHours','status','updatedAt'
+          ])
+          && request.resource.data.status in ['draft','published']);
+      allow delete: if isAdmin();
     }
   }
 }
