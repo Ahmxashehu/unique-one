@@ -1705,6 +1705,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Biometric verification could not be completed safely. Please try again.');
       }
       if (!challengeData || challengeData.uid !== uid || challengeData.type !== 'assertion' || challengeData.expiresAt.toMillis() < Date.now()) return errorResponse(res, 'FORBIDDEN', 'The biometric challenge is invalid or expired.');
+      // Transaction-bound challenges must only be consumed by the transaction endpoint that can verify the exact binding.
+      // Never allow the generic assertion endpoint to turn a payment-bound challenge into a generic "verified" result.
+      if (typeof challengeData.transactionBinding === 'string' && challengeData.transactionBinding.length > 0) {
+        return errorResponse(res, 'FORBIDDEN', 'This biometric challenge is reserved for its specific transaction.');
+      }
       const { origin, rpId } = requestWebAuthnOrigin(req);
       let clientData: any;
       try { clientData = JSON.parse(clientDataJSON.toString('utf8')); } catch { return errorResponse(res, 'INVALID_REQUEST', 'The biometric client data is invalid.'); }
