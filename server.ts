@@ -1279,7 +1279,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
-  app.get("/api/admin/business-applications", authenticate, async (req, res) => {
+  app.get("/api/admin/business-applications", authenticate, requirePermission('access:admin_tools'), async (req, res) => {
     const adminUid = (req as any).user?.uid as string | undefined;
     if (!adminUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
     try {
