@@ -282,7 +282,23 @@ service cloud.firestore {
         && (!('variant' in request.resource.data) || request.resource.data.variant is map);
       allow delete: if isAuthenticated() && resource.data.customerId == request.auth.uid;
     }
-    match /wishlists/{wishlistId} { allow read: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow update: if isAuthenticated() && resource.data.customerId == request.auth.uid && request.resource.data.customerId == resource.data.customerId; allow delete: if isAuthenticated() && resource.data.customerId == request.auth.uid; allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid; }
+    match /wishlists/{wishlistId} {
+      allow read: if isAuthenticated() && resource.data.customerId == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.id == wishlistId
+        && request.resource.data.customerId == request.auth.uid
+        && request.resource.data.productId is string
+        && exists(/databases/$(database)/documents/products/$(request.resource.data.productId))
+        && get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.status == 'published'
+        && request.resource.data.keys().hasOnly(['id','customerId','productId','updatedAt']);
+      allow update: if isAuthenticated()
+        && resource.data.customerId == request.auth.uid
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.customerId == resource.data.customerId
+        && request.resource.data.productId == resource.data.productId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt']);
+      allow delete: if isAuthenticated() && resource.data.customerId == request.auth.uid;
+    }
     match /reviews/{reviewId} { allow read: if true; allow create: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5 && request.resource.data.targetId is string && request.resource.data.targetType in ['product', 'seller'] && request.resource.data.verifiedPurchase == false; allow update, delete: if isAdmin(); }
     match /payment_requests/{reqId} {
       allow read: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isAdmin();
