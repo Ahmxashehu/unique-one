@@ -476,7 +476,12 @@ service cloud.firestore {
 
       match /likes/{uid} {
         allow read: if true;
-        allow create: if isAuthenticated() && uid == request.auth.uid;
+        allow create: if isAuthenticated()
+          && uid == request.auth.uid
+          && exists(/databases/$(database)/documents/edgePosts/$(postId))
+          && get(/databases/$(database)/documents/edgePosts/$(postId)).data.status == 'published'
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['uid','name','createdAt']);
         allow delete: if isAuthenticated() && uid == request.auth.uid;
         allow update: if false;
       }
@@ -484,10 +489,16 @@ service cloud.firestore {
       match /comments/{commentId} {
         allow read: if true;
         allow create: if isAuthenticated()
+          && exists(/databases/$(database)/documents/edgePosts/$(postId))
+          && get(/databases/$(database)/documents/edgePosts/$(postId)).data.status == 'published'
+          && get(/databases/$(database)/documents/edgePosts/$(postId)).data.allowComments == true
           && request.resource.data.authorUid == request.auth.uid
+          && request.resource.data.authorName is string
+          && request.resource.data.authorPhotoUrl is string
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 1000;
+          && request.resource.data.text.size() <= 1000
+          && request.resource.data.keys().hasOnly(['authorUid','authorName','authorPhotoUrl','text','createdAt']);
         allow update: if isAuthenticated()
           && resource.data.authorUid == request.auth.uid
           && request.resource.data.authorUid == resource.data.authorUid
