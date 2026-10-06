@@ -18,7 +18,7 @@ import SyncOverlay from "./components/SyncOverlay";
 import U1Loader from "./components/U1Loader";
 import DashboardPage from "./pages/DashboardPage";
 import WorkspaceDashboardPage from "./pages/WorkspaceDashboardPage";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 
 const ConferencePage = lazy(() => import("./pages/ConferencePage"));
 const HomePage = lazy(() => import("./pages/HomePage"));
@@ -113,6 +113,45 @@ const MasterVisionPage = lazy(() => import("./pages/MasterVisionPage"));
 const UniqueMediaPage = lazy(() => import("./pages/UniqueMediaPage"));
 const UniqueSharePage = lazy(() => import("./pages/UniqueSharePage"));
 const ObservationModePage = lazy(() => import("./pages/ObservationModePage"));
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  componentDidCatch() {
+    try {
+      const key = "unique-platform-runtime-recovery-v1";
+      if (sessionStorage.getItem(key) !== "done") {
+        sessionStorage.setItem(key, "done");
+        window.location.reload();
+        return;
+      }
+    } catch {
+      // Continue to the visible fallback if storage is unavailable.
+    }
+    this.setState({ hasError: true });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 text-center">
+          <div className="max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div className="text-lg font-black text-slate-900">UniquePlatform</div>
+            <p className="mt-2 text-sm text-slate-500">The app encountered a temporary loading problem.</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-5 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white"
+            >
+              Reload UniquePlatform
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function App() {
   const [u1Booting, setU1Booting] = useState(true);
