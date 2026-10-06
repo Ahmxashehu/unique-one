@@ -3609,6 +3609,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         }
         const items = Array.isArray(order.items) ? order.items : [];
         const quantities = new Map<string, number>();
+        const statusByProduct = new Map<string, string>();
         for (const item of items) {
           if (!item || typeof item !== 'object') throw new RequestValidationError('INVALID_REQUEST', 'The Store order contains invalid inventory data.');
           const productId = typeof (item as any).productId === 'string' ? (item as any).productId : '';
@@ -3617,6 +3618,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             throw new RequestValidationError('INVALID_REQUEST', 'The Store order contains invalid inventory data.');
           }
           quantities.set(productId, (quantities.get(productId) || 0) + quantity);
+          const checkoutStatus = typeof (item as any).productStatusAtCheckout === 'string' ? (item as any).productStatusAtCheckout : null;
+          if (checkoutStatus) statusByProduct.set(productId, checkoutStatus);
         }
         const productSnaps = await Promise.all(Array.from(quantities.keys()).map((id) => transaction.get(adminDb.collection('products').doc(id))));
         const now = Timestamp.now().toDate().toISOString();
@@ -3630,7 +3633,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           }
           transaction.update(snap.ref, {
             quantity: currentQuantity + restoreQuantity,
-            status: product.status === 'out_of_stock' ? 'published' : product.status,
+            status: statusByProduct.get(Array.from(quantities.keys())[index]) || product.status,
             updatedAt: now,
           });
         });
