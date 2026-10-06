@@ -2525,14 +2525,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const existingMembers = memberSnapshot.docs.map((doc) => doc.data().uid).filter((memberUid) => typeof memberUid === 'string');
           if (existingMembers.includes(uid)) {
             // No-op: a differently keyed legacy membership already exists.
-          } else if (conversation.type === 'direct' && existingMembers.length > 0) {
-            const createdAt = typeof conversation.createdAt === 'string' ? conversation.createdAt : Timestamp.now().toDate().toISOString();
-            await ownMembershipRef.set({
-              conversationId,
-              uid,
-              role: 'member',
-              joinedAt: createdAt,
-            }, { merge: true });
+          } else {
+            // A sent message alone is not proof that the requester is still a
+            // member. Do not expose conversation metadata or repair membership
+            // unless the canonical membership set already contains this UID.
+            continue;
           }
         }
 
