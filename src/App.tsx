@@ -242,21 +242,21 @@ export default function App() {
                   </Route>
 
                   <Route path="/admin/login" element={<AdminLoginPage />} />
-                  <Route path="/admin" element={<RoleGuard dashboard="platform_admin"><AdminLayout /></RoleGuard>}>
+                  <Route path="/admin" element={<AdminLayout>}
                     <Route index element={<Navigate to="/admin/control-tower" replace />} />
                     <Route path="control-tower" element={<RoleGuard dashboard="super_admin"><AdminControlTowerPage /></RoleGuard>} />
                     <Route path="workspace/finance" element={<RoleGuard dashboard="finance_settlement"><WorkspaceDashboardPage dashboard="finance_settlement" /></RoleGuard>} />
                     <Route path="workspace/risk" element={<RoleGuard dashboard="security_risk"><WorkspaceDashboardPage dashboard="security_risk" /></RoleGuard>} />
                     <Route path="workspace/platform" element={<RoleGuard dashboard="platform_admin"><WorkspaceDashboardPage dashboard="platform_admin" /></RoleGuard>} />
                     <Route path="workspace/super" element={<RoleGuard dashboard="super_admin"><WorkspaceDashboardPage dashboard="super_admin" /></RoleGuard>} />
-                    <Route path="users" element={<AdminUsersPage />} />
-                    <Route path="businesses" element={<AdminBusinessesPage />} />
-                    <Route path="products" element={<AdminProductsPage />} />
-                    <Route path="requests" element={<AdminRequestsPage />} />
-                    <Route path="reports" element={<AdminReportsPage />} />
+                    <Route path="users" element={<RoleGuard dashboard="platform_admin"><AdminUsersPage /></RoleGuard>} />
+                    <Route path="businesses" element={<RoleGuard dashboard="platform_admin"><AdminBusinessesPage /></RoleGuard>} />
+                    <Route path="products" element={<RoleGuard dashboard="platform_admin"><AdminProductsPage /></RoleGuard>} />
+                    <Route path="requests" element={<RoleGuard dashboard="platform_admin"><AdminRequestsPage /></RoleGuard>} />
+                    <Route path="reports" element={<RoleGuard dashboard="platform_admin"><AdminReportsPage /></RoleGuard>} />
                     <Route path="verification" element={<RoleGuard dashboard="security_risk"><AdminVerificationPage /></RoleGuard>} />
                     <Route path="transactions" element={<RoleGuard dashboard="finance_settlement"><AdminTransactionsPage /></RoleGuard>} />
-                    <Route path="settings" element={<AdminSettingsPage />} />
+                    <Route path="settings" element={<RoleGuard dashboard="platform_admin"><AdminSettingsPage /></RoleGuard>} />
                   </Route>
 
                   <Route path="*" element={<Navigate to="/" replace />} />
