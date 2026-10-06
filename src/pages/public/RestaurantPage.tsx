@@ -152,7 +152,7 @@ export default function RestaurantPage() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error?.message || 'We could not create your restaurant order.');
       if (draft.paymentMethod === 'uniquepay') {
-        const paymentResponse = await fetch('/api/restaurant/pay', {
+        let paymentResponse = await fetch('/api/restaurant/pay', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
