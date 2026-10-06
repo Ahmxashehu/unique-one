@@ -98,14 +98,22 @@ export function registerIdentityVerificationRoutes(app: Express, authenticate: R
 
     const snapshot = await getFirestore().collection("identityVerifications")
       .where("uid", "==", uid)
-      .orderBy("updatedAt", "desc")
-      .limit(20)
+      .limit(100)
       .get();
+
+    const verifications = snapshot.docs
+      .map((doc) => doc.data())
+      .sort((a, b) => {
+        const aTime = a.updatedAt?.toMillis?.() ?? 0;
+        const bTime = b.updatedAt?.toMillis?.() ?? 0;
+        return bTime - aTime;
+      })
+      .slice(0, 20);
 
     return res.json({
       provider: process.env.IDENTITY_PROVIDER || "dojah",
       configured: providerConfigured(),
-      verifications: snapshot.docs.map((doc) => doc.data()),
+      verifications,
     });
   });
 
