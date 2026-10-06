@@ -134,6 +134,16 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
       const decoded = await getAuth().verifyIdToken(idToken);
       const session = await getActiveSession(db, decoded.uid, businessToken);
       if (!session) return fail(res, 'BUSINESS_AUTH_REQUIRED', 'Your Business Platform session has expired or was revoked. Please sign in again.', 401);
+
+      // Sensitive Business actions require a recent password step-up.
+      const stepUpRequired = new Set(['/inventory/adjust', '/access/change-password']);
+      if (stepUpRequired.has(req.path)) {
+        const expiresAt = session.stepUpExpiresAt;
+        if (typeof expiresAt?.toMillis !== 'function' || expiresAt.toMillis() <= Date.now()) {
+          return fail(res, 'STEP_UP_REQUIRED', 'Additional Business verification is required before this sensitive action.', 403);
+        }
+      }
+
       (req as any).businessSession = session;
       return next();
     } catch {
