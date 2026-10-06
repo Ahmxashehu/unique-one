@@ -137,7 +137,8 @@ service cloud.firestore {
         && request.resource.data.category in ['Household','Community','Education','Agriculture','Health','Business','Emergency','Other']
         && request.resource.data.description is string
         && request.resource.data.description.size() > 0
-        && request.resource.data.description.size() <= 1000;
+        && request.resource.data.description.size() <= 1000
+        && request.resource.data.keys().hasOnly(['requesterUid','title','category','description','status','createdAt','updatedAt']);
       allow update: if isAdmin()
         || (isAuthenticated()
           && resource.data.requesterUid == request.auth.uid
@@ -157,7 +158,8 @@ service cloud.firestore {
         && request.resource.data.status == 'pending'
         && exists(/databases/$(database)/documents/contributionRequests/$(request.resource.data.requestId))
         && get(/databases/$(database)/documents/contributionRequests/$(request.resource.data.requestId)).data.requesterUid == request.resource.data.requesterUid
-        && get(/databases/$(database)/documents/contributionRequests/$(request.resource.data.requestId)).data.status == 'published';
+        && get(/databases/$(database)/documents/contributionRequests/$(request.resource.data.requestId)).data.status == 'published'
+        && request.resource.data.keys().hasOnly(['contributorUid','requesterUid','requestId','message','amount','currency','status','createdAt','updatedAt']);
       allow update: if isAdmin()
         || (isAuthenticated()
           && request.resource.data.contributorUid == resource.data.contributorUid
