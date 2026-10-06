@@ -8,7 +8,7 @@ export function registerAdminAuditRoutes(app: Express, authenticate: RequestHand
     const raw = Number(req.query.limit);
     const limit = Number.isInteger(raw) && raw > 0 ? Math.min(raw, 100) : 50;
     try {
-      const snapshot = await db.collection('auditLogs').orderBy('timestamp', 'desc').limit(limit).get();
+      const snapshot = await db.collection('audit_logs').orderBy('timestamp', 'desc').limit(limit).get();
       const logs = snapshot.docs.map((doc) => {
         const data = doc.data();
         const timestamp = typeof data.timestamp?.toDate === 'function' ? data.timestamp.toDate().toISOString() : null;
