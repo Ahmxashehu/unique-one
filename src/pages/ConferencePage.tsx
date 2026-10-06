@@ -50,7 +50,7 @@ export default function ConferencePage() {
   const inviteToken = new URLSearchParams(window.location.search).get('invite') || '';
 
   const displayName = useMemo(
-    () => userData?.displayName || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Unique user',
+    () => userData?.fullName || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Unique user',
     [currentUser, userData],
   );
 
