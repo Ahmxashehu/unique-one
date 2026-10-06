@@ -38,7 +38,7 @@ export default function MobileBottomNav({ variant, onMenu }: MobileBottomNavProp
             return (
               <Link
                 key={item.name}
-                to="/"
+                to="/os/dashboard"
                 className={cn("mobile-nav-item", isActive && "mobile-nav-item-active")}
                 aria-current={isActive ? "page" : undefined}
               >
