@@ -53,9 +53,12 @@ export default function AdminControlTowerPage() {
   const [draftPermissions, setDraftPermissions] = useState<string[]>([]);
   const [rbacMessage, setRbacMessage] = useState('');
   const [rbacBusy, setRbacBusy] = useState(false);
-  useEffect(() => {
+  const [rbacRefreshing, setRbacRefreshing] = useState(false);
+  const loadRbac = async (showSpinner = false) => {
     if (!currentUser || !hasPermission('manage:roles')) return;
-    void (async () => {
+    if (showSpinner) setRbacRefreshing(true);
+    setRbacMessage('');
+    try {
       try {
         const token = await currentUser.getIdToken();
         const headers = { Authorization: `Bearer ${token}` };
@@ -71,8 +74,13 @@ export default function AdminControlTowerPage() {
         setRbacUsers(Array.isArray(users.users) ? users.users : []);
       } catch (error) {
         setRbacMessage(error instanceof Error ? error.message : 'Permission centre could not be loaded.');
-      }
-    })();
+    } finally {
+      setRbacRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadRbac();
   }, [currentUser]);
 
   useEffect(() => {
@@ -126,8 +134,8 @@ export default function AdminControlTowerPage() {
           </p>
           <div className="mt-5 grid grid-cols-3 gap-2 sm:max-w-xl">
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-xl font-black">{dashboards.length}</p><p className="text-[10px] text-white/60">Dashboard environments</p></div>
-            <div className="rounded-2xl bg-white/10 p-3"><p className="text-xl font-black">1</p><p className="text-[10px] text-white/60">Permission centre</p></div>
-            <div className="rounded-2xl bg-white/10 p-3"><p className="text-xl font-black">RBAC</p><p className="text-[10px] text-white/60">Access model</p></div>
+            <div className="rounded-2xl bg-white/10 p-3"><p className="text-xl font-black">{rbacUsers.length}</p><p className="text-[10px] text-white/60">Permission profiles</p></div>
+            <div className="rounded-2xl bg-white/10 p-3"><p className="text-xl font-black">{rbacPermissions.length}</p><p className="text-[10px] text-white/60">Permission definitions</p></div>
           </div>
         </div>
       </section>
