@@ -3,6 +3,7 @@ import type { Express, RequestHandler, Response } from 'express';
 import { getAuth } from 'firebase-admin/auth';
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import rateLimit from 'express-rate-limit';
+import type { Permission } from '../lib/os/types';
 
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const PASSWORD_MIN_LENGTH = 8;
@@ -106,7 +107,7 @@ async function sessionValid(db: Firestore, uid: string, businessId: string, toke
   return Boolean(session && session.businessId === businessId);
 }
 
-export function registerBusinessAccessRoutes(app: Express, authenticate: RequestHandler, db: Firestore) {
+export function registerBusinessAccessRoutes(app: Express, authenticate: RequestHandler, db: Firestore, requirePermission?: (permission: Permission) => RequestHandler) {
   const setupLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 8, standardHeaders: true, legacyHeaders: false });
   const loginLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 12, standardHeaders: true, legacyHeaders: false });
 
@@ -306,7 +307,8 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
     }
   });
 
-  app.post('/api/admin/business-access/reset', authenticate, async (req, res) => {
+  const adminResetMiddleware = requirePermission ? requirePermission('access:admin_tools') : authenticate;
+  app.post('/api/admin/business-access/reset', authenticate, adminResetMiddleware, async (req, res) => {
     const adminUid = String((req as any).user?.uid || '');
     const targetUid = typeof req.body?.uid === 'string' ? req.body.uid.trim() : '';
     const businessId = typeof req.body?.businessId === 'string' ? req.body.businessId.trim() : '';
