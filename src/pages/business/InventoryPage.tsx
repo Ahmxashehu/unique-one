@@ -3,6 +3,7 @@ import { Package, ArrowDownRight, ArrowUpRight, Loader2, RefreshCw } from 'lucid
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { requestBusinessStepUp } from '../../components/auth/BusinessAccessGuard';
 
 type Product = { id:string; sellerId:string; name?:string; quantity?:number; status?:string; category?:string; currency?:string; price?:number; images?:string[] };
 
@@ -25,8 +26,13 @@ export default function InventoryPage() {
     if(!Number.isInteger(quantity)||quantity<1){setError('Enter a positive whole quantity.');return;}
     if(direction==='out' && quantity>Number(product.quantity||0)){setError('Stock out cannot exceed available inventory.');return;}
     if(!currentUser){setError('Please sign in again.');return;}
+    const businessId=localStorage.getItem('unique_business_id')||'';
+    if(!businessId){setError('Business workspace context is missing. Please unlock Business Platform again.');return;}
+    const stepUpPassword=window.prompt('Sensitive inventory action. Re-enter your Business password to continue.');
+    if(stepUpPassword===null)return;
     setBusy(product.id+direction);setError('');
     try{
+      await requestBusinessStepUp(currentUser,businessId,stepUpPassword);
       const token=await currentUser.getIdToken();
       const businessSession=localStorage.getItem('unique_business_session')||'';
       const response=await fetch('/api/business/inventory/adjust',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`,'X-Business-Session':businessSession},body:JSON.stringify({productId:product.id,direction,quantity})});
