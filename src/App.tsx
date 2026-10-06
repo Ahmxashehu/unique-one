@@ -17,6 +17,7 @@ import { OfflineQueueProvider } from "./contexts/OfflineQueueContext";
 import SyncOverlay from "./components/SyncOverlay";
 import U1Loader from "./components/U1Loader";
 import DashboardPage from "./pages/DashboardPage";
+import WorkspaceDashboardPage from "./pages/WorkspaceDashboardPage";
 import { lazy, Suspense, useEffect, useState } from "react";
 
 const ConferencePage = lazy(() => import("./pages/ConferencePage"));
@@ -176,6 +177,14 @@ export default function App() {
                   <Route path="/os" element={<AuthGuard><AppLayout /></AuthGuard>}>
                     <Route index element={<Navigate to="/os/dashboard" replace />} />
                     <Route path="dashboard" element={<HomePage />} />
+                    <Route path="workspace/personal" element={<WorkspaceDashboardPage dashboard="personal" />} />
+                    <Route path="workspace/pay" element={<RoleGuard dashboard="uniquepay"><WorkspaceDashboardPage dashboard="uniquepay" /></RoleGuard>} />
+                    <Route path="workspace/store" element={<RoleGuard dashboard="store_seller"><WorkspaceDashboardPage dashboard="store_seller" /></RoleGuard>} />
+                    <Route path="workspace/business" element={<RoleGuard dashboard="business"><WorkspaceDashboardPage dashboard="business" /></RoleGuard>} />
+                    <Route path="workspace/institution" element={<RoleGuard dashboard="institution"><WorkspaceDashboardPage dashboard="institution" /></RoleGuard>} />
+                    <Route path="workspace/operations" element={<RoleGuard dashboard="operations"><WorkspaceDashboardPage dashboard="operations" /></RoleGuard>} />
+                    <Route path="workspace/active-edge" element={<RoleGuard dashboard="active_edge"><WorkspaceDashboardPage dashboard="active_edge" /></RoleGuard>} />
+                    <Route path="workspace/ai" element={<RoleGuard dashboard="unique_ai"><WorkspaceDashboardPage dashboard="unique_ai" /></RoleGuard>} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="messages/*" element={<MessagesPage />} />
                     <Route path="orders" element={<OrdersPage />} />
@@ -193,7 +202,7 @@ export default function App() {
                     <Route path="education" element={<EducationPage />} />
                     <Route path="travel" element={<TravelPage />} />
                     <Route path="business/register" element={<BusinessRegisterPage />} />
-                    <Route path="business/dashboard" element={<RoleGuard dashboard="business"><SellerDashboardPage /></RoleGuard>} />
+                    <Route path="business/dashboard" element={<RoleGuard dashboard="business"><WorkspaceDashboardPage dashboard="business" /></RoleGuard>} />
                     <Route path="business/settings" element={<BusinessSettingsPage />} />
                     <Route path="business/staff" element={<StaffPage />} />
                     <Route path="business/branches" element={<BranchesPage />} />
@@ -236,6 +245,10 @@ export default function App() {
                   <Route path="/admin" element={<RoleGuard dashboard="platform_admin"><AdminLayout /></RoleGuard>}>
                     <Route index element={<Navigate to="/admin/control-tower" replace />} />
                     <Route path="control-tower" element={<RoleGuard dashboard="super_admin"><AdminControlTowerPage /></RoleGuard>} />
+                    <Route path="workspace/finance" element={<RoleGuard dashboard="finance_settlement"><WorkspaceDashboardPage dashboard="finance_settlement" /></RoleGuard>} />
+                    <Route path="workspace/risk" element={<RoleGuard dashboard="security_risk"><WorkspaceDashboardPage dashboard="security_risk" /></RoleGuard>} />
+                    <Route path="workspace/platform" element={<RoleGuard dashboard="platform_admin"><WorkspaceDashboardPage dashboard="platform_admin" /></RoleGuard>} />
+                    <Route path="workspace/super" element={<RoleGuard dashboard="super_admin"><WorkspaceDashboardPage dashboard="super_admin" /></RoleGuard>} />
                     <Route path="users" element={<AdminUsersPage />} />
                     <Route path="businesses" element={<AdminBusinessesPage />} />
                     <Route path="products" element={<AdminProductsPage />} />
