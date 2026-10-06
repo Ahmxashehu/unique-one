@@ -3559,6 +3559,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           currency: 'NGN',
           idempotencyKey,
           createdAt: now,
+          timestamp: now,
         });
         return paymentResult;
       });
@@ -3652,6 +3653,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           resourceId: orderId,
           reason: 'unpaid_order_inventory_release',
           createdAt: now,
+          timestamp: Timestamp.now(),
         });
         return { orderId, cancelled: true, replayed: false };
       });
