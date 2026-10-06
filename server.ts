@@ -2339,8 +2339,18 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         : adminDb.collection('conversations').doc();
       const existingConversation = await conversationRef.get();
       if (existingConversation.exists) {
+        // An existing conversation must still authorize the requester before
+        // returning its metadata or repairing membership records. This prevents
+        // a caller who knows a deterministic direct-conversation ID from using
+        // this endpoint as a conversation-membership oracle.
+        const requesterMembershipRef = adminDb.collection('conversationMembers')
+          .doc(conversationMemberDocumentId(conversationRef.id, creatorUid));
+        const requesterMembership = await requesterMembershipRef.get();
+        if (!requesterMembership.exists) {
+          return errorResponse(res, 'FORBIDDEN', 'You are not a member of this conversation.', 403);
+        }
         // Repair any missing membership records for an existing direct conversation.
-        // This is safe for conversations created before the current membership flow.
+        // This is safe because the requester has already been authorized as a member.
         const existingData = existingConversation.data() as Conversation;
         const expectedMembers = buildConversationMembers(
           conversationRef.id,
