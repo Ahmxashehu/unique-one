@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
-  Bell,
   Building2,
   Clock3,
   MapPin,
@@ -514,28 +513,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          <Link
-            to="/ai"
-            aria-label="Open Unique AI"
-            className="group relative hidden h-10 shrink-0 translate-y-1 items-center gap-1.5 rounded-full border border-emerald-200/80 bg-white/90 px-2.5 text-emerald-800 shadow-[0_0_16px_rgba(16,185,129,0.18)] backdrop-blur-xl transition hover:scale-[1.04] hover:border-emerald-300 hover:shadow-[0_0_22px_rgba(16,185,129,0.3)] sm:inline-flex"
-          >
-            <span className="absolute -inset-1 rounded-full bg-emerald-300/20 blur-md" aria-hidden="true" />
-            <span className="relative flex h-8 w-8 items-center justify-center" aria-hidden="true">
-              <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-emerald-400 border-r-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.65)]" style={{ animationDuration: '2.4s' }} />
-              <span className="absolute inset-[-2px] animate-pulse rounded-full bg-emerald-400/15 blur-md" />
-              <span className="relative z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/90 bg-white text-[10px] font-black tracking-[-0.08em] text-emerald-700 shadow-sm">
-                U1
-              </span>
-            </span>
-            <span className="relative text-[11px] font-black tracking-tight">Unique AI</span>
-          </Link>
-          <Link
-            to="/os/notifications"
-            className="hidden h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white sm:flex"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-          </Link>
         </div>
       </header>
 
