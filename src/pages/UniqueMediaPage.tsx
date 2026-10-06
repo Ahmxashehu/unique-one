@@ -22,7 +22,7 @@ const kindForFile = (file: File): Exclude<MediaKind, 'all'> | null => {
   return null;
 };
 
-const iconForKind = (kind: Exclude<MediaKind, 'all'> | 'other' | 'document') => {
+const iconForKind = (kind: Exclude<MediaKind, 'all'> | 'other') => {
   if (kind === 'video') return Play;
   if (kind === 'audio') return Music2;
   if (kind === 'image') return ImageIcon;
