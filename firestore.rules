@@ -209,8 +209,11 @@ service cloud.firestore {
         && request.resource.data.sellerId == request.auth.uid
         && request.resource.data.status in ['draft','published','out_of_stock']
         && request.resource.data.price is number
+        && request.resource.data.price >= 0
         && request.resource.data.quantity is number
-        && request.resource.data.minOrderQuantity is number;
+        && request.resource.data.quantity >= 0
+        && request.resource.data.minOrderQuantity is number
+        && request.resource.data.minOrderQuantity >= 1;
       allow update: if isAuthenticated()
         && resource.data.sellerId == request.auth.uid
         && request.resource.data.sellerId == resource.data.sellerId
@@ -222,6 +225,12 @@ service cloud.firestore {
           'variants','location','deliveryOptions','pickupOptions','status','updatedAt'
         ])
         && request.resource.data.status in ['draft','published','out_of_stock']
+        && request.resource.data.price is number
+        && request.resource.data.price >= 0
+        && request.resource.data.quantity is number
+        && request.resource.data.quantity >= 0
+        && request.resource.data.minOrderQuantity is number
+        && request.resource.data.minOrderQuantity >= 1
         || isAdmin();
       allow delete: if isAdmin();
     }
