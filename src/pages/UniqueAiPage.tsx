@@ -1,4 +1,11 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+
+const formatAiTime = (value: unknown): string => {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds)) return '00:00';
+  const total = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(total / 60).toString().padStart(2, '0')}:${(total % 60).toString().padStart(2, '0')}`;
+};
 import { Link } from "react-router-dom";
 import { FileDown, Send, Sparkles } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
