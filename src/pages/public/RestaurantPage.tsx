@@ -161,7 +161,28 @@ export default function RestaurantPage() {
             transactionPin,
           }),
         });
-        const paymentData = await paymentResponse.json().catch(() => ({}));
+        let paymentData = await paymentResponse.json().catch(() => ({}));
+        if (!paymentResponse.ok && paymentData?.error?.code === 'BIOMETRIC_REQUIRED') {
+          const { createBiometricAssertion } = await import('../../components/security/PasskeySecurityCard');
+          const biometricAssertion = await createBiometricAssertion(currentUser, `restaurant_payment|\${currentUser.uid}|\${data.orderId}|\${data.totalMinor}|NGN`);
+          const retryResponse = await fetch('/api/restaurant/pay', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer \${token}` },
+            body: JSON.stringify({
+              orderId: data.orderId,
+              idempotencyKey: `restaurant_pay_\${Date.now()}_\${Math.random().toString(36).slice(2, 10)}`,
+              transactionPin,
+              biometricAssertion,
+            }),
+          });
+          paymentData = await retryResponse.json().catch(() => ({}));
+          if (retryResponse.ok) {
+            setOrderError('Payment confirmed. Your restaurant order has been recorded.');
+            setStage('ready');
+            return;
+          }
+          paymentResponse = retryResponse;
+        }
         if (!paymentResponse.ok) {
           if (paymentResponse.status === 503 || paymentData?.error?.code === 'UNAVAILABLE') {
             setOrderError('Order created securely, but this restaurant is not yet connected to a verified UniquePay merchant wallet. No money was debited.');
