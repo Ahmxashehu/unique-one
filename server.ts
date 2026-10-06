@@ -505,13 +505,18 @@ const app = express();
     try {
       const hostUid = String((req as any).user?.uid || '');
       const roomId = typeof req.body?.roomId === 'string' ? req.body.roomId.trim() : '';
-      const targetUniqueId = typeof req.body?.targetUniqueId === 'string' ? req.body.targetUniqueId.trim().slice(0, 128) : '';
+      const targetUniqueId = typeof req.body?.targetUniqueId === 'string' ? req.body.targetUniqueId.trim() : '';
+      if (targetUniqueId && !/^\d{11}$/.test(targetUniqueId)) return errorResponse(res, 'INVALID_REQUEST', 'A target Unique ID must be exactly 11 digits.');
       if (!isSafeFirebaseUid(hostUid) || !isSafeFirebaseUid(roomId)) return errorResponse(res, 'INVALID_REQUEST', 'A valid conference is required.');
       const conferenceSnap = await adminDb.collection('conferences').doc(roomId).get();
       if (!conferenceSnap.exists || conferenceSnap.data()?.hostUid !== hostUid || conferenceSnap.data()?.status !== 'live') return errorResponse(res, 'FORBIDDEN', 'Only the active conference host can create invitations.');
       const inviteToken = randomUUID() + randomUUID().replace(/-/g, '');
       const inviteHash = createHash('sha256').update(inviteToken).digest('hex');
       const now = Timestamp.now();
+      if (targetUniqueId) {
+        const targetSnap = await adminDb.collection('users').where('uniqueOneId', '==', targetUniqueId).limit(1).get();
+        if (targetSnap.empty) return errorResponse(res, 'NOT_FOUND', 'The target Unique ID could not be found.');
+      }
       await adminDb.collection('conferenceInvites').doc(inviteHash).set({ conferenceId: roomId, hostUid, targetUniqueId: targetUniqueId || null, status: 'active', expiresAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000), createdAt: now });
       return res.json({ inviteUrl: `${req.protocol}://${req.get('host')}/conference/${roomId}?invite=${encodeURIComponent(inviteToken)}`, expiresInSeconds: 86400 });
     } catch (error) {
