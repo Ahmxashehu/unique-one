@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Check, Loader2, Search, ShieldCheck, X } from 'lucide-react';
+import { AlertCircle, Check, Loader2, Search, ShieldCheck, X, RefreshCw } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -38,6 +38,20 @@ export default function AdminVerificationPage() {
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refreshUsers = async () => {
+    setRefreshing(true);
+    setError('');
+    try {
+      const snapshot = await getDocs(collection(db, 'users'));
+      setUsers(snapshot.docs.map(item => ({ id: item.id, ...item.data() } as UserRecord)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to refresh verification records.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const loadUsers = async () => {
     setLoading(true);
@@ -106,6 +120,7 @@ export default function AdminVerificationPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Verification Center</h1>
         <p className="text-sm text-slate-500 mt-1">Review and manage platform user verification status.</p>
+        <button type="button" onClick={() => void refreshUsers()} disabled={refreshing} className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"><RefreshCw className={refreshing ? 'w-4 h-4 animate-spin' : 'w-4 h-4'} /> Refresh</button>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
