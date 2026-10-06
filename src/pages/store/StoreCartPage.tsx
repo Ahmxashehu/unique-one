@@ -147,6 +147,7 @@ export default function StoreCartPage() {
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>;
 
   const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const totalMinor = Math.round(total * 100);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6 pb-28">
