@@ -139,7 +139,7 @@ export default function AppLayout() {
                 ['Near Me', '/near-me', Globe],
                 ['Jobs', '/jobs', Briefcase],
                 ['Contributions', '/os/contributions', HeartHandshake],
-                ['Education', '/education-hub', GraduationCap],
+                ['Education', '/os/education', GraduationCap],
                 ['Travel', '/os/travel', Plane],
               ].map(([name, path, Icon]) => {
                 const ExperienceIcon = Icon as React.ComponentType<{ className?: string }>;
