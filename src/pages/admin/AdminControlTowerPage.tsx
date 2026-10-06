@@ -120,13 +120,13 @@ export default function AdminControlTowerPage() {
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[.18em] text-emerald-200">
             <LockKeyhole className="h-3.5 w-3.5" /> Governance
           </div>
-          <h1 className="mt-3 text-2xl font-black sm:text-4xl">Unique One Control Tower</h1>
+          <h1 className="mt-3 text-2xl font-black sm:text-4xl">UniquePlatform Control Tower</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-white/70">
             One role-based management architecture for Personal, Pay, Store, Business, Operations, Finance, Security and Platform administration.
           </p>
           <div className="mt-5 grid grid-cols-3 gap-2 sm:max-w-xl">
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-xl font-black">{dashboards.length}</p><p className="text-[10px] text-white/60">Dashboard environments</p></div>
-            <div className="rounded-2xl bg-white/10 p-3"><p className="text-xl font-black">1</p><p className="text-[10px] text-white/60">Permission centre</p></div>
+            <div className="rounded-2xl bg-white/10 p-3"><p className="text-xl font-black">RBAC</p><p className="text-[10px] text-white/60">Permission centre</p></div>
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-xl font-black">RBAC</p><p className="text-[10px] text-white/60">Access model</p></div>
           </div>
         </div>
