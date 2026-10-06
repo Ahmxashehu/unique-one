@@ -694,6 +694,20 @@ const app = express();
         lastLogin: now.toDate().toISOString(),
         verificationStatus: 'phone_verified',
       }, { merge: true });
+      try {
+        await getAuth().revokeRefreshTokens(decoded.uid);
+      } catch (revokeError) {
+        console.error('Password reset session revocation failed:', revokeError);
+        return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Password reset completed, but active sessions could not be safely revoked. Please sign in again later.');
+      }
+      await adminDb.collection('audit_logs').add({
+        action: 'auth.login_password.reset',
+        actorUid: decoded.uid,
+        targetUid: decoded.uid,
+        resource: 'auth_credentials',
+        resourceId: decoded.uid,
+        timestamp: now,
+      });
       return res.json({ ok: true, passwordReset: true });
     } catch (error: any) {
       const code = error?.code === 'auth/id-token-expired' || error?.code === 'auth/argument-error'
