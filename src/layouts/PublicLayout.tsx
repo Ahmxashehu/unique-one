@@ -61,19 +61,19 @@ export default function PublicLayout() {
         </header>
       )}
 
-      <main className={cn("flex-1 overflow-y-auto pb-16 md:pb-0", location.pathname !== "/" && "pt-16")}>
+      <main className={cn("flex-1 overflow-y-auto pb-16", location.pathname !== "/" && "pt-16")}>
         <Outlet />
       </main>
 
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-[100] isolate" role="dialog" aria-modal="true" aria-label="More UniquePlatform">
+        <div className="fixed inset-0 z-[100] isolate" role="dialog" aria-modal="true" aria-label="More UniquePlatform">
           <button
             type="button"
             aria-label="Close menu"
             className="absolute inset-0 h-full w-full bg-slate-950/45 backdrop-blur-sm"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          <div className="absolute inset-x-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-h-[72dvh] overflow-y-auto overscroll-contain rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl sm:inset-x-3 sm:p-4">
+          <div className="absolute inset-x-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-h-[72dvh] md:inset-x-auto md:left-1/2 md:w-[min(760px,calc(100vw-2rem))] md:-translate-x-1/2 overflow-y-auto overscroll-contain rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl sm:inset-x-3 sm:p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-600">UniquePlatform</p>
@@ -126,7 +126,7 @@ export default function PublicLayout() {
         to="/admin/login"
         aria-label="Authorized access"
         title="Authorized access"
-        className="fixed bottom-3 left-3 z-[90] hidden md:flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/70 bg-white/55 text-slate-300 shadow-sm backdrop-blur-sm transition-all duration-200 hover:h-8 hover:w-8 hover:border-emerald-300 hover:bg-white hover:text-emerald-600 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+        className="fixed bottom-[5.25rem] left-3 z-[90] hidden md:flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/70 bg-white/55 text-slate-300 shadow-sm backdrop-blur-sm transition-all duration-200 hover:h-8 hover:w-8 hover:border-emerald-300 hover:bg-white hover:text-emerald-600 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
       >
         <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.25} />
         <span className="sr-only">Authorized access</span>
