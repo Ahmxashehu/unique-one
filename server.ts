@@ -3268,9 +3268,9 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 500) : '';
       const cart = body.cart;
       const subtotal = body.subtotal;
-      const deliveryFee = body.deliveryFee;
-      const serviceFee = body.serviceFee;
-      const total = body.total;
+      const requestedDeliveryFee = body.deliveryFee;
+      const requestedServiceFee = body.serviceFee;
+      const requestedTotal = body.total;
       if (!restaurantId || !['dine-in', 'delivery', 'pickup'].includes(String(mode)) ||
           !['uniquepay', 'bank-transfer'].includes(String(paymentMethod)) ||
           !customerName || !customerPhone || !isPlainObject(cart) ||
@@ -3280,7 +3280,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (mode === 'delivery' && !deliveryAddress) return errorResponse(res, 'INVALID_REQUEST', 'A delivery address is required.');
       if (mode === 'dine-in' && (!date || !time)) return errorResponse(res, 'INVALID_REQUEST', 'Date and time are required for dine-in.');
       if (mode === 'pickup' && (!date || !time)) return errorResponse(res, 'INVALID_REQUEST', 'Pickup date and time are required.');
-      if (total !== subtotal + deliveryFee + serviceFee || total <= 0) return errorResponse(res, 'INVALID_AMOUNT', 'The restaurant order total is invalid.');
+      if (!Number.isSafeInteger(subtotal) || subtotal <= 0) return errorResponse(res, 'INVALID_AMOUNT', 'The restaurant subtotal is invalid.');
+      const deliveryFee = mode === 'delivery' ? 1500 : 0;
+      const serviceFee = Math.max(300, Math.round(subtotal * 0.03));
+      const total = subtotal + deliveryFee + serviceFee;
+      if (!Number.isSafeInteger(total) || total <= 0) return errorResponse(res, 'INVALID_AMOUNT', 'The restaurant order total is invalid.');
       const items = Object.entries(cart).map(([itemId, quantity]) => ({ itemId, quantity })).filter((item) => Number.isSafeInteger(item.quantity) && Number(item.quantity) > 0);
       if (!items.length) return errorResponse(res, 'INVALID_REQUEST', 'Add at least one menu item before checkout.');
       const fingerprint = createHash('sha256').update(JSON.stringify({ uid, restaurantId, mode, paymentMethod, customerName, customerPhone, deliveryAddress, date, time, seating, notes, items, subtotal, deliveryFee, serviceFee, total })).digest('hex');
