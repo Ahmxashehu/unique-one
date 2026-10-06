@@ -91,7 +91,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasRole = (role: Role) => {
     if (!userData) return false;
-    return userData.roles.includes(role) || userData.roles.includes('administrator');
+    // Role checks must be exact. "administrator" is not a substitute for
+    // higher-privilege roles such as platform_admin or super_admin.
+    return userData.roles.includes(role);
   };
 
   const hasPermission = (permission: Permission) => {
