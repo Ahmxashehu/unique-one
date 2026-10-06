@@ -240,7 +240,13 @@ service cloud.firestore {
     }
     match /quotes/{quoteId} {
       allow read: if isAdmin() || (isAuthenticated() && (resource.data.sellerId == request.auth.uid || (exists(/databases/$(database)/documents/productRequests/$(resource.data.requestId)) && get(/databases/$(database)/documents/productRequests/$(resource.data.requestId)).data.customerId == request.auth.uid)));
-      allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.sellerId == request.auth.uid
+        && request.resource.data.requestId is string
+        && exists(/databases/$(database)/documents/productRequests/$(request.resource.data.requestId))
+        && get(/databases/$(database)/documents/productRequests/$(request.resource.data.requestId)).data.status == 'published'
+        && get(/databases/$(database)/documents/productRequests/$(request.resource.data.requestId)).data.customerId != request.auth.uid
+        && request.resource.data.keys().hasOnly(['requestId','sellerId','amount','currency','message','status','createdAt','updatedAt']);
       allow update: if isAuthenticated()
         && request.resource.data.sellerId == resource.data.sellerId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
