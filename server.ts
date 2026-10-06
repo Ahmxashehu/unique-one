@@ -3933,14 +3933,6 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
-  app.get("/api/calendar/events", authenticate, async (req, res) => {
-    try {
-      const authHeader = req.headers.authorization; if (!authHeader) return res.status(401).json({ error: "No authorization header" });
-      const response = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=" + new Date().toISOString() + "&maxResults=10&singleEvents=true&orderBy=startTime", { headers: { Authorization: authHeader, Accept: "application/json" } });
-      if (!response.ok) return res.status(response.status).json(await response.json());
-      return res.json(await response.json());
-    } catch (error) { console.error("Calendar API Error:", error); return res.status(500).json({ error: "Failed to fetch calendar events" }); }
-  });
   if (process.env.NODE_ENV !== "production") { const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" }); app.use(vite.middlewares); }
   else {
     const distPath = path.join(process.cwd(), "dist");
