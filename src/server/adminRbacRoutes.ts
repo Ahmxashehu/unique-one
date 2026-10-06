@@ -60,8 +60,10 @@ export function registerAdminRbacRoutes(
   app.patch('/api/admin/rbac/users/:uid', authenticate, requirePermission('manage:roles'), async (req, res) => {
     const actorUid = String((req as any).user?.uid || '');
     const targetUid = String(req.params.uid || '').trim();
-    const roles = Array.isArray(req.body?.roles) ? Array.from(new Set(req.body.roles.filter((value: unknown): value is Role => isRole(value)))) : [];
-    const permissions = Array.isArray(req.body?.permissions) ? Array.from(new Set(req.body.permissions.filter((value: unknown): value is Permission => isPermission(value)))) : [];
+    const rawRoles: unknown[] = Array.isArray(req.body?.roles) ? req.body.roles : [];
+    const rawPermissions: unknown[] = Array.isArray(req.body?.permissions) ? req.body.permissions : [];
+    const roles: Role[] = Array.from(new Set(rawRoles.filter(isRole)));
+    const permissions: Permission[] = Array.from(new Set(rawPermissions.filter(isPermission)));
     if (!targetUid || roles.length !== (rawRoles.length ? new Set(rawRoles).size : 0) || permissions.length !== (rawPermissions.length ? new Set(rawPermissions).size : 0)) {
       return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Invalid role or permission values.' } });
     }
