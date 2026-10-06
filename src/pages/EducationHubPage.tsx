@@ -2,10 +2,10 @@ import { Link } from 'react-router-dom';
 import { BookOpen, GraduationCap, Users, Presentation, Lightbulb, HeartHandshake, School, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 
 const pathways = [
-  { title: 'Learn', text: 'Discover courses, study resources, practical skills and learning opportunities.', icon: BookOpen, to: '/education' },
-  { title: 'Teach', text: 'Teachers, lecturers, tutors and experts can share knowledge and build learning communities.', icon: Presentation, to: '/education' },
+  { title: 'Learn', text: 'Discover courses, study resources, practical skills and learning opportunities.', icon: BookOpen, to: '/os/education' },
+  { title: 'Teach', text: 'Teachers, lecturers, tutors and experts can share knowledge and build learning communities.', icon: Presentation, to: '/os/education' },
   { title: 'Contribute', text: 'Students, alumni, educators and everyone with useful knowledge can contribute ideas, resources and opportunities.', icon: HeartHandshake, to: '/register' },
-  { title: 'Institutions', text: 'Schools, colleges, universities and training providers can build a trusted presence.', icon: School, to: '/education' },
+  { title: 'Institutions', text: 'Schools, colleges, universities and training providers can build a trusted presence.', icon: School, to: '/os/education' },
 ];
 
 export default function EducationHubPage() {
