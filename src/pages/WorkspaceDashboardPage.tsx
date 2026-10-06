@@ -5,7 +5,7 @@ import { DASHBOARD_ACCESS_ROLES, type DashboardId } from '../lib/auth/rbac';
 import {
   LayoutDashboard, Wallet, Store, Building2, Landmark, BriefcaseBusiness, Radio, Bot,
   ShieldCheck, Settings2, Activity, ArrowRight, Users, Package, ShoppingBag, CalendarDays,
-  MessageSquare, FileText, BarChart3, CreditCard, Search, Bell, CheckCircle2
+  MessageSquare, FileText, BarChart3, CreditCard, Search, Bell, CheckCircle2, Sparkles
 } from 'lucide-react';
 
 type Module = { label: string; description: string; to: string; icon: React.ElementType };
@@ -223,7 +223,7 @@ const configs: Record<DashboardId, WorkspaceConfig> = {
 };
 
 function SparklesIcon(props: React.ComponentProps<typeof Sparkles>) {
-  return <Bot {...props} />;
+  return <Sparkles {...props} />;
 }
 
 export default function WorkspaceDashboardPage({ dashboard }: { dashboard: DashboardId }) {
@@ -254,11 +254,11 @@ export default function WorkspaceDashboardPage({ dashboard }: { dashboard: Dashb
       </section>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {config.metrics.map((metric, index) => (
+        {config.metrics.map((metric) => (
           <div key={metric} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{metric}</p>
-            <p className="mt-2 text-xl font-black text-slate-900">{index === 0 ? 'Live' : 'Ready'}</p>
-            <p className="mt-1 text-xs text-slate-500">Connected workspace module</p>
+            <p className="mt-2 text-xl font-black text-slate-900">Available</p>
+            <p className="mt-1 text-xs text-slate-500">Workspace module connected</p>
           </div>
         ))}
       </section>
