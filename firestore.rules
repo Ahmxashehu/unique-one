@@ -329,11 +329,15 @@ service cloud.firestore {
     }
     match /suppliers/{supplierId} {
       allow read: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
-      allow create: if isAuthenticated() && request.resource.data.businessOwnerUid == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.businessOwnerUid == request.auth.uid
+        && request.resource.data.outstandingAmount == 0
+        && request.resource.data.verificationStatus == 'unverified'
+        && request.resource.data.keys().hasOnly(['businessOwnerUid','name','companyName','phone','email','address','category','outstandingAmount','verificationStatus','createdAt']);
       allow update: if isAuthenticated()
         && resource.data.businessOwnerUid == request.auth.uid
         && request.resource.data.businessOwnerUid == resource.data.businessOwnerUid
-        && request.resource.data.diff(resource.data).affectedKeys().hasNone(['businessOwnerUid', 'outstandingAmount', 'verificationStatus', 'createdAt']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','companyName','phone','email','address','category']);
       allow delete: if isAuthenticated() && resource.data.businessOwnerUid == request.auth.uid;
     }
 
