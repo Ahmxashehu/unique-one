@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, CheckCircle2, KeyRound, Loader2, LogIn, ShieldCheck, LockKeyhole } from 'lucide-react';
+import { Building2, KeyRound, Loader2, LogIn, ShieldCheck } from 'lucide-react';
 import { getIdToken } from 'firebase/auth';
-import { useAuth } from '../contexts/AuthContext';
-import BusinessRegisterPage from './business/BusinessRegisterPage';
+import { useAuth } from '../../contexts/AuthContext';
+import BusinessRegisterPage from '../../pages/business/BusinessRegisterPage';
 
 type Membership = { businessId: string; businessName: string; role: string; status: string };
 type Status = {
@@ -16,12 +16,9 @@ type Status = {
 
 const SESSION_KEY = 'unique_business_session';
 
-async function api(path: string, options: RequestInit = {}) {
-  const token = getIdToken;
+async function api(firebaseUser: NonNullable<ReturnType<typeof useAuth>['currentUser']>, path: string, options: RequestInit = {}) {
+  const idToken = await getIdToken(firebaseUser);
   const current = options.headers instanceof Headers ? Object.fromEntries(options.headers.entries()) : (options.headers || {});
-  const firebaseUser = (window as any).__uniqueCurrentUser;
-  if (!firebaseUser) throw new Error('Personal Account session is required.');
-  const idToken = await token(firebaseUser);
   const businessSession = localStorage.getItem(SESSION_KEY) || '';
   return fetch(path, {
     ...options,
@@ -40,22 +37,15 @@ export function BusinessAccessGuard({ children }: { children: React.ReactNode })
   const [loading, setLoading] = useState(true);
   const [businessId, setBusinessId] = useState('');
   const [password, setPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [working, setWorking] = useState(false);
-
-  // Keep the Firebase user available to the small API helper without exposing credentials.
-  useEffect(() => {
-    (window as any).__uniqueCurrentUser = currentUser;
-    return () => { delete (window as any).__uniqueCurrentUser; };
-  }, [currentUser]);
 
   const load = async () => {
     if (!currentUser) return;
     setLoading(true);
     try {
-      const response = await api('/api/business/access/status');
+      const response = await api(currentUser, '/api/business/access/status');
       const result = await response.json().catch(() => null);
       if (!response.ok) throw new Error(result?.error?.message || 'Unable to check Business Platform access.');
       setStatus(result);
@@ -71,11 +61,12 @@ export function BusinessAccessGuard({ children }: { children: React.ReactNode })
   useEffect(() => { void load(); }, [currentUser]);
 
   const submit = async (mode: 'setup' | 'login') => {
+    if (!currentUser) return;
     setWorking(true);
     setError('');
     try {
       if (mode === 'setup' && password !== confirmPassword) throw new Error('The passwords do not match.');
-      const response = await api(`/api/business/access/${mode}`, {
+      const response = await api(currentUser, `/api/business/access/${mode}`, {
         method: 'POST',
         body: JSON.stringify({ businessId, password }),
       });
