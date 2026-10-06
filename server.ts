@@ -1182,6 +1182,22 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           productId, sellerId: uid, direction, quantity, previousQuantity: currentQuantity,
           remainingQuantity: nextQuantity, note, createdAt: Timestamp.now(),
         });
+        const auditRef = adminDb.collection('audit_logs').doc();
+        transaction.create(auditRef, {
+          action: 'business.inventory.adjusted',
+          actorUid: uid,
+          targetUid: uid,
+          resource: 'inventory',
+          resourceId: productId,
+          productId,
+          movementId: movementRef.id,
+          direction,
+          quantity,
+          previousQuantity: currentQuantity,
+          remainingQuantity: nextQuantity,
+          note,
+          timestamp: Timestamp.now(),
+        });
       });
 
       return res.status(200).json({ productId, direction, quantity, remainingQuantity: remaining });
