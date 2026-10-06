@@ -1,5 +1,6 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import type { Express, RequestHandler, Response } from 'express';
+import { getAuth } from 'firebase-admin/auth';
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import rateLimit from 'express-rate-limit';
 
@@ -27,38 +28,117 @@ function validateBusinessPassword(value: unknown): string | null {
 }
 
 async function getMemberships(db: Firestore, uid: string) {
-  const snapshot = await db.collection('businessMemberships')
+  const membershipSnapshot = await db.collection('businessMemberships')
     .where('uid', '==', uid)
     .where('status', '==', 'active')
     .limit(20)
     .get();
 
-  return Promise.all(snapshot.docs.map(async (doc) => {
+  const existing = new Map<string, { businessId: string; role: string; businessName: string; status: string }>();
+  for (const doc of membershipSnapshot.docs) {
     const data = doc.data();
     const businessId = String(data.businessId || '');
-    const businessSnap = businessId ? await db.collection('businesses').doc(businessId).get() : null;
-    const business = businessSnap?.exists ? businessSnap.data() || {} : {};
-    return {
+    if (!businessId) continue;
+    const businessSnap = await db.collection('businesses').doc(businessId).get();
+    const business = businessSnap.exists ? businessSnap.data() || {} : {};
+    existing.set(businessId, {
       businessId,
       role: String(data.role || 'staff_member'),
       businessName: String(business.name || data.businessName || 'Unique Business'),
       status: String(data.status || 'active'),
-    };
-  }));
+    });
+  }
+
+  // Repair/complete memberships for approvals created before the membership record existed.
+  const approvals = await db.collection('businessApplications')
+    .where('applicantUid', '==', uid)
+    .where('status', '==', 'approved')
+    .limit(20)
+    .get();
+
+  for (const approvalDoc of approvals.docs) {
+    const application = approvalDoc.data();
+    let businessId = typeof application.businessId === 'string' ? application.businessId : '';
+    if (!businessId && application.applicationType === 'join_business' && typeof application.organizationName === 'string') {
+      const businessQuery = await db.collection('businesses').where('name', '==', application.organizationName.trim()).limit(1).get();
+      businessId = businessQuery.empty ? '' : businessQuery.docs[0].id;
+    }
+    if (!businessId || existing.has(businessId)) continue;
+
+    const businessSnap = await db.collection('businesses').doc(businessId).get();
+    if (!businessSnap.exists) continue;
+    const business = businessSnap.data() || {};
+    const role = String(application.requestedRole || 'staff_member');
+    const membershipRef = db.collection('businessMemberships').doc(`${uid}__${businessId}`);
+    await membershipRef.set({
+      uid,
+      businessId,
+      role,
+      businessName: String(business.name || application.organizationName || application.name || 'Unique Business'),
+      status: 'active',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      sourceApplicationId: approvalDoc.id,
+    }, { merge: true });
+
+    existing.set(businessId, {
+      businessId,
+      role,
+      businessName: String(business.name || application.organizationName || application.name || 'Unique Business'),
+      status: 'active',
+    });
+  }
+
+  return Array.from(existing.values());
+}
+
+async function getActiveSession(db: Firestore, uid: string, token: string) {
+  if (!token || token.length < 32) return null;
+  const snapshot = await db.collection('businessAccessSessions').doc(hashToken(token)).get();
+  if (!snapshot.exists) return null;
+  const data = snapshot.data() || {};
+  if (data.uid !== uid || data.status !== 'active' || typeof data.expiresAt?.toMillis !== 'function' || data.expiresAt.toMillis() <= Date.now()) return null;
+  return data;
 }
 
 async function sessionValid(db: Firestore, uid: string, businessId: string, token: string) {
-  if (!token || token.length < 32) return false;
-  const snapshot = await db.collection('businessAccessSessions').doc(hashToken(token)).get();
-  if (!snapshot.exists) return false;
-  const data = snapshot.data() || {};
-  return data.uid === uid && data.businessId === businessId && data.status === 'active' &&
-    typeof data.expiresAt?.toMillis === 'function' && data.expiresAt.toMillis() > Date.now();
+  const session = await getActiveSession(db, uid, token);
+  return Boolean(session && session.businessId === businessId);
 }
 
 export function registerBusinessAccessRoutes(app: Express, authenticate: RequestHandler, db: Firestore) {
   const setupLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 8, standardHeaders: true, legacyHeaders: false });
   const loginLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 12, standardHeaders: true, legacyHeaders: false });
+
+  // Server-side enforcement: the separate Business credential is required for protected
+  // Business APIs, not merely for displaying the dashboard UI.
+  app.use('/api/business', async (req, res, next) => {
+    const exempt = new Set([
+      '/register',
+      '/applications',
+      '/access/status',
+      '/access/setup',
+      '/access/login',
+      '/access/logout',
+      '/staff/accept-invite',
+    ]);
+    if (exempt.has(req.path)) return next();
+
+    const authHeader = typeof req.headers.authorization === 'string' ? req.headers.authorization : '';
+    const businessToken = typeof req.headers['x-business-session'] === 'string' ? req.headers['x-business-session'] : '';
+    if (!authHeader.startsWith('Bearer ') || !businessToken) return fail(res, 'BUSINESS_AUTH_REQUIRED', 'Business Platform authentication is required.', 401);
+
+    try {
+      const idToken = authHeader.slice(7).trim();
+      const decoded = await getAuth().verifyIdToken(idToken);
+      const session = await getActiveSession(db, decoded.uid, businessToken);
+      if (!session) return fail(res, 'BUSINESS_AUTH_REQUIRED', 'Your Business Platform session has expired or was revoked. Please sign in again.', 401);
+      (req as any).businessSession = session;
+      return next();
+    } catch {
+      return fail(res, 'BUSINESS_AUTH_REQUIRED', 'Business Platform authentication could not be verified.', 401);
+    }
+  });
 
   app.get('/api/business/access/status', authenticate, async (req, res) => {
     const uid = String((req as any).user?.uid || '');
