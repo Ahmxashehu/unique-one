@@ -422,7 +422,11 @@ service cloud.firestore {
     match /messageRequests/{requestId} { allow read: if isAuthenticated() && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid); allow create, update, delete: if false; }
     match /userPresence/{uid} { allow read: if isAuthenticated() && request.auth.uid == uid; allow create, update, delete: if false; }
     match /locations/{locationId} {
-      allow read: if true;
+      // Personal coordinates must never be publicly readable. Business/service coordinates may remain discoverable for Near Me.
+      allow read: if isAdmin()
+        || (isAuthenticated() && resource.data.referenceId == request.auth.uid)
+        || (resource.data.referenceId is string
+          && exists(/databases/$(database)/documents/businesses/$(resource.data.referenceId)));
       allow create: if isAuthenticated()
         && request.resource.data.keys().hasOnly(['referenceId', 'lat', 'lng'])
         && request.resource.data.referenceId is string
