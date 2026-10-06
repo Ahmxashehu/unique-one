@@ -62,7 +62,7 @@ export function registerAdminRbacRoutes(
     const targetUid = String(req.params.uid || '').trim();
     const roles = Array.isArray(req.body?.roles) ? Array.from(new Set(req.body.roles.filter((value: unknown): value is Role => isRole(value)))) : [];
     const permissions = Array.isArray(req.body?.permissions) ? Array.from(new Set(req.body.permissions.filter((value: unknown): value is Permission => isPermission(value)))) : [];
-    if (!targetUid || roles.length !== (Array.isArray(req.body?.roles) ? new Set(req.body.roles).size : 0) || permissions.length !== (Array.isArray(req.body?.permissions) ? new Set(req.body.permissions).size : 0)) {
+    if (!targetUid || roles.length !== (rawRoles.length ? new Set(rawRoles).size : 0) || permissions.length !== (rawPermissions.length ? new Set(rawPermissions).size : 0)) {
       return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Invalid role or permission values.' } });
     }
     if (targetUid === actorUid && !roles.includes('super_admin')) {
