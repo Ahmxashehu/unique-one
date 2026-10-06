@@ -15,7 +15,7 @@ export default function AdminLayout() {
     { name: 'Users', path: '/admin/users', icon: Users },
     { name: 'Businesses', path: '/admin/businesses', icon: Building2 },
     { name: 'Products', path: '/admin/products', icon: Package },
-    { name: 'Requests', path: '/admin/requests', icon: Inbox },
+    { name: 'Business Applications', path: '/admin/requests', icon: Inbox },
     { name: 'Reports', path: '/admin/reports', icon: BarChart3 },
     { name: 'Verification', path: '/admin/verification', icon: ShieldCheck },
     { name: 'Transactions', path: '/admin/transactions', icon: Activity },
@@ -31,7 +31,7 @@ export default function AdminLayout() {
             <div className="w-8 h-8 bg-white/10 rounded flex items-center justify-center">
               <ShieldCheck className="w-5 h-5 text-emerald-400" />
             </div>
-            OS Admin
+            Unique Control Tower
           </div>
         </div>
         
