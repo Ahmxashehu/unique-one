@@ -371,6 +371,7 @@ export default function HomePage() {
       href: string;
       description?: string;
       price?: string;
+      image?: string;
     }> = [];
 
     edgeProducts.slice(0, 3).forEach((product) => {
