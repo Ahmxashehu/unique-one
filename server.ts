@@ -2210,6 +2210,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         if (action === 'decline') {
           const now = Timestamp.now().toDate().toISOString();
           transaction.update(requestRef, { status: 'declined', updatedAt: now });
+          const auditRef = adminDb.collection('audit_logs').doc();
+          transaction.create(auditRef, { action: 'communication.message_request.declined', actorUid: responderUid, targetUid: requestData.fromUid, resource: 'message_request', resourceId: requestId, timestamp: Timestamp.now() });
           return {
             request: { ...requestData, id: requestId, status: 'declined', updatedAt: now },
             conversation: undefined,
@@ -2266,6 +2268,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         }
 
         transaction.update(requestRef, { status: 'accepted', conversationId, updatedAt: nowIso });
+        const auditRef = adminDb.collection('audit_logs').doc();
+        transaction.create(auditRef, { action: 'communication.message_request.accepted', actorUid: responderUid, targetUid: requestData.fromUid, resource: 'message_request', resourceId: requestId, conversationId, timestamp: now });
         return {
           request: { ...requestData, id: requestId, status: 'accepted', conversationId, updatedAt: nowIso },
           conversation,
@@ -2920,6 +2924,16 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           attachments: [],
           encryptedPayload: null,
         });
+        const auditRef = adminDb.collection('audit_logs').doc();
+        transaction.create(auditRef, {
+          action: 'communication.message.deleted',
+          actorUid: uid,
+          targetUid: typeof message.conversationId === 'string' ? message.conversationId : null,
+          resource: 'communication_message',
+          resourceId: messageId,
+          conversationId: message.conversationId ?? null,
+          timestamp: Timestamp.now(),
+        });
       });
       if (attachmentStoragePaths.length > 0) {
         const bucket = getStorage().bucket();
@@ -2994,7 +3008,10 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (blockerUid === blockedUid) return errorResponse(res, 'INVALID_REQUEST', 'You cannot block yourself.');
       if (!(await readUserExists(blockedUid))) return errorResponse(res, 'INVALID_RECIPIENT', 'The user does not exist.');
       const blockId = createHash('sha256').update(blockerUid + ':' + blockedUid).digest('hex').slice(0, 40);
-      await adminDb.collection('communicationBlocks').doc(blockId).set({ id: blockId, blockerUid, blockedUid, createdAt: Timestamp.now().toDate().toISOString() }, { merge: true });      return res.status(200).json({ blocked: true });
+      const now = Timestamp.now();
+      await adminDb.collection('communicationBlocks').doc(blockId).set({ id: blockId, blockerUid, blockedUid, createdAt: now.toDate().toISOString() }, { merge: true });
+      await adminDb.collection('audit_logs').add({ action: 'communication.user.blocked', actorUid: blockerUid, targetUid: blockedUid, resource: 'communication_block', resourceId: blockId, timestamp: now });
+      return res.status(200).json({ blocked: true });
     } catch (error) {
       console.error('Communication block failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Failed to block this user.');
