@@ -187,8 +187,10 @@ service cloud.firestore {
           ]));
       allow delete: if isAdmin();
     }
-    match /roles/{roleId} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
-    match /organizations/{orgId} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
+    // Role definitions and organization records are internal control-plane data.
+    // Keep them out of ordinary authenticated client reads.
+    match /roles/{roleId} { allow read, write: if isAdmin(); }
+    match /organizations/{orgId} { allow read, write: if isAdmin(); }
     match /sessions/{sessionId} { allow read: if isOwner(resource.data.uid) || isAdmin(); allow create, update, delete: if false; }
     match /notifications/{notificationId} { allow read: if isOwner(resource.data.uid); allow update: if isOwner(resource.data.uid) && request.resource.data.uid == resource.data.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']); allow create, delete: if isAdmin(); }
     match /audit_logs/{logId} { allow read: if isAdmin(); allow create, update, delete: if false; }
