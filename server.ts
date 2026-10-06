@@ -3545,6 +3545,20 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         }
         const paymentResult = { status: 'completed', orderIds, transactionIds: paymentTransactionIds, amountMinor, idempotencyKey };
         transaction.create(idempotencyRef, { uid, orderIds, amountMinor, requestFingerprint: fingerprint, status: 'completed', result: paymentResult, createdAt: now, updatedAt: now });
+        const auditRef = adminDb.collection('audit_logs').doc();
+        transaction.create(auditRef, {
+          action: 'store.settlement.completed',
+          actorUid: uid,
+          targetUid: uid,
+          resource: 'store_order_payment',
+          resourceId: orderIds[0],
+          orderIds,
+          transactionIds: paymentTransactionIds,
+          amountMinor,
+          currency: 'NGN',
+          idempotencyKey,
+          createdAt: now,
+        });
         return paymentResult;
       });
       return res.status(200).json(result);
