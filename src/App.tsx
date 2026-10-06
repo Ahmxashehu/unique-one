@@ -202,7 +202,7 @@ export default function App() {
                     <Route path="education" element={<EducationPage />} />
                     <Route path="travel" element={<TravelPage />} />
                     <Route path="business/register" element={<BusinessRegisterPage />} />
-                    <Route path="business/dashboard" element={<RoleGuard dashboard="business"><WorkspaceDashboardPage dashboard="business" /></RoleGuard>} />
+                    <Route path="business/dashboard" element={<RoleGuard dashboard="business" fallback={<BusinessRegisterPage />}><WorkspaceDashboardPage dashboard="business" /></RoleGuard>} />
                     <Route path="business/settings" element={<RoleGuard dashboard="business"><BusinessSettingsPage /></RoleGuard>} />
                     <Route path="business/staff" element={<RoleGuard dashboard="business"><StaffPage /></RoleGuard>} />
                     <Route path="business/branches" element={<RoleGuard dashboard="business"><BranchesPage /></RoleGuard>} />
