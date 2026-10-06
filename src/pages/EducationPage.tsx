@@ -78,7 +78,8 @@ export default function EducationPage() {
     if (!currentUser || !enrollmentInstitutionId) return;
     try {
       const now = new Date().toISOString();
-      await addDoc(collection(db, 'educationEnrollments'), { studentUid: currentUser.uid, institutionId: enrollmentInstitutionId, programme: enrollmentProgramme.trim(), level: enrollmentLevel.trim(), status: 'active', createdAt: now, updatedAt: now });
+      const enrollmentRef = doc(collection(db, 'educationEnrollments'));
+      await setDoc(enrollmentRef, { id: enrollmentRef.id, studentUid: currentUser.uid, institutionId: enrollmentInstitutionId, programme: enrollmentProgramme.trim(), level: enrollmentLevel.trim(), status: 'active', createdAt: now, updatedAt: now });
       setEnrollmentInstitutionId(''); setEnrollmentProgramme(''); setEnrollmentLevel(''); setShowEnrollmentForm(false);
     } catch (e) { console.error(e); setError('Could not create the education enrollment.'); }
   };
