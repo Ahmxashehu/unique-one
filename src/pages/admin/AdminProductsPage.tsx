@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Package, Search, Loader2, AlertCircle } from 'lucide-react';
+import { Package, Search, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
@@ -37,6 +37,7 @@ export default function AdminProductsPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -60,6 +61,20 @@ export default function AdminProductsPage() {
     return () => { active = false; };
   }, []);
 
+  const refreshProducts = async () => {
+    setRefreshing(true);
+    setError('');
+    try {
+      const snapshot = await getDocs(collection(db, 'products'));
+      setProducts(snapshot.docs.map(item => ({ id: item.id, ...item.data() }) as AdminProduct));
+    } catch (loadError) {
+      console.error('Failed to refresh products:', loadError);
+      setError('Unable to refresh products. Check administrator access and try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return products;
@@ -77,7 +92,11 @@ export default function AdminProductsPage() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Global Product Catalog</h1>
           <p className="text-sm text-slate-500 mt-1">Administer all products available across the ecosystem.</p>
         </div>
-        <div className="relative w-full sm:w-72">
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button type="button" onClick={() => void refreshProducts()} disabled={refreshing} className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+            <RefreshCw className={refreshing ? 'w-4 h-4 animate-spin' : 'w-4 h-4'} /> Refresh
+          </button>
+          <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
