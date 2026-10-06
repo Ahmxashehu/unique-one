@@ -3367,6 +3367,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             name: typeof product.name === 'string' ? product.name : 'Product',
             price: product.price,
             quantity: Number(cart.data.quantity),
+            productStatusAtCheckout: product.status,
           }));
           const totalAmount = items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
           transaction.create(orderRef, {
