@@ -1657,6 +1657,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
   app.post('/api/auth/passkey/assertion-options', rateLimit({ windowMs: 5 * 60_000, limit: 12, standardHeaders: true, legacyHeaders: false, handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many biometric verification attempts. Please try again later.') }), authenticate, async (req, res) => {
     try {
       const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const transactionBinding = typeof req.body?.transactionBinding === 'string' && req.body.transactionBinding.length <= 512 ? req.body.transactionBinding : null;
       const credentials = await adminDb.collection('authCredentials').doc(uid).collection(PASSKEY_COLLECTION).get();
       if (credentials.empty) return errorResponse(res, 'NOT_FOUND', 'No biometric security credential is registered on this account.');
       const { origin, rpId } = requestWebAuthnOrigin(req);
@@ -1665,6 +1666,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const challengeId = bufferToBase64Url(crypto.randomBytes(18));
       await adminDb.collection(PASSKEY_CHALLENGES_COLLECTION).doc(challengeId).set({
         uid, type: 'assertion', challenge: bufferToBase64Url(challenge), origin, rpId,
+        ...(transactionBinding ? { transactionBinding } : {}),
         expiresAt: Timestamp.fromMillis(Date.now() + PASSKEY_CHALLENGE_TTL_MS), createdAt: Timestamp.now()
       });
       return res.json({ challenge: bufferToBase64Url(challenge), challengeId, rpId, timeout: 120000, userVerification: 'required', allowCredentials: credentials.docs.map(doc => ({ type: 'public-key', id: doc.id })) });
@@ -1828,6 +1830,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const previousCount = Number(credential.signCount || 0);
       if (previousCount > 0 && signCount > 0 && signCount <= previousCount) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'The biometric credential counter is invalid.');
       await credentialRef.update({ signCount, lastUsedAt: Timestamp.now() });
+      const expectedBinding = 'wallet_transfer|' + senderUid + '|' + recipientId + '|' + amountMinor + '|' + currency + '|' + (description ?? '');
+      if (challengeData.transactionBinding !== expectedBinding) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'This biometric approval is not bound to this transfer.');
     }
     try {
       if (!(await readUserExists(recipientId))) return errorResponse(res, 'RECIPIENT_NOT_FOUND', 'The recipient user does not exist.');
