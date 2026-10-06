@@ -25,7 +25,7 @@ export default function EducationHubPage() {
               </div>
             </div>
             <div className="mt-6 grid grid-cols-2 gap-2 sm:flex">
-              <Link to="/education" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950">Enter Education <ArrowRight className="h-4 w-4" /></Link>
+              <Link to="/os/education" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950">Enter Education <ArrowRight className="h-4 w-4" /></Link>
               <Link to="/register" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-black text-white">Join & Contribute</Link>
             </div>
           </div>
