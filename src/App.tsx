@@ -203,38 +203,38 @@ export default function App() {
                     <Route path="travel" element={<TravelPage />} />
                     <Route path="business/register" element={<BusinessRegisterPage />} />
                     <Route path="business/dashboard" element={<RoleGuard dashboard="business"><WorkspaceDashboardPage dashboard="business" /></RoleGuard>} />
-                    <Route path="business/settings" element={<BusinessSettingsPage />} />
-                    <Route path="business/staff" element={<StaffPage />} />
-                    <Route path="business/branches" element={<BranchesPage />} />
-                    <Route path="business/catalog" element={<CatalogPage />} />
-                    <Route path="business/catalog/new-product" element={<AddProductPage />} />
-                    <Route path="business/catalog/new-service" element={<AddServicePage />} />
-                    <Route path="business/inventory" element={<InventoryPage />} />
-                    <Route path="business/customers" element={<BusinessCustomersPage />} />
-                    <Route path="business/suppliers" element={<SuppliersPage />} />
-                    <Route path="business/orders" element={<BusinessOrdersPage />} />
-                    <Route path="business/invoices" element={<InvoicesPage />} />
-                    <Route path="business/finance" element={<FinancePage />} />
-                    <Route path="business/reports" element={<ReportsPage />} />
-                    <Route path="business/activity" element={<ActivityPage />} />
-                    <Route path="business/profile" element={<BusinessProfilePage />} />
+                    <Route path="business/settings" element={<RoleGuard dashboard="business"><BusinessSettingsPage /></RoleGuard>} />
+                    <Route path="business/staff" element={<RoleGuard dashboard="business"><StaffPage /></RoleGuard>} />
+                    <Route path="business/branches" element={<RoleGuard dashboard="business"><BranchesPage /></RoleGuard>} />
+                    <Route path="business/catalog" element={<RoleGuard dashboard="business"><CatalogPage /></RoleGuard>} />
+                    <Route path="business/catalog/new-product" element={<RoleGuard dashboard="business"><AddProductPage /></RoleGuard>} />
+                    <Route path="business/catalog/new-service" element={<RoleGuard dashboard="business"><AddServicePage /></RoleGuard>} />
+                    <Route path="business/inventory" element={<RoleGuard dashboard="business"><InventoryPage /></RoleGuard>} />
+                    <Route path="business/customers" element={<RoleGuard dashboard="business"><BusinessCustomersPage /></RoleGuard>} />
+                    <Route path="business/suppliers" element={<RoleGuard dashboard="business"><SuppliersPage /></RoleGuard>} />
+                    <Route path="business/orders" element={<RoleGuard dashboard="business"><BusinessOrdersPage /></RoleGuard>} />
+                    <Route path="business/invoices" element={<RoleGuard dashboard="business"><InvoicesPage /></RoleGuard>} />
+                    <Route path="business/finance" element={<RoleGuard dashboard="business"><FinancePage /></RoleGuard>} />
+                    <Route path="business/reports" element={<RoleGuard dashboard="business"><ReportsPage /></RoleGuard>} />
+                    <Route path="business/activity" element={<RoleGuard dashboard="business"><ActivityPage /></RoleGuard>} />
+                    <Route path="business/profile" element={<RoleGuard dashboard="business"><BusinessProfilePage /></RoleGuard>} />
                     <Route path="business/members" element={<RoleGuard dashboard="institution"><OrganizationMembersPage /></RoleGuard>} />
                     <Route path="services" element={<RoleGuard dashboard="operations"><ServicesPage /></RoleGuard>} />
-                    <Route path="customers" element={<CustomersPage />} />
-                    <Route path="invoices" element={<InvoicesPage />} />
-                    <Route path="payment-requests" element={<PaymentRequestsPage />} />
-                    <Route path="payment-requests/new" element={<CreatePaymentRequestPage />} />
-                    <Route path="invoices/new" element={<CreateInvoicePage />} />
-                    <Route path="pay/receipts/:id" element={<ReceiptPage />} />
-                    <Route path="pay/school-payments" element={<SchoolPaymentDashboard />} />
-                    <Route path="pay/history" element={<TransactionHistoryPage />} />
-                    <Route path="pay/send" element={<SendMoneyPage />} />
-                    <Route path="pay/receive" element={<ReceiveMoneyPage />} />
-                    <Route path="pay/ajo" element={<CycleAjoPage />} />
-                    <Route path="pay/verification" element={<VerificationCenterPage />} />
-                    <Route path="pay/beneficiaries" element={<BeneficiariesPage />} />
-                    <Route path="pay/settings" element={<PaySettingsPage />} />
-                    <Route path="pay/security" element={<PaySecurityPage />} />
+                    <Route path="customers" element={<RoleGuard dashboard="business"><CustomersPage /></RoleGuard>} />
+                    <Route path="invoices" element={<RoleGuard dashboard="business"><InvoicesPage /></RoleGuard>} />
+                    <Route path="payment-requests" element={<RoleGuard dashboard="business"><PaymentRequestsPage /></RoleGuard>} />
+                    <Route path="payment-requests/new" element={<RoleGuard dashboard="business"><CreatePaymentRequestPage /></RoleGuard>} />
+                    <Route path="invoices/new" element={<RoleGuard dashboard="business"><CreateInvoicePage /></RoleGuard>} />
+                    <Route path="pay/receipts/:id" element={<RoleGuard dashboard="uniquepay"><ReceiptPage /></RoleGuard>} />
+                    <Route path="pay/school-payments" element={<RoleGuard dashboard="uniquepay"><SchoolPaymentDashboard /></RoleGuard>} />
+                    <Route path="pay/history" element={<RoleGuard dashboard="uniquepay"><TransactionHistoryPage /></RoleGuard>} />
+                    <Route path="pay/send" element={<RoleGuard dashboard="uniquepay"><SendMoneyPage /></RoleGuard>} />
+                    <Route path="pay/receive" element={<RoleGuard dashboard="uniquepay"><ReceiveMoneyPage /></RoleGuard>} />
+                    <Route path="pay/ajo" element={<RoleGuard dashboard="uniquepay"><CycleAjoPage /></RoleGuard>} />
+                    <Route path="pay/verification" element={<RoleGuard dashboard="uniquepay"><VerificationCenterPage /></RoleGuard>} />
+                    <Route path="pay/beneficiaries" element={<RoleGuard dashboard="uniquepay"><BeneficiariesPage /></RoleGuard>} />
+                    <Route path="pay/settings" element={<RoleGuard dashboard="uniquepay"><PaySettingsPage /></RoleGuard>} />
+                    <Route path="pay/security" element={<RoleGuard dashboard="uniquepay"><PaySecurityPage /></RoleGuard>} />
                     <Route path="notifications" element={<NotificationsPage />} />
                     <Route path="language" element={<LanguagePage />} />
                     <Route path="security" element={<SecurityPage />} />
