@@ -123,4 +123,17 @@ export function BusinessAccessGuard({ children }: { children: React.ReactNode })
   return <>{children}</>;
 }
 
+export async function requestBusinessStepUp(currentUser: NonNullable<ReturnType<typeof useAuth>['currentUser']>, businessId: string, password: string) {
+  const token = await getIdToken(currentUser);
+  const session = localStorage.getItem(SESSION_KEY) || '';
+  const response = await fetch('/api/business/access/step-up', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Business-Session': session },
+    body: JSON.stringify({ businessId, password }),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(result?.error?.message || 'Step-up verification failed.');
+  return result;
+}
+
 export default BusinessAccessGuard;
