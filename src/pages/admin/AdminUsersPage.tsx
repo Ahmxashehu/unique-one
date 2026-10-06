@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Users, Search, Loader2, AlertCircle } from 'lucide-react';
+import { Users, Search, Loader2, AlertCircle, RefreshCw, ShieldCheck } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
@@ -10,6 +10,7 @@ interface AdminUser {
   phone?: string;
   uniqueOneId?: string;
   roles?: string[];
+  verificationStatus?: string;
   createdAt?: unknown;
 }
 
@@ -29,6 +30,7 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -52,6 +54,20 @@ export default function AdminUsersPage() {
     return () => { active = false; };
   }, []);
 
+  const refreshUsers = async () => {
+    setRefreshing(true);
+    setError('');
+    try {
+      const snapshot = await getDocs(collection(db, 'users'));
+      setUsers(snapshot.docs.map(item => ({ id: item.id, ...item.data() } as AdminUser)));
+    } catch (loadError) {
+      console.error('Failed to refresh admin users:', loadError);
+      setError('Unable to refresh users. Check administrator access and try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return users;
@@ -69,7 +85,11 @@ export default function AdminUsersPage() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Ecosystem Users</h1>
           <p className="text-sm text-slate-500 mt-1">Manage accounts across the Unique One platform.</p>
         </div>
-        <div className="relative w-full sm:w-72">
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button type="button" onClick={() => void refreshUsers()} disabled={refreshing} className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50" aria-label="Refresh users">
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+          <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
@@ -110,6 +130,7 @@ export default function AdminUsersPage() {
                   <th className="text-left px-4 py-3 font-semibold text-slate-700">Contact</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-700">Unique ID</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-700">Roles</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-700">Verification</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-700">Joined</th>
                 </tr>
               </thead>
@@ -126,6 +147,7 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-4 py-3 text-slate-600">{user.uniqueOneId || '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{user.roles?.join(', ') || 'user'}</td>
+                    <td className="px-4 py-3"><span className="inline-flex items-center gap-1 text-xs font-medium text-slate-600"><ShieldCheck className="w-3.5 h-3.5" />{user.verificationStatus || 'unverified'}</span></td>
                     <td className="px-4 py-3 text-slate-600">{formatDate(user.createdAt)}</td>
                   </tr>
                 ))}
