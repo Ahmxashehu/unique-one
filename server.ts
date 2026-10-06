@@ -1199,54 +1199,212 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
     try {
       const body = req.body as Record<string, unknown>;
+      const applicationType = body?.applicationType === 'join_business' ? 'join_business' : 'create_business';
       const name = typeof body?.name === 'string' ? body.name.trim() : '';
       const registrationNumber = typeof body?.registrationNumber === 'string' ? body.registrationNumber.trim() : '';
       const description = typeof body?.description === 'string' ? body.description.trim() : '';
       const contactEmail = typeof body?.contactEmail === 'string' ? body.contactEmail.trim() : '';
       const contactPhone = typeof body?.contactPhone === 'string' ? body.contactPhone.trim() : '';
       const category = typeof body?.category === 'string' ? body.category.trim() : '';
+      const requestedRole = typeof body?.requestedRole === 'string' ? body.requestedRole.trim() : '';
+      const organizationName = typeof body?.organizationName === 'string' ? body.organizationName.trim() : '';
 
-      if (!name || name.length > 200 || description.length > 5000 || contactEmail.length > 320 || contactPhone.length > 50 || category.length > 100 || registrationNumber.length > 100) {
-        return errorResponse(res, 'INVALID_REQUEST', 'Business registration data is invalid.');
+      const allowedRoles = new Set([
+        'business_owner', 'seller', 'staff_member', 'service_provider',
+        'school_administrator', 'finance_officer', 'risk_security_officer',
+      ]);
+
+      if (!name || name.length > 200 || description.length > 5000 || contactEmail.length > 320 ||
+          contactPhone.length > 50 || category.length > 100 || registrationNumber.length > 100 ||
+          requestedRole.length > 80 || organizationName.length > 200) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Business application data is invalid.');
       }
-      if (!contactEmail || !contactPhone || !category || !description) {
-        return errorResponse(res, 'INVALID_REQUEST', 'Business name, description, email, phone, and category are required.');
+      if (!contactEmail || !contactPhone || !category || !description || !requestedRole || !allowedRoles.has(requestedRole)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Complete business details and a valid requested role are required.');
+      }
+      if (applicationType === 'join_business' && !organizationName) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Enter the organization or business you want to join.');
       }
 
-      const existing = await adminDb.collection('businesses').where('ownerUid', '==', uid).limit(1).get();
-      if (!existing.empty) return errorResponse(res, 'BLOCKED', 'This account already has a business registration.', 409);
+      const existingPending = await adminDb.collection('businessApplications')
+        .where('applicantUid', '==', uid)
+        .where('status', '==', 'pending')
+        .limit(1).get();
+      if (!existingPending.empty) {
+        return errorResponse(res, 'BLOCKED', 'You already have a business application under review.', 409);
+      }
 
       const now = Timestamp.now();
-      const businessRef = adminDb.collection('businesses').doc();
-      const userRef = adminDb.collection('users').doc(uid);
-
-      await adminDb.runTransaction(async transaction => {
-        const userSnapshot = await transaction.get(userRef);
-        const userData = userSnapshot.data() as Record<string, unknown> | undefined;
-        const existingRoles = Array.isArray(userData?.roles)
-          ? userData.roles.filter((role): role is string => typeof role === 'string')
-          : [];
-
-        transaction.set(businessRef, {
-          ownerUid: uid,
-          name,
-          registrationNumber,
-          description,
-          contactEmail,
-          contactPhone,
-          categories: [category],
-          status: 'pending',
-          verificationStatus: 'unverified',
-          createdAt: now,
-          updatedAt: now,
-        });
-        transaction.update(userRef, { roles: Array.from(new Set([...existingRoles, 'business_owner'])) });
+      const applicationRef = adminDb.collection('businessApplications').doc();
+      await applicationRef.set({
+        applicantUid: uid,
+        applicationType,
+        name,
+        organizationName: organizationName || null,
+        registrationNumber,
+        description,
+        contactEmail,
+        contactPhone,
+        category,
+        requestedRole,
+        status: 'pending',
+        verificationStatus: 'unverified',
+        createdAt: now,
+        updatedAt: now,
       });
 
-      return res.status(201).json({ businessId: businessRef.id, status: 'pending' });
+      return res.status(201).json({ applicationId: applicationRef.id, status: 'pending' });
     } catch (error) {
-      console.error('Business registration failed:', error);
-      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to submit business registration right now.');
+      console.error('Business application submission failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to submit your business application right now.');
+    }
+  });
+
+  app.get("/api/business/applications", authenticate, async (req, res) => {
+    const uid = (req as any).user?.uid as string | undefined;
+    if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+    try {
+      const snapshot = await adminDb.collection('businessApplications')
+        .where('applicantUid', '==', uid)
+        .orderBy('createdAt', 'desc')
+        .limit(20).get();
+      return res.status(200).json({
+        applications: snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      });
+    } catch (error) {
+      console.error('Business application lookup failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to load your business applications.');
+    }
+  });
+
+  app.get("/api/admin/business-applications", authenticate, async (req, res) => {
+    const adminUid = (req as any).user?.uid as string | undefined;
+    if (!adminUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+    try {
+      const adminSnapshot = await adminDb.collection('users').doc(adminUid).get();
+      const roles = Array.isArray(adminSnapshot.data()?.roles) ? adminSnapshot.data()?.roles : [];
+      if (!roles.some((role: unknown) => ['platform_admin', 'super_admin', 'administrator'].includes(String(role)))) {
+        return errorResponse(res, 'FORBIDDEN', 'Platform administration access is required.', 403);
+      }
+      const status = typeof req.query.status === 'string' ? req.query.status : 'pending';
+      const allowedStatuses = new Set(['pending', 'approved', 'declined', 'all']);
+      if (!allowedStatuses.has(status)) return errorResponse(res, 'INVALID_REQUEST', 'Invalid application status.');
+      let query: FirebaseFirestore.Query = adminDb.collection('businessApplications').orderBy('createdAt', 'desc').limit(100);
+      if (status !== 'all') query = adminDb.collection('businessApplications').where('status', '==', status).orderBy('createdAt', 'desc').limit(100);
+      const snapshot = await query.get();
+      const applications = await Promise.all(snapshot.docs.map(async (applicationDoc) => {
+        const data = applicationDoc.data();
+        const applicantSnapshot = await adminDb.collection('users').doc(String(data.applicantUid || '')).get();
+        const applicant = applicantSnapshot.data() || {};
+        return {
+          id: applicationDoc.id,
+          ...data,
+          applicant: {
+            uid: data.applicantUid,
+            fullName: applicant.fullName || applicant.displayName || 'Unique One User',
+            email: applicant.email || data.contactEmail || '',
+            phone: applicant.phone || data.contactPhone || '',
+            uniqueOneId: applicant.uniqueOneId || '',
+          },
+        };
+      }));
+      return res.status(200).json({ applications });
+    } catch (error) {
+      console.error('Admin business application lookup failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to load business applications.');
+    }
+  });
+
+  app.patch("/api/admin/business-applications/:id", authenticate, async (req, res) => {
+    const adminUid = (req as any).user?.uid as string | undefined;
+    if (!adminUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+    try {
+      const adminSnapshot = await adminDb.collection('users').doc(adminUid).get();
+      const roles = Array.isArray(adminSnapshot.data()?.roles) ? adminSnapshot.data()?.roles : [];
+      if (!roles.some((role: unknown) => ['platform_admin', 'super_admin', 'administrator'].includes(String(role)))) {
+        return errorResponse(res, 'FORBIDDEN', 'Platform administration access is required.', 403);
+      }
+      const applicationRef = adminDb.collection('businessApplications').doc(req.params.id);
+      const applicationSnapshot = await applicationRef.get();
+      if (!applicationSnapshot.exists) return errorResponse(res, 'NOT_FOUND', 'Business application not found.', 404);
+      const application = applicationSnapshot.data() as Record<string, any>;
+      const action = req.body?.action === 'approve' ? 'approve' : req.body?.action === 'decline' ? 'decline' : '';
+      const reviewNote = typeof req.body?.reviewNote === 'string' ? req.body.reviewNote.trim().slice(0, 2000) : '';
+      if (!action) return errorResponse(res, 'INVALID_REQUEST', 'Choose approve or decline.');
+
+      const now = Timestamp.now();
+      if (action === 'decline') {
+        await applicationRef.update({ status: 'declined', reviewNote, reviewedBy: adminUid, reviewedAt: now, updatedAt: now });
+        await adminDb.collection('audit_logs').add({
+          action: 'business_application_declined',
+          actorUid: adminUid,
+          targetId: applicationRef.id,
+          applicantUid: application.applicantUid,
+          createdAt: now,
+          note: reviewNote,
+        });
+        return res.status(200).json({ status: 'declined' });
+      }
+
+      const applicantUid = String(application.applicantUid || '');
+      const userRef = adminDb.collection('users').doc(applicantUid);
+      const businessRef = adminDb.collection('businesses').doc();
+      await adminDb.runTransaction(async (transaction) => {
+        const userSnapshot = await transaction.get(userRef);
+        if (!userSnapshot.exists) throw new Error('APPLICANT_NOT_FOUND');
+        const userData = userSnapshot.data() || {};
+        const existingRoles = Array.isArray(userData.roles) ? userData.roles.filter((role: unknown): role is string => typeof role === 'string') : [];
+        const requestedRole = String(application.requestedRole || 'business_owner');
+
+        if (application.applicationType === 'create_business') {
+          transaction.set(businessRef, {
+            ownerUid: applicantUid,
+            name: application.name,
+            registrationNumber: application.registrationNumber || '',
+            description: application.description,
+            contactEmail: application.contactEmail,
+            contactPhone: application.contactPhone,
+            categories: [application.category],
+            status: 'active',
+            verificationStatus: 'verified',
+            createdAt: now,
+            updatedAt: now,
+            approvedAt: now,
+            approvedBy: adminUid,
+          });
+        }
+
+        transaction.update(userRef, {
+          roles: Array.from(new Set([...existingRoles, requestedRole])),
+          businessAccessApprovedAt: now,
+          businessAccessApprovedBy: adminUid,
+        });
+        transaction.update(applicationRef, {
+          status: 'approved',
+          reviewNote,
+          reviewedBy: adminUid,
+          reviewedAt: now,
+          updatedAt: now,
+          businessId: application.applicationType === 'create_business' ? businessRef.id : null,
+        });
+      });
+
+      await adminDb.collection('audit_logs').add({
+        action: 'business_application_approved',
+        actorUid: adminUid,
+        targetId: applicationRef.id,
+        applicantUid,
+        createdAt: now,
+        note: reviewNote,
+      });
+
+      return res.status(200).json({ status: 'approved', businessId: application.applicationType === 'create_business' ? businessRef.id : null });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'APPLICANT_NOT_FOUND') {
+        return errorResponse(res, 'NOT_FOUND', 'The applicant account no longer exists.', 404);
+      }
+      console.error('Admin business application review failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to review this business application right now.');
     }
   });
 
