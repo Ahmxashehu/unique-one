@@ -60,10 +60,8 @@ async function getMemberships(db: Firestore, uid: string) {
   for (const approvalDoc of approvals.docs) {
     const application = approvalDoc.data();
     let businessId = typeof application.businessId === 'string' ? application.businessId : '';
-    if (!businessId && application.applicationType === 'join_business' && typeof application.organizationName === 'string') {
-      const businessQuery = await db.collection('businesses').where('name', '==', application.organizationName.trim()).limit(1).get();
-      businessId = businessQuery.empty ? '' : businessQuery.docs[0].id;
-    }
+    // Join approvals must persist the exact businessId; never infer membership from a business name.
+    if (!businessId && application.applicationType === 'join_business') continue;
     if (!businessId || existing.has(businessId)) continue;
 
     const businessSnap = await db.collection('businesses').doc(businessId).get();
