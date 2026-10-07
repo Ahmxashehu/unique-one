@@ -1334,8 +1334,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     try {
       const adminSnapshot = await adminDb.collection('users').doc(adminUid).get();
       const roles = Array.isArray(adminSnapshot.data()?.roles) ? adminSnapshot.data()?.roles : [];
-      if (!roles.some((role: unknown) => ['platform_admin', 'super_admin', 'administrator'].includes(String(role)))) {
-        return errorResponse(res, 'FORBIDDEN', 'Platform administration access is required.', 403);
+      if (!roles.some((role: unknown) => ['platform_admin', 'super_admin'].includes(String(role)))) {
+        return errorResponse(res, 'FORBIDDEN', 'Platform or Super Admin access is required.', 403);
       }
       const status = typeof req.query.status === 'string' ? req.query.status : 'pending';
       const allowedStatuses = new Set(['pending', 'approved', 'declined', 'all']);
