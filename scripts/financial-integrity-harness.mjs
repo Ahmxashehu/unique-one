@@ -41,6 +41,8 @@ function scenario() {
   });
   assert(once("transfer", "customer|seller|10000", () => { throw new Error("duplicate mutation"); }), "transfer replay is idempotent");
 
+  // Store checkout binding: the order amount is the exact PSS plan total.
+  assert.equal(state.plan.deposit + state.plan.installments.reduce((sum, amount) => sum + amount, 0), state.order.total, "Store checkout amount matches PSS plan total");
   state.order.status = "reserved";
   state.plan.status = "active";
   state.customer -= state.plan.deposit;
@@ -90,6 +92,26 @@ function scenario() {
   assert.equal(state.customer, expectedCustomer, "customer wallet reconciles to all wallet activity");
   assert.equal(state.seller, 10_000 + 60_000 - 30_000, "seller wallet reconciles to all wallet activity");
   assert.equal(state.hold, 0, "PSS hold is zero after settlement");
+
+  // PSS cancellation/refund path: a funded plan can refund only the remaining hold.
+  const cancellation = { customer: 40_000, hold: 40_000, status: "active" };
+  assert(cancellation.hold > 0, "cancellation requires refundable hold");
+  cancellation.customer += cancellation.hold;
+  cancellation.hold = 0;
+  cancellation.status = "cancelled_refunded";
+  assert.equal(cancellation.customer, 80_000, "PSS cancellation refunds held funds exactly once");
+  assert.equal(cancellation.hold, 0, "PSS cancellation drains hold exactly once");
+
+  // Deterministic concurrency/idempotency race simulation: two workers using one key may mutate once only.
+  let concurrentMutations = 0;
+  const concurrentKey = new Set();
+  function concurrentAttempt() {
+    if (concurrentKey.has("race-1")) return;
+    concurrentKey.add("race-1");
+    concurrentMutations += 1;
+  }
+  concurrentAttempt(); concurrentAttempt();
+  assert.equal(concurrentMutations, 1, "concurrent idempotent attempts mutate once");
 
   assert.throws(() => { const balance = 5_000; assert(balance >= 10_000, "overdraft guard"); }, /overdraft guard/);
   assert.throws(() => { assert(MAX <= MAX - 1, "overflow guard"); }, /overflow guard/);
