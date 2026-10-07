@@ -666,6 +666,37 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const refund = refundByPlan.get(planId) || 0;
         const installmentPaid = Array.isArray(plan.installments) ? plan.installments.filter((x: any) => String(x.status || '') === 'paid').reduce((s: number, x: any) => s + Number(x.amountMinor || 0), 0) : 0;
         const expectedPaid = funding;
+        const status = String(plan.status || '');
+        const order = orderDocs.get(String(plan.orderId || ''));
+        const orderPaymentStatus = String(order?.paymentStatus || '');
+        const orderStatus = String(order?.status || '');
+        const orderPssStatus = String(order?.paySmallSmallStatus || '');
+        const validStatuses = new Set(['draft', 'active', 'completed', 'cancelled']);
+        if (!validStatuses.has(status)) {
+          addFinding({ code: 'INVALID_PLAN_STATUS', severity: 'critical', planId, detail: 'Pay Small Small plan has an unsupported lifecycle status.' });
+        }
+        if (status === 'draft' && (paid !== 0 || remaining !== total || settlement !== 0 || refund !== 0 || orderPssStatus !== 'draft')) {
+          addFinding({ code: 'DRAFT_STATE_MISMATCH', severity: 'critical', planId, detail: 'Draft plan/order state is inconsistent with an unfunded plan.' });
+        }
+        if (status === 'active' && (paid <= 0 || paid >= total || remaining <= 0 || orderPssStatus !== 'active' || orderPaymentStatus !== 'partial' || orderStatus !== 'reserved')) {
+          addFinding({ code: 'ACTIVE_STATE_MISMATCH', severity: 'critical', planId, detail: 'Active Pay Small Small plan is not synchronized with its required partially-paid reserved Store order state.' });
+        }
+        if (status === 'completed' && (paid !== total || remaining !== 0 || orderPssStatus !== 'completed' || orderPaymentStatus !== 'paid' || orderStatus !== 'confirmed')) {
+          addFinding({ code: 'COMPLETED_STATE_MISMATCH', severity: 'critical', planId, detail: 'Completed Pay Small Small plan is not synchronized with a fully paid confirmed Store order.' });
+        }
+        if (status === 'cancelled' && (paid !== 0 || remaining !== total || orderPssStatus !== 'cancelled' || orderPaymentStatus !== 'refunded' || orderStatus !== 'cancelled')) {
+          addFinding({ code: 'CANCELLED_STATE_MISMATCH', severity: 'critical', planId, detail: 'Cancelled Pay Small Small plan is not synchronized with a refunded cancelled Store order.' });
+        }
+        if (status === 'completed' && order) {
+          const sellerId = String(order.sellerId || '');
+          const settlementTxIds = settlementTxByPlan.get(planId) || new Set<string>();
+          for (const settlementTxId of settlementTxIds) {
+            const settlementTx = txMap.get(settlementTxId) || {};
+            if (String(settlementTx.recipientId || '') !== sellerId) {
+              addFinding({ code: 'SETTLEMENT_SELLER_MISMATCH', severity: 'critical', planId, transactionId: settlementTxId, detail: 'Final settlement recipient does not match the Store order seller.' });
+            }
+          }
+        }
         if (!Number.isSafeInteger(total) || total <= 0 || !Number.isSafeInteger(paid) || !Number.isSafeInteger(remaining)) {
           addFinding({ code: 'PLAN_AMOUNT_INVALID', severity: 'critical', planId, detail: 'Plan contains invalid monetary totals.' });
           continue;
