@@ -220,7 +220,7 @@ export async function executeFinancialRefund(
 
     const now = Timestamp.now();
     const refundRef = db.collection('transactions').doc();
-    const reference = `UP-REF-\${refundRef.id}`;
+    const reference = `UP-REF-${refundRef.id}`;
     const result: FinancialRefundResult = {
       transactionId: refundRef.id,
       reference,
