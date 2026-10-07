@@ -3566,9 +3566,13 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             quantity: Number(cart.data.quantity),
             productStatusAtCheckout: product.status,
           }));
-          const totalAmount = items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+          const totalAmountMinor = items.reduce((sum, item) => sum + Math.round(Number(item.price) * 100) * item.quantity, 0);
+          if (!Number.isSafeInteger(totalAmountMinor) || totalAmountMinor <= 0) {
+            throw new RequestValidationError('INVALID_AMOUNT', 'The Store order amount is invalid.');
+          }
+          const totalAmount = totalAmountMinor / 100;
           transaction.create(orderRef, {
-            id: orderRef.id, customerId: uid, sellerId, items, totalAmount, currency: 'NGN',
+            id: orderRef.id, customerId: uid, sellerId, items, totalAmount, amountMinor: totalAmountMinor, currency: 'NGN',
             status: 'pending', shippingAddress, createdAt: now, updatedAt: now,
           });
           orderIds.push(orderRef.id);
@@ -3616,22 +3620,23 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
 
       const orderIds = Array.from(new Set(orders as string[]));
       const orderSnapshots = await Promise.all(orderIds.map((id) => adminDb.collection('orders').doc(id).get()));
-      const sellerTotals = new Map<string, number>();
-      let totalAmountNaira = 0;
+      const sellerTotalsMinor = new Map<string, number>();
+      let amountMinor = 0;
 
       for (const snapshot of orderSnapshots) {
         if (!snapshot.exists) return errorResponse(res, 'NOT_FOUND', 'One or more Store orders could not be found.');
         const order = snapshot.data() as Record<string, unknown>;
         if (order.customerId !== uid || order.currency !== 'NGN') return errorResponse(res, 'FORBIDDEN', 'You can only pay for your own NGN Store orders.');
         if (order.status !== 'pending') return errorResponse(res, 'INVALID_REQUEST', 'One or more Store orders are no longer awaiting payment.');
-        if (!isSafeFirebaseUid(order.sellerId) || typeof order.totalAmount !== 'number' || !Number.isFinite(order.totalAmount) || order.totalAmount <= 0) {
+        if (!isSafeFirebaseUid(order.sellerId) || !Number.isSafeInteger(order.amountMinor) || order.amountMinor <= 0) {
           return errorResponse(res, 'INVALID_REQUEST', 'One or more Store orders have invalid payment data.');
         }
-        totalAmountNaira += order.totalAmount;
-        sellerTotals.set(order.sellerId, (sellerTotals.get(order.sellerId) || 0) + order.totalAmount);
+        amountMinor += order.amountMinor;
+        if (!Number.isSafeInteger(amountMinor)) return errorResponse(res, 'INVALID_AMOUNT', 'The Store payment amount is invalid.');
+        const sellerAmountMinor = (sellerTotalsMinor.get(order.sellerId) || 0) + order.amountMinor;
+        if (!Number.isSafeInteger(sellerAmountMinor)) return errorResponse(res, 'INVALID_AMOUNT', 'The Store seller settlement amount is invalid.');
+        sellerTotalsMinor.set(order.sellerId, sellerAmountMinor);
       }
-
-      const amountMinor = Math.round(totalAmountNaira * 100);
       if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) return errorResponse(res, 'INVALID_AMOUNT', 'The Store payment amount is invalid.');
 
       const authPolicy = getTransactionAuthPolicy({
@@ -3689,7 +3694,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       }
 
       const idempotencyRef = adminDb.collection('storePaymentIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
-      const fingerprint = [uid, orderIds.join(','), String(amountMinor)].join('|');
+      const fingerprint = [uid, orderIds.join(','), String(amountMinor), 'NGN'].join('|');
       const result = await adminDb.runTransaction(async (transaction) => {
         const existing = await transaction.get(idempotencyRef);
         if (existing.exists) {
@@ -3698,7 +3703,28 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           return data.result;
         }
 
-        const walletRefs = Array.from(sellerTotals.keys()).map((sellerId) => adminDb.collection('wallets').doc(sellerId));
+        const transactionOrderSnapshots = await Promise.all(orderIds.map((orderId) => transaction.get(adminDb.collection('orders').doc(orderId))));
+        const transactionSellerTotalsMinor = new Map<string, number>();
+        let transactionAmountMinor = 0;
+        transactionOrderSnapshots.forEach((snapshot, index) => {
+          if (!snapshot.exists) throw new RequestValidationError('NOT_FOUND', 'One or more Store orders could not be found.');
+          const order = snapshot.data() as Record<string, unknown>;
+          if (order.customerId !== uid || order.currency !== 'NGN' || order.status !== 'pending' ||
+              !isSafeFirebaseUid(order.sellerId) || !Number.isSafeInteger(order.amountMinor) || order.amountMinor <= 0) {
+            throw new RequestValidationError('INVALID_REQUEST', 'One or more Store orders changed and must be revalidated before payment.');
+          }
+          transactionAmountMinor += order.amountMinor;
+          const sellerAmountMinor = (transactionSellerTotalsMinor.get(order.sellerId) || 0) + order.amountMinor;
+          if (!Number.isSafeInteger(transactionAmountMinor) || !Number.isSafeInteger(sellerAmountMinor)) {
+            throw new RequestValidationError('INVALID_AMOUNT', 'The Store payment amount is invalid.');
+          }
+          transactionSellerTotalsMinor.set(order.sellerId, sellerAmountMinor);
+        });
+        if (transactionAmountMinor !== amountMinor) {
+          throw new RequestValidationError('INVALID_REQUEST', 'The Store payment amount changed; please retry checkout.');
+        }
+
+        const walletRefs = Array.from(transactionSellerTotalsMinor.keys()).map((sellerId) => adminDb.collection('wallets').doc(sellerId));
         const customerWalletRef = adminDb.collection('wallets').doc(uid);
         const snapshots = await Promise.all([transaction.get(customerWalletRef), ...walletRefs.map((ref) => transaction.get(ref))]);
         const customerWalletSnap = snapshots[0];
@@ -3708,7 +3734,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         if (customerWallet.availableBalanceMinor < amountMinor) throw new Error('STORE_INSUFFICIENT_FUNDS');
 
         const sellerWallets = new Map<string, WalletDocument>();
-        Array.from(sellerTotals.keys()).forEach((sellerId, index) => {
+        Array.from(transactionSellerTotalsMinor.keys()).forEach((sellerId, index) => {
           const snap = snapshots[index + 1];
           if (!snap.exists) throw new Error('STORE_SELLER_WALLET_NOT_FOUND');
           const wallet = validateWalletDocument(snap.data(), sellerId);
@@ -3718,8 +3744,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
 
         const now = Timestamp.now();
         const paymentTransactionIds: string[] = [];
-        for (const [sellerId, sellerTotalNaira] of sellerTotals) {
-          const sellerAmountMinor = Math.round(sellerTotalNaira * 100);
+        for (const [sellerId, sellerAmountMinor] of transactionSellerTotalsMinor) {
           if (!Number.isSafeInteger(sellerAmountMinor) || sellerAmountMinor <= 0) throw new Error('STORE_INVALID_AMOUNT');
           const sellerWallet = sellerWallets.get(sellerId)!;
           const transactionId = adminDb.collection('transactions').doc().id;
@@ -3741,8 +3766,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const customerBalanceAfter = customerWallet.availableBalanceMinor - amountMinor;
         if (!Number.isSafeInteger(customerBalanceAfter) || customerBalanceAfter < 0) throw new Error('STORE_TRANSACTION_FAILED');
         transaction.update(customerWalletRef, { availableBalanceMinor: customerBalanceAfter, updatedAt: now });
-        for (const [sellerId, sellerTotalNaira] of sellerTotals) {
-          const sellerAmountMinor = Math.round(sellerTotalNaira * 100);
+        for (const [sellerId, sellerAmountMinor] of transactionSellerTotalsMinor) {
           const sellerWallet = sellerWallets.get(sellerId)!;
           const sellerBalanceAfter = sellerWallet.availableBalanceMinor + sellerAmountMinor;
           if (!Number.isSafeInteger(sellerBalanceAfter)) throw new Error('STORE_TRANSACTION_FAILED');
