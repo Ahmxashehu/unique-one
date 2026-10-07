@@ -3939,6 +3939,9 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         if (existingDispute && ['opened','seller_responded','under_review','resolved'].includes(String(existingDispute.status))) {
           throw new RequestValidationError('INVALID_REQUEST', 'A dispute already exists for this order.');
         }
+        if (order.returnRequest && typeof order.returnRequest === 'object') {
+          throw new RequestValidationError('INVALID_REQUEST', 'A Store return workflow already exists for this order; resolve it before opening a dispute.');
+        }
         const now = Timestamp.now().toDate().toISOString();
         const dispute = { status: 'opened', reason, evidence, openedBy: uid, openedAt: now, updatedAt: now };
         transaction.update(orderRef, { dispute, updatedAt: now });
@@ -4115,6 +4118,10 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         }
         if (order.returnRequest && typeof order.returnRequest === 'object') {
           throw new RequestValidationError('INVALID_REQUEST', 'A return request already exists for this order.');
+        }
+        const existingDispute = order.dispute && typeof order.dispute === 'object' ? order.dispute as Record<string, unknown> : null;
+        if (existingDispute && ['opened','seller_responded','under_review','resolved'].includes(String(existingDispute.status))) {
+          throw new RequestValidationError('INVALID_REQUEST', 'A Store dispute already exists for this order; resolve it before opening a return.');
         }
         const sourceItems = Array.isArray(order.items) ? order.items : [];
         const requestedItems = Array.isArray(req.body?.items) ? req.body.items : sourceItems.filter((item: any) => item?.returnable !== false);
