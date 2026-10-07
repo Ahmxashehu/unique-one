@@ -136,6 +136,15 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
       const session = await getActiveSession(db, decoded.uid, businessToken);
       if (!session) return fail(res, 'BUSINESS_AUTH_REQUIRED', 'Your Business Platform session has expired or was revoked. Please sign in again.', 401);
 
+      // Re-check active membership on every protected request so revoked access cannot
+      // continue through an already-issued Business session.
+      const membershipSnap = await db.collection('businessMemberships').doc(`${decoded.uid}__${session.businessId}`).get();
+      if (!membershipSnap.exists || membershipSnap.data()?.status !== 'active') {
+        return fail(res, 'BUSINESS_AUTH_REQUIRED', 'Your approved Business Platform access is no longer active.', 403);
+      }
+      const membership = membershipSnap.data() || {};
+      (req as any).businessMembership = membership;
+
       // Sensitive Business actions require a recent password step-up.
       const stepUpRequired = new Set(['/inventory/adjust', '/access/change-password']);
       if (stepUpRequired.has(req.path)) {
