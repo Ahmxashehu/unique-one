@@ -591,6 +591,118 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
     }
   });
 
+  app.get('/api/financial-reconciliation/wallets', async (req, res) => {
+    const token = typeof req.header('x-pay-small-small-cron-token') === 'string' ? req.header('x-pay-small-small-cron-token') : '';
+    if (!process.env.PAY_SMALL_SMALL_CRON_TOKEN || token !== process.env.PAY_SMALL_SMALL_CRON_TOKEN) {
+      return fail(res, 'FORBIDDEN', 'Forbidden.', 403);
+    }
+    try {
+      const [walletsSnap, ledgerSnap] = await Promise.all([
+        db.collection('wallets').get(),
+        db.collection('ledgerEntries').get()
+      ]);
+      const walletIds = new Set<string>();
+      const walletBalances = new Map<string, number>();
+      const walletLedgerNet = new Map<string, number>();
+      const findings: any[] = [];
+      const supportedWalletAccountTypes = new Set(['', 'seller_settlement', 'wallet_refund']);
+
+      for (const doc of walletsSnap.docs) {
+        const wallet = doc.data() || {};
+        const uid = String(wallet.uid || doc.id);
+        const balance = Number(wallet.availableBalanceMinor);
+        if (walletIds.has(uid)) {
+          findings.push({ code: 'DUPLICATE_WALLET_UID', severity: 'critical', uid, detail: 'More than one wallet document resolves to the same user ID.' });
+          continue;
+        }
+        walletIds.add(uid);
+        walletBalances.set(uid, balance);
+        if (String(wallet.currency || '') !== 'NGN' || String(wallet.status || '') !== 'active' && !['suspended', 'locked'].includes(String(wallet.status || '')) ||
+            !Number.isSafeInteger(balance) || balance < 0) {
+          findings.push({ code: 'INVALID_WALLET', severity: 'critical', uid, amountMinor: Number.isSafeInteger(balance) ? balance : undefined, detail: 'Wallet has invalid currency, status, or balance data.' });
+        }
+      }
+
+      for (const doc of ledgerSnap.docs) {
+        const entry = doc.data() || {};
+        const uid = String(entry.uid || '');
+        const accountType = String(entry.accountType || '');
+        if (accountType === 'pay_small_small_hold') continue;
+        if (!uid) {
+          findings.push({ code: 'LEDGER_MISSING_UID', severity: 'critical', transactionId: String(entry.transactionId || ''), detail: 'Wallet ledger entry has no account UID.' });
+          continue;
+        }
+        if (!supportedWalletAccountTypes.has(accountType)) {
+          findings.push({ code: 'UNSUPPORTED_WALLET_ACCOUNT_TYPE', severity: 'critical', uid, transactionId: String(entry.transactionId || ''), detail: 'Ledger entry uses an account type that is not a recognized wallet account.' });
+        }
+        const amount = Number(entry.amountMinor);
+        if (!Number.isSafeInteger(amount) || amount <= 0) {
+          findings.push({ code: 'INVALID_WALLET_LEDGER_AMOUNT', severity: 'critical', uid, transactionId: String(entry.transactionId || ''), detail: 'Wallet ledger amount must be a positive safe integer.' });
+          continue;
+        }
+        const direction = String(entry.direction || '');
+        if (direction !== 'credit' && direction !== 'debit') {
+          findings.push({ code: 'INVALID_WALLET_LEDGER_DIRECTION', severity: 'critical', uid, transactionId: String(entry.transactionId || ''), amountMinor: amount, detail: 'Wallet ledger direction must be credit or debit.' });
+          continue;
+        }
+        if (String(entry.currency || '') !== 'NGN' || String(entry.status || '') !== 'completed') {
+          findings.push({ code: 'INVALID_WALLET_LEDGER_STATE', severity: 'critical', uid, transactionId: String(entry.transactionId || ''), amountMinor: amount, detail: 'Wallet ledger entry must be a completed NGN entry.' });
+        }
+        if (!String(entry.transactionId || '') || !String(entry.reference || '')) {
+          findings.push({ code: 'WALLET_LEDGER_IDENTITY_MISSING', severity: 'critical', uid, amountMinor: amount, detail: 'Wallet ledger entry must contain transactionId and reference.' });
+        }
+        if (!walletIds.has(uid)) {
+          findings.push({ code: 'ORPHAN_WALLET_LEDGER', severity: 'critical', uid, transactionId: String(entry.transactionId || ''), amountMinor: amount, detail: 'Ledger entry points to a user without a wallet document.' });
+        }
+        const delta = direction === 'credit' ? amount : -amount;
+        const current = walletLedgerNet.get(uid) || 0;
+        const next = current + delta;
+        if (!Number.isSafeInteger(next)) {
+          findings.push({ code: 'WALLET_LEDGER_NET_OVERFLOW', severity: 'critical', uid, amountMinor: amount, detail: 'Aggregated wallet ledger net exceeds JavaScript safe-integer bounds.' });
+        } else {
+          walletLedgerNet.set(uid, next);
+        }
+      }
+
+      for (const uid of walletIds) {
+        const balance = walletBalances.get(uid) as number;
+        const ledgerNet = walletLedgerNet.get(uid) || 0;
+        if (!Number.isSafeInteger(ledgerNet)) {
+          findings.push({ code: 'WALLET_LEDGER_NET_INVALID', severity: 'critical', uid, detail: 'Wallet ledger net is outside the safe-integer range.' });
+          continue;
+        }
+        if (balance !== ledgerNet) {
+          findings.push({ code: 'WALLET_LEDGER_BALANCE_MISMATCH', severity: 'critical', uid, amountMinor: balance - ledgerNet, detail: 'Wallet availableBalanceMinor does not equal the net of all wallet ledger credits and debits.' });
+        }
+      }
+
+      for (const [uid] of walletLedgerNet) {
+        if (!walletIds.has(uid)) {
+          findings.push({ code: 'ORPHAN_WALLET_LEDGER', severity: 'critical', uid, detail: 'Ledger activity exists for a user with no wallet.' });
+        }
+      }
+
+      return res.json({
+        ok: findings.length === 0,
+        readOnly: true,
+        scope: 'wallet-balances-vs-ledger',
+        checkedAt: Timestamp.now(),
+        counts: {
+          wallets: walletsSnap.size,
+          ledgerEntries: ledgerSnap.size,
+          findings: findings.length,
+          critical: findings.filter(x => x.severity === 'critical').length,
+          high: findings.filter(x => x.severity === 'high').length
+        },
+        findings: findings.slice(0, 500),
+        truncatedFindings: findings.length > 500
+      });
+    } catch (error) {
+      console.error('Wallet ledger reconciliation failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'Wallet ledger reconciliation could not be completed safely.', 503);
+    }
+  });
+
   app.get('/api/pay-small-small/system/reconcile', async (req, res) => {
     const token = typeof req.header('x-pay-small-small-cron-token') === 'string' ? req.header('x-pay-small-small-cron-token') : '';
     if (!process.env.PAY_SMALL_SMALL_CRON_TOKEN || token !== process.env.PAY_SMALL_SMALL_CRON_TOKEN) return fail(res, 'FORBIDDEN', 'Forbidden.', 403);
