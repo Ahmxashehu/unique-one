@@ -540,10 +540,24 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         if (ledgers.length !== required) {
           addFinding({ code: 'LEDGER_TRANSACTION_MISMATCH', severity: 'critical', planId, transactionId: txId, amountMinor: amount, detail: 'Expected exactly two balanced ledger entries for this Pay Small Small transaction.' });
         }
-        const debit = ledgers.filter(x => String(x.direction || '') === 'debit').reduce((s, x) => s + Number(x.amountMinor || 0), 0);
-        const credit = ledgers.filter(x => String(x.direction || '') === 'credit').reduce((s, x) => s + Number(x.amountMinor || 0), 0);
+        const debitEntries = ledgers.filter(x => String(x.direction || '') === 'debit');
+        const creditEntries = ledgers.filter(x => String(x.direction || '') === 'credit');
+        const debit = debitEntries.reduce((s, x) => s + Number(x.amountMinor || 0), 0);
+        const credit = creditEntries.reduce((s, x) => s + Number(x.amountMinor || 0), 0);
         if (debit !== amount || credit !== amount) {
           addFinding({ code: 'LEDGER_AMOUNT_IMBALANCE', severity: 'critical', planId, transactionId: txId, amountMinor: amount, detail: 'Ledger debit/credit does not balance to the transaction amount.' });
+        }
+        if (debitEntries.length !== 1 || creditEntries.length !== 1) {
+          addFinding({ code: 'LEDGER_DIRECTION_STRUCTURE_MISMATCH', severity: 'critical', planId, transactionId: txId, amountMinor: amount, detail: 'Pay Small Small transaction must have exactly one debit and one credit ledger entry.' });
+        }
+        for (const entry of ledgers) {
+          const entryAmount = Number(entry.amountMinor);
+          if (!Number.isSafeInteger(entryAmount) || entryAmount !== amount) {
+            addFinding({ code: 'LEDGER_ENTRY_AMOUNT_MISMATCH', severity: 'critical', planId, transactionId: txId, amountMinor: amount, detail: 'A ledger entry amount does not exactly match its financial transaction.' });
+          }
+          if (String(entry.transactionId || '') !== txId || String(entry.reference || '') !== String(tx.reference || '') || String(entry.currency || '') !== String(tx.currency || 'NGN') || String(entry.status || '') !== 'completed') {
+            addFinding({ code: 'LEDGER_TRANSACTION_IDENTITY_MISMATCH', severity: 'critical', planId, transactionId: txId, amountMinor: amount, detail: 'A ledger entry identity does not match its financial transaction.' });
+          }
         }
         if (module === 'unique_pay_small_small.deposit' || module === 'unique_pay_small_small.installment') {
           const fundingPlanId = String(tx.recipientId || '');
