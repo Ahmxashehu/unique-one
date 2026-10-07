@@ -200,6 +200,17 @@ service cloud.firestore {
         ])
         && request.resource.data.id == productId
         && request.resource.data.sellerId == request.auth.uid
+        && (!('businessId' in request.resource.data)
+          || (request.resource.data.businessId is string
+            && exists(/databases/$(database)/documents/businesses/$(request.resource.data.businessId))
+            && (
+              get(/databases/$(database)/documents/businesses/$(request.resource.data.businessId)).data.ownerUid == request.auth.uid
+              || (
+                exists(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId))
+                && get(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId)).data.status == 'active'
+              )
+            )
+          ))
         && request.resource.data.status in ['draft','published','out_of_stock']
         && request.resource.data.price is number
         && request.resource.data.price >= 0
@@ -212,6 +223,19 @@ service cloud.firestore {
         && request.resource.data.sellerId == resource.data.sellerId
         && request.resource.data.id == resource.data.id
         && request.resource.data.createdAt == resource.data.createdAt
+        && (!('businessId' in request.resource.data)
+          || (
+            request.resource.data.businessId is string
+            && exists(/databases/$(database)/documents/businesses/$(request.resource.data.businessId))
+            && (
+              get(/databases/$(database)/documents/businesses/$(request.resource.data.businessId)).data.ownerUid == request.auth.uid
+              || (
+                exists(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId))
+                && get(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId)).data.status == 'active'
+              )
+            )
+          )
+        )
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'businessId','name','description','category','images','hasVideo','price','currency',
           'discount','condition','quantity','minOrderQuantity','wholesalePrice','bulkPrice',
