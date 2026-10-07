@@ -47,7 +47,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const order = orderSnap.data() || {};
         if (String(order.customerId || '') !== uid) throw new Error('FORBIDDEN');
         if (String(order.currency || '') !== 'NGN') throw new Error('INVALID_CURRENCY');
-        if (Number(order.totalAmountMinor) !== totalAmountMinor) throw new Error('AMOUNT_MISMATCH');
+        if (Number(order.totalMinor) !== totalAmountMinor) throw new Error('AMOUNT_MISMATCH');
         if (String(order.paymentStatus || '') !== 'pending_payment') throw new Error('ORDER_NOT_ELIGIBLE');
         if (order.paySmallSmallPlanId) throw new Error('PLAN_EXISTS');
         const now = Timestamp.now();
@@ -106,6 +106,18 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const plan = planSnap.data() || {};
         if (String(plan.customerId || '') !== uid) throw new Error('FORBIDDEN');
         if (String(plan.currency || '') !== 'NGN' || String(plan.status || '') !== 'draft') throw new Error('PLAN_NOT_ELIGIBLE');
+        const orderRef = db.collection('orders').doc(String(plan.orderId || ''));
+        const orderSnap = await transaction.get(orderRef);
+        if (!orderSnap.exists) throw new Error('ORDER_NOT_FOUND');
+        const order = orderSnap.data() || {};
+        if (String(order.customerId || '') !== uid ||
+            String(order.paySmallSmallPlanId || '') !== planId ||
+            String(order.currency || '') !== 'NGN' ||
+            String(order.paymentStatus || '') !== 'pending' ||
+            String(order.status || '') !== 'pending_payment' ||
+            Number(order.totalMinor) !== Number(plan.totalAmountMinor)) {
+          throw new Error('ORDER_STATE_MISMATCH');
+        }
         const credential = credentialSnap.data() || {};
         if (!verifyPinCredential(credential, transactionPin)) throw new Error('BAD_PIN');
         const deposit = Number(plan.depositAmountMinor);
@@ -134,7 +146,6 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
           status: 'active', paidAmountMinor: deposit, remainingAmountMinor: Number(plan.totalAmountMinor) - deposit,
           depositTransactionId: txRef.id, activatedAt: now, updatedAt: now
         });
-        const orderRef = db.collection('orders').doc(String(plan.orderId));
         transaction.update(orderRef, {
           paySmallSmallStatus: 'active', paySmallSmallPlanId: planId, paymentStatus: 'partial', status: 'reserved',
           updatedAt: now
@@ -158,6 +169,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
       if (code === 'WALLET_NOT_FOUND') return fail(res, 'WALLET_NOT_FOUND', 'Your UniquePay wallet is not available.');
       if (code === 'INSUFFICIENT_FUNDS') return fail(res, 'INSUFFICIENT_FUNDS', 'Insufficient UniquePay wallet balance.');
       if (code === 'PLAN_NOT_ELIGIBLE') return fail(res, 'INVALID_REQUEST', 'This Pay Small Small plan is not ready for activation.');
+      if (code === 'ORDER_NOT_FOUND' || code === 'ORDER_STATE_MISMATCH') return fail(res, 'CONFLICT', 'The Store order is no longer eligible for Pay Small Small activation.', 409);
       if (code === 'INVALID_AMOUNT') return fail(res, 'INVALID_AMOUNT', 'The deposit amount is invalid.');
       console.error('Pay Small Small deposit failed:', error);
       return fail(res, 'SERVICE_UNAVAILABLE', 'The Pay Small Small deposit could not be completed safely.', 503);
@@ -273,7 +285,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
           }
           const sellerId = typeof order.sellerId === 'string' ? order.sellerId : '';
           if (!sellerId || sellerId === uid) throw new Error('INVALID_SELLER');
-          if (Number(order.amountMinor) !== total) throw new Error('SETTLEMENT_AMOUNT_MISMATCH');
+          if (Number(order.totalMinor) !== total) throw new Error('SETTLEMENT_AMOUNT_MISMATCH');
           const sellerWalletRef = db.collection('wallets').doc(sellerId);
           const sellerWalletSnap = await transaction.get(sellerWalletRef);
           if (!sellerWalletSnap.exists) throw new Error('SELLER_WALLET_NOT_FOUND');
