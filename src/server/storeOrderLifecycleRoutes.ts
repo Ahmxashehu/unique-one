@@ -55,7 +55,12 @@ export function registerStoreOrderLifecycleRoutes(
           : [];
 
         const isSeller = String(order.sellerId || '') === uid;
-        if (!isSeller && !hasRolePermission(roles, permissions, 'manage:orders')) {
+        const businessMembership = (req as any).businessMembership as Record<string, unknown> | undefined;
+        const activeBusinessId = typeof businessMembership?.businessId === 'string' ? businessMembership.businessId : '';
+        const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
+        const hasBusinessContext = Boolean(activeBusinessId);
+        const privilegedBusinessAccess = hasBusinessContext && orderBusinessId === activeBusinessId;
+        if (!isSeller && (!hasRolePermission(roles, permissions, 'manage:orders') || !privilegedBusinessAccess)) {
           throw new Error('FORBIDDEN');
         }
 
