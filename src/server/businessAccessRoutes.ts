@@ -159,8 +159,44 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
     }
   });
 
-  app.post('/api/business/staff/accept-invite', loginLimiter, authenticate, async (req, res) => {\n    const uid = String((req as any).user?.uid || '');\n    const inviteId = typeof req.body?.inviteId === 'string' ? req.body.inviteId.trim() : '';\n    if (!uid || !inviteId) return fail(res, 'INVALID_REQUEST', 'An invitation ID is required.');\n\n    try {\n      const decoded = await getAuth().getUser(uid);\n      const email = String(decoded.email || '').trim().toLowerCase();\n      if (!email) return fail(res, 'INVITEE_EMAIL_REQUIRED', 'A verified account email is required to accept this invitation.', 403);\n\n      const inviteRef = db.collection('staffInvites').doc(inviteId);\n      const result = await db.runTransaction(async (transaction) => {\n        const inviteSnap = await transaction.get(inviteRef);\n        if (!inviteSnap.exists) throw Object.assign(new Error('INVITE_NOT_FOUND'), { code: 'INVITE_NOT_FOUND' });\n        const invite = inviteSnap.data() || {};\n        const inviteStatus = String(invite.status || '');\n        if (inviteStatus !== 'pending') {\n          if (inviteStatus === 'accepted' && String(invite.acceptedByUid || '') === uid) {\n            return { businessId: String(invite.businessId || ''), role: String(invite.role || 'viewer'), alreadyAccepted: true };\n          }\n          throw Object.assign(new Error('INVITE_NOT_PENDING'), { code: 'INVITE_NOT_PENDING' });\n        }\n        const inviteEmail = String(invite.inviteeEmail || '').trim().toLowerCase();\n        const businessId = String(invite.businessId || '').trim();\n        const ownerUid = String(invite.businessOwnerUid || '').trim();\n        const role = String(invite.role || '').trim();
-        const branchId = typeof invite.branchId === 'string' ? invite.branchId.trim() : '';\n        const allowedRoles = new Set(['admin','manager','sales','cashier','accountant','inventory','support','delivery','branch_manager','viewer']);\n        if (!inviteEmail || inviteEmail !== email) throw Object.assign(new Error('INVITE_EMAIL_MISMATCH'), { code: 'INVITE_EMAIL_MISMATCH' });\n        if (!businessId || !ownerUid || !allowedRoles.has(role)) throw Object.assign(new Error('INVALID_INVITE'), { code: 'INVALID_INVITE' });\n\n        const businessRef = db.collection('businesses').doc(businessId);\n        const businessSnap = await transaction.get(businessRef);\n        if (!businessSnap.exists || String(businessSnap.data()?.ownerUid || '') !== ownerUid) {\n          throw Object.assign(new Error('INVALID_BUSINESS_OWNER'), { code: 'INVALID_BUSINESS_OWNER' });\n        }\n\n        if (branchId) {
+  app.post('/api/business/staff/accept-invite', loginLimiter, authenticate, async (req, res) => {
+    const uid = String((req as any).user?.uid || '');
+    const inviteId = typeof req.body?.inviteId === 'string' ? req.body.inviteId.trim() : '';
+    if (!uid || !inviteId) return fail(res, 'INVALID_REQUEST', 'An invitation ID is required.');
+
+    try {
+      const decoded = await getAuth().getUser(uid);
+      const email = String(decoded.email || '').trim().toLowerCase();
+      if (!email) return fail(res, 'INVITEE_EMAIL_REQUIRED', 'A verified account email is required to accept this invitation.', 403);
+
+      const inviteRef = db.collection('staffInvites').doc(inviteId);
+      const result = await db.runTransaction(async (transaction) => {
+        const inviteSnap = await transaction.get(inviteRef);
+        if (!inviteSnap.exists) throw Object.assign(new Error('INVITE_NOT_FOUND'), { code: 'INVITE_NOT_FOUND' });
+        const invite = inviteSnap.data() || {};
+        const inviteStatus = String(invite.status || '');
+        if (inviteStatus !== 'pending') {
+          if (inviteStatus === 'accepted' && String(invite.acceptedByUid || '') === uid) {
+            return { businessId: String(invite.businessId || ''), role: String(invite.role || 'viewer'), alreadyAccepted: true };
+          }
+          throw Object.assign(new Error('INVITE_NOT_PENDING'), { code: 'INVITE_NOT_PENDING' });
+        }
+        const inviteEmail = String(invite.inviteeEmail || '').trim().toLowerCase();
+        const businessId = String(invite.businessId || '').trim();
+        const ownerUid = String(invite.businessOwnerUid || '').trim();
+        const role = String(invite.role || '').trim();
+        const branchId = typeof invite.branchId === 'string' ? invite.branchId.trim() : '';
+        const allowedRoles = new Set(['admin','manager','sales','cashier','accountant','inventory','support','delivery','branch_manager','viewer']);
+        if (!inviteEmail || inviteEmail !== email) throw Object.assign(new Error('INVITE_EMAIL_MISMATCH'), { code: 'INVITE_EMAIL_MISMATCH' });
+        if (!businessId || !ownerUid || !allowedRoles.has(role)) throw Object.assign(new Error('INVALID_INVITE'), { code: 'INVALID_INVITE' });
+
+        const businessRef = db.collection('businesses').doc(businessId);
+        const businessSnap = await transaction.get(businessRef);
+        if (!businessSnap.exists || String(businessSnap.data()?.ownerUid || '') !== ownerUid) {
+          throw Object.assign(new Error('INVALID_BUSINESS_OWNER'), { code: 'INVALID_BUSINESS_OWNER' });
+        }
+
+        if (branchId) {
           const branchSnap = await transaction.get(db.collection('branches').doc(branchId));
           const branch = branchSnap.exists ? branchSnap.data() || {} : {};
           if (!branchSnap.exists || String(branch.businessId || '') !== businessId || String(branch.ownerUid || '') !== ownerUid || String(branch.status || '') !== 'active') {
@@ -168,7 +204,47 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
           }
         }
 
-        const membershipRef = db.collection('businessMemberships').doc(uid + '__' + businessId);\n        const membershipSnap = await transaction.get(membershipRef);\n        if (membershipSnap.exists && String(membershipSnap.data()?.status || '') === 'active') {\n          const currentRole = String(membershipSnap.data()?.role || '');\n          if (currentRole !== role) throw Object.assign(new Error('MEMBERSHIP_ALREADY_ACTIVE'), { code: 'MEMBERSHIP_ALREADY_ACTIVE' });\n        } else {\n          const now = Timestamp.now();\n          transaction.set(membershipRef, {\n            uid, businessId, role,\n            businessName: String(businessSnap.data()?.name || 'Unique Business'),\n            status: 'active',\n            ...(branchId ? { branchId, branchName: typeof invite.branchName === 'string' && invite.branchName.trim() ? invite.branchName.trim() : null } : {}),\n            createdAt: membershipSnap.exists ? (membershipSnap.data()?.createdAt || now) : now,\n            updatedAt: now,\n            sourceInviteId: inviteId,\n            sourceInviteOwnerUid: ownerUid,\n          }, { merge: true });\n        }\n        const now = Timestamp.now();\n        transaction.update(inviteRef, { status: 'accepted', acceptedByUid: uid, acceptedAt: now });\n        return { businessId, role, alreadyAccepted: false };\n      });\n\n      await db.collection('audit_logs').add({\n        action: result.alreadyAccepted ? 'business_staff_invite_accept_idempotent' : 'business_staff_invite_accepted',\n        actorUid: uid, targetUid: uid, businessId: result.businessId, inviteId, role: result.role, createdAt: Timestamp.now(),\n      });\n      return res.json({ ok: true, businessId: result.businessId, role: result.role, alreadyAccepted: result.alreadyAccepted });\n    } catch (error: any) {\n      const code = String(error?.code || '');\n      const statusMap: Record<string, number> = { INVITE_NOT_FOUND: 404, INVITE_NOT_PENDING: 409, INVITE_EMAIL_MISMATCH: 403, INVALID_INVITE: 400, INVALID_BUSINESS_OWNER: 403, INVALID_BRANCH: 403, MEMBERSHIP_ALREADY_ACTIVE: 409 };\n      const messageMap: Record<string, string> = {\n        INVITE_NOT_FOUND: 'Invitation not found.', INVITE_NOT_PENDING: 'This invitation is no longer pending.',\n        INVITE_EMAIL_MISMATCH: 'This invitation belongs to a different account email.', INVALID_INVITE: 'This invitation is invalid or incomplete.',\n        INVALID_BUSINESS_OWNER: 'This invitation is not linked to a valid business owner.', INVALID_BRANCH: 'This invitation is linked to an invalid or inactive branch.', MEMBERSHIP_ALREADY_ACTIVE: 'You already have an active membership for this business with a different role.'\n      };\n      return fail(res, code || 'SERVICE_UNAVAILABLE', messageMap[code] || 'Unable to accept the Business invitation.', statusMap[code] || 503);\n    }\n  });\n\n  app.get('/api/business/access/status', authenticate, async (req, res) => {
+        const membershipRef = db.collection('businessMemberships').doc(uid + '__' + businessId);
+        const membershipSnap = await transaction.get(membershipRef);
+        if (membershipSnap.exists && String(membershipSnap.data()?.status || '') === 'active') {
+          const currentRole = String(membershipSnap.data()?.role || '');
+          if (currentRole !== role) throw Object.assign(new Error('MEMBERSHIP_ALREADY_ACTIVE'), { code: 'MEMBERSHIP_ALREADY_ACTIVE' });
+        } else {
+          const now = Timestamp.now();
+          transaction.set(membershipRef, {
+            uid, businessId, role,
+            businessName: String(businessSnap.data()?.name || 'Unique Business'),
+            status: 'active',
+            ...(branchId ? { branchId, branchName: typeof invite.branchName === 'string' && invite.branchName.trim() ? invite.branchName.trim() : null } : {}),
+            createdAt: membershipSnap.exists ? (membershipSnap.data()?.createdAt || now) : now,
+            updatedAt: now,
+            sourceInviteId: inviteId,
+            sourceInviteOwnerUid: ownerUid,
+          }, { merge: true });
+        }
+        const now = Timestamp.now();
+        transaction.update(inviteRef, { status: 'accepted', acceptedByUid: uid, acceptedAt: now });
+        return { businessId, role, alreadyAccepted: false };
+      });
+
+      await db.collection('audit_logs').add({
+        action: result.alreadyAccepted ? 'business_staff_invite_accept_idempotent' : 'business_staff_invite_accepted',
+        actorUid: uid, targetUid: uid, businessId: result.businessId, inviteId, role: result.role, createdAt: Timestamp.now(),
+      });
+      return res.json({ ok: true, businessId: result.businessId, role: result.role, alreadyAccepted: result.alreadyAccepted });
+    } catch (error: any) {
+      const code = String(error?.code || '');
+      const statusMap: Record<string, number> = { INVITE_NOT_FOUND: 404, INVITE_NOT_PENDING: 409, INVITE_EMAIL_MISMATCH: 403, INVALID_INVITE: 400, INVALID_BUSINESS_OWNER: 403, INVALID_BRANCH: 403, MEMBERSHIP_ALREADY_ACTIVE: 409 };
+      const messageMap: Record<string, string> = {
+        INVITE_NOT_FOUND: 'Invitation not found.', INVITE_NOT_PENDING: 'This invitation is no longer pending.',
+        INVITE_EMAIL_MISMATCH: 'This invitation belongs to a different account email.', INVALID_INVITE: 'This invitation is invalid or incomplete.',
+        INVALID_BUSINESS_OWNER: 'This invitation is not linked to a valid business owner.', INVALID_BRANCH: 'This invitation is linked to an invalid or inactive branch.', MEMBERSHIP_ALREADY_ACTIVE: 'You already have an active membership for this business with a different role.'
+      };
+      return fail(res, code || 'SERVICE_UNAVAILABLE', messageMap[code] || 'Unable to accept the Business invitation.', statusMap[code] || 503);
+    }
+  });
+
+  app.get('/api/business/access/status', authenticate, async (req, res) => {
     const uid = String((req as any).user?.uid || '');
     if (!uid) return fail(res, 'UNAUTHENTICATED', 'Authentication is required.', 401);
     try {
