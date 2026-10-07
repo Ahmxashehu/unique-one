@@ -303,7 +303,20 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
           if (!sellerWalletSnap.exists) throw new Error('SELLER_WALLET_NOT_FOUND');
           const sellerWallet = sellerWalletSnap.data() || {};
           const sellerBalance = Number(sellerWallet.availableBalanceMinor);
-          if (String(sellerWallet.status || '') !== 'active' || !Number.isSafeInteger(sellerBalance)) throw new Error('SELLER_WALLET_UNAVAILABLE');
+          if (String(sellerWallet.status || '') !== 'active' || !Number.isSafeInteger(sellerBalance) || sellerBalance > Number.MAX_SAFE_INTEGER - total) throw new Error('SELLER_WALLET_UNAVAILABLE');
+          const holdLedgerSnap = await transaction.get(db.collection('ledgerEntries')
+            .where('uid', '==', String(plan.planId))
+            .where('accountType', '==', 'pay_small_small_hold'));
+          let holdBalance = 0;
+          for (const holdDoc of holdLedgerSnap.docs) {
+            const holdEntry = holdDoc.data() || {};
+            const holdAmount = Number(holdEntry.amountMinor);
+            if (!Number.isSafeInteger(holdAmount) || holdAmount < 0) throw new Error('HOLD_LEDGER_INVALID');
+            if (String(holdEntry.status || '') !== 'completed') continue;
+            if (String(holdEntry.direction || '') === 'credit') holdBalance += holdAmount;
+            else if (String(holdEntry.direction || '') === 'debit') holdBalance -= holdAmount;
+          }
+          if (!Number.isSafeInteger(holdBalance) || holdBalance < total) throw new Error('HOLD_BALANCE_MISMATCH');
           const settlementTxRef = db.collection('transactions').doc();
           const settlementReference = 'UP-PSS-SET-' + settlementTxRef.id;
           const holdDebitRef = db.collection('ledgerEntries').doc();
@@ -332,7 +345,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
       if (code === 'BAD_PIN') return fail(res, 'FORBIDDEN', 'Incorrect Transaction PIN.', 403);
       if (code === 'PLAN_NOT_ELIGIBLE' || code === 'INSTALLMENT_NOT_PAYABLE' || code === 'INSTALLMENT_PAID') return fail(res, 'INVALID_REQUEST', 'This installment is not payable.');
       if (code === 'INSTALLMENT_NOT_FOUND') return fail(res, 'NOT_FOUND', 'The requested installment was not found.', 404);
-      if (code === 'ORDER_NOT_FOUND' || code === 'ORDER_STATE_MISMATCH' || code === 'INVALID_SELLER' || code === 'SETTLEMENT_AMOUNT_MISMATCH' || code === 'SELLER_WALLET_NOT_FOUND' || code === 'SELLER_WALLET_UNAVAILABLE') return fail(res, 'SERVICE_UNAVAILABLE', 'Seller settlement could not be completed safely. Your installment was not charged.', 503);
+      if (code === 'ORDER_NOT_FOUND' || code === 'ORDER_STATE_MISMATCH' || code === 'INVALID_SELLER' || code === 'SETTLEMENT_AMOUNT_MISMATCH' || code === 'SELLER_WALLET_NOT_FOUND' || code === 'SELLER_WALLET_UNAVAILABLE' || code === 'HOLD_BALANCE_MISMATCH' || code === 'HOLD_LEDGER_INVALID') return fail(res, 'SERVICE_UNAVAILABLE', 'Seller settlement could not be completed safely. Your installment was not charged.', 503);
       if (code === 'INSUFFICIENT_FUNDS') return fail(res, 'INSUFFICIENT_FUNDS', 'Insufficient UniquePay wallet balance.');
       if (code === 'INVALID_AMOUNT') return fail(res, 'INVALID_AMOUNT', 'The installment amount is invalid.');
       if (code === 'IDEMPOTENCY_CONFLICT') return fail(res, 'INVALID_REQUEST', 'This payment idempotency key was already used for a different installment.');
@@ -426,6 +439,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
                 transaction.create(refundTx, { id: refundTx.id, reference: refundRef, senderId: String(plan.planId), recipientId: customerId, amount: refundAmount, currency: 'NGN', type: 'refund', sourceModule: 'unique_pay_small_small.cancellation_refund', provider: 'unique_pay_internal_wallet', status: 'completed', relatedOrderIds: [String(plan.orderId)], createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' });
                 transaction.create(holdDebit, { id: holdDebit.id, transactionId: refundTx.id, reference: refundRef, uid: String(plan.planId), direction: 'debit', amountMinor: refundAmount, currency: 'NGN', status: 'completed', createdAt: now, accountType: 'pay_small_small_hold' });
                 transaction.create(customerCredit, { id: customerCredit.id, transactionId: refundTx.id, reference: refundRef, uid: customerId, direction: 'credit', amountMinor: refundAmount, currency: 'NGN', status: 'completed', createdAt: now, accountType: 'wallet_refund' });
+                if (refundAmount > Number.MAX_SAFE_INTEGER - balance) throw new Error('WALLET_OVERFLOW');
                 transaction.update(walletRef, { availableBalanceMinor: balance + refundAmount, updatedAt: now });
                 update.cancellationRefundTransactionId = refundTx.id;
               }
