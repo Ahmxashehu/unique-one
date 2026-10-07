@@ -480,6 +480,117 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
     }
   });
 
+  app.get('/api/financial-reconciliation/global', async (req, res) => {
+    const token = typeof req.header('x-pay-small-small-cron-token') === 'string' ? req.header('x-pay-small-small-cron-token') : '';
+    if (!process.env.PAY_SMALL_SMALL_CRON_TOKEN || token !== process.env.PAY_SMALL_SMALL_CRON_TOKEN) {
+      return fail(res, 'FORBIDDEN', 'Forbidden.', 403);
+    }
+    try {
+      const requestedLimit = Number(req.query.limit);
+      const pageSize = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 250) : 250;
+      const cursor = typeof req.query.cursor === 'string' ? req.query.cursor.trim() : '';
+      let query = db.collection('transactions')
+        .where('recordKind', '==', 'financial')
+        .orderBy('__name__')
+        .limit(pageSize);
+      if (cursor) query = query.startAfter(db.collection('transactions').doc(cursor)) as any;
+      const transactionSnap = await query.get();
+      const transactions = transactionSnap.docs.map(doc => ({ doc, data: doc.data() || {} }));
+      const ids = transactions.map(item => item.doc.id);
+      const ledgerDocs: any[] = [];
+      for (let i = 0; i < ids.length; i += 30) {
+        const batch = ids.slice(i, i + 30);
+        if (batch.length === 0) continue;
+        const snap = await db.collection('ledgerEntries').where('transactionId', 'in', batch).get();
+        ledgerDocs.push(...snap.docs);
+      }
+      const ledgerByTx = new Map<string, any[]>();
+      for (const doc of ledgerDocs) {
+        const entry = doc.data() || {};
+        const txId = String(entry.transactionId || '');
+        const list = ledgerByTx.get(txId) || [];
+        list.push({ docId: doc.id, ...entry });
+        ledgerByTx.set(txId, list);
+      }
+      const findings: any[] = [];
+      const seenTransactionIds = new Set<string>();
+      for (const { doc, data: tx } of transactions) {
+        const txId = String(tx.id || '');
+        const amount = Number(tx.amount);
+        if (!txId || txId !== doc.id) {
+          findings.push({ code: 'TRANSACTION_IDENTITY_MISMATCH', severity: 'critical', transactionId: txId || doc.id, detail: 'Financial transaction id must match its Firestore document id.' });
+        }
+        if (seenTransactionIds.has(txId)) {
+          findings.push({ code: 'DUPLICATE_TRANSACTION_ID', severity: 'critical', transactionId: txId, detail: 'Duplicate financial transaction ID detected in the reconciliation page.' });
+        }
+        seenTransactionIds.add(txId);
+        if (String(tx.status || '') !== 'completed' || String(tx.currency || '') !== 'NGN' ||
+            String(tx.provider || '') !== 'unique_pay_internal_wallet' || Number(tx.schemaVersion) !== 2 ||
+            String(tx.amountUnit || '') !== 'minor' || !Number.isSafeInteger(amount) || amount <= 0) {
+          findings.push({ code: 'NON_CANONICAL_FINANCIAL_TRANSACTION', severity: 'critical', transactionId: txId, amountMinor: Number.isSafeInteger(amount) ? amount : undefined, detail: 'Completed financial transactions must use the canonical NGN minor-unit schema.' });
+        }
+        const entries = ledgerByTx.get(txId) || [];
+        if (entries.length !== 2) {
+          findings.push({ code: 'LEDGER_COUNT_MISMATCH', severity: 'critical', transactionId: txId, amountMinor: amount, detail: 'Every canonical financial transaction must have exactly one debit and one credit ledger entry.' });
+          continue;
+        }
+        const debits = entries.filter(x => String(x.direction || '') === 'debit');
+        const credits = entries.filter(x => String(x.direction || '') === 'credit');
+        if (debits.length !== 1 || credits.length !== 1) {
+          findings.push({ code: 'LEDGER_DIRECTION_MISMATCH', severity: 'critical', transactionId: txId, detail: 'Financial transaction must have exactly one debit and one credit ledger entry.' });
+        }
+        for (const entry of entries) {
+          const entryAmount = Number(entry.amountMinor);
+          if (!Number.isSafeInteger(entryAmount) || entryAmount !== amount ||
+              String(entry.transactionId || '') !== txId ||
+              String(entry.reference || '') !== String(tx.reference || '') ||
+              String(entry.currency || '') !== String(tx.currency || '') ||
+              String(entry.status || '') !== 'completed') {
+            findings.push({ code: 'LEDGER_TRANSACTION_MISMATCH', severity: 'critical', transactionId: txId, detail: 'Ledger identity, amount, currency, or status does not exactly match its transaction.' });
+          }
+        }
+        const debit = debits[0];
+        const credit = credits[0];
+        if (debit && String(debit.uid || '') !== String(tx.senderId || '')) {
+          findings.push({ code: 'DEBIT_PARTY_MISMATCH', severity: 'critical', transactionId: txId, detail: 'Debit ledger account does not match transaction sender.' });
+        }
+        if (credit && String(credit.uid || '') !== String(tx.recipientId || '')) {
+          findings.push({ code: 'CREDIT_PARTY_MISMATCH', severity: 'critical', transactionId: txId, detail: 'Credit ledger account does not match transaction recipient.' });
+        }
+        if (String(tx.sourceModule || '').startsWith('unique_pay_small_small.') && debit &&
+            String(tx.sourceModule || '') !== 'unique_pay_small_small.deposit' &&
+            String(tx.sourceModule || '') !== 'unique_pay_small_small.installment' &&
+            String(tx.sourceModule || '') !== 'unique_pay_small_small.settlement' &&
+            String(tx.sourceModule || '') !== 'unique_pay_small_small.cancellation_refund') {
+          findings.push({ code: 'UNKNOWN_PSS_SOURCE_MODULE', severity: 'critical', transactionId: txId, detail: 'Pay Small Small financial transaction uses an unsupported source module.' });
+        }
+        if (debit && credit && (Number(debit.amountMinor) !== amount || Number(credit.amountMinor) !== amount)) {
+          findings.push({ code: 'LEDGER_AMOUNT_IMBALANCE', severity: 'critical', transactionId: txId, amountMinor: amount, detail: 'Debit and credit ledger amounts do not both equal the transaction amount.' });
+        }
+      }
+      const nextCursor = transactionSnap.size === pageSize ? transactionSnap.docs[transactionSnap.docs.length - 1]?.id || null : null;
+      return res.json({
+        ok: findings.length === 0,
+        readOnly: true,
+        scope: 'global-financial-transactions',
+        checkedAt: Timestamp.now(),
+        page: { limit: pageSize, transactions: transactionSnap.size, nextCursor },
+        counts: {
+          transactions: transactionSnap.size,
+          ledgerEntries: ledgerDocs.length,
+          findings: findings.length,
+          critical: findings.filter(x => x.severity === 'critical').length,
+          high: findings.filter(x => x.severity === 'high').length
+        },
+        findings: findings.slice(0, 500),
+        truncatedFindings: findings.length > 500
+      });
+    } catch (error) {
+      console.error('Global financial reconciliation failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'Global financial reconciliation could not be completed safely.', 503);
+    }
+  });
+
   app.get('/api/pay-small-small/system/reconcile', async (req, res) => {
     const token = typeof req.header('x-pay-small-small-cron-token') === 'string' ? req.header('x-pay-small-small-cron-token') : '';
     if (!process.env.PAY_SMALL_SMALL_CRON_TOKEN || token !== process.env.PAY_SMALL_SMALL_CRON_TOKEN) return fail(res, 'FORBIDDEN', 'Forbidden.', 403);
