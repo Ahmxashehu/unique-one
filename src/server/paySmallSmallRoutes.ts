@@ -564,10 +564,6 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const plan = planMap.get(planId) || {};
         const customerId = String(plan.customerId || '');
         const orderId = String(plan.orderId || '');
-        const expectedSellerId = (() => {
-          const orderIdValue = String(plan.orderId || '');
-          return orderMap.has(orderIdValue) ? '' : '';
-        })();
         const expectedFlow = module === 'unique_pay_small_small.deposit' || module === 'unique_pay_small_small.installment'
           ? { senderId: customerId, recipientId: planId, debitUid: customerId, debitAccountType: '', creditUid: planId, creditAccountType: 'pay_small_small_hold' }
           : module === 'unique_pay_small_small.settlement'
