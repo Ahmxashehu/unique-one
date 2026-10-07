@@ -22,6 +22,7 @@ export interface FinancialRefundInput {
   reason: string;
   relatedOrderId?: string;
   sourceModule?: string;
+  finalizeOrder?: 'full' | 'partial';
 }
 
 export interface FinancialRefundResult {
@@ -49,6 +50,7 @@ function fingerprint(input: FinancialRefundInput): string {
       input.relatedOrderId ?? '',
       input.reason,
       input.sourceModule ?? '',
+      input.finalizeOrder ?? 'full',
     ].join('\0'))
     .digest('hex');
 }
@@ -87,7 +89,8 @@ export async function executeFinancialRefund(
     input.idempotencyKey.length > 200 ||
     input.currency !== 'NGN' ||
     !input.reason.trim() ||
-    (input.relatedOrderId !== undefined && !isSafeId(input.relatedOrderId))
+    (input.relatedOrderId !== undefined && !isSafeId(input.relatedOrderId)) ||
+    (input.finalizeOrder !== undefined && input.finalizeOrder !== 'full' && input.finalizeOrder !== 'partial')
   ) {
     return { error: { code: 'INVALID_REQUEST', message: 'Invalid refund request.' } };
   }
@@ -159,10 +162,16 @@ export async function executeFinancialRefund(
         order.customerId !== customerUid ||
         order.sellerId !== sellerUid ||
         order.currency !== 'NGN' ||
-        order.paymentStatus !== 'paid' ||
+        !['paid', 'partially_refunded'].includes(String(order.paymentStatus)) ||
         !['confirmed', 'processing', 'ready_for_pickup', 'shipped', 'out_for_delivery', 'delivered', 'completed'].includes(String(order.status))
       ) {
         return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order is not eligible for refund.' } };
+      }
+      if (input.finalizeOrder === 'partial') {
+        const rr = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest as Record<string, unknown> : null;
+        if (!rr || rr.status !== 'received' || Number(rr.requestedRefundAmountMinor) !== input.amountMinor) {
+          return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The partial Store return is not ready for this refund.' } };
+        }
       }
     }
     const customerWalletRef = db.collection('wallets').doc(customerUid);
@@ -262,13 +271,28 @@ export async function executeFinancialRefund(
     });
 
     if (relatedOrderRef) {
-      transaction.update(relatedOrderRef, {
-        status: 'refunded',
-        paymentStatus: 'refunded',
-        refundedAt: now,
-        updatedAt: now,
-        refundTransactionId: refundRef.id,
-      });
+      if (input.finalizeOrder === 'partial') {
+        const orderSnap = await transaction.get(relatedOrderRef);
+        if (!orderSnap.exists) return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order was not found.' } };
+        const order = orderSnap.data() ?? {};
+        const rr = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest as Record<string, unknown> : null;
+        if (!rr || rr.status !== 'received' || Number(rr.requestedRefundAmountMinor) !== input.amountMinor) {
+          return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The partial Store return is no longer eligible for this refund.' } };
+        }
+        transaction.update(relatedOrderRef, {
+          paymentStatus: 'partially_refunded',
+          returnRequest: { ...rr, status: 'refunded', refundedAt: now, refundTransactionId: refundRef.id },
+          updatedAt: now,
+        });
+      } else {
+        transaction.update(relatedOrderRef, {
+          status: 'refunded',
+          paymentStatus: 'refunded',
+          refundedAt: now,
+          updatedAt: now,
+          refundTransactionId: refundRef.id,
+        });
+      }
     }
 
     transaction.set(idempotencyRef, {
