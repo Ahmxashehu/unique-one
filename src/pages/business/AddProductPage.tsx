@@ -131,12 +131,15 @@ export default function AddProductPage() {
         uploadedStoragePaths.push(result.storagePath);
       }
       const now = new Date().toISOString();
+      const businessSession = localStorage.getItem('unique_business_session') || '';
+      const businessId = businessSession ? (localStorage.getItem('unique_business_id') || '') : '';
       const productData: Product = {
         id: productId, sellerId: currentUser.uid, name: cleanName, description: cleanDescription, category,
         images: uploadedImages, hasVideo, price: parsedPrice, currency, condition, quantity: parsedQuantity,
         minOrderQuantity: parsedMinOrder, location: { address: locationAddress.trim(), lat: 0, lng: 0 },
         deliveryOptions: deliveryOption ? ['standard_delivery'] : [], pickupOptions: pickupOption ? ['in_store_pickup'] : [],
         status, createdAt: now, updatedAt: now,
+        ...(businessId ? { businessId } : {}),
         ...(parsedDiscount !== undefined ? { discount: parsedDiscount } : {}),
         ...(parsedWholesale !== undefined ? { wholesalePrice: parsedWholesale } : {}),
         ...(parsedBulk !== undefined ? { bulkPrice: parsedBulk } : {}),
