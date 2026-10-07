@@ -244,7 +244,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const credentialRef = db.collection('authCredentials').doc(uid);
         const idemRef = db.collection('paySmallSmallPaymentIdempotency').doc(crypto.createHash('sha256').update(uid + '\0' + idempotencyKey).digest('hex'));
         const [planSnap, walletSnap, credentialSnap, idemSnap] = await Promise.all([transaction.get(planRef), transaction.get(walletRef), transaction.get(credentialRef), transaction.get(idemRef)]);
-        const fingerprint = planId + '|' + installmentNumber;
+        const fingerprint = planId + '|' + installmentNumber + '|' + String((Array.isArray(planSnap.data()?.installments) ? (planSnap.data()?.installments[installmentNumber - 1] as any)?.amountMinor : '') || '');
         if (idemSnap.exists) {
           const existing = idemSnap.data() || {};
           if (String(existing.requestFingerprint || '') !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT');
