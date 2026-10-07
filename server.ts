@@ -4125,8 +4125,13 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           selected.set(productId, quantity);
         }
         const items = Array.from(selected.entries()).map(([productId, quantity]) => ({ productId, quantity, priceMinor: orderedByProduct.get(productId)!.priceMinor, returnable: true }));
-        const requestedRefundAmountMinor = items.reduce((sum, item) => sum + item.priceMinor * item.quantity, 0);
-        if (!Number.isSafeInteger(requestedRefundAmountMinor) || requestedRefundAmountMinor <= 0) throw new RequestValidationError('INVALID_AMOUNT', 'The requested return amount is invalid.');
+        const requestedRefundAmountMinor = items.reduce((sum, item) => {
+          const lineTotal = item.priceMinor * item.quantity;
+          if (!Number.isSafeInteger(lineTotal) || !Number.isSafeInteger(sum + lineTotal)) throw new RequestValidationError('INVALID_AMOUNT', 'The requested return amount is too large.');
+          return sum + lineTotal;
+        }, 0);
+        const orderAmountMinor = Number(order.amountMinor);
+        if (!Number.isSafeInteger(orderAmountMinor) || orderAmountMinor <= 0 || requestedRefundAmountMinor > orderAmountMinor) throw new RequestValidationError('INVALID_AMOUNT', 'The requested return amount cannot exceed the Store order amount.');
         const now = Timestamp.now().toDate().toISOString();
         const returnRequest = { status: 'requested', reason, items, requestedRefundAmountMinor, requestedBy: uid, requestedAt: now, restocked: false };
         transaction.update(orderRef, { returnRequest, updatedAt: now });
