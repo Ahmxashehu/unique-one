@@ -3533,7 +3533,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const productId = String(cart.data.productId).trim();
           productSnapshots.set(productId, await transaction.get(adminDb.collection('products').doc(productId)));
         }
-        const groups = new Map<string, { cart: typeof carts[number]; product: Record<string, unknown>; productId: string }[]>();
+        const groups = new Map<string, { cart: typeof carts[number]; product: Record<string, unknown>; productId: string; sellerId: string; businessId: string | null }[]>();
         const requestedByProduct = new Map<string, number>();
         for (const cart of carts) {
           const productId = String(cart.data.productId).trim();
@@ -3542,6 +3542,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const product = snapshot.data() || {};
           const quantity = Number(cart.data.quantity);
           const sellerId = product.sellerId;
+          const businessId = typeof product.businessId === 'string' && product.businessId.trim() ? product.businessId.trim() : null;
           const price = product.price;
           const available = product.quantity;
           const minOrderQuantity = Number(product.minOrderQuantity || 1);
@@ -3557,9 +3558,10 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             throw new RequestValidationError('INVALID_REQUEST', 'One or more products in your cart are no longer available in the requested quantity.');
           }
           requestedByProduct.set(productId, requested);
-          const group = groups.get(sellerId) || [];
-          group.push({ cart, product, productId });
-          groups.set(sellerId, group);
+          const groupKey = `${sellerId}::${businessId || ''}`;
+          const group = groups.get(groupKey) || [];
+          group.push({ cart, product, productId, sellerId, businessId });
+          groups.set(groupKey, group);
         }
         const orderIds: string[] = [];
         const now = Timestamp.now().toDate().toISOString();
@@ -3574,8 +3576,10 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             updatedAt: now,
           });
         }
-        for (const [sellerId, sellerItems] of groups) {
+        for (const [, sellerItems] of groups) {
           const orderRef = adminDb.collection('orders').doc();
+          const sellerId = sellerItems[0].sellerId;
+          const businessId = sellerItems[0].businessId;
           const items = sellerItems.map(({ product, productId, cart }) => ({
             productId,
             name: typeof product.name === 'string' ? product.name : 'Product',
@@ -3590,7 +3594,9 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           }
           const totalAmount = totalAmountMinor / 100;
           transaction.create(orderRef, {
-            id: orderRef.id, customerId: uid, sellerId, items, totalAmount, amountMinor: totalAmountMinor, currency: 'NGN',
+            id: orderRef.id, customerId: uid, sellerId,
+            ...(businessId ? { businessId } : {}),
+            items, totalAmount, amountMinor: totalAmountMinor, currency: 'NGN',
             status: 'pending', shippingAddress, createdAt: now, updatedAt: now,
           });
           orderIds.push(orderRef.id);

@@ -39,7 +39,11 @@ export function registerStoreReturnInspectionRoutes(
         const canManage = roles.includes('super_admin') || roles.includes('platform_admin') ||
           roles.includes('administrator') || permissions.includes('manage:disputes');
 
-        if (uid !== order.sellerId && !canManage) throw new Error('FORBIDDEN');
+        const businessMembership = (req as any).businessMembership as Record<string, unknown> | undefined;
+        const activeBusinessId = typeof businessMembership?.businessId === 'string' ? businessMembership.businessId : '';
+        const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
+        const privilegedBusinessAccess = Boolean(activeBusinessId && orderBusinessId === activeBusinessId);
+        if (uid !== order.sellerId && (!canManage || !privilegedBusinessAccess)) throw new Error('FORBIDDEN');
 
         const rr = order.returnRequest && typeof order.returnRequest === 'object'
           ? order.returnRequest as Record<string, unknown>
