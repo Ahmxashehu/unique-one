@@ -4022,6 +4022,19 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         });
         return res.status(200).json({ orderId, status: 'resolved', decision: 'deny' });
       }
+      const paymentTransactionIds = Array.isArray(order.paymentTransactionIds)
+        ? order.paymentTransactionIds.filter((id: unknown) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id))
+        : [];
+      if (!paymentTransactionIds.length) return errorResponse(res, 'NOT_FOUND', 'The Store order does not have a payment transaction for dispute refund.');
+      if (order.paymentStatus === 'partially_refunded' || order.paymentStatus === 'refunded' || (order.returnRequest && typeof order.returnRequest === 'object')) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A Store dispute cannot issue a full refund after an existing return or refund.');
+      }
+      const payments = await Promise.all(paymentTransactionIds.map(id => adminDb.collection('transactions').doc(id).get()));
+      const candidates = payments
+        .filter(s => s.exists)
+        .map(s => ({ id: s.id, data: s.data() as Record<string, unknown> }))
+        .filter(({data:p}) => p.recordKind === 'financial' && p.schemaVersion === 2 && p.amountUnit === 'minor' && p.currency === 'NGN' && p.status === 'completed' && p.type === 'merchant_payment' && p.sourceModule === 'unique_store.checkout' && p.senderId === order.customerId && p.recipientId === order.sellerId && Array.isArray(p.relatedOrderIds) && p.relatedOrderIds.includes(orderId) && Number.isSafeInteger(Number(p.amount)) && Number(p.amount) >= amountMinor);
+      if (candidates.length !== 1) return errorResponse(res, candidates.length === 0 ? 'NOT_FOUND' : 'INVALID_REQUEST', 'The original Store payment could not be uniquely matched for dispute refund.');
       const refund = await executeFinancialRefund(adminDb, {
         originalTransactionId: candidates[0].id,
         amountMinor,
