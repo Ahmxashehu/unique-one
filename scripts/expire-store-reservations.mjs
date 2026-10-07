@@ -25,7 +25,9 @@ for (const doc of snap.docs) {
     const order = orderSnap.data() || {};
     if (order.status !== 'pending') return false;
 
-    const expiresAt = typeof order.expiresAt === 'string' ? Date.parse(order.expiresAt) : NaN;
+    const explicitExpiry = typeof order.expiresAt === 'string' ? Date.parse(order.expiresAt) : NaN;
+    const createdAt = typeof order.createdAt === 'string' ? Date.parse(order.createdAt) : NaN;
+    const expiresAt = Number.isFinite(explicitExpiry) ? explicitExpiry : Number.isFinite(createdAt) ? createdAt + 1800000 : NaN;
     if (!Number.isFinite(expiresAt) || expiresAt > now.getTime()) return false;
 
     const items = Array.isArray(order.items) ? order.items : [];
