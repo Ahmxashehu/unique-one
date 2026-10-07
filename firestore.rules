@@ -238,7 +238,7 @@ service cloud.firestore {
         )
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'businessId','name','description','category','images','hasVideo','price','currency',
-          'discount','condition','quantity','minOrderQuantity','wholesalePrice','bulkPrice',
+          'discount','condition','minOrderQuantity','wholesalePrice','bulkPrice',
           'variants','location','deliveryOptions','pickupOptions','status','updatedAt'
         ])
         && request.resource.data.status in ['draft','published','out_of_stock']
