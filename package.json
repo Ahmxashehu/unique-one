@@ -12,7 +12,8 @@
     "lint": "tsc --noEmit",
     "test": "node scripts/verify-platform.mjs",
     "localization:audit": "node scripts/audit-localization.mjs",
-    "localization:strict": "node scripts/audit-localization.mjs --strict"
+    "localization:strict": "node scripts/audit-localization.mjs --strict",
+    "store:expire-reservations": "node scripts/expire-store-reservations.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
