@@ -185,7 +185,7 @@ service cloud.firestore {
     match /roles/{roleId} { allow read: if isAdmin(); allow write: if isPlatformAdmin(); }
     match /organizations/{orgId} { allow read: if isAdmin(); allow write: if isPlatformAdmin(); }
     match /sessions/{sessionId} { allow read: if isOwner(resource.data.uid) || isPlatformAdmin(); allow create, update, delete: if false; }
-    match /notifications/{notificationId} { allow read: if isOwner(resource.data.uid); allow update: if isOwner(resource.data.uid) && request.resource.data.uid == resource.data.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']); allow create, delete: if isAdmin(); }
+    match /notifications/{notificationId} { allow read: if isOwner(resource.data.uid); allow update: if isOwner(resource.data.uid) && request.resource.data.uid == resource.data.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']); allow create, delete: if isPlatformAdmin(); }
     match /audit_logs/{logId} { allow read: if isAdmin(); allow create, update, delete: if false; }
     // Unique AI audit logs are server-managed through the Firebase Admin SDK. Clients have no access.
     match /aiAuditLogs/{logId} { allow read, create, update, delete: if false; }
@@ -265,7 +265,7 @@ service cloud.firestore {
       allow delete: if isPlatformAdmin();
     }
     match /quotes/{quoteId} {
-      allow read: if isAdmin() || (isAuthenticated() && (resource.data.sellerId == request.auth.uid || (exists(/databases/$(database)/documents/productRequests/$(resource.data.requestId)) && get(/databases/$(database)/documents/productRequests/$(resource.data.requestId)).data.customerId == request.auth.uid)));
+      allow read: if isPlatformAdmin() || (isAuthenticated() && (resource.data.sellerId == request.auth.uid || (exists(/databases/$(database)/documents/productRequests/$(resource.data.requestId)) && get(/databases/$(database)/documents/productRequests/$(resource.data.requestId)).data.customerId == request.auth.uid)));
       allow create: if isAuthenticated()
         && request.resource.data.sellerId == request.auth.uid
         && request.resource.data.requestId is string
@@ -381,7 +381,7 @@ service cloud.firestore {
       allow delete: if isPlatformAdmin();
     }
     match /receipts/{recId} { allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isPlatformAdmin(); allow create, update, delete: if false; }
-    match /transactions/{txId} { allow read: if isAdmin() || (isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid)); allow create, update, delete: if false; }
+    match /transactions/{txId} { allow read: if isPlatformAdmin() || (isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid)); allow create, update, delete: if false; }
     match /wallets/{uid} { allow read, create, update, delete: if false; }
     match /walletIdempotency/{idempotencyId} { allow read, create, update, delete: if false; }
     match /ledgerEntries/{ledgerId} { allow read, create, update, delete: if false; }
