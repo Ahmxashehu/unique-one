@@ -265,6 +265,12 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
           const orderSnap = await transaction.get(orderRef);
           if (!orderSnap.exists) throw new Error('ORDER_NOT_FOUND');
           const order = orderSnap.data() || {};
+          if (String(order.paySmallSmallPlanId || '') !== planId ||
+              String(order.paySmallSmallStatus || '') !== 'active' ||
+              String(order.paymentStatus || '') !== 'partial' ||
+              String(order.status || '') !== 'reserved') {
+            throw new Error('ORDER_STATE_MISMATCH');
+          }
           const sellerId = typeof order.sellerId === 'string' ? order.sellerId : '';
           if (!sellerId || sellerId === uid) throw new Error('INVALID_SELLER');
           if (Number(order.amountMinor) !== total) throw new Error('SETTLEMENT_AMOUNT_MISMATCH');
@@ -302,7 +308,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
       if (code === 'BAD_PIN') return fail(res, 'FORBIDDEN', 'Incorrect Transaction PIN.', 403);
       if (code === 'PLAN_NOT_ELIGIBLE' || code === 'INSTALLMENT_NOT_PAYABLE' || code === 'INSTALLMENT_PAID') return fail(res, 'INVALID_REQUEST', 'This installment is not payable.');
       if (code === 'INSTALLMENT_NOT_FOUND') return fail(res, 'NOT_FOUND', 'The requested installment was not found.', 404);
-      if (code === 'ORDER_NOT_FOUND' || code === 'INVALID_SELLER' || code === 'SETTLEMENT_AMOUNT_MISMATCH' || code === 'SELLER_WALLET_NOT_FOUND' || code === 'SELLER_WALLET_UNAVAILABLE') return fail(res, 'SERVICE_UNAVAILABLE', 'Seller settlement could not be completed safely. Your installment was not charged.', 503);
+      if (code === 'ORDER_NOT_FOUND' || code === 'ORDER_STATE_MISMATCH' || code === 'INVALID_SELLER' || code === 'SETTLEMENT_AMOUNT_MISMATCH' || code === 'SELLER_WALLET_NOT_FOUND' || code === 'SELLER_WALLET_UNAVAILABLE') return fail(res, 'SERVICE_UNAVAILABLE', 'Seller settlement could not be completed safely. Your installment was not charged.', 503);
       if (code === 'INSUFFICIENT_FUNDS') return fail(res, 'INSUFFICIENT_FUNDS', 'Insufficient UniquePay wallet balance.');
       if (code === 'INVALID_AMOUNT') return fail(res, 'INVALID_AMOUNT', 'The installment amount is invalid.');
       if (code === 'IDEMPOTENCY_CONFLICT') return fail(res, 'INVALID_REQUEST', 'This payment idempotency key was already used for a different installment.');
@@ -363,6 +369,16 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
               const wallet = walletSnap.data() || {};
               const balance = Number(wallet.availableBalanceMinor);
               if (!Number.isSafeInteger(balance) || String(wallet.status || '') !== 'active') throw new Error('WALLET_UNAVAILABLE');
+              const orderRef = db.collection('orders').doc(String(plan.orderId));
+              const orderSnap = await transaction.get(orderRef);
+              if (!orderSnap.exists) throw new Error('ORDER_NOT_FOUND');
+              const order = orderSnap.data() || {};
+              if (String(order.paySmallSmallPlanId || '') !== String(plan.planId) ||
+                  String(order.paySmallSmallStatus || '') !== 'active' ||
+                  String(order.paymentStatus || '') !== 'partial' ||
+                  String(order.status || '') !== 'reserved') {
+                throw new Error('ORDER_STATE_MISMATCH');
+              }
               const refundAmount = Number(plan.paidAmountMinor || 0);
               if (!Number.isSafeInteger(refundAmount) || refundAmount < 0) throw new Error('INVALID_REFUND');
               if (refundAmount > 0) {
@@ -382,7 +398,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
               update.cancelReason = 'missed_payment';
               update.paidAmountMinor = 0;
               update.remainingAmountMinor = Number(plan.totalAmountMinor || 0);
-              transaction.update(db.collection('orders').doc(String(plan.orderId)), { paySmallSmallStatus: 'cancelled', paymentStatus: 'refunded', status: 'cancelled', updatedAt: now });
+              transaction.update(orderRef, { paySmallSmallStatus: 'cancelled', paymentStatus: 'refunded', status: 'cancelled', updatedAt: now });
               transaction.create(db.collection('audit_logs').doc(), { action: 'pay_small_small.cancelled_for_missed_payment', actorUid: 'system', targetUid: customerId, resource: 'pay_small_pay_small_plan', resourceId: String(plan.planId), orderId: String(plan.orderId), refundAmountMinor: refundAmount, createdAt: now, timestamp: now });
               cancelled++;
             } else if (oldestMs && age >= graceMs) {
