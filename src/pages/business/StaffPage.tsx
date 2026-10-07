@@ -4,7 +4,8 @@ import { addDoc, collection, getDocs, query, where, serverTimestamp } from 'fire
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 
-type StaffInvite = { id: string; businessId?: string; inviteeEmail: string; role: string; branchId?: string; branchName?: string; status: string };\ntype BusinessBranch = { id: string; name: string; status?: string; businessId?: string };
+type StaffInvite = { id: string; businessId?: string; inviteeEmail: string; role: string; branchId?: string; branchName?: string; status: string };
+type BusinessBranch = { id: string; name: string; status?: string; businessId?: string };
 const roles = ['admin', 'manager', 'sales', 'cashier', 'accountant', 'inventory', 'support', 'delivery', 'branch_manager', 'viewer'];
 
 export default function StaffPage() {
@@ -15,7 +16,8 @@ export default function StaffPage() {
   const [showForm, setShowForm] = useState(false);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('manager');
-  const [branchId, setBranchId] = useState('');\n  const [branches, setBranches] = useState<BusinessBranch[]>([]);
+  const [branchId, setBranchId] = useState('');
+  const [branches, setBranches] = useState<BusinessBranch[]>([]);
   const [businessId, setBusinessId] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -28,8 +30,10 @@ export default function StaffPage() {
     setLoading(true);
     setError('');
     try {
-      const snapshot = await getDocs(query(collection(db, 'staffInvites'), where('businessOwnerUid', '==', currentUser.uid), where('businessId', '==', activeBusinessId)));\n      const branchSnapshot = await getDocs(query(collection(db, 'branches'), where('ownerUid', '==', currentUser.uid), where('businessId', '==', activeBusinessId)));
-      setInvites(snapshot.docs.map(item => ({ id: item.id, ...item.data() } as StaffInvite)));\n      setBranches(branchSnapshot.docs.map(item => ({ id: item.id, ...item.data() } as BusinessBranch)).filter(branch => branch.status !== 'inactive'));
+      const snapshot = await getDocs(query(collection(db, 'staffInvites'), where('businessOwnerUid', '==', currentUser.uid), where('businessId', '==', activeBusinessId)));
+      const branchSnapshot = await getDocs(query(collection(db, 'branches'), where('ownerUid', '==', currentUser.uid), where('businessId', '==', activeBusinessId)));
+      setInvites(snapshot.docs.map(item => ({ id: item.id, ...item.data() } as StaffInvite)));
+      setBranches(branchSnapshot.docs.map(item => ({ id: item.id, ...item.data() } as BusinessBranch)).filter(branch => branch.status !== 'inactive'));
     } catch (err) {
       console.error('Staff invites load failed:', err);
       setError('We could not load staff invitations. Please try again.');
