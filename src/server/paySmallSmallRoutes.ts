@@ -691,7 +691,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
           } else {
             installmentNumbers.add(numberValue);
           }
-          if (!Number.isSafeInteger(amountValue) || amountValue <= 0 || !['pending', 'paid'].includes(installmentStatus)) {
+          if (!Number.isSafeInteger(amountValue) || amountValue <= 0 || !['pending', 'overdue', 'paid'].includes(installmentStatus)) {
             addFinding({ code: 'INVALID_INSTALLMENT_RECORD', severity: 'critical', planId, detail: 'Installment schedule contains an invalid amount or status.' });
           } else {
             scheduleTotal += amountValue;
