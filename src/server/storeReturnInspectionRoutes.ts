@@ -99,6 +99,8 @@ export function registerStoreReturnInspectionRoutes(
           returnRequest: {
             ...rr,
             inventoryDisposition: disposition,
+            quarantined: false,
+            restocked: disposition === 'resalable',
             inspectedBy: uid,
             inspectedAt: now.toDate().toISOString(),
           },
