@@ -470,7 +470,11 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         db.collection('ledgerEntries').get()
       ]);
 
-      type Finding = { code: string; severity: 'critical' | 'high' | 'medium'; planId?: string; transactionId?: string; amountMinor?: number; detail: string };\n      const findings: Finding[] = [];\n      const addFinding = (finding: Finding) => findings.push(finding);\n\n      const walletLedgerNet = new Map<string, number>();
+      type Finding = { code: string; severity: 'critical' | 'high' | 'medium'; planId?: string; transactionId?: string; amountMinor?: number; detail: string };
+      const findings: Finding[] = [];
+      const addFinding = (finding: Finding) => findings.push(finding);
+
+      const walletLedgerNet = new Map<string, number>();
       for (const doc of allLedgerSnap.docs) {
         const entry = doc.data() || {};
         const accountType = String(entry.accountType || '');
