@@ -4005,6 +4005,25 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+
+async function storeBusinessAccessMatches(req: any, uid: string, businessId: string): Promise<boolean> {
+  if (!businessId) return false;
+  const token = typeof req.headers?.['x-business-session'] === 'string' ? req.headers['x-business-session'] : '';
+  if (!token || token.length < 32) return false;
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const sessionSnap = await adminDb.collection('businessAccessSessions').doc(tokenHash).get();
+  if (!sessionSnap.exists) return false;
+  const session = sessionSnap.data() || {};
+  if (String(session.uid || '') !== uid || String(session.businessId || '') !== businessId || String(session.status || '') !== 'active') return false;
+  if (typeof session.expiresAt?.toMillis !== 'function' || session.expiresAt.toMillis() <= Date.now()) return false;
+  const membershipSnap = await adminDb.collection('businessMemberships').doc(uid + '__' + businessId).get();
+  return membershipSnap.exists && String(membershipSnap.data()?.status || '') === 'active';
+}
+
+function isGlobalStoreAdmin(roles: unknown[]): boolean {
+  return roles.some((role) => role === 'super_admin' || role === 'platform_admin');
+}
+
   app.post("/api/store/orders/:orderId/dispute-response", authenticate, rateLimit({
     windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false,
     store: createFirestoreRateLimitStore('storeDisputeResponseRateLimits', 60_000),
@@ -4023,7 +4042,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const snap = await ref.get();
       if (!snap.exists) return errorResponse(res, 'NOT_FOUND', 'The Store order was not found.');
       const order = snap.data() as Record<string, unknown>;
-      if (uid !== order.sellerId && !hasRolePermission(roles, permissions, 'manage:disputes')) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to respond to this dispute.');
+      const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
+      const globalAdmin = isGlobalStoreAdmin(roles);
+      const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
+      const sellerAccess = uid === order.sellerId && (!orderBusinessId || tenantAccess);
+      const privilegedAccess = hasRolePermission(roles, permissions, 'manage:disputes') && (orderBusinessId ? (globalAdmin || tenantAccess) : globalAdmin);
+      if (!sellerAccess && !privilegedAccess) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to respond to this dispute.');
       const result = await adminDb.runTransaction(async (transaction) => {
         const currentSnap = await transaction.get(ref);
         if (!currentSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
@@ -4060,7 +4084,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const rolesSnap = await adminDb.collection('users').doc(uid).get();
       const roles = Array.isArray(rolesSnap.data()?.roles) ? rolesSnap.data()?.roles.filter((v: unknown) => typeof v === 'string') as any[] : [];
       const permissions = Array.isArray(rolesSnap.data()?.permissions) ? rolesSnap.data()?.permissions.filter((v: unknown) => typeof v === 'string') as any[] : [];
-      if (!hasRolePermission(roles, permissions, 'manage:disputes')) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to resolve Store disputes.');
+      const orderBusinessId = typeof (await adminDb.collection('orders').doc(orderId).get()).data()?.businessId === 'string'
+        ? String((await adminDb.collection('orders').doc(orderId).get()).data()?.businessId)
+        : '';
+      const globalAdmin = isGlobalStoreAdmin(roles);
+      const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
+      if (!hasRolePermission(roles, permissions, 'manage:disputes') || (orderBusinessId ? (!globalAdmin && !tenantAccess) : !globalAdmin)) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to resolve Store disputes.');
       const snap = await adminDb.collection('orders').doc(orderId).get();
       if (!snap.exists) return errorResponse(res, 'NOT_FOUND', 'The Store order was not found.');
       const order = snap.data() as Record<string, unknown>;
@@ -4243,7 +4272,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const rolesSnap = await adminDb.collection('users').doc(uid).get();
       const roles = Array.isArray(rolesSnap.data()?.roles) ? rolesSnap.data()?.roles.filter((r: unknown) => typeof r === 'string') as any[] : [];
       const permissions = Array.isArray(rolesSnap.data()?.permissions) ? rolesSnap.data()?.permissions.filter((p: unknown) => typeof p === 'string') as any[] : [];
-      if (uid !== order.sellerId && !hasRolePermission(roles, permissions, 'manage:disputes')) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to approve this Store return.');
+      const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
+      const globalAdmin = isGlobalStoreAdmin(roles);
+      const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
+      const sellerAccess = uid === order.sellerId && (!orderBusinessId || tenantAccess);
+      const privilegedAccess = hasRolePermission(roles, permissions, 'manage:disputes') && (orderBusinessId ? (globalAdmin || tenantAccess) : globalAdmin);
+      if (!sellerAccess && !privilegedAccess) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to approve this Store return.');
       const result = await adminDb.runTransaction(async (transaction) => {
         const ref = adminDb.collection('orders').doc(orderId);
         const snap = await transaction.get(ref);
@@ -4290,7 +4324,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const rolesSnap = await transaction.get(adminDb.collection('users').doc(uid));
         const roles = Array.isArray(rolesSnap.data()?.roles) ? rolesSnap.data()?.roles.filter((r: unknown) => typeof r === 'string') as any[] : [];
         const permissions = Array.isArray(rolesSnap.data()?.permissions) ? rolesSnap.data()?.permissions.filter((p: unknown) => typeof p === 'string') as any[] : [];
-        if (uid !== order.sellerId && !hasRolePermission(roles, permissions, 'manage:disputes')) throw new RequestValidationError('FORBIDDEN', 'You are not permitted to receive this Store return.');
+        const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
+        const globalAdmin = isGlobalStoreAdmin(roles);
+        const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
+        const sellerAccess = uid === order.sellerId && (!orderBusinessId || tenantAccess);
+        const privilegedAccess = hasRolePermission(roles, permissions, 'manage:disputes') && (orderBusinessId ? (globalAdmin || tenantAccess) : globalAdmin);
+        if (!sellerAccess && !privilegedAccess) throw new RequestValidationError('FORBIDDEN', 'You are not permitted to receive this Store return.');
         const rr = order.returnRequest as Record<string, unknown> | undefined;
         if (!rr || rr.status !== 'approved' || rr.quarantined === true) {
           if (rr?.status === 'received' && rr.quarantined === true) return { orderId, status: 'received', restocked: false, quarantined: true, replayed: true };
@@ -4362,7 +4401,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const roles = Array.isArray(rolesSnap.data()?.roles) ? rolesSnap.data()?.roles.filter((role: unknown) => typeof role === 'string') as any[] : [];
       const permissions = Array.isArray(rolesSnap.data()?.permissions) ? rolesSnap.data()?.permissions.filter((permission: unknown) => typeof permission === 'string') as any[] : [];
       const canManageDisputes = hasRolePermission(roles, permissions, 'manage:disputes');
-      if (uid !== customerId && !canManageDisputes) {
+      const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
+      const globalAdmin = isGlobalStoreAdmin(roles);
+      const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
+      const privilegedRefundAccess = canManageDisputes && (orderBusinessId ? (globalAdmin || tenantAccess) : globalAdmin);
+      if (uid !== customerId && !privilegedRefundAccess) {
         return errorResponse(res, 'FORBIDDEN', 'You are not permitted to refund this Store order.');
       }
       const orderStatus = String(order.status || '');
