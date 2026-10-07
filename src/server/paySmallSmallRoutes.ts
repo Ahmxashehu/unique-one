@@ -703,6 +703,152 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
     }
   });
 
+  app.get('/api/financial-reconciliation/cross-domain', async (req, res) => {
+    const token = typeof req.header('x-pay-small-small-cron-token') === 'string' ? req.header('x-pay-small-small-cron-token') : '';
+    if (!process.env.PAY_SMALL_SMALL_CRON_TOKEN || token !== process.env.PAY_SMALL_SMALL_CRON_TOKEN) return fail(res, 'FORBIDDEN', 'Forbidden.', 403);
+    try {
+      const [txSnap, ordersSnap, plansSnap] = await Promise.all([
+        db.collection('transactions').where('recordKind', '==', 'financial').where('schemaVersion', '==', 2).where('amountUnit', '==', 'minor').where('status', '==', 'completed').get(),
+        db.collection('orders').get(),
+        db.collection('paySmallSmallPlans').get()
+      ]);
+      const findings: any[] = [];
+      const txById = new Map<string, any>();
+      const orderTx = new Map<string, any[]>();
+      const refundsByOriginal = new Map<string, number>();
+      const paymentSources = new Set([
+        'unique_pay.wallet_transfer',
+        'unique_store.checkout',
+        'unique_restaurant.checkout',
+        'unique_pay_small_small.deposit',
+        'unique_pay_small_small.installment',
+        'unique_pay_small_small.settlement',
+        'unique_pay_small_small.cancellation_refund',
+        'unique_store.refund',
+        'unique_store.dispute',
+        'unique_pay.financial_refund',
+      ]);
+      for (const doc of txSnap.docs) {
+        const tx = doc.data() || {};
+        const id = String(tx.id || doc.id);
+        if (txById.has(id)) findings.push({ code: 'DUPLICATE_TRANSACTION_ID', severity: 'critical', transactionId: id, detail: 'Duplicate canonical transaction ID detected.' });
+        txById.set(id, tx);
+        const amount = Number(tx.amount);
+        if (!Number.isSafeInteger(amount) || amount <= 0 || String(tx.currency || '') !== 'NGN' || String(tx.provider || '') !== 'unique_pay_internal_wallet') {
+          findings.push({ code: 'INVALID_CANONICAL_TRANSACTION', severity: 'critical', transactionId: id, detail: 'Cross-domain financial transaction has invalid amount, currency, or provider.' });
+          continue;
+        }
+        const module = String(tx.sourceModule || '');
+        if (!paymentSources.has(module)) {
+          findings.push({ code: 'UNKNOWN_FINANCIAL_SOURCE_MODULE', severity: 'high', transactionId: id, amountMinor: amount, detail: 'A completed canonical financial transaction uses an unrecognized platform financial source module.' });
+        }
+        const relatedOrders = Array.isArray(tx.relatedOrderIds) ? tx.relatedOrderIds.map(String) : [];
+        for (const orderId of relatedOrders) {
+          const list = orderTx.get(orderId) || [];
+          list.push({ id, module, amount });
+          orderTx.set(orderId, list);
+        }
+        if (String(tx.type || '') === 'refund') {
+          const originalId = String(tx.reversalOfTransactionId || '');
+          if (!originalId) {
+            findings.push({ code: 'REFUND_MISSING_ORIGINAL', severity: 'critical', transactionId: id, amountMinor: amount, detail: 'A refund has no reversalOfTransactionId.' });
+          } else {
+            refundsByOriginal.set(originalId, (refundsByOriginal.get(originalId) || 0) + amount);
+            if (!txById.has(originalId)) {
+              // Checked after all transaction IDs are loaded below.
+            }
+          }
+        }
+      }
+
+      for (const [id, totalRefunded] of refundsByOriginal) {
+        const original = txById.get(id);
+        if (!original) {
+          findings.push({ code: 'REFUND_ORIGINAL_NOT_FOUND', severity: 'critical', transactionId: id, amountMinor: totalRefunded, detail: 'Refunds reference an original financial transaction that does not exist.' });
+          continue;
+        }
+        const originalAmount = Number(original.amount);
+        if (!Number.isSafeInteger(originalAmount) || totalRefunded > originalAmount) {
+          findings.push({ code: 'REFUND_OVER_ORIGINAL', severity: 'critical', transactionId: id, amountMinor: totalRefunded, detail: 'Completed refunds exceed the original transaction amount.' });
+        }
+        if (String(original.type || '') === 'refund') {
+          findings.push({ code: 'REFUND_CHAIN', severity: 'critical', transactionId: id, detail: 'A refund reverses another refund instead of an original payment.' });
+        }
+        const originalModule = String(original.sourceModule || '');
+        const allowedRefund = originalModule === 'unique_store.checkout'
+          ? new Set(['unique_store.refund', 'unique_store.dispute', 'unique_pay.financial_refund'])
+          : originalModule === 'unique_restaurant.checkout'
+            ? new Set(['unique_pay.financial_refund'])
+            : new Set(['unique_pay.financial_refund', 'unique_store.refund', 'unique_store.dispute']);
+        for (const [refundId, refund] of txById) {
+          if (String(refund.type || '') === 'refund' && String(refund.reversalOfTransactionId || '') === id && !allowedRefund.has(String(refund.sourceModule || ''))) {
+            findings.push({ code: 'REFUND_DOMAIN_MISMATCH', severity: 'critical', transactionId: refundId, amountMinor: Number(refund.amount), detail: 'Refund source module is not valid for the original financial domain.' });
+          }
+        }
+      }
+
+      for (const [orderId, entries] of orderTx) {
+        const order = ordersSnap.docs.find(d => d.id === orderId)?.data() || null;
+        if (!order) {
+          findings.push({ code: 'FINANCIAL_ORDER_NOT_FOUND', severity: 'critical', orderId, detail: 'Financial transaction references a Store/Restaurant order that does not exist.' });
+          continue;
+        }
+        const checkoutEntries = entries.filter(x => x.module === 'unique_store.checkout' || x.module === 'unique_restaurant.checkout');
+        if (checkoutEntries.length > 1) {
+          findings.push({ code: 'MULTIPLE_ORDER_CHECKOUTS', severity: 'critical', orderId, amountMinor: checkoutEntries.reduce((s, x) => s + x.amount, 0), detail: 'An order has more than one completed direct checkout transaction.' });
+        }
+        const orderTotal = Number(order.totalMinor ?? order.amountMinor);
+        if (Number.isSafeInteger(orderTotal) && checkoutEntries.length === 1 && checkoutEntries[0].amount !== orderTotal) {
+          findings.push({ code: 'ORDER_CHECKOUT_AMOUNT_MISMATCH', severity: 'critical', orderId, amountMinor: checkoutEntries[0].amount, detail: 'Completed checkout amount does not match the order total.' });
+        }
+        const pss = entries.filter(x => x.module.startsWith('unique_pay_small_small.'));
+        if (pss.length > 0 && !String(order.paySmallSmallPlanId || '')) {
+          findings.push({ code: 'PSS_ORDER_LINK_MISSING', severity: 'critical', orderId, detail: 'Pay Small Small financial activity references an order without a linked plan.' });
+        }
+      }
+
+      const planById = new Map<string, any>();
+      for (const doc of plansSnap.docs) planById.set(String(doc.data()?.planId || doc.id), doc.data() || {});
+      for (const [id, tx] of txById) {
+        const module = String(tx.sourceModule || '');
+        if (!module.startsWith('unique_pay_small_small.')) continue;
+        const planId = module === 'unique_pay_small_small.deposit' || module === 'unique_pay_small_small.installment'
+          ? String(tx.recipientId || '')
+          : String(tx.senderId || '');
+        const plan = planById.get(planId);
+        if (!plan) {
+          findings.push({ code: 'PSS_TRANSACTION_PLAN_MISSING', severity: 'critical', transactionId: id, detail: 'Pay Small Small transaction has no corresponding plan.' });
+          continue;
+        }
+        const orderId = String(plan.orderId || '');
+        const relatedOrders = Array.isArray(tx.relatedOrderIds) ? tx.relatedOrderIds.map(String) : [];
+        if (!relatedOrders.includes(orderId)) {
+          findings.push({ code: 'PSS_TRANSACTION_ORDER_LINK_MISSING', severity: 'critical', transactionId: id, planId, orderId, detail: 'Pay Small Small transaction does not point to its plan Store order.' });
+        }
+      }
+
+      return res.json({
+        ok: findings.length === 0,
+        readOnly: true,
+        scope: 'cross-domain-financial-integrity',
+        checkedAt: Timestamp.now(),
+        counts: {
+          transactions: txSnap.size,
+          orders: ordersSnap.size,
+          plans: plansSnap.size,
+          findings: findings.length,
+          critical: findings.filter(x => x.severity === 'critical').length,
+          high: findings.filter(x => x.severity === 'high').length
+        },
+        findings: findings.slice(0, 500),
+        truncatedFindings: findings.length > 500
+      });
+    } catch (error) {
+      console.error('Cross-domain financial reconciliation failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'Cross-domain financial reconciliation could not be completed safely.', 503);
+    }
+  });
+
   app.get('/api/pay-small-small/system/reconcile', async (req, res) => {
     const token = typeof req.header('x-pay-small-small-cron-token') === 'string' ? req.header('x-pay-small-small-cron-token') : '';
     if (!process.env.PAY_SMALL_SMALL_CRON_TOKEN || token !== process.env.PAY_SMALL_SMALL_CRON_TOKEN) return fail(res, 'FORBIDDEN', 'Forbidden.', 403);
