@@ -432,7 +432,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
     const token = typeof req.header('x-pay-small-small-cron-token') === 'string' ? req.header('x-pay-small-small-cron-token') : '';
     if (!process.env.PAY_SMALL_SMALL_CRON_TOKEN || token !== process.env.PAY_SMALL_SMALL_CRON_TOKEN) return fail(res, 'FORBIDDEN', 'Forbidden.', 403);
     try {
-      const [plansSnap, depositTxSnap, installmentTxSnap, settlementTxSnap, refundTxSnap, holdSnap, sellerCreditSnap, customerRefundSnap] = await Promise.all([
+      const [plansSnap, depositTxSnap, installmentTxSnap, settlementTxSnap, refundTxSnap, holdSnap, sellerCreditSnap, customerRefundSnap, walletsSnap, allLedgerSnap] = await Promise.all([
         db.collection('paySmallSmallPlans').get(),
         db.collection('transactions').where('sourceModule', '==', 'unique_pay_small_small.deposit').get(),
         db.collection('transactions').where('sourceModule', '==', 'unique_pay_small_small.installment').get(),
@@ -440,11 +440,45 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         db.collection('transactions').where('sourceModule', '==', 'unique_pay_small_small.cancellation_refund').get(),
         db.collection('ledgerEntries').where('accountType', '==', 'pay_small_small_hold').get(),
         db.collection('ledgerEntries').where('accountType', '==', 'seller_settlement').get(),
-        db.collection('ledgerEntries').where('accountType', '==', 'wallet_refund').get()
+        db.collection('ledgerEntries').where('accountType', '==', 'wallet_refund').get(),
+        db.collection('wallets').get(),
+        db.collection('ledgerEntries').get()
       ]);
 
       type Finding = { code: string; severity: 'critical' | 'high' | 'medium'; planId?: string; transactionId?: string; amountMinor?: number; detail: string };
       const findings: Finding[] = [];
+      const walletLedgerNet = new Map<string, number>();
+      for (const doc of allLedgerSnap.docs) {
+        const entry = doc.data() || {};
+        const accountType = String(entry.accountType || '');
+        const uid = String(entry.uid || '');
+        if (!uid || accountType === 'pay_small_small_hold') continue;
+        const amount = Number(entry.amountMinor);
+        if (!Number.isSafeInteger(amount) || amount <= 0) {
+          addFinding({ code: 'INVALID_WALLET_LEDGER_AMOUNT', severity: 'critical', detail: 'A wallet ledger entry has an invalid positive integer amount.' });
+          continue;
+        }
+        const direction = String(entry.direction || '');
+        const delta = direction === 'credit' ? amount : direction === 'debit' ? -amount : 0;
+        if (delta === 0) {
+          addFinding({ code: 'INVALID_WALLET_LEDGER_DIRECTION', severity: 'critical', transactionId: String(entry.transactionId || ''), amountMinor: amount, detail: 'A wallet ledger entry has an invalid direction.' });
+          continue;
+        }
+        walletLedgerNet.set(uid, (walletLedgerNet.get(uid) || 0) + delta);
+      }
+      for (const doc of walletsSnap.docs) {
+        const wallet = doc.data() || {};
+        const uid = String(wallet.uid || doc.id);
+        const balance = Number(wallet.availableBalanceMinor);
+        const ledgerNet = walletLedgerNet.get(uid) || 0;
+        if (!Number.isSafeInteger(balance) || balance < 0 || !Number.isSafeInteger(ledgerNet)) {
+          addFinding({ code: 'WALLET_BALANCE_INVALID', severity: 'critical', detail: 'A wallet contains an invalid balance or its ledger net is outside the safe integer range.' });
+          continue;
+        }
+        if (balance !== ledgerNet) {
+          addFinding({ code: 'WALLET_LEDGER_BALANCE_MISMATCH', severity: 'critical', amountMinor: balance - ledgerNet, detail: 'Wallet availableBalanceMinor does not equal the net of its wallet ledger credits and debits.' });
+        }
+      }
       const planMap = new Map<string, any>();
       const orderMap = new Map<string, string>();
       for (const doc of plansSnap.docs) {
@@ -566,8 +600,14 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         if (refund > funding) addFinding({ code: 'REFUND_EXCEEDS_FUNDING', severity: 'critical', planId, amountMinor: refund, detail: 'Customer refunds exceed customer funding.' });
         const expectedHold = funding - settlement - refund;
         const actualHold = allLedgerDocs
-          .filter(x => String(x.data?.().uid || '') === planId)
-          .reduce((s, x) => s + (String(x.data?.().direction || '') === 'credit' ? Number(x.data?.().amountMinor || 0) : -Number(x.data?.().amountMinor || 0)), 0);
+          .filter(x => {
+            const data = x.data();
+            return String(data.uid || '') === planId && String(data.accountType || '') === 'pay_small_small_hold';
+          })
+          .reduce((s, x) => {
+            const data = x.data();
+            return s + (String(data.direction || '') === 'credit' ? Number(data.amountMinor || 0) : -Number(data.amountMinor || 0));
+          }, 0);
         if (actualHold !== expectedHold) addFinding({ code: 'HOLD_BALANCE_MISMATCH', severity: 'critical', planId, amountMinor: actualHold, detail: 'Pay Small Small hold ledger balance does not reconcile to funding minus settlements and refunds.' });
       }
 
