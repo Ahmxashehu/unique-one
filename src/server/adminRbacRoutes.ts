@@ -89,17 +89,25 @@ export function registerAdminRbacRoutes(
     if (!target.exists) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User was not found.' } });
     try {
       const now = Timestamp.now();
-      await ref.update({ roles, permissions, rbacUpdatedAt: now, rbacUpdatedBy: actorUid });
-      await db.collection('audit_logs').add({
-        uid: actorUid,
-        action: 'rbac.update',
-        resource: 'user',
-        resourceId: targetUid,
-        details: JSON.stringify({ roles, permissions }),
-        timestamp: now,
+      const auditRef = db.collection('audit_logs').doc();
+      await db.runTransaction(async (transaction) => {
+        const targetSnapshot = await transaction.get(ref);
+        if (!targetSnapshot.exists) throw new Error('TARGET_NOT_FOUND');
+        transaction.update(ref, { roles, permissions, rbacUpdatedAt: now, rbacUpdatedBy: actorUid });
+        transaction.set(auditRef, {
+          uid: actorUid,
+          action: 'rbac.update',
+          resource: 'user',
+          resourceId: targetUid,
+          details: JSON.stringify({ roles, permissions }),
+          timestamp: now,
+        });
       });
       return res.json({ uid: targetUid, roles, permissions });
     } catch (error) {
+      if (error instanceof Error && error.message === 'TARGET_NOT_FOUND') {
+        return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User was not found.' } });
+      }
       console.error('RBAC update failed:', error);
       return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'The role update could not be saved.' } });
     }
