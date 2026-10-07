@@ -1267,6 +1267,15 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (applicationType === 'join_business' && !organizationName) {
         return errorResponse(res, 'INVALID_REQUEST', 'Enter the organization or business you want to join.');
       }
+      // Ownership may only be requested when creating a new business. Joining an
+      // existing business must use a non-owner role; approval must never grant
+      // ownership merely because a client supplied requestedRole=business_owner.
+      if (applicationType === 'create_business' && requestedRole !== 'business_owner') {
+        return errorResponse(res, 'INVALID_REQUEST', 'A new business application must request the business owner role.');
+      }
+      if (applicationType === 'join_business' && requestedRole === 'business_owner') {
+        return errorResponse(res, 'INVALID_REQUEST', 'Business owner access cannot be requested through a join application.');
+      }
 
       const existingPending = await adminDb.collection('businessApplications')
         .where('applicantUid', '==', uid)
