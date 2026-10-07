@@ -586,9 +586,15 @@ const app = express();
       const password = validateLoginPassword(req.body?.password);
       const confirmPassword = validateLoginPassword(req.body?.confirmPassword);
       if (password !== confirmPassword) return errorResponse(res, 'INVALID_REQUEST', 'The 6-digit login passwords do not match.');
-      const transactionPin = typeof req.body?.transactionPin === 'string' ? req.body.transactionPin : '';
-      const confirmTransactionPin = typeof req.body?.confirmTransactionPin === 'string' ? req.body.confirmTransactionPin : '';
-      if (!/^\d{4}$/.test(transactionPin) || !/^\d{4}$/.test(confirmTransactionPin)) return errorResponse(res, 'INVALID_REQUEST', 'Your Transaction PIN must be exactly 4 digits.');
+      let transactionPin: string;
+      let confirmTransactionPin: string;
+      try {
+        transactionPin = validateTransactionPin(req.body?.transactionPin);
+        confirmTransactionPin = validateTransactionPin(req.body?.confirmTransactionPin);
+      } catch (error) {
+        if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+        throw error;
+      }
       if (transactionPin !== confirmTransactionPin) return errorResponse(res, 'INVALID_REQUEST', 'The Transaction PINs do not match.');
       const fullName = typeof req.body?.fullName === 'string' ? req.body.fullName.trim().slice(0, 120) : '';
       const now = Timestamp.now();
@@ -758,7 +764,7 @@ const app = express();
     try {
       const identifier = typeof req.body?.identifier === 'string' ? req.body.identifier.trim().toLowerCase() : '';
       const password = validateLoginPassword(req.body?.password);
-      if (!identifier) return errorResponse(res, 'INVALID_REQUEST', 'Enter your phone number, Unique ID, or verified email.');
+      if (!identifier) return errorResponse(res, 'INVALID_REQUEST', 'Enter your registered phone number.');
 
       let uid = '';
       let user: UserRecord | null = null;
@@ -769,17 +775,11 @@ const app = express();
       } else if (/^\d{10}$/.test(identifier)) {
         user = await getAuth().getUserByPhoneNumber('+234' + identifier);
         uid = user.uid;
-      } else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
-        const emailSnapshot = await adminDb.collection('users').where('email', '==', identifier).limit(1).get();
-        if (!emailSnapshot.empty) {
-          const data = emailSnapshot.docs[0].data() as { uid?: unknown; emailVerified?: unknown };
-          if (data.emailVerified === true && typeof data.uid === 'string') {
-            uid = data.uid;
-            user = await getAuth().getUser(uid);
-          }
-        }
+      } else if (/^\+\d{8,15}$/.test(identifier)) {
+        user = await getAuth().getUserByPhoneNumber(normalizeAuthPhone(identifier));
+        uid = user.uid;
       } else {
-        return errorResponse(res, 'INVALID_REQUEST', 'Use an 11-digit phone number, 10-digit Unique ID, or verified email.');
+        return errorResponse(res, 'INVALID_REQUEST', 'Use your registered phone number to log in.');
       }
 
       if (!user || !uid) return errorResponse(res, 'UNAUTHENTICATED', 'Invalid login identifier or 6-digit Login PIN.');
