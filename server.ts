@@ -3535,7 +3535,9 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const price = product.price;
           const available = product.quantity;
           const minOrderQuantity = Number(product.minOrderQuantity || 1);
+          const priceMinor = typeof price === 'number' && Number.isFinite(price) ? Math.round(price * 100) : NaN;
           if (!isSafeFirebaseUid(sellerId) || product.status !== 'published' || typeof price !== 'number' || !Number.isFinite(price) || price < 0 ||
+              !Number.isSafeInteger(priceMinor) || priceMinor < 0 || Math.abs(price - priceMinor / 100) > 1e-9 ||
               product.currency !== 'NGN' || !Number.isSafeInteger(available) || available < 0 ||
               !Number.isSafeInteger(minOrderQuantity) || minOrderQuantity < 1 || quantity < minOrderQuantity) {
             throw new RequestValidationError('INVALID_REQUEST', 'One or more products in your cart are no longer available in the requested quantity.');
