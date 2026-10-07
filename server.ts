@@ -4010,31 +4010,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) return errorResponse(res, 'INVALID_REQUEST', 'The Store order amount is invalid.');
       if (decision === 'deny') {
         const now = Timestamp.now();
-        await adminDb.runTransaction(async transaction => {
-          const ref = adminDb.collection('orders').doc(orderId);
-          const currentSnap = await transaction.get(ref);
-          if (!currentSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
-          const current = currentSnap.data() as Record<string, unknown>;
-          const currentDispute = current.dispute && typeof current.dispute === 'object' ? current.dispute as Record<string, unknown> : null;
-          if (!currentDispute || !['opened','seller_responded','under_review'].includes(String(currentDispute.status))) throw new RequestValidationError('INVALID_REQUEST', 'This dispute has already been resolved.');
-          const next = { ...currentDispute, status: 'resolved', decision: 'deny', resolutionReason: reason, resolvedBy: uid, resolvedAt: now };
-          transaction.update(ref, { dispute: next, updatedAt: now });
-          transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.dispute.denied', actorUid: uid, resource: 'store_order', resourceId: orderId, reason, timestamp: now, createdAt: now });
-        });
-        return res.status(200).json({ orderId, status: 'resolved', decision: 'deny' });
-      }
-      await adminDb.runTransaction(async transaction => {
-        const ref = adminDb.collection('orders').doc(orderId);
-        const currentSnap = await transaction.get(ref);
-        if (!currentSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
-        const current = currentSnap.data() as Record<string, unknown>;
-        const currentDispute = current.dispute && typeof current.dispute === 'object' ? current.dispute as Record<string, unknown> : null;
-        if (!currentDispute || !['opened','seller_responded'].includes(String(currentDispute.status))) throw new RequestValidationError('INVALID_REQUEST', 'This dispute is already being resolved or has been resolved.');
-        const now = Timestamp.now().toDate().toISOString();
-        transaction.update(ref, { dispute: { ...currentDispute, status: 'under_review', reviewStartedBy: uid, reviewStartedAt: now, updatedAt: now }, updatedAt: now });
-        transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.dispute.review_started', actorUid: uid, resource: 'store_order', resourceId: orderId, timestamp: Timestamp.now(), createdAt: now });
-      });
-      const paymentTransactionIds = Array.isArray(order.paymentTransactionIds) ? order.paymentTransactionIds.filter((v: unknown) => typeof v === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(v)) : [];
+        const paymentTransactionIds = Array.isArray(order.paymentTransactionIds) ? order.paymentTransactionIds.filter((v: unknown) => typeof v === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(v)) : [];
       const payments = await Promise.all(paymentTransactionIds.map(id => adminDb.collection('transactions').doc(id).get()));
       const candidates = payments.filter(s => s.exists).map(s => ({ id: s.id, data: s.data() as Record<string, unknown> })).filter(({data:p}) => p.recordKind === 'financial' && p.schemaVersion === 2 && p.amountUnit === 'minor' && p.currency === 'NGN' && p.status === 'completed' && p.type === 'merchant_payment' && p.sourceModule === 'unique_store.checkout' && p.senderId === order.customerId && p.recipientId === order.sellerId && Array.isArray(p.relatedOrderIds) && p.relatedOrderIds.includes(orderId) && Number.isSafeInteger(Number(p.amount)) && Number(p.amount) >= amountMinor);
       if (candidates.length !== 1) return errorResponse(res, candidates.length === 0 ? 'NOT_FOUND' : 'INVALID_REQUEST', 'The original Store payment could not be uniquely matched for dispute refund.');
