@@ -316,7 +316,7 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
     try {
       const adminSnap = await db.collection('users').doc(adminUid).get();
       const roles = Array.isArray(adminSnap.data()?.roles) ? adminSnap.data()?.roles : [];
-      if (!roles.some((role: unknown) => ['super_admin', 'platform_admin', 'administrator'].includes(String(role)))) return fail(res, 'FORBIDDEN', 'Platform administration access is required.', 403);
+      if (!roles.some((role: unknown) => ['super_admin', 'platform_admin'].includes(String(role)))) return fail(res, 'FORBIDDEN', 'Platform or Super Admin access is required.', 403);
 
       const now = Timestamp.now();
       const credentialRef = db.collection('businessAccessCredentials').doc(credentialId(targetUid, businessId));
