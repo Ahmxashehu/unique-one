@@ -130,6 +130,8 @@ export interface Product {
   discount?: number;
   condition: ProductCondition;
   quantity: number;
+  /** Units physically returned and quarantined pending inspection; never included in sellable quantity. */
+  quarantineQuantity?: number;
   minOrderQuantity: number;
   wholesalePrice?: number;
   bulkPrice?: number;
