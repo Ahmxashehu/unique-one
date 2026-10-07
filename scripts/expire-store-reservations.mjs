@@ -57,9 +57,11 @@ for (const doc of snap.docs) {
           quantity + restore > Number.MAX_SAFE_INTEGER) {
         throw new Error('INVALID_STOCK');
       }
+      const currentStatus = typeof product.status === 'string' ? product.status : 'published';
+      const restoredStatus = currentStatus === 'out_of_stock' && quantity + restore > 0 ? 'published' : currentStatus;
       transaction.update(productSnap.ref, {
         quantity: quantity + restore,
-        status: 'published',
+        status: restoredStatus,
         updatedAt: nowIso,
       });
     }
