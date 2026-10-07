@@ -452,6 +452,16 @@ service cloud.firestore {
         && request.resource.data.authorUid == request.auth.uid
         && request.resource.data.status == 'published'
         && request.resource.data.actorType in ['user','business','institution']
+        && request.resource.data.actorId is string
+        && (
+          (request.resource.data.actorType == 'user' && request.resource.data.actorId == request.auth.uid)
+          || (request.resource.data.actorType == 'business'
+            && exists(/databases/$(database)/documents/businesses/$(request.resource.data.actorId))
+            && get(/databases/$(database)/documents/businesses/$(request.resource.data.actorId)).data.ownerUid == request.auth.uid)
+          || (request.resource.data.actorType == 'institution'
+            && exists(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.actorId))
+            && get(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.actorId)).data.ownerUid == request.auth.uid)
+        )
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 5000
@@ -543,7 +553,7 @@ service cloud.firestore {
     match /userPresence/{uid} { allow read: if isAuthenticated() && request.auth.uid == uid; allow create, update, delete: if false; }
     match /locations/{locationId} {
       // Personal coordinates must never be publicly readable. Business/service coordinates may remain discoverable for Near Me.
-      allow read: if isAdmin()
+      allow read: if isPlatformAdmin()
         || (isAuthenticated() && resource.data.referenceId == request.auth.uid)
         || (resource.data.referenceId is string
           && exists(/databases/$(database)/documents/businesses/$(resource.data.referenceId)));
