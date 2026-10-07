@@ -3938,16 +3938,34 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           throw new RequestValidationError('INVALID_REQUEST', 'A return request already exists for this order.');
         }
         const sourceItems = Array.isArray(order.items) ? order.items : [];
-        const items = sourceItems.map((item: any) => ({
-          productId: typeof item?.productId === 'string' ? item.productId : '',
-          quantity: Number(item?.quantity),
-          returnable: item?.returnable !== false,
-        }));
-        if (!items.length || items.some((item) => !/^[A-Za-z0-9_-]{1,128}$/.test(item.productId) || !Number.isSafeInteger(item.quantity) || item.quantity <= 0 || !item.returnable)) {
-          throw new RequestValidationError('INVALID_REQUEST', 'This order does not contain eligible inventory-backed items for return.');
+        const requestedItems = Array.isArray(req.body?.items) ? req.body.items : sourceItems.filter((item: any) => item?.returnable !== false);
+        if (!requestedItems.length) throw new RequestValidationError('INVALID_REQUEST', 'Select at least one returnable item.');
+        const orderedByProduct = new Map<string, { quantity: number; priceMinor: number; returnable: boolean }>();
+        for (const item of sourceItems) {
+          const productId = typeof item?.productId === 'string' ? item.productId : '';
+          const quantity = Number(item?.quantity);
+          const priceMinor = Math.round(Number(item?.price) * 100);
+          if (!/^[A-Za-z0-9_-]{1,128}$/.test(productId) || !Number.isSafeInteger(quantity) || quantity <= 0 || !Number.isSafeInteger(priceMinor) || priceMinor <= 0) {
+            throw new RequestValidationError('INVALID_REQUEST', 'The Store order contains invalid return data.');
+          }
+          const previous = orderedByProduct.get(productId);
+          orderedByProduct.set(productId, { quantity: (previous?.quantity || 0) + quantity, priceMinor, returnable: item?.returnable !== false && (previous?.returnable ?? true) });
         }
+        const selected = new Map<string, number>();
+        for (const item of requestedItems) {
+          const productId = typeof item?.productId === 'string' ? item.productId.trim() : '';
+          const quantity = Number(item?.quantity);
+          if (!/^[A-Za-z0-9_-]{1,128}$/.test(productId) || !Number.isSafeInteger(quantity) || quantity <= 0) throw new RequestValidationError('INVALID_REQUEST', 'Return quantities must be positive whole numbers.');
+          if (selected.has(productId)) throw new RequestValidationError('INVALID_REQUEST', 'Each product may appear only once in a return request.');
+          const ordered = orderedByProduct.get(productId);
+          if (!ordered || !ordered.returnable || quantity > ordered.quantity) throw new RequestValidationError('INVALID_REQUEST', 'One or more requested return quantities are not eligible.');
+          selected.set(productId, quantity);
+        }
+        const items = Array.from(selected.entries()).map(([productId, quantity]) => ({ productId, quantity, priceMinor: orderedByProduct.get(productId)!.priceMinor, returnable: true }));
+        const requestedRefundAmountMinor = items.reduce((sum, item) => sum + item.priceMinor * item.quantity, 0);
+        if (!Number.isSafeInteger(requestedRefundAmountMinor) || requestedRefundAmountMinor <= 0) throw new RequestValidationError('INVALID_AMOUNT', 'The requested return amount is invalid.');
         const now = Timestamp.now().toDate().toISOString();
-        const returnRequest = { status: 'requested', reason, items, requestedBy: uid, requestedAt: now, restocked: false };
+        const returnRequest = { status: 'requested', reason, items, requestedRefundAmountMinor, requestedBy: uid, requestedAt: now, restocked: false };
         transaction.update(orderRef, { returnRequest, updatedAt: now });
         transaction.create(idempotencyRef, { uid, orderId, idempotencyKey, status: 'requested', createdAt: now, updatedAt: now });
         transaction.create(adminDb.collection('audit_logs').doc(), {
@@ -4110,6 +4128,17 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       }
       if (order.currency !== 'NGN' || order.paymentStatus !== 'paid') {
         return errorResponse(res, 'INVALID_REQUEST', 'Only paid NGN Store orders can be refunded.');
+      }
+      const existingReturnRequest = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest as Record<string, unknown> : null;
+      if (existingReturnRequest) {
+        const returnStatus = String(existingReturnRequest.status || '');
+        const requestedRefundAmountMinor = Number(existingReturnRequest.requestedRefundAmountMinor);
+        if (returnStatus !== 'received' || !Number.isSafeInteger(requestedRefundAmountMinor) || requestedRefundAmountMinor <= 0) {
+          return errorResponse(res, 'INVALID_REQUEST', 'A Store return must be received before its refund is processed.');
+        }
+        if (requestedRefundAmountMinor !== Number(order.amountMinor)) {
+          return errorResponse(res, 'INVALID_REQUEST', 'A partial Store return requires item-level refund processing and cannot use the full-order refund endpoint.');
+        }
       }
       const refundableStatuses = new Set(['confirmed', 'processing', 'ready_for_pickup', 'shipped', 'out_for_delivery', 'delivered', 'completed']);
       if (!refundableStatuses.has(String(order.status))) {
