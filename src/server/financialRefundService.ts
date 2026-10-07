@@ -148,6 +148,23 @@ export async function executeFinancialRefund(
 
     const customerUid = String(original.senderId);
     const sellerUid = String(original.recipientId);
+    const relatedOrderRef = input.relatedOrderId ? db.collection('orders').doc(input.relatedOrderId) : null;
+    if (relatedOrderRef) {
+      const relatedOrderSnap = await transaction.get(relatedOrderRef);
+      if (!relatedOrderSnap.exists) {
+        return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order was not found.' } };
+      }
+      const order = relatedOrderSnap.data() ?? {};
+      if (
+        order.customerId !== customerUid ||
+        order.sellerId !== sellerUid ||
+        order.currency !== 'NGN' ||
+        order.paymentStatus !== 'paid' ||
+        !['confirmed', 'processing', 'ready_for_pickup', 'shipped', 'out_for_delivery', 'delivered', 'completed'].includes(String(order.status))
+      ) {
+        return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order is not eligible for refund.' } };
+      }
+    }
     const customerWalletRef = db.collection('wallets').doc(customerUid);
     const sellerWalletRef = db.collection('wallets').doc(sellerUid);
     const [customerWalletSnap, sellerWalletSnap] = await Promise.all([
@@ -243,6 +260,16 @@ export async function executeFinancialRefund(
       idempotencyKey: input.idempotencyKey,
       createdAt: now,
     });
+
+    if (relatedOrderRef) {
+      transaction.update(relatedOrderRef, {
+        status: 'refunded',
+        paymentStatus: 'refunded',
+        refundedAt: now,
+        updatedAt: now,
+        refundTransactionId: refundRef.id,
+      });
+    }
 
     transaction.set(idempotencyRef, {
       actorUid: input.actorUid,
