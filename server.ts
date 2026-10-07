@@ -4264,7 +4264,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const currentQuantity = Number(product.quantity);
           const restore = quantities.get(Array.from(quantities.keys())[index]) || 0;
           if (!Number.isSafeInteger(currentQuantity) || currentQuantity < 0) throw new RequestValidationError('INVALID_REQUEST', 'Inventory data is invalid; return receipt was not applied.');
-          transaction.update(productSnap.ref, { quantity: currentQuantity + restore, status: 'published', updatedAt: now });
+          transaction.update(productSnap.ref, { quantity: currentQuantity, quarantineQuantity: Number(product.quarantineQuantity || 0) + restore, updatedAt: now });
         });
         transaction.update(ref, {
           returnRequest: { ...rr, status: 'received', receivedBy: uid, receivedAt: now, restocked: true },
