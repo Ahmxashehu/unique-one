@@ -4130,6 +4130,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         return errorResponse(res, 'INVALID_REQUEST', 'Only paid NGN Store orders can be refunded.');
       }
       const existingReturnRequest = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest as Record<string, unknown> : null;
+      let partialReturnRefund = false;
+      let refundAmountMinor = Number(order.amountMinor);
       if (existingReturnRequest) {
         const returnStatus = String(existingReturnRequest.status || '');
         const requestedRefundAmountMinor = Number(existingReturnRequest.requestedRefundAmountMinor);
@@ -4137,7 +4139,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           return errorResponse(res, 'INVALID_REQUEST', 'A Store return must be received before its refund is processed.');
         }
         if (requestedRefundAmountMinor !== Number(order.amountMinor)) {
-          return errorResponse(res, 'INVALID_REQUEST', 'A partial Store return requires item-level refund processing and cannot use the full-order refund endpoint.');
+          partialReturnRefund = true;
+          refundAmountMinor = requestedRefundAmountMinor;
         }
       }
       const refundableStatuses = new Set(['confirmed', 'processing', 'ready_for_pickup', 'shipped', 'out_for_delivery', 'delivered', 'completed']);
