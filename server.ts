@@ -19,6 +19,7 @@ import { getTransactionAuthPolicy } from "./src/server/transactionAuthPolicy";
 import { registerAdminRbacRoutes } from "./src/server/adminRbacRoutes";
 import { registerAdminAuditRoutes } from "./src/server/adminAuditRoutes";
 import { hasRolePermission } from "./src/lib/auth/rbac";
+import { executeFinancialRefund } from "./src/server/financialRefundService";
 
 interface WalletDocument {
   uid: string;
@@ -3895,6 +3896,111 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
       console.error('Store order cancellation failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The Store order could not be cancelled safely.');
+    }
+  });
+
+  app.post("/api/store/orders/:orderId/refund", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('storeOrderRefundRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Store refund requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const orderId = req.params.orderId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The order ID is invalid.');
+      }
+      const idempotencyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey.trim() : '';
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : '';
+      if (!/^[A-Za-z0-9_-]{1,200}$/.test(idempotencyKey) || !reason) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid idempotency key and refund reason are required.');
+      }
+
+      const orderSnap = await adminDb.collection('orders').doc(orderId).get();
+      if (!orderSnap.exists) return errorResponse(res, 'NOT_FOUND', 'The Store order was not found.');
+      const order = orderSnap.data() as Record<string, unknown>;
+      const customerId = typeof order.customerId === 'string' ? order.customerId : '';
+      const sellerId = typeof order.sellerId === 'string' ? order.sellerId : '';
+      const rolesSnap = await adminDb.collection('users').doc(uid).get();
+      const roles = Array.isArray(rolesSnap.data()?.roles) ? rolesSnap.data()?.roles.filter((role: unknown) => typeof role === 'string') as any[] : [];
+      const permissions = Array.isArray(rolesSnap.data()?.permissions) ? rolesSnap.data()?.permissions.filter((permission: unknown) => typeof permission === 'string') as any[] : [];
+      const canManageDisputes = hasRolePermission(roles, permissions, 'manage:disputes');
+      if (uid !== customerId && !canManageDisputes) {
+        return errorResponse(res, 'FORBIDDEN', 'You are not permitted to refund this Store order.');
+      }
+      if (order.currency !== 'NGN' || order.paymentStatus !== 'paid') {
+        return errorResponse(res, 'INVALID_REQUEST', 'Only paid NGN Store orders can be refunded.');
+      }
+      const refundableStatuses = new Set(['confirmed', 'processing', 'ready_for_pickup', 'shipped', 'out_for_delivery', 'delivered', 'completed']);
+      if (!refundableStatuses.has(String(order.status))) {
+        return errorResponse(res, 'INVALID_REQUEST', 'This Store order is not in a refundable state.');
+      }
+      const paymentTransactionIds = Array.isArray(order.paymentTransactionIds)
+        ? order.paymentTransactionIds.filter((id: unknown) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id))
+        : [];
+      if (paymentTransactionIds.length !== 1) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The Store order does not have one unambiguous payment transaction for refund.');
+      }
+      if (!sellerId || !customerId) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The Store order has incomplete payment ownership data.');
+      }
+
+      const transactionSnap = await adminDb.collection('transactions').doc(paymentTransactionIds[0]).get();
+      if (!transactionSnap.exists) return errorResponse(res, 'NOT_FOUND', 'The original Store payment transaction was not found.');
+      const payment = transactionSnap.data() as Record<string, unknown>;
+      const amountMinor = Number(payment.amount);
+      const orderAmountMinor = Number(order.amountMinor);
+      const relatedOrderIds = Array.isArray(payment.relatedOrderIds) ? payment.relatedOrderIds : [];
+      if (
+        payment.recordKind !== 'financial' ||
+        payment.schemaVersion !== 2 ||
+        payment.amountUnit !== 'minor' ||
+        payment.currency !== 'NGN' ||
+        payment.status !== 'completed' ||
+        payment.type !== 'merchant_payment' ||
+        payment.sourceModule !== 'unique_store.checkout' ||
+        payment.senderId !== customerId ||
+        payment.recipientId !== sellerId ||
+        !relatedOrderIds.includes(orderId) ||
+        !Number.isSafeInteger(amountMinor) ||
+        amountMinor <= 0 ||
+        !Number.isSafeInteger(orderAmountMinor) ||
+        orderAmountMinor !== amountMinor
+      ) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The Store payment cannot be safely matched to this order.');
+      }
+
+      const result = await executeFinancialRefund(adminDb, {
+        originalTransactionId: paymentTransactionIds[0],
+        amountMinor,
+        currency: 'NGN',
+        idempotencyKey,
+        actorUid: uid,
+        reason,
+        relatedOrderId: orderId,
+        sourceModule: 'unique_store.refund',
+      });
+      if ('error' in result) {
+        const status = result.error.code === 'REFUND_IN_PROGRESS' || result.error.code === 'REFUND_EXCEEDS_REMAINING' || result.error.code === 'IDEMPOTENCY_CONFLICT' ? 409 :
+          result.error.code === 'ORIGINAL_NOT_FOUND' ? 404 :
+          result.error.code === 'WALLET_NOT_FOUND' ? 404 :
+          result.error.code === 'WALLET_UNAVAILABLE' ? 403 :
+          result.error.code === 'INSUFFICIENT_FUNDS' ? 409 :
+          result.error.code === 'INVALID_REQUEST' ? 400 :
+          result.error.code === 'ORIGINAL_NOT_REFUNDABLE' ? 409 : 500;
+        return res.status(status).json({ error: result.error });
+      }
+      return res.status(200).json({ ...result, orderId });
+    } catch (error) {
+      console.error('Store order refund failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The Store order refund could not be completed safely.');
     }
   });
 
