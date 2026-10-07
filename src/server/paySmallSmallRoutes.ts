@@ -393,6 +393,19 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
               }
               const refundAmount = Number(plan.paidAmountMinor || 0);
               if (!Number.isSafeInteger(refundAmount) || refundAmount < 0) throw new Error('INVALID_REFUND');
+              const holdLedgerSnap = await transaction.get(db.collection('ledgerEntries')
+                .where('uid', '==', String(plan.planId))
+                .where('accountType', '==', 'pay_small_small_hold'));
+              let holdBalance = 0;
+              for (const holdDoc of holdLedgerSnap.docs) {
+                const holdEntry = holdDoc.data() || {};
+                const holdAmount = Number(holdEntry.amountMinor);
+                if (!Number.isSafeInteger(holdAmount) || holdAmount < 0) throw new Error('HOLD_LEDGER_INVALID');
+                if (String(holdEntry.status || '') !== 'completed') continue;
+                if (String(holdEntry.direction || '') === 'credit') holdBalance += holdAmount;
+                else if (String(holdEntry.direction || '') === 'debit') holdBalance -= holdAmount;
+              }
+              if (!Number.isSafeInteger(holdBalance) || holdBalance < refundAmount) throw new Error('HOLD_BALANCE_MISMATCH');
               if (refundAmount > 0) {
                 const refundTx = db.collection('transactions').doc();
                 const refundRef = 'UP-PSS-REF-' + refundTx.id;
