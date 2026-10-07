@@ -4289,6 +4289,13 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (uid !== customerId && !canManageDisputes) {
         return errorResponse(res, 'FORBIDDEN', 'You are not permitted to refund this Store order.');
       }
+      const orderStatus = String(order.status || '');
+      const hasReturnRequest = Boolean(order.returnRequest && typeof order.returnRequest === 'object');
+      const customerMayUseDirectRefund = new Set(['confirmed', 'processing']).has(orderStatus) && !hasReturnRequest;
+      const customerMayUseReturnRefund = uid === customerId && hasReturnRequest;
+      if (uid === customerId && !canManageDisputes && !customerMayUseDirectRefund && !customerMayUseReturnRefund) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A customer refund requires an eligible early-order cancellation or a completed return workflow.');
+      }
       if (order.currency !== 'NGN' || order.paymentStatus !== 'paid') {
         return errorResponse(res, 'INVALID_REQUEST', 'Only paid NGN Store orders can be refunded.');
       }
