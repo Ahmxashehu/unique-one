@@ -3945,40 +3945,52 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const paymentTransactionIds = Array.isArray(order.paymentTransactionIds)
         ? order.paymentTransactionIds.filter((id: unknown) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id))
         : [];
-      if (paymentTransactionIds.length !== 1) {
-        return errorResponse(res, 'INVALID_REQUEST', 'The Store order does not have one unambiguous payment transaction for refund.');
+      if (!paymentTransactionIds.length) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The Store order does not have a payment transaction for refund.');
       }
       if (!sellerId || !customerId) {
         return errorResponse(res, 'INVALID_REQUEST', 'The Store order has incomplete payment ownership data.');
       }
 
-      const transactionSnap = await adminDb.collection('transactions').doc(paymentTransactionIds[0]).get();
-      if (!transactionSnap.exists) return errorResponse(res, 'NOT_FOUND', 'The original Store payment transaction was not found.');
-      const payment = transactionSnap.data() as Record<string, unknown>;
-      const amountMinor = Number(payment.amount);
       const orderAmountMinor = Number(order.amountMinor);
-      const relatedOrderIds = Array.isArray(payment.relatedOrderIds) ? payment.relatedOrderIds : [];
-      if (
-        payment.recordKind !== 'financial' ||
-        payment.schemaVersion !== 2 ||
-        payment.amountUnit !== 'minor' ||
-        payment.currency !== 'NGN' ||
-        payment.status !== 'completed' ||
-        payment.type !== 'merchant_payment' ||
-        payment.sourceModule !== 'unique_store.checkout' ||
-        payment.senderId !== customerId ||
-        payment.recipientId !== sellerId ||
-        !relatedOrderIds.includes(orderId) ||
-        !Number.isSafeInteger(amountMinor) ||
-        amountMinor <= 0 ||
-        !Number.isSafeInteger(orderAmountMinor) ||
-        orderAmountMinor !== amountMinor
-      ) {
-        return errorResponse(res, 'INVALID_REQUEST', 'The Store payment cannot be safely matched to this order.');
+      if (!Number.isSafeInteger(orderAmountMinor) || orderAmountMinor <= 0) {
+        return errorResponse(res, 'INVALID_REQUEST', 'The Store order amount is invalid for refund.');
       }
 
+      const paymentSnaps = await Promise.all(paymentTransactionIds.map((id) => adminDb.collection('transactions').doc(id).get()));
+      const candidates = paymentSnaps
+        .filter((snap) => snap.exists)
+        .map((snap) => ({ id: snap.id, data: snap.data() as Record<string, unknown> }))
+        .filter(({ data: payment }) => {
+          const amountMinor = Number(payment.amount);
+          const relatedOrderIds = Array.isArray(payment.relatedOrderIds) ? payment.relatedOrderIds : [];
+          return payment.recordKind === 'financial' &&
+            payment.schemaVersion === 2 &&
+            payment.amountUnit === 'minor' &&
+            payment.currency === 'NGN' &&
+            payment.status === 'completed' &&
+            payment.type === 'merchant_payment' &&
+            payment.sourceModule === 'unique_store.checkout' &&
+            payment.senderId === customerId &&
+            payment.recipientId === sellerId &&
+            relatedOrderIds.includes(orderId) &&
+            Number.isSafeInteger(amountMinor) &&
+            amountMinor >= orderAmountMinor;
+        });
+
+      if (candidates.length !== 1) {
+        return errorResponse(res, candidates.length === 0 ? 'NOT_FOUND' : 'INVALID_REQUEST',
+          candidates.length === 0
+            ? 'The original Store payment transaction was not found.'
+            : 'The Store payment could not be uniquely matched to this order.');
+      }
+
+      const originalTransactionId = candidates[0].id;
+      const payment = candidates[0].data;
+      const amountMinor = Number(payment.amount);
+
       const result = await executeFinancialRefund(adminDb, {
-        originalTransactionId: paymentTransactionIds[0],
+        originalTransactionId,
         amountMinor,
         currency: 'NGN',
         idempotencyKey,
