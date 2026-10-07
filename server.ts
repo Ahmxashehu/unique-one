@@ -3727,7 +3727,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           if (!snapshot.exists) throw new RequestValidationError('NOT_FOUND', 'One or more Store orders could not be found.');
           const order = snapshot.data() as Record<string, unknown>;
           if (order.customerId !== uid || order.currency !== 'NGN' || order.status !== 'pending' ||
-              !isSafeFirebaseUid(order.sellerId) || !Number.isSafeInteger(order.amountMinor) || order.amountMinor <= 0) {
+              !isSafeFirebaseUid(order.sellerId) || !Number.isSafeInteger(order.amountMinor) || Number(order.amountMinor) <= 0) {
             throw new RequestValidationError('INVALID_REQUEST', 'One or more Store orders changed and must be revalidated before payment.');
           }
           transactionAmountMinor += Number(order.amountMinor);
@@ -4500,7 +4500,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         Boolean(tx.reversalOfTransactionId)
       );
       const originalPaidMinor = originalPayments.reduce((sum, tx) => sum + Number(tx.amountMinor || 0), 0);
-      const refundedMinor = refunds.reduce((sum, tx) => sum + (tx.amountMinor || 0), 0);
+      const refundedMinor = refunds.reduce((sum, tx) => sum + Number(tx.amountMinor || 0), 0);
       const orderAmountMinor = Number(order.amountMinor);
       const amountsValid = Number.isSafeInteger(orderAmountMinor) && orderAmountMinor > 0;
       const overRefunded = refundedMinor > originalPaidMinor && originalPaidMinor > 0;
