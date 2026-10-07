@@ -178,6 +178,9 @@ export async function executeFinancialRefund(
           return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The partial Store return is not ready for this refund.' } };
         }
       }
+      if (input.finalizeOrder === 'full' && originalAmount !== Number(order.amountMinor)) {
+        return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Store payment amount must exactly match the order amount for a full refund.' } };
+      }
       if (input.finalizeDispute) {
         const dispute = order.dispute && typeof order.dispute === 'object' ? order.dispute as Record<string, unknown> : null;
         if (!dispute || !['opened', 'seller_responded', 'under_review'].includes(String(dispute.status))) {
