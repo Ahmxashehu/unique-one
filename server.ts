@@ -4014,7 +4014,16 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) return errorResponse(res, 'INVALID_REQUEST', 'The Store order amount is invalid.');
       if (decision === 'deny') {
         const now = Timestamp.now();
-        await adminDb.runTransaction(async transaction => {
+        const denialIdemRef = adminDb.collection('storeDisputeResolutionIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
+        const denialResult = await adminDb.runTransaction(async transaction => {
+          const existing = await transaction.get(denialIdemRef);
+          if (existing.exists) {
+            const stored = existing.data() as Record<string, unknown>;
+            if (stored.orderId !== orderId || stored.decision !== 'deny' || stored.reason !== reason) {
+              throw new RequestValidationError('INVALID_REQUEST', 'This idempotency key was already used for a different dispute resolution.');
+            }
+            return { orderId, status: 'resolved', decision: 'deny', replayed: true };
+          }
           const ref = adminDb.collection('orders').doc(orderId);
           const currentSnap = await transaction.get(ref);
           if (!currentSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
@@ -4022,9 +4031,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const currentDispute = current.dispute && typeof current.dispute === 'object' ? current.dispute as Record<string, unknown> : null;
           if (!currentDispute || !['opened','seller_responded','under_review'].includes(String(currentDispute.status))) throw new RequestValidationError('INVALID_REQUEST', 'This dispute is not awaiting resolution.');
           transaction.update(ref, { dispute: { ...currentDispute, status: 'resolved', decision: 'deny', resolutionReason: reason, resolvedBy: uid, resolvedAt: now }, updatedAt: now });
+          transaction.create(denialIdemRef, { uid, orderId, decision: 'deny', reason, status: 'resolved', createdAt: now, updatedAt: now });
           transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.dispute.denied', actorUid: uid, resource: 'store_order', resourceId: orderId, reason, timestamp: now, createdAt: now });
+          return { orderId, status: 'resolved', decision: 'deny', replayed: false };
         });
-        return res.status(200).json({ orderId, status: 'resolved', decision: 'deny' });
+        return res.status(200).json(denialResult);
       }
       const paymentTransactionIds = Array.isArray(order.paymentTransactionIds)
         ? order.paymentTransactionIds.filter((id: unknown) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id))
