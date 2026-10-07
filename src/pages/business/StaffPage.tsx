@@ -28,7 +28,7 @@ export default function StaffPage() {
     setLoading(true);
     setError('');
     try {
-      const snapshot = await getDocs(query(collection(db, 'staffInvites'), where('businessOwnerUid', '==', currentUser.uid), where('businessId', '==', businessId)));
+      const snapshot = await getDocs(query(collection(db, 'staffInvites'), where('businessOwnerUid', '==', currentUser.uid), where('businessId', '==', activeBusinessId)));
       setInvites(snapshot.docs.map(item => ({ id: item.id, ...item.data() } as StaffInvite)));
     } catch (err) {
       console.error('Staff invites load failed:', err);
