@@ -4023,6 +4023,17 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         });
         return res.status(200).json({ orderId, status: 'resolved', decision: 'deny' });
       }
+      await adminDb.runTransaction(async transaction => {
+        const ref = adminDb.collection('orders').doc(orderId);
+        const currentSnap = await transaction.get(ref);
+        if (!currentSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
+        const current = currentSnap.data() as Record<string, unknown>;
+        const currentDispute = current.dispute && typeof current.dispute === 'object' ? current.dispute as Record<string, unknown> : null;
+        if (!currentDispute || !['opened','seller_responded'].includes(String(currentDispute.status))) throw new RequestValidationError('INVALID_REQUEST', 'This dispute is already being resolved or has been resolved.');
+        const now = Timestamp.now().toDate().toISOString();
+        transaction.update(ref, { dispute: { ...currentDispute, status: 'under_review', reviewStartedBy: uid, reviewStartedAt: now, updatedAt: now }, updatedAt: now });
+        transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.dispute.review_started', actorUid: uid, resource: 'store_order', resourceId: orderId, timestamp: Timestamp.now(), createdAt: now });
+      });
       const paymentTransactionIds = Array.isArray(order.paymentTransactionIds) ? order.paymentTransactionIds.filter((v: unknown) => typeof v === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(v)) : [];
       const payments = await Promise.all(paymentTransactionIds.map(id => adminDb.collection('transactions').doc(id).get()));
       const candidates = payments.filter(s => s.exists).map(s => ({ id: s.id, data: s.data() as Record<string, unknown> })).filter(({data:p}) => p.recordKind === 'financial' && p.schemaVersion === 2 && p.amountUnit === 'minor' && p.currency === 'NGN' && p.status === 'completed' && p.type === 'merchant_payment' && p.sourceModule === 'unique_store.checkout' && p.senderId === order.customerId && p.recipientId === order.sellerId && Array.isArray(p.relatedOrderIds) && p.relatedOrderIds.includes(orderId) && Number.isSafeInteger(Number(p.amount)) && Number(p.amount) >= amountMinor);
@@ -4049,7 +4060,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         if (!currentSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
         const current = currentSnap.data() as Record<string, unknown>;
         const currentDispute = current.dispute && typeof current.dispute === 'object' ? current.dispute as Record<string, unknown> : null;
-        if (!currentDispute || !['opened','seller_responded','under_review'].includes(String(currentDispute.status))) throw new RequestValidationError('INVALID_REQUEST', 'This dispute has already been resolved.');
+        if (!currentDispute || currentDispute.status !== 'under_review' || currentDispute.reviewStartedBy !== uid) throw new RequestValidationError('INVALID_REQUEST', 'This dispute is not locked to the current reviewer.');
         transaction.update(ref, { dispute: { ...currentDispute, status: 'resolved', decision: 'approve_refund', resolutionReason: reason, resolvedBy: uid, resolvedAt: now, refundTransactionId: refund.transactionId }, updatedAt: now });
         transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.dispute.refund_approved', actorUid: uid, resource: 'store_order', resourceId: orderId, refundTransactionId: refund.transactionId, amountMinor, reason, timestamp: now, createdAt: now });
       });
