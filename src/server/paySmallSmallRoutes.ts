@@ -561,6 +561,33 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
           continue;
         }
         const ledgers = ledgerByTx.get(txId) || [];
+        const plan = planMap.get(planId) || {};
+        const customerId = String(plan.customerId || '');
+        const orderId = String(plan.orderId || '');
+        const expectedSellerId = (() => {
+          const orderIdValue = String(plan.orderId || '');
+          return orderMap.has(orderIdValue) ? '' : '';
+        })();
+        const expectedFlow = module === 'unique_pay_small_small.deposit' || module === 'unique_pay_small_small.installment'
+          ? { senderId: customerId, recipientId: planId, debitUid: customerId, debitAccountType: '', creditUid: planId, creditAccountType: 'pay_small_small_hold' }
+          : module === 'unique_pay_small_small.settlement'
+            ? { senderId: planId, recipientId: String(tx.recipientId || ''), debitUid: planId, debitAccountType: 'pay_small_small_hold', creditUid: String(tx.recipientId || ''), creditAccountType: 'seller_settlement' }
+            : module === 'unique_pay_small_small.cancellation_refund'
+              ? { senderId: planId, recipientId: customerId, debitUid: planId, debitAccountType: 'pay_small_small_hold', creditUid: customerId, creditAccountType: 'wallet_refund' }
+              : null;
+        if (expectedFlow) {
+          if (String(tx.senderId || '') !== expectedFlow.senderId || String(tx.recipientId || '') !== expectedFlow.recipientId) {
+            addFinding({ code: 'TRANSACTION_PARTY_SEMANTICS_MISMATCH', severity: 'critical', planId, transactionId: txId, amountMinor: amount, detail: 'Pay Small Small transaction sender/recipient does not match the required flow for its module.' });
+          }
+          const debitEntry = ledgers.find(x => String(x.direction || '') === 'debit');
+          const creditEntry = ledgers.find(x => String(x.direction || '') === 'credit');
+          if (debitEntry && (String(debitEntry.uid || '') !== expectedFlow.debitUid || String(debitEntry.accountType || '') !== expectedFlow.debitAccountType)) {
+            addFinding({ code: 'DEBIT_LEDGER_SEMANTICS_MISMATCH', severity: 'critical', planId, transactionId: txId, amountMinor: amount, detail: 'Pay Small Small debit ledger points to the wrong account or account type.' });
+          }
+          if (creditEntry && (String(creditEntry.uid || '') !== expectedFlow.creditUid || String(creditEntry.accountType || '') !== expectedFlow.creditAccountType)) {
+            addFinding({ code: 'CREDIT_LEDGER_SEMANTICS_MISMATCH', severity: 'critical', planId, transactionId: txId, amountMinor: amount, detail: 'Pay Small Small credit ledger points to the wrong account or account type.' });
+          }
+        }
         const required = module === 'unique_pay_small_small.deposit' || module === 'unique_pay_small_small.installment' || module === 'unique_pay_small_small.settlement' || module === 'unique_pay_small_small.cancellation_refund' ? 2 : 0;
         expectedLedgerCount.set(txId, required);
         if (ledgers.length !== required) {
