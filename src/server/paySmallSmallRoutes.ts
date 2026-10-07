@@ -94,10 +94,10 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
     try {
       const result = await db.runTransaction(async (transaction) => {
         const planRef = db.collection('paySmallSmallPlans').doc(planId);
-        const userRef = db.collection('users').doc(uid);
         const walletRef = db.collection('wallets').doc(uid);
         const idemRef = db.collection('paySmallSmallPaymentIdempotency').doc(crypto.createHash('sha256').update(uid + '\0' + idempotencyKey).digest('hex'));
-        const credentialRef = db.collection('authCredentials').doc(uid);\n        const [planSnap, credentialSnap, walletSnap, idemSnap] = await Promise.all([
+        const credentialRef = db.collection('authCredentials').doc(uid);
+        const [planSnap, credentialSnap, walletSnap, idemSnap] = await Promise.all([
           transaction.get(planRef), transaction.get(credentialRef), transaction.get(walletRef), transaction.get(idemRef)
         ]);
         if (idemSnap.exists) return { ...(idemSnap.data()?.result || {}), replayed: true };
@@ -162,6 +162,48 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
       if (code === 'INVALID_AMOUNT') return fail(res, 'INVALID_AMOUNT', 'The deposit amount is invalid.');
       console.error('Pay Small Small deposit failed:', error);
       return fail(res, 'SERVICE_UNAVAILABLE', 'The Pay Small Small deposit could not be completed safely.', 503);
+    }
+  });
+
+  app.post('/api/pay-small-small/plans/:planId/sync-due-status', limiter, authenticate, async (req, res) => {
+    const uid = String((req as any).user?.uid || '');
+    const planId = typeof req.params.planId === 'string' ? req.params.planId.trim() : '';
+    if (!uid || !PLAN_ID.test(planId)) return fail(res, 'INVALID_REQUEST', 'A valid plan ID is required.');
+    try {
+      const result = await db.runTransaction(async (transaction) => {
+        const planRef = db.collection('paySmallSmallPlans').doc(planId);
+        const snap = await transaction.get(planRef);
+        if (!snap.exists) throw new Error('PLAN_NOT_FOUND');
+        const plan = snap.data() || {};
+        if (String(plan.customerId || '') !== uid) throw new Error('FORBIDDEN');
+        if (String(plan.status || '') !== 'active') return { planId, status: String(plan.status || ''), updatedInstallments: 0 };
+        const now = Timestamp.now();
+        let changed = 0;
+        const installments = Array.isArray(plan.installments) ? plan.installments : [];
+        const next = installments.map((item: any) => {
+          if (String(item.status || '') === 'pending' && item.dueAt && typeof item.dueAt.toMillis === 'function' && item.dueAt.toMillis() <= now.toMillis()) {
+            changed++;
+            return { ...item, status: 'overdue', overdueAt: now };
+          }
+          return item;
+        });
+        if (changed > 0) {
+          transaction.update(planRef, { installments: next, updatedAt: now });
+          transaction.create(db.collection('audit_logs').doc(), {
+            action: 'pay_small_small.installments_marked_overdue', actorUid: uid, targetUid: uid,
+            resource: 'pay_small_small_plan', resourceId: planId, changedInstallments: changed,
+            createdAt: now, timestamp: now
+          });
+        }
+        return { planId, status: 'active', updatedInstallments: changed, installments: next };
+      });
+      return res.json(result);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'PLAN_NOT_FOUND') return fail(res, 'NOT_FOUND', 'The Pay Small Small plan was not found.', 404);
+      if (code === 'FORBIDDEN') return fail(res, 'FORBIDDEN', 'You are not permitted to update this plan.', 403);
+      console.error('Pay Small Small due-status sync failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'The Pay Small Small due status could not be synchronized safely.', 503);
     }
   });
 
