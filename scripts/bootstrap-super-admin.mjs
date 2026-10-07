@@ -8,7 +8,7 @@ const email = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase();
 const suppliedPassword = process.env.SUPER_ADMIN_PASSWORD;
 const confirmation = process.env.BOOTSTRAP_SUPER_ADMIN_CONFIRM;
 if (confirmation !== CONFIRMATION) throw new Error('Refusing to bootstrap Super Admin: set BOOTSTRAP_SUPER_ADMIN_CONFIRM=UNIQUE_ONE_CREATE_SUPER_ADMIN.');
-if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) throw new Error('SUPER_ADMIN_EMAIL must be a valid email address.');
+if (!email || !/^\S+@\S+\.\S+$/.test(email)) throw new Error('SUPER_ADMIN_EMAIL must be a valid email address.');
 if (suppliedPassword && suppliedPassword.length < 12) throw new Error('SUPER_ADMIN_PASSWORD must be at least 12 characters when supplied.');
 function credential() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
