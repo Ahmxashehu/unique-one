@@ -42,7 +42,12 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const orderRef = db.collection('orders').doc(orderId);
         const idemRef = db.collection('paySmallSmallIdempotency').doc(uid + '_' + idempotencyKey);
         const [orderSnap, idemSnap] = await Promise.all([transaction.get(orderRef), transaction.get(idemRef)]);
-        if (idemSnap.exists) return { ...(idemSnap.data() || {}), replayed: true };
+        if (idemSnap.exists) {
+          const existing = idemSnap.data() || {};
+          const expectedFingerprint = orderId + '|' + totalAmountMinor + '|' + depositAmountMinor + '|' + installmentCount + '|' + frequency;
+          if (String(existing.requestFingerprint || '') !== expectedFingerprint) throw new Error('IDEMPOTENCY_CONFLICT');
+          return { ...(existing.result || existing), replayed: true };
+        }
         if (!orderSnap.exists) throw new Error('ORDER_NOT_FOUND');
         const order = orderSnap.data() || {};
         if (String(order.customerId || '') !== uid) throw new Error('FORBIDDEN');
@@ -66,7 +71,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const plan = { planId: planRef.id, orderId, customerId: uid, currency: 'NGN', totalAmountMinor, depositAmountMinor, installmentCount, frequency, installments, status: 'draft', createdAt: now, updatedAt: now };
         transaction.create(planRef, plan);
         transaction.update(orderRef, { paySmallSmallPlanId: planRef.id, paySmallSmallStatus: 'draft', updatedAt: now });
-        transaction.create(idemRef, { uid, planId: planRef.id, orderId, createdAt: now });
+        transaction.create(idemRef, { uid, planId: planRef.id, orderId, requestFingerprint: orderId + '|' + totalAmountMinor + '|' + depositAmountMinor + '|' + installmentCount + '|' + frequency, result: { ...plan }, createdAt: now });
         transaction.create(db.collection('audit_logs').doc(), { action: 'pay_small_small.plan_created', actorUid: uid, targetUid: uid, resource: 'pay_small_pay_small_plan', resourceId: planRef.id, orderId, timestamp: now, createdAt: now });
         return { ...plan, replayed: false };
       });
@@ -77,6 +82,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
       if (code === 'FORBIDDEN') return fail(res, 'FORBIDDEN', 'You are not permitted to use this order.', 403);
       if (code === 'INVALID_CURRENCY' || code === 'AMOUNT_MISMATCH' || code === 'ORDER_NOT_ELIGIBLE') return fail(res, 'INVALID_REQUEST', 'This order is not eligible for Pay Small Small.');
       if (code === 'PLAN_EXISTS') return fail(res, 'CONFLICT', 'This order already has a Pay Small Small plan.', 409);
+      if (code === 'IDEMPOTENCY_CONFLICT') return fail(res, 'INVALID_REQUEST', 'This idempotency key was already used for different Pay Small Small plan details.');
       console.error('Pay Small Small plan creation failed:', error);
       return fail(res, 'SERVICE_UNAVAILABLE', 'The Pay Small Small plan could not be created safely.', 503);
     }
@@ -176,6 +182,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
       if (code === 'PLAN_NOT_ELIGIBLE') return fail(res, 'INVALID_REQUEST', 'This Pay Small Small plan is not ready for activation.');
       if (code === 'ORDER_NOT_FOUND' || code === 'ORDER_STATE_MISMATCH') return fail(res, 'CONFLICT', 'The Store order is no longer eligible for Pay Small Small activation.', 409);
       if (code === 'INVALID_AMOUNT') return fail(res, 'INVALID_AMOUNT', 'The deposit amount is invalid.');
+      if (code === 'IDEMPOTENCY_CONFLICT') return fail(res, 'INVALID_REQUEST', 'This payment idempotency key was already used for a different Pay Small Small payment.');
       console.error('Pay Small Small deposit failed:', error);
       return fail(res, 'SERVICE_UNAVAILABLE', 'The Pay Small Small deposit could not be completed safely.', 503);
     }
