@@ -423,10 +423,15 @@ service cloud.firestore {
 
     match /staffInvites/{inviteId} {
       allow read: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.inviteeEmail == request.auth.token.email);
-      allow create: if isAuthenticated() && request.resource.data.businessOwnerUid == request.auth.uid && request.resource.data.status == 'pending' && request.resource.data.role in ['admin','manager','sales','cashier','accountant','inventory','support','delivery','branch_manager','viewer'] && request.resource.data.inviteeEmail is string && request.resource.data.inviteeEmail.size() > 0 && request.resource.data.keys().hasOnly(['businessOwnerUid','businessId','inviteeEmail','role','branchName','status','createdAt','invitedAt'])
+      allow create: if isAuthenticated() && request.resource.data.businessOwnerUid == request.auth.uid && request.resource.data.status == 'pending' && request.resource.data.role in ['admin','manager','sales','cashier','accountant','inventory','support','delivery','branch_manager','viewer'] && request.resource.data.inviteeEmail is string && request.resource.data.inviteeEmail.size() > 0 && request.resource.data.keys().hasOnly(['businessOwnerUid','businessId','inviteeEmail','role','branchId','branchName','status','createdAt','invitedAt'])
         && request.resource.data.businessId is string
         && exists(/databases/$(database)/documents/businesses/$(request.resource.data.businessId))
-        && get(/databases/$(database)/documents/businesses/$(request.resource.data.businessId)).data.ownerUid == request.auth.uid;
+        && get(/databases/$(database)/documents/businesses/$(request.resource.data.businessId)).data.ownerUid == request.auth.uid
+        && (!('branchId' in request.resource.data) || (request.resource.data.branchId is string
+          && exists(/databases/$(database)/documents/branches/$(request.resource.data.branchId))
+          && get(/databases/$(database)/documents/branches/$(request.resource.data.branchId)).data.businessId == request.resource.data.businessId
+          && get(/databases/$(database)/documents/branches/$(request.resource.data.branchId)).data.ownerUid == request.auth.uid
+          && get(/databases/$(database)/documents/branches/$(request.resource.data.branchId)).data.status == 'active'));
       allow update: if isPlatformAdmin() ||
         (isAuthenticated() &&
           resource.data.inviteeEmail == request.auth.token.email &&
@@ -434,6 +439,7 @@ service cloud.firestore {
           request.resource.data.inviteeEmail == resource.data.inviteeEmail &&
           request.resource.data.role == resource.data.role &&
           request.resource.data.branchName == resource.data.branchName &&
+          request.resource.data.branchId == resource.data.branchId &&
           request.resource.data.createdAt == resource.data.createdAt &&
           request.resource.data.invitedAt == resource.data.invitedAt &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status in ['accepted','declined']);
