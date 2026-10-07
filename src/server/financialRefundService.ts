@@ -23,6 +23,7 @@ export interface FinancialRefundInput {
   relatedOrderId?: string;
   sourceModule?: string;
   finalizeOrder?: 'full' | 'partial';
+  finalizeDispute?: { decision: 'approve_refund'; reason: string; actorUid: string };
 }
 
 export interface FinancialRefundResult {
@@ -90,7 +91,8 @@ export async function executeFinancialRefund(
     input.currency !== 'NGN' ||
     !input.reason.trim() ||
     (input.relatedOrderId !== undefined && !isSafeId(input.relatedOrderId)) ||
-    (input.finalizeOrder !== undefined && input.finalizeOrder !== 'full' && input.finalizeOrder !== 'partial')
+    (input.finalizeOrder !== undefined && input.finalizeOrder !== 'full' && input.finalizeOrder !== 'partial') ||
+    (input.finalizeDispute !== undefined && (input.finalizeDispute.decision !== 'approve_refund' || !input.finalizeDispute.reason.trim() || !isSafeId(input.finalizeDispute.actorUid)))
   ) {
     return { error: { code: 'INVALID_REQUEST', message: 'Invalid refund request.' } };
   }
@@ -171,6 +173,12 @@ export async function executeFinancialRefund(
         const rr = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest as Record<string, unknown> : null;
         if (!rr || rr.status !== 'received' || Number(rr.requestedRefundAmountMinor) !== input.amountMinor) {
           return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The partial Store return is not ready for this refund.' } };
+        }
+      }
+      if (input.finalizeDispute) {
+        const dispute = order.dispute && typeof order.dispute === 'object' ? order.dispute as Record<string, unknown> : null;
+        if (!dispute || !['opened', 'seller_responded', 'under_review'].includes(String(dispute.status))) {
+          return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Store dispute is no longer awaiting resolution.' } };
         }
       }
     }
@@ -285,13 +293,32 @@ export async function executeFinancialRefund(
           updatedAt: now,
         });
       } else {
-        transaction.update(relatedOrderRef, {
+        const orderUpdate: Record<string, unknown> = {
           status: 'refunded',
           paymentStatus: 'refunded',
           refundedAt: now,
           updatedAt: now,
           refundTransactionId: refundRef.id,
-        });
+        };
+        if (input.finalizeDispute) {
+          const orderSnap = await transaction.get(relatedOrderRef);
+          if (!orderSnap.exists) return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order was not found.' } };
+          const current = orderSnap.data() ?? {};
+          const dispute = current.dispute && typeof current.dispute === 'object' ? current.dispute as Record<string, unknown> : null;
+          if (!dispute || !['opened', 'seller_responded', 'under_review'].includes(String(dispute.status))) {
+            return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Store dispute has already been resolved.' } };
+          }
+          orderUpdate.dispute = {
+            ...dispute,
+            status: 'resolved',
+            decision: 'approve_refund',
+            resolutionReason: input.finalizeDispute.reason.trim(),
+            resolvedBy: input.finalizeDispute.actorUid,
+            resolvedAt: now,
+            refundTransactionId: refundRef.id,
+          };
+        }
+        transaction.update(relatedOrderRef, orderUpdate);
       }
     }
 
