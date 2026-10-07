@@ -13,7 +13,8 @@
     "test": "node scripts/verify-platform.mjs",
     "localization:audit": "node scripts/audit-localization.mjs",
     "localization:strict": "node scripts/audit-localization.mjs --strict",
-    "store:expire-reservations": "node scripts/expire-store-reservations.mjs"
+    "store:expire-reservations": "node scripts/expire-store-reservations.mjs",
+    "pay-small-small:sync": "node scripts/pay-small-small-sync.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
