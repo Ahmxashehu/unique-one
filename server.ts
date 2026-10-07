@@ -4084,15 +4084,13 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
       const rolesSnap = await adminDb.collection('users').doc(uid).get();
       const roles = Array.isArray(rolesSnap.data()?.roles) ? rolesSnap.data()?.roles.filter((v: unknown) => typeof v === 'string') as any[] : [];
       const permissions = Array.isArray(rolesSnap.data()?.permissions) ? rolesSnap.data()?.permissions.filter((v: unknown) => typeof v === 'string') as any[] : [];
-      const orderBusinessId = typeof (await adminDb.collection('orders').doc(orderId).get()).data()?.businessId === 'string'
-        ? String((await adminDb.collection('orders').doc(orderId).get()).data()?.businessId)
-        : '';
-      const globalAdmin = isGlobalStoreAdmin(roles);
-      const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
-      if (!hasRolePermission(roles, permissions, 'manage:disputes') || (orderBusinessId ? (!globalAdmin && !tenantAccess) : !globalAdmin)) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to resolve Store disputes.');
       const snap = await adminDb.collection('orders').doc(orderId).get();
       if (!snap.exists) return errorResponse(res, 'NOT_FOUND', 'The Store order was not found.');
       const order = snap.data() as Record<string, unknown>;
+      const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
+      const globalAdmin = isGlobalStoreAdmin(roles);
+      const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
+      if (!hasRolePermission(roles, permissions, 'manage:disputes') || (orderBusinessId ? (!globalAdmin && !tenantAccess) : !globalAdmin)) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to resolve Store disputes.');
       const dispute = order.dispute && typeof order.dispute === 'object' ? order.dispute as Record<string, unknown> : null;
       if (!dispute || !['opened','seller_responded','under_review'].includes(String(dispute.status))) return errorResponse(res, 'INVALID_REQUEST', 'This dispute is not awaiting resolution.');
       const amountMinor = Number(order.amountMinor);
