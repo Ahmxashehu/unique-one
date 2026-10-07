@@ -3645,12 +3645,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const order = snapshot.data() as Record<string, unknown>;
         if (order.customerId !== uid || order.currency !== 'NGN') return errorResponse(res, 'FORBIDDEN', 'You can only pay for your own NGN Store orders.');
         if (order.status !== 'pending') return errorResponse(res, 'INVALID_REQUEST', 'One or more Store orders are no longer awaiting payment.');
-        if (!isSafeFirebaseUid(order.sellerId) || !Number.isSafeInteger(order.amountMinor) || order.amountMinor <= 0) {
+        if (!isSafeFirebaseUid(order.sellerId) || !Number.isSafeInteger(Number(order.amountMinor)) || Number(order.amountMinor) <= 0) {
           return errorResponse(res, 'INVALID_REQUEST', 'One or more Store orders have invalid payment data.');
         }
-        amountMinor += order.amountMinor;
+        amountMinor += Number(order.amountMinor);
         if (!Number.isSafeInteger(amountMinor)) return errorResponse(res, 'INVALID_AMOUNT', 'The Store payment amount is invalid.');
-        const sellerAmountMinor = (sellerTotalsMinor.get(order.sellerId) || 0) + order.amountMinor;
+        const sellerAmountMinor = (sellerTotalsMinor.get(order.sellerId) || 0) + Number(order.amountMinor);
         if (!Number.isSafeInteger(sellerAmountMinor)) return errorResponse(res, 'INVALID_AMOUNT', 'The Store seller settlement amount is invalid.');
         sellerTotalsMinor.set(order.sellerId, sellerAmountMinor);
       }
@@ -3727,11 +3727,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           if (!snapshot.exists) throw new RequestValidationError('NOT_FOUND', 'One or more Store orders could not be found.');
           const order = snapshot.data() as Record<string, unknown>;
           if (order.customerId !== uid || order.currency !== 'NGN' || order.status !== 'pending' ||
-              !isSafeFirebaseUid(order.sellerId) || !Number.isSafeInteger(order.amountMinor) || order.amountMinor <= 0) {
+              !isSafeFirebaseUid(order.sellerId) || !Number.isSafeInteger(order.amountMinor) || Number(order.amountMinor) <= 0) {
             throw new RequestValidationError('INVALID_REQUEST', 'One or more Store orders changed and must be revalidated before payment.');
           }
-          transactionAmountMinor += order.amountMinor;
-          const sellerAmountMinor = (transactionSellerTotalsMinor.get(order.sellerId) || 0) + order.amountMinor;
+          transactionAmountMinor += Number(order.amountMinor);
+          const sellerAmountMinor = (transactionSellerTotalsMinor.get(order.sellerId) || 0) + Number(order.amountMinor);
           if (!Number.isSafeInteger(transactionAmountMinor) || !Number.isSafeInteger(sellerAmountMinor)) {
             throw new RequestValidationError('INVALID_AMOUNT', 'The Store payment amount is invalid.');
           }
@@ -4486,7 +4486,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         tx.currency === 'NGN' &&
         tx.status === 'completed' &&
         Number.isSafeInteger(tx.amountMinor) &&
-        (tx.amountMinor || 0) > 0
+        Number(tx.amountMinor || 0) > 0
       );
       const originalPayments = validFinancialTransactions.filter((tx) =>
         tx.type === 'merchant_payment' &&
@@ -4499,8 +4499,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         tx.recipientId === customerId &&
         Boolean(tx.reversalOfTransactionId)
       );
-      const originalPaidMinor = originalPayments.reduce((sum, tx) => sum + (tx.amountMinor || 0), 0);
-      const refundedMinor = refunds.reduce((sum, tx) => sum + (tx.amountMinor || 0), 0);
+      const originalPaidMinor = originalPayments.reduce((sum, tx) => sum + Number(tx.amountMinor || 0), 0);
+      const refundedMinor = refunds.reduce((sum, tx) => sum + Number(tx.amountMinor || 0), 0);
       const orderAmountMinor = Number(order.amountMinor);
       const amountsValid = Number.isSafeInteger(orderAmountMinor) && orderAmountMinor > 0;
       const overRefunded = refundedMinor > originalPaidMinor && originalPaidMinor > 0;

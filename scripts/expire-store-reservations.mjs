@@ -31,7 +31,7 @@ for (const doc of snap.docs) {
     if (!Number.isFinite(expiresAt) || expiresAt > now.getTime()) return false;
 
     const items = Array.isArray(order.items) ? order.items : [];
-    const quantities = new Map<string, number>();
+    const quantities = new Map();
     for (const item of items) {
       const productId = typeof item?.productId === 'string' ? item.productId : '';
       const quantity = Number(item?.quantity);
