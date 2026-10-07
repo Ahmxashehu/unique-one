@@ -5,6 +5,7 @@ import { ROLE_PERMISSIONS, hasRolePermission } from '../lib/auth/rbac';
 import { registerBusinessAccessRoutes } from './businessAccessRoutes';
 import { registerBusinessInventoryRoutes } from './businessInventoryRoutes';
 import { registerStoreOrderLifecycleRoutes } from './storeOrderLifecycleRoutes';
+import { registerStoreReturnInspectionRoutes } from './storeReturnInspectionRoutes';
 
 const ALL_ROLES: Role[] = [
   'customer','buyer','seller','business_owner','staff_member','farmer','service_provider',
@@ -108,4 +109,5 @@ export function registerAdminRbacRoutes(
   registerBusinessAccessRoutes(app, authenticate, db, requirePermission);
   registerBusinessInventoryRoutes(app, authenticate, db);
   registerStoreOrderLifecycleRoutes(app, authenticate, db);
+  registerStoreReturnInspectionRoutes(app, authenticate, db);
 }
