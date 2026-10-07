@@ -249,7 +249,7 @@ export function registerUniqueOtpRoutes(app: Express, authenticate?: RequestHand
   }), async (req, res) => {
     try {
       const recoveryToken = typeof req.body?.recoveryToken === 'string' ? req.body.recoveryToken.trim() : '';
-      if (!/^\[a-f0-9]{64}$/.test(recoveryToken)) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'A verified PIN recovery session is required.' } });
+      if (!/^[a-f0-9]{64}$/.test(recoveryToken)) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'A verified PIN recovery session is required.' } });
       const pin = typeof req.body?.pin === 'string' ? req.body.pin : '';
       const confirmPin = typeof req.body?.confirmPin === 'string' ? req.body.confirmPin : '';
       if (!/^\d{4}$/.test(pin) || !/^\d{4}$/.test(confirmPin)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Choose a valid 4-digit transaction PIN.' } });
