@@ -246,7 +246,7 @@ export async function executeFinancialRefund(
       schemaVersion: 2,
       amountUnit: 'minor',
       reversalOfTransactionId: input.originalTransactionId,
-      ...(input.relatedOrderId ? { relatedOrderId: input.relatedOrderId } : {}),
+      ...(input.relatedOrderId ? { relatedOrderId: input.relatedOrderId, relatedOrderIds: [input.relatedOrderId] } : {}),
       refundReason: input.reason.trim(),
       initiatedByUid: input.actorUid,
       createdAt: now,
