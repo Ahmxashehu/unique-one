@@ -1358,13 +1358,14 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     try {
       const adminSnapshot = await adminDb.collection('users').doc(adminUid).get();
       const roles = Array.isArray(adminSnapshot.data()?.roles) ? adminSnapshot.data()?.roles : [];
-      if (!roles.some((role: unknown) => ['platform_admin', 'super_admin', 'administrator'].includes(String(role)))) {
-        return errorResponse(res, 'FORBIDDEN', 'Platform administration access is required.', 403);
+      if (!roles.some((role: unknown) => ['platform_admin', 'super_admin'].includes(String(role)))) {
+        return errorResponse(res, 'FORBIDDEN', 'Platform or Super Admin access is required.', 403);
       }
       const applicationRef = adminDb.collection('businessApplications').doc(req.params.id);
       const applicationSnapshot = await applicationRef.get();
       if (!applicationSnapshot.exists) return errorResponse(res, 'NOT_FOUND', 'Business application not found.', 404);
       const application = applicationSnapshot.data() as Record<string, any>;
+      if (application.status !== 'pending') return errorResponse(res, 'INVALID_REQUEST', 'Only pending business applications can be reviewed.', 409);
       const action = req.body?.action === 'approve' ? 'approve' : req.body?.action === 'decline' ? 'decline' : '';
       const reviewNote = typeof req.body?.reviewNote === 'string' ? req.body.reviewNote.trim().slice(0, 2000) : '';
       if (!action) return errorResponse(res, 'INVALID_REQUEST', 'Choose approve or decline.');
