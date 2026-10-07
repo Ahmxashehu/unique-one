@@ -3986,12 +3986,10 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       }
 
       const originalTransactionId = candidates[0].id;
-      const payment = candidates[0].data;
-      const amountMinor = Number(payment.amount);
 
       const result = await executeFinancialRefund(adminDb, {
         originalTransactionId,
-        amountMinor,
+        amountMinor: orderAmountMinor,
         currency: 'NGN',
         idempotencyKey,
         actorUid: uid,
