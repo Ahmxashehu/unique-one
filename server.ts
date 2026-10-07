@@ -1460,6 +1460,36 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.get("/api/admin/overview", authenticate, requirePermission('access:admin_tools'), rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), async (_req, res) => {
+    try {
+      const [usersSnap, businessesSnap, productsCount, transactionsSnap] = await Promise.all([
+        adminDb.collection('users').get(),
+        adminDb.collection('businesses').get(),
+        adminDb.collection('products').count().get(),
+        adminDb.collection('transactions').where('recordKind', '==', 'financial').where('amountUnit', '==', 'minor').where('currency', '==', 'NGN').get(),
+      ]);
+      const users = usersSnap.docs.map((doc) => {
+        const d = doc.data();
+        return { id: doc.id, fullName: typeof d.fullName === 'string' ? d.fullName : null, email: typeof d.email === 'string' ? d.email : null, phone: typeof d.phone === 'string' ? d.phone : null, uniqueOneId: typeof d.uniqueOneId === 'string' ? d.uniqueOneId : null, roles: Array.isArray(d.roles) ? d.roles.filter((v: unknown) => typeof v === 'string') : [], verificationStatus: typeof d.verificationStatus === 'string' ? d.verificationStatus : 'unverified', createdAt: typeof d.createdAt?.toDate === 'function' ? d.createdAt.toDate().toISOString() : null };
+      });
+      const businesses = businessesSnap.docs.map((doc) => {
+        const d = doc.data();
+        return { id: doc.id, name: typeof d.name === 'string' ? d.name : (typeof d.businessName === 'string' ? d.businessName : null), ownerUid: typeof d.ownerUid === 'string' ? d.ownerUid : null, category: typeof d.category === 'string' ? d.category : null, status: typeof d.status === 'string' ? d.status : null, verificationStatus: typeof d.verificationStatus === 'string' ? d.verificationStatus : null, createdAt: typeof d.createdAt?.toDate === 'function' ? d.createdAt.toDate().toISOString() : null };
+      });
+      let transactionVolumeMinor = 0;
+      let transactionCount = 0;
+      for (const doc of transactionsSnap.docs) {
+        const d = doc.data();
+        if (d.status === 'completed' && typeof d.amount === 'number' && Number.isSafeInteger(d.amount)) { transactionCount += 1; transactionVolumeMinor += d.amount; }
+      }
+      const pendingVerification = users.reduce((n, u) => n + (u.verificationStatus === 'fully_verified' ? 0 : 1), 0);
+      return res.json({ users, businesses, stats: { users: users.length, businesses: businesses.length, products: productsCount.data().count, transactions: transactionCount, transactionVolumeMinor, pendingVerification } });
+    } catch (error) {
+      console.error('Admin overview failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to load protected admin overview.');
+    }
+  });
+
   app.patch("/api/admin/users/verification", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), authenticate, requirePermission('manage:verification'), async (req, res) => {
     const adminUid = (req as any).user?.uid as string | undefined;
     if (!adminUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
