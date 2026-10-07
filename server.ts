@@ -1170,7 +1170,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
-  app.post("/api/business/inventory/adjust", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+  // Register Business Platform session middleware before protected Business endpoints.\n  // This prevents inventory and future /api/business routes from bypassing the separate business session.\n  registerAdminRbacRoutes(app, authenticate, requirePermission);\n\n  app.post("/api/business/inventory/adjust", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = (req as any).user?.uid as string | undefined;
     if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
     try {
