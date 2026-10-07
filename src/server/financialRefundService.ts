@@ -52,6 +52,9 @@ function fingerprint(input: FinancialRefundInput): string {
       input.reason,
       input.sourceModule ?? '',
       input.finalizeOrder ?? 'full',
+      input.finalizeDispute?.decision ?? '',
+      input.finalizeDispute?.reason ?? '',
+      input.finalizeDispute?.actorUid ?? '',
     ].join('\0'))
     .digest('hex');
 }
