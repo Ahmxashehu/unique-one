@@ -4194,13 +4194,14 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
 
       const result = await executeFinancialRefund(adminDb, {
         originalTransactionId,
-        amountMinor: orderAmountMinor,
+        amountMinor: partialReturnRefund ? refundAmountMinor : orderAmountMinor,
         currency: 'NGN',
         idempotencyKey,
         actorUid: uid,
         reason,
         relatedOrderId: orderId,
         sourceModule: 'unique_store.refund',
+        finalizeOrder: partialReturnRefund ? 'partial' : 'full',
       });
       if ('error' in result) {
         const status = result.error.code === 'REFUND_IN_PROGRESS' || result.error.code === 'REFUND_EXCEEDS_REMAINING' || result.error.code === 'IDEMPOTENCY_CONFLICT' ? 409 :
