@@ -259,7 +259,6 @@ export async function executeFinancialRefund(
       return { error: { code: 'TRANSACTION_FAILED', message: 'The refund would exceed the safe wallet accounting range.' } };
     }
 
-    const now = Timestamp.now();
     const refundRef = db.collection('transactions').doc();
     const reference = `UP-REF-${refundRef.id}`;
     const result: FinancialRefundResult = {
