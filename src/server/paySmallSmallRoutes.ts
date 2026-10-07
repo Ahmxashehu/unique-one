@@ -96,7 +96,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const planRef = db.collection('paySmallSmallPlans').doc(planId);
         const userRef = db.collection('users').doc(uid);
         const walletRef = db.collection('wallets').doc(uid);
-        const idemRef = db.collection('paySmallSmallPaymentIdempotency').doc(uid + '_' + idempotencyKey);
+        const idemRef = db.collection('paySmallSmallPaymentIdempotency').doc(crypto.createHash('sha256').update(uid + '\0' + idempotencyKey).digest('hex'));
         const credentialRef = db.collection('authCredentials').doc(uid);\n        const [planSnap, credentialSnap, walletSnap, idemSnap] = await Promise.all([
           transaction.get(planRef), transaction.get(credentialRef), transaction.get(walletRef), transaction.get(idemRef)
         ]);
@@ -129,6 +129,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
           amountMinor: deposit, currency: 'NGN', status: 'completed', idempotencyKey,
           createdAt: now
         });
+        transaction.create(holdRef, { id: holdRef.id, transactionId: txRef.id, reference, uid: String(plan.planId), direction: 'credit', amountMinor: deposit, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now, accountType: 'pay_small_small_hold' });
         transaction.update(walletRef, { availableBalanceMinor: balance - deposit, updatedAt: now });
         transaction.update(planRef, {
           status: 'active', paidAmountMinor: deposit, remainingAmountMinor: Number(plan.totalAmountMinor) - deposit,
@@ -161,6 +162,85 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
       if (code === 'INVALID_AMOUNT') return fail(res, 'INVALID_AMOUNT', 'The deposit amount is invalid.');
       console.error('Pay Small Small deposit failed:', error);
       return fail(res, 'SERVICE_UNAVAILABLE', 'The Pay Small Small deposit could not be completed safely.', 503);
+    }
+  });
+
+  app.post('/api/pay-small-small/plans/:planId/installments/:installmentNumber/pay', limiter, authenticate, async (req, res) => {
+    const uid = String((req as any).user?.uid || '');
+    const planId = typeof req.params.planId === 'string' ? req.params.planId.trim() : '';
+    const installmentNumber = Number(req.params.installmentNumber);
+    const transactionPin = typeof req.body?.transactionPin === 'string' ? req.body.transactionPin : '';
+    const idempotencyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey.trim() : '';
+    if (!uid || !PLAN_ID.test(planId) || !Number.isInteger(installmentNumber) || installmentNumber < 1 || installmentNumber > 24 || !/^\d{4}$/.test(transactionPin) || !IDEMPOTENCY.test(idempotencyKey)) return fail(res, 'INVALID_REQUEST', 'A valid plan, installment number, Transaction PIN and idempotency key are required.');
+    try {
+      const result = await db.runTransaction(async (transaction) => {
+        const planRef = db.collection('paySmallSmallPlans').doc(planId);
+        const walletRef = db.collection('wallets').doc(uid);
+        const credentialRef = db.collection('authCredentials').doc(uid);
+        const idemRef = db.collection('paySmallSmallPaymentIdempotency').doc(crypto.createHash('sha256').update(uid + '\0' + idempotencyKey).digest('hex'));
+        const [planSnap, walletSnap, credentialSnap, idemSnap] = await Promise.all([transaction.get(planRef), transaction.get(walletRef), transaction.get(credentialRef), transaction.get(idemRef)]);
+        const fingerprint = planId + '|' + installmentNumber;
+        if (idemSnap.exists) {
+          const existing = idemSnap.data() || {};
+          if (String(existing.requestFingerprint || '') !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT');
+          return { ...(existing.result || {}), replayed: true };
+        }
+        if (!planSnap.exists) throw new Error('PLAN_NOT_FOUND');
+        if (!walletSnap.exists) throw new Error('WALLET_NOT_FOUND');
+        if (!credentialSnap.exists) throw new Error('USER_NOT_FOUND');
+        const plan = planSnap.data() || {};
+        if (String(plan.customerId || '') !== uid) throw new Error('FORBIDDEN');
+        if (String(plan.currency || '') !== 'NGN' || String(plan.status || '') !== 'active') throw new Error('PLAN_NOT_ELIGIBLE');
+        if (!verifyPinCredential(credentialSnap.data() || {}, transactionPin)) throw new Error('BAD_PIN');
+        const installments = Array.isArray(plan.installments) ? plan.installments : [];
+        const index = installmentNumber - 1;
+        if (index < 0 || index >= installments.length) throw new Error('INSTALLMENT_NOT_FOUND');
+        const installment = installments[index] || {};
+        if (Number(installment.installmentNumber) !== installmentNumber) throw new Error('INSTALLMENT_NOT_FOUND');
+        if (String(installment.status || '') === 'paid') throw new Error('INSTALLMENT_PAID');
+        if (!['pending', 'overdue'].includes(String(installment.status || ''))) throw new Error('INSTALLMENT_NOT_PAYABLE');
+        const amount = Number(installment.amountMinor);
+        if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('INVALID_AMOUNT');
+        const wallet = walletSnap.data() || {};
+        const balance = Number(wallet.availableBalanceMinor);
+        if (String(wallet.status || '') !== 'active' || !Number.isSafeInteger(balance) || balance < amount) throw new Error('INSUFFICIENT_FUNDS');
+        const now = Timestamp.now();
+        const txRef = db.collection('transactions').doc();
+        const reference = 'UP-PSS-' + txRef.id;
+        const debitRef = db.collection('ledgerEntries').doc();
+        const holdRef = db.collection('ledgerEntries').doc();
+        transaction.create(txRef, { id: txRef.id, reference, senderId: uid, recipientId: String(plan.planId), amount, currency: 'NGN', type: 'merchant_payment', sourceModule: 'unique_pay_small_small.installment', provider: 'unique_pay_internal_wallet', status: 'completed', relatedOrderIds: [String(plan.orderId)], createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor', installmentNumber });
+        transaction.create(debitRef, { id: debitRef.id, transactionId: txRef.id, reference, uid, direction: 'debit', amountMinor: amount, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now });
+        transaction.create(holdRef, { id: holdRef.id, transactionId: txRef.id, reference, uid: String(plan.planId), direction: 'credit', amountMinor: amount, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now, accountType: 'pay_small_small_hold' });
+        const nextInstallments = installments.map((item: any, i: number) => i === index ? { ...item, status: 'paid', paidAt: now, paymentTransactionId: txRef.id } : item);
+        const paidAmount = Number(plan.paidAmountMinor || 0) + amount;
+        const total = Number(plan.totalAmountMinor);
+        const remaining = total - paidAmount;
+        if (!Number.isSafeInteger(paidAmount) || paidAmount > total || remaining < 0) throw new Error('INVALID_AMOUNT');
+        const completed = remaining === 0 && nextInstallments.every((item: any) => String(item.status || '') === 'paid');
+        transaction.update(walletRef, { availableBalanceMinor: balance - amount, updatedAt: now });
+        transaction.update(planRef, { installments: nextInstallments, paidAmountMinor: paidAmount, remainingAmountMinor: remaining, status: completed ? 'completed' : 'active', ...(completed ? { completedAt: now } : {}), updatedAt: now });
+        transaction.update(db.collection('orders').doc(String(plan.orderId)), { paySmallSmallStatus: completed ? 'completed' : 'active', paymentStatus: completed ? 'paid' : 'partial', status: completed ? 'confirmed' : 'reserved', updatedAt: now, ...(completed ? { paidAt: now } : {}) });
+        const paymentResult = { status: completed ? 'completed' : 'active', planId, installmentNumber, transactionId: txRef.id, amountMinor: amount, paidAmountMinor: paidAmount, remainingAmountMinor: remaining, idempotencyKey };
+        transaction.create(idemRef, { uid, planId, installmentNumber, transactionId: txRef.id, requestFingerprint: fingerprint, result: paymentResult, createdAt: now });
+        transaction.create(db.collection('audit_logs').doc(), { action: completed ? 'pay_small_small.plan_completed' : 'pay_small_small.installment_completed', actorUid: uid, targetUid: uid, resource: 'pay_small_small_plan', resourceId: planId, orderId: String(plan.orderId), transactionId: txRef.id, installmentNumber, amountMinor: amount, currency: 'NGN', idempotencyKey, createdAt: now, timestamp: now });
+        return paymentResult;
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'PLAN_NOT_FOUND') return fail(res, 'NOT_FOUND', 'The Pay Small Small plan was not found.', 404);
+      if (code === 'USER_NOT_FOUND') return fail(res, 'UNAUTHENTICATED', 'Your account profile could not be found.', 401);
+      if (code === 'WALLET_NOT_FOUND') return fail(res, 'WALLET_NOT_FOUND', 'Your UniquePay wallet is not available.');
+      if (code === 'FORBIDDEN') return fail(res, 'FORBIDDEN', 'You are not permitted to fund this plan.', 403);
+      if (code === 'BAD_PIN') return fail(res, 'FORBIDDEN', 'Incorrect Transaction PIN.', 403);
+      if (code === 'PLAN_NOT_ELIGIBLE' || code === 'INSTALLMENT_NOT_PAYABLE' || code === 'INSTALLMENT_PAID') return fail(res, 'INVALID_REQUEST', 'This installment is not payable.');
+      if (code === 'INSTALLMENT_NOT_FOUND') return fail(res, 'NOT_FOUND', 'The requested installment was not found.', 404);
+      if (code === 'INSUFFICIENT_FUNDS') return fail(res, 'INSUFFICIENT_FUNDS', 'Insufficient UniquePay wallet balance.');
+      if (code === 'INVALID_AMOUNT') return fail(res, 'INVALID_AMOUNT', 'The installment amount is invalid.');
+      if (code === 'IDEMPOTENCY_CONFLICT') return fail(res, 'INVALID_REQUEST', 'This payment idempotency key was already used for a different installment.');
+      console.error('Pay Small Small installment failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'The installment could not be completed safely.', 503);
     }
   });
 
