@@ -17,21 +17,30 @@ service cloud.firestore {
                'super_admin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles
              );
     }
+    function isPlatformAdmin() {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data != null &&
+             'roles' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+             (
+               'platform_admin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles ||
+               'super_admin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles
+             );
+    }
 
     match /educationInstitutions/{institutionId} {
-      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isAdmin();
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.status in ['draft','published'];
-      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','type','location','description','status','updatedAt']) && request.resource.data.status in ['draft','published','suspended'] || isAdmin();
-      allow delete: if isAdmin();
+      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','type','location','description','status','updatedAt']) && request.resource.data.status in ['draft','published','suspended'] || isPlatformAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /educationCourses/{courseId} {
-      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isAdmin();
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.institutionId is string && exists(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId)) && get(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId)).data.ownerUid == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.institutionId == resource.data.institutionId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','level','status','updatedAt']) && request.resource.data.status in ['draft','published','archived'] || isAdmin();
-      allow delete: if isAdmin();
+      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.institutionId == resource.data.institutionId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','level','status','updatedAt']) && request.resource.data.status in ['draft','published','archived'] || isPlatformAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /educationEnrollments/{enrollmentId} {
-      allow read: if isAuthenticated() && resource.data.studentUid == request.auth.uid || isAdmin();
+      allow read: if isAuthenticated() && resource.data.studentUid == request.auth.uid || isPlatformAdmin();
       allow create: if isAuthenticated()
         && request.resource.data.id == enrollmentId
         && request.resource.data.studentUid == request.auth.uid
@@ -55,12 +64,12 @@ service cloud.firestore {
         && request.resource.data.courseId == resource.data.courseId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['programme','level','status','updatedAt'])
         && request.resource.data.status in ['active','completed','withdrawn']
-        || isAdmin();
-      allow delete: if isAdmin();
+        || isPlatformAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /authCredentials/{userId} { allow read, write: if false; }
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isPlatformAdmin();
       allow create: if isOwner(userId) && (!('roles' in request.resource.data) || !('administrator' in request.resource.data.roles));
       // User role/permission/status changes are server-controlled. Do not let
       // an authenticated admin client mutate the control-plane user document
@@ -70,10 +79,10 @@ service cloud.firestore {
           'firstName','otherName','lastName','fullName','username','preferredLanguage',
           'profilePhotoUrl','address','shippingAddresses','communicationProfile'
         ]);
-      allow delete: if isAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /profiles/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isPlatformAdmin();
       allow create: if isOwner(userId)
         && request.resource.data.diff({}).affectedKeys().hasOnly([
           'uid','firstName','otherName','lastName','fullName','profilePhotoUrl',
@@ -86,17 +95,17 @@ service cloud.firestore {
           'preferredLanguage','communicationProfile'
         ])
         && request.resource.data.uid == resource.data.uid)
-        || isAdmin();
-      allow delete: if isAdmin();
+        || isPlatformAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /jobs/{jobId} {
-      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.employerUid == request.auth.uid) || isAdmin();
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.employerUid == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated() && request.resource.data.employerUid == request.auth.uid && request.resource.data.status in ['draft','published'];
       allow update: if isAuthenticated() && resource.data.employerUid == request.auth.uid && request.resource.data.employerUid == resource.data.employerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','companyName','category','location','employmentType','description','status','updatedAt']) && request.resource.data.status in ['draft','published','closed'];
-      allow delete: if isAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /jobApplications/{applicationId} {
-      allow read: if isAuthenticated() && (resource.data.applicantUid == request.auth.uid || resource.data.employerUid == request.auth.uid) || isAdmin();
+      allow read: if isAuthenticated() && (resource.data.applicantUid == request.auth.uid || resource.data.employerUid == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated()
         && request.resource.data.applicantUid == request.auth.uid
         && request.resource.data.status == 'submitted'
@@ -105,7 +114,7 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)).data.status == 'published'
         && request.resource.data.employerUid == get(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)).data.employerUid;
       allow update: if isAuthenticated() && resource.data.employerUid == request.auth.uid && request.resource.data.applicantUid == resource.data.applicantUid && request.resource.data.jobId == resource.data.jobId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt']) && request.resource.data.status in ['submitted','reviewing','shortlisted','rejected','accepted','withdrawn'];
-      allow delete: if isAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /contributionRequests/{requestId} {
       allow read: if isAdmin()
@@ -123,13 +132,13 @@ service cloud.firestore {
         && request.resource.data.description.size() > 0
         && request.resource.data.description.size() <= 1000
         && request.resource.data.keys().hasOnly(['requesterUid','title','category','description','status','createdAt','updatedAt']);
-      allow update: if isAdmin()
+      allow update: if isPlatformAdmin()
         || (isAuthenticated()
           && resource.data.requesterUid == request.auth.uid
           && request.resource.data.requesterUid == resource.data.requesterUid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','category','description','status','updatedAt'])
           && request.resource.data.status in ['published','closed','cancelled']);
-      allow delete: if isAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /contributionOffers/{offerId} {
       allow read: if isAdmin()
@@ -144,7 +153,7 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/contributionRequests/$(request.resource.data.requestId)).data.requesterUid == request.resource.data.requesterUid
         && get(/databases/$(database)/documents/contributionRequests/$(request.resource.data.requestId)).data.status == 'published'
         && request.resource.data.keys().hasOnly(['contributorUid','requesterUid','requestId','message','amount','currency','status','createdAt','updatedAt']);
-      allow update: if isAdmin()
+      allow update: if isPlatformAdmin()
         || (isAuthenticated()
           && request.resource.data.contributorUid == resource.data.contributorUid
           && request.resource.data.requesterUid == resource.data.requesterUid
@@ -154,12 +163,12 @@ service cloud.firestore {
             (resource.data.contributorUid == request.auth.uid && request.resource.data.status in ['pending','withdrawn'])
             || (resource.data.requesterUid == request.auth.uid && request.resource.data.status in ['accepted','rejected'])
           ));
-      allow delete: if isAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /businesses/{businessId} {
       allow read: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() ||
+      allow create: if isPlatformAdmin();
+      allow update: if isPlatformAdmin() ||
         (isAuthenticated()
           && resource.data.ownerUid == request.auth.uid
           && request.resource.data.ownerUid == resource.data.ownerUid
@@ -169,19 +178,19 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'name','registrationNumber','description','contactEmail','contactPhone','categories'
           ]));
-      allow delete: if isAdmin();
+      allow delete: if isPlatformAdmin();
     }
     // Role definitions and organization records are internal control-plane data.
     // Keep them out of ordinary authenticated client reads.
-    match /roles/{roleId} { allow read, write: if isAdmin(); }
-    match /organizations/{orgId} { allow read, write: if isAdmin(); }
-    match /sessions/{sessionId} { allow read: if isOwner(resource.data.uid) || isAdmin(); allow create, update, delete: if false; }
+    match /roles/{roleId} { allow read: if isAdmin(); allow write: if isPlatformAdmin(); }
+    match /organizations/{orgId} { allow read: if isAdmin(); allow write: if isPlatformAdmin(); }
+    match /sessions/{sessionId} { allow read: if isOwner(resource.data.uid) || isPlatformAdmin(); allow create, update, delete: if false; }
     match /notifications/{notificationId} { allow read: if isOwner(resource.data.uid); allow update: if isOwner(resource.data.uid) && request.resource.data.uid == resource.data.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']); allow create, delete: if isAdmin(); }
     match /audit_logs/{logId} { allow read: if isAdmin(); allow create, update, delete: if false; }
     // Unique AI audit logs are server-managed through the Firebase Admin SDK. Clients have no access.
     match /aiAuditLogs/{logId} { allow read, create, update, delete: if false; }
     match /products/{productId} {
-      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isAdmin();
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated()
         && request.resource.data.keys().hasOnly([
           'id','sellerId','businessId','name','description','category','images','hasVideo',
@@ -215,17 +224,17 @@ service cloud.firestore {
         && request.resource.data.quantity >= 0
         && request.resource.data.minOrderQuantity is number
         && request.resource.data.minOrderQuantity >= 1
-        || isAdmin();
-      allow delete: if isAdmin();
+        || isPlatformAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /orders/{orderId} {
-      allow read: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.sellerId == request.auth.uid) || isAdmin();
+      allow read: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.sellerId == request.auth.uid) || isPlatformAdmin();
             allow create: if false;
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow update: if isPlatformAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /productRequests/{requestId} {
-      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.customerId == request.auth.uid) || isAdmin();
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.customerId == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated()
         && request.resource.data.id == requestId
         && request.resource.data.customerId == request.auth.uid
@@ -246,14 +255,14 @@ service cloud.firestore {
         && request.resource.data.expiryDate is string
         && request.resource.data.status in ['draft','published']
         && request.resource.data.keys().hasOnly(['id','customerId','title','description','quantity','budget','location','requiredDate','isPublic','expiryDate','status','createdAt']);
-      allow update: if isAdmin()
+      allow update: if isPlatformAdmin()
         || (isAuthenticated()
           && resource.data.customerId == request.auth.uid
           && request.resource.data.customerId == resource.data.customerId
           && request.resource.data.id == resource.data.id
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
           && request.resource.data.status in ['draft', 'published', 'cancelled', 'closed']);
-      allow delete: if isAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /quotes/{quoteId} {
       allow read: if isAdmin() || (isAuthenticated() && (resource.data.sellerId == request.auth.uid || (exists(/databases/$(database)/documents/productRequests/$(resource.data.requestId)) && get(/databases/$(database)/documents/productRequests/$(resource.data.requestId)).data.customerId == request.auth.uid)));
@@ -268,8 +277,8 @@ service cloud.firestore {
         && request.resource.data.sellerId == resource.data.sellerId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
         && request.resource.data.status in ['pending', 'accepted', 'rejected', 'negotiating']
-        || isAdmin();
-      allow delete: if isAdmin();
+        || isPlatformAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /carts/{cartId} {
       allow read: if isAuthenticated() && resource.data.customerId == request.auth.uid;
@@ -333,11 +342,11 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
     match /payment_requests/{reqId} {
-      allow read: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isAdmin();
+      allow read: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isPlatformAdmin();
       // Payment requests are created only through the authenticated server API, which resolves the recipient and writes the audit record.
       allow create: if false;
       // Keep sender and recipient state transitions separated so one party cannot impersonate the other's approval/rejection.
-      allow update: if isAdmin()
+      allow update: if isPlatformAdmin()
         || (isAuthenticated()
           && request.resource.data.senderId == resource.data.senderId
           && request.resource.data.recipientId == resource.data.recipientId
@@ -348,10 +357,10 @@ service cloud.firestore {
             || (resource.data.recipientId == request.auth.uid
               && request.resource.data.status in ['viewed', 'pending_approval', 'approved', 'rejected'])
           ));
-      allow delete: if isAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /invoices/{invId} {
-      allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin();
+      allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated()
         && request.resource.data.sellerId == request.auth.uid
         && request.resource.data.currency == 'NGN'
@@ -368,10 +377,10 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
         && request.resource.data.status in ['draft', 'sent', 'viewed', 'overdue', 'cancelled', 'disputed']
         && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid)
-        || isAdmin();
-      allow delete: if isAdmin();
+        || isPlatformAdmin();
+      allow delete: if isPlatformAdmin();
     }
-    match /receipts/{recId} { allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isAdmin(); allow create, update, delete: if false; }
+    match /receipts/{recId} { allow read: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || resource.data.customerId == request.auth.uid) || isPlatformAdmin(); allow create, update, delete: if false; }
     match /transactions/{txId} { allow read: if isAdmin() || (isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid)); allow create, update, delete: if false; }
     match /wallets/{uid} { allow read, create, update, delete: if false; }
     match /walletIdempotency/{idempotencyId} { allow read, create, update, delete: if false; }
@@ -380,7 +389,7 @@ service cloud.firestore {
     match /staffInvites/{inviteId} {
       allow read: if isAuthenticated() && (resource.data.businessOwnerUid == request.auth.uid || resource.data.inviteeEmail == request.auth.token.email);
       allow create: if isAuthenticated() && request.resource.data.businessOwnerUid == request.auth.uid && request.resource.data.status == 'pending' && request.resource.data.role in ['admin','manager','sales','cashier','accountant','inventory','support','delivery','branch_manager','viewer'] && request.resource.data.inviteeEmail is string && request.resource.data.inviteeEmail.size() > 0 && request.resource.data.keys().hasOnly(['businessOwnerUid','inviteeEmail','role','branchName','status','createdAt','invitedAt']);
-      allow update: if isAdmin() ||
+      allow update: if isPlatformAdmin() ||
         (isAuthenticated() &&
           resource.data.inviteeEmail == request.auth.token.email &&
           request.resource.data.businessOwnerUid == resource.data.businessOwnerUid &&
@@ -438,7 +447,7 @@ service cloud.firestore {
     }
 
     match /edgePosts/{postId} {
-      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.authorUid == request.auth.uid) || isAdmin();
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.authorUid == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated()
         && request.resource.data.authorUid == request.auth.uid
         && request.resource.data.status == 'published'
@@ -458,14 +467,14 @@ service cloud.firestore {
             && exists(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.actorId))
             && get(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.actorId)).data.ownerUid == request.auth.uid)
         );
-      allow update: if isAdmin()
+      allow update: if isPlatformAdmin()
         || (isAuthenticated()
           && resource.data.authorUid == request.auth.uid
           && request.resource.data.authorUid == resource.data.authorUid
           && request.resource.data.actorType == resource.data.actorType
           && request.resource.data.actorId == resource.data.actorId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text','audience','allowComments','allowReshare','updatedAt']));
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
+      allow delete: if isPlatformAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
 
       match /likes/{uid} {
         allow read: if true;
@@ -499,18 +508,18 @@ service cloud.firestore {
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 1000;
-        allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
+        allow delete: if isPlatformAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
       }
     }
     match /edgeStatuses/{statusId} {
-      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.authorUid == request.auth.uid) || isAdmin();
+      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.authorUid == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated()
         && request.resource.data.authorUid == request.auth.uid
         && request.resource.data.status == 'published'
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 500;
-      allow update: if isAdmin()
+      allow update: if isPlatformAdmin()
         || (isAuthenticated()
           && resource.data.authorUid == request.auth.uid
           && request.resource.data.authorUid == resource.data.authorUid
@@ -518,13 +527,13 @@ service cloud.firestore {
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 500);
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
+      allow delete: if isPlatformAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
     }
     match /edgePreferences/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isPlatformAdmin();
       allow create, update: if isOwner(userId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['defaultAudience','allowComments','allowReshare','updatedAt']);
-      allow delete: if isAdmin() || isOwner(userId);
+      allow delete: if isPlatformAdmin() || isOwner(userId);
     }
     match /conversations/{conversationId} { allow read: if isConversationMember(conversationId); allow create, update, delete: if false; }
     match /conversationMembers/{memberId} { allow read: if isAuthenticated() && resource.data.uid == request.auth.uid; allow create, update, delete: if false; }
@@ -562,7 +571,7 @@ service cloud.firestore {
         && request.resource.data.lat <= 90
         && request.resource.data.lng >= -180
         && request.resource.data.lng <= 180;
-      allow delete: if isAdmin();
+      allow delete: if isPlatformAdmin();
     }
     match /conferences/{conferenceId} {
       allow read: if isAuthenticated() && (
@@ -626,7 +635,7 @@ service cloud.firestore {
     match /services/{serviceId} {
       allow read: if resource.data.status == 'published'
         || (isAuthenticated() && resource.data.ownerUid == request.auth.uid)
-        || isAdmin();
+        || isPlatformAdmin();
       allow create: if isAuthenticated()
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.status in ['draft','published']
@@ -648,7 +657,7 @@ service cloud.firestore {
           'ownerUid','providerName','title','category','description','price',
           'currency','durationHours','status','createdAt','updatedAt'
         ]);
-      allow update: if isAdmin()
+      allow update: if isPlatformAdmin()
         || (isAuthenticated()
           && resource.data.ownerUid == request.auth.uid
           && request.resource.data.ownerUid == resource.data.ownerUid
@@ -656,7 +665,7 @@ service cloud.firestore {
             'providerName','title','category','description','price','currency','durationHours','status','updatedAt'
           ])
           && request.resource.data.status in ['draft','published']);
-      allow delete: if isAdmin();
+      allow delete: if isPlatformAdmin();
     }
   }
 }
