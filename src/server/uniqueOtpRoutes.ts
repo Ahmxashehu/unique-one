@@ -180,6 +180,117 @@ export function registerUniqueOtpRoutes(app: Express, authenticate?: RequestHand
     }
   });
 
+
+  app.post('/api/auth/unique-otp/recovery/request-pin', rateLimit({
+    windowMs: 10 * 60_000,
+    limit: 5,
+    standardHeaders: true,
+    legacyHeaders: true,
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+    handler: (_req, res) => res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Too many PIN recovery requests. Please try again later.' } }),
+  }), async (req, res) => {
+    try {
+      const phone = normalizePhone(req.body?.phone);
+      const requestedChannel = req.body?.channel;
+      const channel: RecoveryChannel = requestedChannel === 'whatsapp' ? 'whatsapp' : 'sms';
+      if (channel === 'whatsapp' && !isWhatsAppOtpConfigured()) {
+        return res.status(400).json({ error: { code: 'WHATSAPP_BETA_UNAVAILABLE', message: 'WhatsApp OTP (Beta) is not available yet.' } });
+      }
+      await getAuth().getUserByPhoneNumber(phone);
+      await getUniqueOtpService(channel).issue({ destination: phone, purpose: 'transaction_pin_reset', channel });
+      return res.json({ ok: true, channel, expiresInSeconds: 300, resendAfterSeconds: 30, recoveryStarted: true });
+    } catch (error: any) {
+      if (error?.message === 'INVALID_PHONE') return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter a valid registered phone number.' } });
+      if (error?.code === 'auth/user-not-found') return res.status(200).json({ ok: true, channel: 'sms', expiresInSeconds: 300, resendAfterSeconds: 30, recoveryStarted: true });
+      console.error('UniqueOTP transaction PIN recovery request failed:', error);
+      return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'We could not send a PIN recovery code right now.' } });
+    }
+  });
+
+  app.post('/api/auth/unique-otp/recovery/verify-pin', rateLimit({
+    windowMs: 10 * 10_000,
+    limit: 8,
+    standardHeaders: true,
+    legacyHeaders: true,
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+    handler: (_req, res) => res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Too many PIN verification attempts. Please wait before trying again.' } }),
+  }), async (req, res) => {
+    try {
+      const phone = normalizePhone(req.body?.phone);
+      const code = typeof req.body?.code === 'string' ? req.body.code : '';
+      if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter the 6-digit verification code.' } });
+      const requestedChannel = req.body?.channel;
+      const channel: RecoveryChannel = requestedChannel === 'whatsapp' ? 'whatsapp' : 'sms';
+      const verified = await getUniqueOtpService(channel).verify({ destination: phone, purpose: 'transaction_pin_reset', channel, code });
+      if (!verified) return res.status(403).json({ error: { code: 'OTP_INVALID', message: 'The verification code is invalid, expired, or already used.' } });
+      const user = await getAuth().getUserByPhoneNumber(phone);
+      const recoveryToken = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
+      const now = Timestamp.now();
+      await getFirestore().collection('uniqueOtpRecoverySessions').doc(tokenHash(recoveryToken)).set({
+        uid: user.uid, phone, purpose: 'transaction_pin_reset', createdAt: now,
+        expiresAt: Timestamp.fromMillis(Date.now() + 10 * 60_000), consumedAt: null,
+      });
+      return res.json({ ok: true, verified: true, recoveryToken, expiresInSeconds: 600 });
+    } catch (error: any) {
+      if (error?.message === 'INVALID_PHONE') return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Enter a valid registered phone number.' } });
+      if (error?.code === 'auth/user-not-found') return res.status(403).json({ error: { code: 'OTP_INVALID', message: 'The verification code is invalid or expired.' } });
+      console.error('UniqueOTP transaction PIN recovery verification failed:', error);
+      return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'PIN recovery verification could not be completed.' } });
+    }
+  });
+
+  app.post('/api/auth/unique-otp/recovery/reset-pin', rateLimit({
+    windowMs: 10 * 10 * 60_000,
+    limit: 5,
+    standardHeaders: true,
+    legacyHeaders: true,
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+    handler: (_req, res) => res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Too many PIN reset attempts. Please try again later.' } }),
+  }), async (req, res) => {
+    try {
+      const recoveryToken = typeof req.body?.recoveryToken === 'string' ? req.body.recoveryToken.trim() : '';
+      if (!/^\[a-f0-9]{64}$/.test(recoveryToken)) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'A verified PIN recovery session is required.' } });
+      const pin = typeof req.body?.pin === 'string' ? req.body.pin : '';
+      const confirmPin = typeof req.body?.confirmPin === 'string' ? req.body.confirmPin : '';
+      if (!/^\d{4}$/.test(pin) || !/^\d{4}$/.test(confirmPin)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Choose a valid 4-digit transaction PIN.' } });
+      if (pin !== confirmPin) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'The 4-digit transaction PINs do not match.' } });
+      if (/^(\d)\1{3}$/.test(pin) || /^0123$|^1234$|^4321$/.test(pin)) return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Choose a stronger 4-digit transaction PIN.' } });
+
+      const db = getFirestore();
+      const sessionRef = db.collection('uniqueOtpRecoverySessions').doc(tokenHash(recoveryToken));
+      let uid = '';
+      await db.runTransaction(async transaction => {
+        const session = await transaction.get(sessionRef);
+        if (!session.exists) throw new Error('PIN_RECOVERY_SESSION_INVALID');
+        const data = session.data() as Record<string, unknown>;
+        if (data.purpose !== 'transaction_pin_reset' || data.consumedAt || !(data.expiresAt instanceof Timestamp) || data.expiresAt.toMillis() <= Date.now() || typeof data.uid !== 'string') throw new Error('PIN_RECOVERY_SESSION_INVALID');
+        uid = data.uid;
+        const credentialRef = db.collection('authCredentials').doc(uid);
+        const credential = await transaction.get(credentialRef);
+        if (!credential.exists) throw new Error('CREDENTIAL_NOT_FOUND');
+        const pinSalt = randomUUID().replace(/-/g, '');
+        transaction.update(credentialRef, {
+          transactionPinSalt: pinSalt,
+          transactionPinHash: scryptSync(pin, pinSalt, 64).toString('hex'),
+          updatedAt: Timestamp.now(),
+        });
+        transaction.update(sessionRef, { consumedAt: Timestamp.now() });
+      });
+      try {
+        await getAuth().revokeRefreshTokens(uid);
+      } catch (revokeError) {
+        console.error('UniqueOTP transaction PIN reset session revocation failed:', revokeError);
+        return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'PIN was changed, but active sessions could not be safely revoked. Please sign in again later.' } });
+      }
+      return res.json({ ok: true, transactionPinReset: true });
+    } catch (error: any) {
+      if (error?.message === 'PIN_RECOVERY_SESSION_INVALID') return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'The PIN recovery session is invalid, expired, or already used.' } });
+      if (error?.message === 'CREDENTIAL_NOT_FOUND') return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'This account does not have a recoverable transaction PIN yet.' } });
+      console.error('UniqueOTP transaction PIN reset failed:', error);
+      return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Transaction PIN reset could not be completed.' } });
+    }
+  });
+
   app.post('/api/auth/unique-otp/recovery/reset-password', rateLimit({
     windowMs: 10 * 60_000,
     limit: 5,
