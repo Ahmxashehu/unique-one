@@ -3750,23 +3750,31 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
 
         const now = Timestamp.now();
         const paymentTransactionIds: string[] = [];
-        for (const [sellerId, sellerAmountMinor] of transactionSellerTotalsMinor) {
-          if (!Number.isSafeInteger(sellerAmountMinor) || sellerAmountMinor <= 0) throw new Error('STORE_INVALID_AMOUNT');
-          const sellerWallet = sellerWallets.get(sellerId)!;
+        const paymentTransactionIdsByOrder = new Map<string, string[]>();
+        for (const snapshot of transactionOrderSnapshots) {
+          const order = snapshot.data() as Record<string, unknown>;
+          const orderId = String(order.id || snapshot.id);
+          const sellerId = String(order.sellerId);
+          const orderAmountMinor = Number(order.amountMinor);
+          if (!isSafeFirebaseUid(sellerId) || !Number.isSafeInteger(orderAmountMinor) || orderAmountMinor <= 0) {
+            throw new Error('STORE_INVALID_AMOUNT');
+          }
+          if (!sellerWallets.has(sellerId)) throw new Error('STORE_SELLER_WALLET_NOT_FOUND');
           const transactionId = adminDb.collection('transactions').doc().id;
           const reference = `UP-ST-${transactionId}`;
           const transactionRef = adminDb.collection('transactions').doc(transactionId);
           transaction.create(transactionRef, {
-            id: transactionId, reference, senderId: uid, recipientId: sellerId, amount: sellerAmountMinor,
+            id: transactionId, reference, senderId: uid, recipientId: sellerId, amount: orderAmountMinor,
             currency: 'NGN', type: 'merchant_payment', sourceModule: 'unique_store.checkout',
-            provider: 'unique_pay_internal_wallet', status: 'completed', relatedOrderIds: orderIds,
+            provider: 'unique_pay_internal_wallet', status: 'completed', relatedOrderIds: [orderId],
             createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor',
           });
           const debitRef = adminDb.collection('ledgerEntries').doc();
           const creditRef = adminDb.collection('ledgerEntries').doc();
-          transaction.create(debitRef, { id: debitRef.id, transactionId, reference, uid, direction: 'debit', amountMinor: sellerAmountMinor, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now });
-          transaction.create(creditRef, { id: creditRef.id, transactionId, reference, uid: sellerId, direction: 'credit', amountMinor: sellerAmountMinor, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now });
-                    paymentTransactionIds.push(transactionId);
+          transaction.create(debitRef, { id: debitRef.id, transactionId, reference, uid, direction: 'debit', amountMinor: orderAmountMinor, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now });
+          transaction.create(creditRef, { id: creditRef.id, transactionId, reference, uid: sellerId, direction: 'credit', amountMinor: orderAmountMinor, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now });
+          paymentTransactionIds.push(transactionId);
+          paymentTransactionIdsByOrder.set(orderId, [transactionId]);
         }
 
         const customerBalanceAfter = customerWallet.availableBalanceMinor - amountMinor;
@@ -3781,7 +3789,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
 
         for (const orderId of orderIds) {
           const orderRef = adminDb.collection('orders').doc(orderId);
-          transaction.update(orderRef, { status: 'confirmed', paymentStatus: 'paid', paidAt: now, updatedAt: now, paymentTransactionIds });
+          transaction.update(orderRef, { status: 'confirmed', paymentStatus: 'paid', paidAt: now, updatedAt: now, paymentTransactionIds: paymentTransactionIdsByOrder.get(orderId) || [] });
         }
         const paymentResult = { status: 'completed', orderIds, transactionIds: paymentTransactionIds, amountMinor, idempotencyKey };
         transaction.create(idempotencyRef, { uid, orderIds, amountMinor, requestFingerprint: fingerprint, status: 'completed', result: paymentResult, createdAt: now, updatedAt: now });
