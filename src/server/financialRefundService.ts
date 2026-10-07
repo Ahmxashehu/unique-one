@@ -157,12 +157,14 @@ export async function executeFinancialRefund(
     const customerUid = String(original.senderId);
     const sellerUid = String(original.recipientId);
     const relatedOrderRef = input.relatedOrderId ? db.collection('orders').doc(input.relatedOrderId) : null;
+    let relatedOrderData: Record<string, unknown> | null = null;
     if (relatedOrderRef) {
       const relatedOrderSnap = await transaction.get(relatedOrderRef);
       if (!relatedOrderSnap.exists) {
         return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order was not found.' } };
       }
       const order = relatedOrderSnap.data() ?? {};
+      relatedOrderData = order as Record<string, unknown>;
       if (
         order.customerId !== customerUid ||
         order.sellerId !== sellerUid ||
@@ -289,9 +291,8 @@ export async function executeFinancialRefund(
 
     if (relatedOrderRef) {
       if (input.finalizeOrder === 'partial') {
-        const orderSnap = await transaction.get(relatedOrderRef);
-        if (!orderSnap.exists) return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order was not found.' } };
-        const order = orderSnap.data() ?? {};
+        const order = relatedOrderData;
+        if (!order) return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order was not found.' } };
         const rr = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest as Record<string, unknown> : null;
         if (!rr || rr.status !== 'received' || Number(rr.requestedRefundAmountMinor) !== input.amountMinor) {
           return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The partial Store return is no longer eligible for this refund.' } };
@@ -310,9 +311,8 @@ export async function executeFinancialRefund(
           refundTransactionId: refundRef.id,
         };
         if (input.finalizeDispute) {
-          const orderSnap = await transaction.get(relatedOrderRef);
-          if (!orderSnap.exists) return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order was not found.' } };
-          const current = orderSnap.data() ?? {};
+          const current = relatedOrderData;
+          if (!current) return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order was not found.' } };
           const dispute = current.dispute && typeof current.dispute === 'object' ? current.dispute as Record<string, unknown> : null;
           if (!dispute || !['opened', 'seller_responded', 'under_review'].includes(String(dispute.status))) {
             return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Store dispute has already been resolved.' } };
