@@ -665,6 +665,39 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const settlement = settlementByPlan.get(planId) || 0;
         const refund = refundByPlan.get(planId) || 0;
         const installmentPaid = Array.isArray(plan.installments) ? plan.installments.filter((x: any) => String(x.status || '') === 'paid').reduce((s: number, x: any) => s + Number(x.amountMinor || 0), 0) : 0;
+        const installments = Array.isArray(plan.installments) ? plan.installments : [];
+        const installmentNumbers = new Set<number>();
+        let scheduleTotal = 0;
+        let paidInstallmentCount = 0;
+        for (const installment of installments) {
+          const numberValue = Number(installment?.installmentNumber);
+          const amountValue = Number(installment?.amountMinor);
+          const installmentStatus = String(installment?.status || '');
+          const dueAtMs = typeof installment?.dueAt?.toMillis === 'function' ? installment.dueAt.toMillis() : NaN;
+          if (!Number.isInteger(numberValue) || numberValue < 1 || installmentNumbers.has(numberValue)) {
+            addFinding({ code: 'INVALID_INSTALLMENT_NUMBER', severity: 'critical', planId, detail: 'Installment schedule contains a missing, invalid, or duplicate installment number.' });
+          } else {
+            installmentNumbers.add(numberValue);
+          }
+          if (!Number.isSafeInteger(amountValue) || amountValue <= 0 || !['pending', 'paid'].includes(installmentStatus)) {
+            addFinding({ code: 'INVALID_INSTALLMENT_RECORD', severity: 'critical', planId, detail: 'Installment schedule contains an invalid amount or status.' });
+          } else {
+            scheduleTotal += amountValue;
+            if (installmentStatus === 'paid') paidInstallmentCount++;
+          }
+          if (!Number.isFinite(dueAtMs)) {
+            addFinding({ code: 'INVALID_INSTALLMENT_DUE_DATE', severity: 'critical', planId, detail: 'Installment schedule contains an invalid due date.' });
+          }
+        }
+        if (installments.length !== Number(plan.installmentCount)) {
+          addFinding({ code: 'INSTALLMENT_COUNT_MISMATCH', severity: 'critical', planId, detail: 'Stored installment schedule length does not equal installmentCount.' });
+        }
+        if (scheduleTotal !== Math.max(total - Number(plan.depositAmountMinor || 0), 0)) {
+          addFinding({ code: 'INSTALLMENT_SCHEDULE_TOTAL_MISMATCH', severity: 'critical', planId, amountMinor: scheduleTotal, detail: 'Installment schedule total does not equal the amount remaining after the deposit.' });
+        }
+        if (installments.some((x: any) => String(x.status || '') === 'paid') && paidInstallmentCount !== installmentTxByPlan.get(planId)?.size) {
+          addFinding({ code: 'INSTALLMENT_PAYMENT_COUNT_MISMATCH', severity: 'critical', planId, detail: 'Paid installment records do not match the number of installment financial transactions.' });
+        }
         const expectedPaid = funding;
         const status = String(plan.status || '');
         const order = orderDocs.get(String(plan.orderId || ''));
