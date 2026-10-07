@@ -177,8 +177,11 @@ export async function executeFinancialRefund(
       }
       if (input.finalizeDispute) {
         const dispute = order.dispute && typeof order.dispute === 'object' ? order.dispute as Record<string, unknown> : null;
-        if (!dispute || !['opened', 'seller_responded', 'under_review'].includes(String(dispute.status))) {
+        if (!dispute || !['opened', 'seller_responded'].includes(String(dispute.status))) {
           return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Store dispute is no longer awaiting resolution.' } };
+        }
+        if (String(order.paymentStatus) !== 'paid' || order.returnRequest !== undefined) {
+          return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'A dispute refund requires an otherwise fully paid Store order with no active return workflow.' } };
         }
       }
     }
