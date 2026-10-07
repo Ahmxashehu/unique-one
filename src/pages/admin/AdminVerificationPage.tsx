@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Check, Loader2, Search, ShieldCheck, X, RefreshCw } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+
 import { useAuth } from '../../contexts/AuthContext';
 
 type VerificationStatus = 'unverified' | 'email_verified' | 'phone_verified' | 'fully_verified';
@@ -44,8 +43,12 @@ export default function AdminVerificationPage() {
     setRefreshing(true);
     setError('');
     try {
-      const snapshot = await getDocs(collection(db, 'users'));
-      setUsers(snapshot.docs.map(item => ({ id: item.id, ...item.data() } as UserRecord)));
+      if (!currentUser) return;
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/admin/overview', { headers: { Authorization: 'Bearer ' + token } });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error?.message || 'Failed to load verification records.');
+      setUsers(payload.users || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh verification records.');
     } finally {
