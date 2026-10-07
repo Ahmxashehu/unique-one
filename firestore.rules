@@ -363,7 +363,18 @@ service cloud.firestore {
         && request.resource.data.comment is string
         && request.resource.data.comment.size() <= 5000
         && request.resource.data.keys().hasOnly(['id','reviewerId','targetId','targetType','rating','comment','verifiedPurchase','createdAt']);
-      allow update, delete: if isAdmin();
+      // Review moderation is a platform control-plane action; ordinary administrators must not rewrite public reviews.
+      // Reviewers may edit/delete only their own review and cannot change its identity or target.
+      allow update: if isPlatformAdmin()
+        || (isAuthenticated()
+          && resource.data.reviewerId == request.auth.uid
+          && request.resource.data.reviewerId == resource.data.reviewerId
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.targetId == resource.data.targetId
+          && request.resource.data.targetType == resource.data.targetType
+          && request.resource.data.verifiedPurchase == resource.data.verifiedPurchase
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating','comment']));
+      allow delete: if isPlatformAdmin() || (isAuthenticated() && resource.data.reviewerId == request.auth.uid);
     }
     match /payment_requests/{reqId} {
       allow read: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid) || isPlatformAdmin();
