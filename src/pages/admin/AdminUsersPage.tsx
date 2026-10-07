@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Users, Search, Loader2, AlertCircle, RefreshCw, ShieldCheck } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface AdminUser {
   id: string;
@@ -31,6 +30,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const { currentUser } = useAuth();
 
   useEffect(() => {
     let active = true;
@@ -39,9 +39,13 @@ export default function AdminUsersPage() {
       setLoading(true);
       setError('');
       try {
-        const snapshot = await getDocs(collection(db, 'users'));
+        if (!currentUser) return;
+        const token = await currentUser.getIdToken();
+        const response = await fetch('/api/admin/overview', { headers: { Authorization: 'Bearer ' + token } });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error?.message || 'Unable to load users.');
         if (!active) return;
-        setUsers(snapshot.docs.map(item => ({ id: item.id, ...item.data() } as AdminUser)));
+        setUsers(payload.users || []);
       } catch (loadError) {
         console.error('Failed to load admin users:', loadError);
         if (active) setError('Unable to load users. Check administrator access and try again.');
@@ -52,14 +56,18 @@ export default function AdminUsersPage() {
 
     void loadUsers();
     return () => { active = false; };
-  }, []);
+  }, [currentUser]);
 
   const refreshUsers = async () => {
     setRefreshing(true);
     setError('');
     try {
-      const snapshot = await getDocs(collection(db, 'users'));
-      setUsers(snapshot.docs.map(item => ({ id: item.id, ...item.data() } as AdminUser)));
+      if (!currentUser) return;
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/admin/overview', { headers: { Authorization: 'Bearer ' + token } });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error?.message || 'Unable to refresh users.');
+      setUsers(payload.users || []);
     } catch (loadError) {
       console.error('Failed to refresh admin users:', loadError);
       setError('Unable to refresh users. Check administrator access and try again.');
