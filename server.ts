@@ -3881,7 +3881,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           }
           transaction.update(snap.ref, {
             quantity: currentQuantity + restoreQuantity,
-            status: statusByProduct.get(Array.from(quantities.keys())[index]) || product.status,
+            status: product.status,
             updatedAt: now,
           });
         });
