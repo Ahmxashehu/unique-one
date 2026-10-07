@@ -57,6 +57,7 @@ function fingerprint(input: FinancialRefundInput): string {
       input.finalizeDispute?.decision ?? '',
       input.finalizeDispute?.reason ?? '',
       input.finalizeDispute?.actorUid ?? '',
+      input.releaseInventory ? 'release_inventory' : 'no_inventory_release',
     ].join('\0'))
     .digest('hex');
 }
