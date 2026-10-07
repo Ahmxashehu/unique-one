@@ -3542,6 +3542,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const product = snapshot.data() || {};
           const quantity = Number(cart.data.quantity);
           const sellerId = product.sellerId;
+          const businessId = typeof product.businessId === 'string' && product.businessId.trim() ? product.businessId.trim() : null;
           const price = product.price;
           const available = product.quantity;
           const minOrderQuantity = Number(product.minOrderQuantity || 1);
@@ -3590,7 +3591,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           }
           const totalAmount = totalAmountMinor / 100;
           transaction.create(orderRef, {
-            id: orderRef.id, customerId: uid, sellerId, items, totalAmount, amountMinor: totalAmountMinor, currency: 'NGN',
+            id: orderRef.id, customerId: uid, sellerId,
+            ...(sellerItems[0]?.product && typeof sellerItems[0].product.businessId === 'string' && sellerItems[0].product.businessId.trim()
+              ? { businessId: sellerItems[0].product.businessId.trim() }
+              : {}),
+            items, totalAmount, amountMinor: totalAmountMinor, currency: 'NGN',
             status: 'pending', shippingAddress, createdAt: now, updatedAt: now,
           });
           orderIds.push(orderRef.id);
