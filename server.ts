@@ -3872,7 +3872,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const productSnaps = await Promise.all(Array.from(quantities.keys()).map((id) => transaction.get(adminDb.collection('products').doc(id))));
         const now = Timestamp.now().toDate().toISOString();
         productSnaps.forEach((snap, index) => {
-          if (!snap.exists) return;
+          if (!snap.exists) throw new RequestValidationError('INVALID_REQUEST', 'A referenced product no longer exists; inventory reconciliation is required.');
           const product = snap.data() as Record<string, unknown>;
           const currentQuantity = Number(product.quantity);
           const restoreQuantity = quantities.get(Array.from(quantities.keys())[index]) || 0;
