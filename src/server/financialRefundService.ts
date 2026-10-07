@@ -1,0 +1,278 @@
+import { createHash } from 'node:crypto';
+import { Firestore, Timestamp } from 'firebase-admin/firestore';
+
+export type FinancialRefundErrorCode =
+  | 'INVALID_REQUEST'
+  | 'ORIGINAL_NOT_FOUND'
+  | 'ORIGINAL_NOT_REFUNDABLE'
+  | 'REFUND_EXCEEDS_REMAINING'
+  | 'IDEMPOTENCY_CONFLICT'
+  | 'REFUND_IN_PROGRESS'
+  | 'WALLET_NOT_FOUND'
+  | 'WALLET_UNAVAILABLE'
+  | 'INSUFFICIENT_FUNDS'
+  | 'TRANSACTION_FAILED';
+
+export interface FinancialRefundInput {
+  originalTransactionId: string;
+  amountMinor: number;
+  currency: 'NGN';
+  idempotencyKey: string;
+  actorUid: string;
+  reason: string;
+  relatedOrderId?: string;
+  sourceModule?: string;
+}
+
+export interface FinancialRefundResult {
+  transactionId: string;
+  reference: string;
+  originalTransactionId: string;
+  amountMinor: number;
+  currency: 'NGN';
+  status: 'completed';
+  idempotencyKey: string;
+}
+
+type Failure = { error: { code: FinancialRefundErrorCode; message: string } };
+
+function isSafeId(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+}
+
+function fingerprint(input: FinancialRefundInput): string {
+  return createHash('sha256')
+    .update([
+      input.originalTransactionId,
+      input.amountMinor,
+      input.currency,
+      input.relatedOrderId ?? '',
+      input.reason,
+      input.sourceModule ?? '',
+    ].join('\0'))
+    .digest('hex');
+}
+
+function idempotencyDocumentId(actorUid: string, key: string): string {
+  return createHash('sha256').update(actorUid + '\0' + key).digest('hex');
+}
+
+function validateWallet(data: FirebaseFirestore.DocumentData | undefined, uid: string) {
+  if (!data || data.uid !== uid || data.currency !== 'NGN' || data.status !== 'active') {
+    throw new Error('WALLET_UNAVAILABLE');
+  }
+  const balance = data.availableBalanceMinor;
+  if (!Number.isSafeInteger(balance) || balance < 0) throw new Error('WALLET_UNAVAILABLE');
+  return balance as number;
+}
+
+/**
+ * Executes a wallet-funded refund against an existing completed financial
+ * transaction. Authorization of the actor belongs to the calling domain
+ * (Store, Restaurant, admin, etc.); this function is the atomic money primitive.
+ *
+ * Remaining refundable value is calculated inside the Firestore transaction,
+ * preventing concurrent over-refunds.
+ */
+export async function executeFinancialRefund(
+  db: Firestore,
+  input: FinancialRefundInput,
+): Promise<FinancialRefundResult | Failure> {
+  if (
+    !isSafeId(input.originalTransactionId) ||
+    !isSafeId(input.actorUid) ||
+    !Number.isSafeInteger(input.amountMinor) ||
+    input.amountMinor <= 0 ||
+    !isSafeId(input.idempotencyKey) ||
+    input.idempotencyKey.length > 200 ||
+    input.currency !== 'NGN' ||
+    !input.reason.trim() ||
+    (input.relatedOrderId !== undefined && !isSafeId(input.relatedOrderId))
+  ) {
+    return { error: { code: 'INVALID_REQUEST', message: 'Invalid refund request.' } };
+  }
+
+  const idempotencyRef = db.collection('financialRefundIdempotency')
+    .doc(idempotencyDocumentId(input.actorUid, input.idempotencyKey));
+  const originalRef = db.collection('transactions').doc(input.originalTransactionId);
+
+  return db.runTransaction(async (transaction) => {
+    const idemSnap = await transaction.get(idempotencyRef);
+    const requestFingerprint = fingerprint(input);
+
+    if (idemSnap.exists) {
+      const existing = idemSnap.data() ?? {};
+      if (existing.requestFingerprint !== requestFingerprint) {
+        return { error: { code: 'IDEMPOTENCY_CONFLICT', message: 'This idempotency key was already used for different refund parameters.' } };
+      }
+      if (existing.status === 'completed' && existing.result) return existing.result as FinancialRefundResult;
+      if (existing.status === 'in_progress') {
+        return { error: { code: 'REFUND_IN_PROGRESS', message: 'This refund is already being processed.' } };
+      }
+    }
+
+    const originalSnap = await transaction.get(originalRef);
+    if (!originalSnap.exists) {
+      return { error: { code: 'ORIGINAL_NOT_FOUND', message: 'The original financial transaction was not found.' } };
+    }
+
+    const original = originalSnap.data() ?? {};
+    const originalAmount = original.amount;
+    if (
+      original.recordKind !== 'financial' ||
+      original.schemaVersion !== 2 ||
+      original.amountUnit !== 'minor' ||
+      original.currency !== 'NGN' ||
+      original.status !== 'completed' ||
+      !Number.isSafeInteger(originalAmount) ||
+      originalAmount <= 0 ||
+      !isSafeId(String(original.senderId ?? '')) ||
+      !isSafeId(String(original.recipientId ?? ''))
+    ) {
+      return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The original transaction is not eligible for refund.' } };
+    }
+
+    const refundQuery = db.collection('transactions')
+      .where('reversalOfTransactionId', '==', input.originalTransactionId)
+      .where('type', '==', 'refund')
+      .where('status', '==', 'completed');
+    const refundSnapshots = await transaction.get(refundQuery);
+    const refundedMinor = refundSnapshots.docs.reduce((sum, doc) => {
+      const amount = doc.data().amount;
+      return Number.isSafeInteger(amount) && amount > 0 && Number.isSafeInteger(sum + amount) ? sum + amount : sum;
+    }, 0);
+
+    if (!Number.isSafeInteger(refundedMinor) || refundedMinor >= originalAmount || input.amountMinor > originalAmount - refundedMinor) {
+      return { error: { code: 'REFUND_EXCEEDS_REMAINING', message: 'The requested refund exceeds the remaining refundable amount.' } };
+    }
+
+    const customerUid = String(original.senderId);
+    const sellerUid = String(original.recipientId);
+    const customerWalletRef = db.collection('wallets').doc(customerUid);
+    const sellerWalletRef = db.collection('wallets').doc(sellerUid);
+    const [customerWalletSnap, sellerWalletSnap] = await Promise.all([
+      transaction.get(customerWalletRef),
+      transaction.get(sellerWalletRef),
+    ]);
+
+    if (!customerWalletSnap.exists || !sellerWalletSnap.exists) {
+      return { error: { code: 'WALLET_NOT_FOUND', message: 'Both wallets must exist before a refund can be processed.' } };
+    }
+
+    let customerBalance: number;
+    let sellerBalance: number;
+    try {
+      customerBalance = validateWallet(customerWalletSnap.data(), customerUid);
+      sellerBalance = validateWallet(sellerWalletSnap.data(), sellerUid);
+    } catch {
+      return { error: { code: 'WALLET_UNAVAILABLE', message: 'One or both wallets are unavailable for refund.' } };
+    }
+
+    if (sellerBalance < input.amountMinor) {
+      return { error: { code: 'INSUFFICIENT_FUNDS', message: 'The seller wallet does not have enough funds to cover this refund.' } };
+    }
+
+    const newSellerBalance = sellerBalance - input.amountMinor;
+    const newCustomerBalance = customerBalance + input.amountMinor;
+    if (!Number.isSafeInteger(newSellerBalance) || !Number.isSafeInteger(newCustomerBalance)) {
+      return { error: { code: 'TRANSACTION_FAILED', message: 'The refund would exceed the safe wallet accounting range.' } };
+    }
+
+    const now = Timestamp.now();
+    const refundRef = db.collection('transactions').doc();
+    const reference = \`UP-REF-\${refundRef.id}\`;
+    const result: FinancialRefundResult = {
+      transactionId: refundRef.id,
+      reference,
+      originalTransactionId: input.originalTransactionId,
+      amountMinor: input.amountMinor,
+      currency: 'NGN',
+      status: 'completed',
+      idempotencyKey: input.idempotencyKey,
+    };
+
+    transaction.set(refundRef, {
+      id: refundRef.id,
+      reference,
+      senderId: sellerUid,
+      recipientId: customerUid,
+      amount: input.amountMinor,
+      currency: 'NGN',
+      type: 'refund',
+      sourceModule: input.sourceModule ?? 'unique_pay.financial_refund',
+      provider: 'unique_pay_internal_wallet',
+      status: 'completed',
+      recordKind: 'financial',
+      schemaVersion: 2,
+      amountUnit: 'minor',
+      reversalOfTransactionId: input.originalTransactionId,
+      ...(input.relatedOrderId ? { relatedOrderId: input.relatedOrderId } : {}),
+      refundReason: input.reason.trim(),
+      initiatedByUid: input.actorUid,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: now,
+    });
+
+    transaction.update(sellerWalletRef, { availableBalanceMinor: newSellerBalance, updatedAt: now });
+    transaction.update(customerWalletRef, { availableBalanceMinor: newCustomerBalance, updatedAt: now });
+
+    const debitRef = db.collection('ledgerEntries').doc();
+    const creditRef = db.collection('ledgerEntries').doc();
+    transaction.set(debitRef, {
+      id: debitRef.id,
+      transactionId: refundRef.id,
+      reference,
+      uid: sellerUid,
+      direction: 'debit',
+      amountMinor: input.amountMinor,
+      currency: 'NGN',
+      status: 'completed',
+      idempotencyKey: input.idempotencyKey,
+      createdAt: now,
+    });
+    transaction.set(creditRef, {
+      id: creditRef.id,
+      transactionId: refundRef.id,
+      reference,
+      uid: customerUid,
+      direction: 'credit',
+      amountMinor: input.amountMinor,
+      currency: 'NGN',
+      status: 'completed',
+      idempotencyKey: input.idempotencyKey,
+      createdAt: now,
+    });
+
+    transaction.set(idempotencyRef, {
+      actorUid: input.actorUid,
+      originalTransactionId: input.originalTransactionId,
+      amountMinor: input.amountMinor,
+      currency: 'NGN',
+      relatedOrderId: input.relatedOrderId ?? null,
+      requestFingerprint,
+      status: 'completed',
+      result,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const auditRef = db.collection('audit_logs').doc();
+    transaction.create(auditRef, {
+      action: 'financial.refund.completed',
+      actorUid: input.actorUid,
+      resource: 'financial_refund',
+      resourceId: refundRef.id,
+      transactionId: refundRef.id,
+      originalTransactionId: input.originalTransactionId,
+      relatedOrderId: input.relatedOrderId ?? null,
+      amountMinor: input.amountMinor,
+      currency: 'NGN',
+      reason: input.reason.trim(),
+      idempotencyKey: input.idempotencyKey,
+      timestamp: now,
+    });
+
+    return result;
+  });
+}
