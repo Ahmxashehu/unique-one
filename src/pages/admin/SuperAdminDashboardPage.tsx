@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, getCountFromServer, getDocs } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Activity, AlertTriangle, BarChart3, Building2, CheckCircle2, ChevronRight,
@@ -38,43 +36,18 @@ export default function SuperAdminDashboardPage() {
     setLoading(true);
     setError('');
     try {
-      const [users, businesses, products, transactions, verificationUsers] = await Promise.all([
-        getCountFromServer(collection(db, 'users')),
-        getCountFromServer(collection(db, 'businesses')),
-        getCountFromServer(collection(db, 'products')),
-        getDocs(collection(db, 'transactions')),
-        getDocs(collection(db, 'users')),
-      ]);
-
-      let completedVolumeMinor = 0;
-      let transactionCount = 0;
-      transactions.forEach((item) => {
-        const data = item.data();
-        if (
-          data.recordKind === 'financial' &&
-          data.amountUnit === 'minor' &&
-          data.currency === 'NGN' &&
-          typeof data.amount === 'number' &&
-          Number.isSafeInteger(data.amount)
-        ) {
-          transactionCount += 1;
-          if (data.status === 'completed') completedVolumeMinor += data.amount;
-        }
-      });
-
-      let pendingVerification = 0;
-      verificationUsers.forEach((item) => {
-        const status = String(item.data().verificationStatus || 'unverified');
-        if (status !== 'fully_verified') pendingVerification += 1;
-      });
-
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/admin/overview', { headers: { Authorization: 'Bearer ' + token } });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error?.message || 'Unable to load Super Admin platform data.');
+      const s = payload.stats;
       setStats({
-        users: users.data().count,
-        businesses: businesses.data().count,
-        products: products.data().count,
-        transactions: transactionCount,
-        completedVolumeMinor,
-        pendingVerification,
+        users: s.users,
+        businesses: s.businesses,
+        products: s.products,
+        transactions: s.transactions,
+        completedVolumeMinor: s.transactionVolumeMinor,
+        pendingVerification: s.pendingVerification,
       });
       setLastUpdated(new Date());
     } catch (err) {
