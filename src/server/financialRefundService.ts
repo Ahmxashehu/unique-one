@@ -23,6 +23,8 @@ export interface FinancialRefundInput {
   relatedOrderId?: string;
   sourceModule?: string;
   finalizeOrder?: 'full' | 'partial';
+  /** Restore Store inventory for an early full refund before fulfillment. */
+  releaseInventory?: boolean;
   finalizeDispute?: { decision: 'approve_refund'; reason: string; actorUid: string };
 }
 
@@ -95,6 +97,7 @@ export async function executeFinancialRefund(
     !input.reason.trim() ||
     (input.relatedOrderId !== undefined && !isSafeId(input.relatedOrderId)) ||
     (input.finalizeOrder !== undefined && input.finalizeOrder !== 'full' && input.finalizeOrder !== 'partial') ||
+    (input.releaseInventory === true && (input.sourceModule !== 'unique_store.refund' || input.finalizeOrder !== 'full')) ||
     (input.finalizeDispute !== undefined && (input.finalizeDispute.decision !== 'approve_refund' || !input.finalizeDispute.reason.trim() || !isSafeId(input.finalizeDispute.actorUid) || input.finalizeDispute.actorUid !== input.actorUid))
   ) {
     return { error: { code: 'INVALID_REQUEST', message: 'Invalid refund request.' } };
@@ -182,6 +185,37 @@ export async function executeFinancialRefund(
       }
       if (input.finalizeOrder === 'full' && originalAmount !== Number(order.amountMinor)) {
         return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Store payment amount must exactly match the order amount for a full refund.' } };
+      }
+      if (input.releaseInventory) {
+        if (input.finalizeDispute || input.sourceModule !== 'unique_store.refund' || input.finalizeOrder !== 'full' || !['confirmed', 'processing'].includes(String(order.status)) || order.returnRequest !== undefined) {
+          return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'Inventory can only be released for an early full Store refund before a return or dispute workflow.' } };
+        }
+        const sourceItems = Array.isArray(order.items) ? order.items : [];
+        const quantities = new Map<string, number>();
+        for (const item of sourceItems) {
+          const productId = typeof item?.productId === 'string' ? item.productId : '';
+          const quantity = Number(item?.quantity);
+          if (!isSafeId(productId) || !Number.isSafeInteger(quantity) || quantity <= 0) {
+            return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Store order contains invalid inventory data; the refund was not applied.' } };
+          }
+          quantities.set(productId, (quantities.get(productId) || 0) + quantity);
+        }
+        if (quantities.size === 0) return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Store order has no refundable inventory lines.' } };
+        for (const [productId, quantity] of quantities) {
+          const productRef = db.collection('products').doc(productId);
+          const productSnap = await transaction.get(productRef);
+          if (!productSnap.exists) return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'A Store product no longer exists; inventory reconciliation is required before refund.' } };
+          const product = productSnap.data() ?? {};
+          const currentQuantity = Number(product.quantity);
+          if (!Number.isSafeInteger(currentQuantity) || currentQuantity < 0 || !Number.isSafeInteger(currentQuantity + quantity)) {
+            return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'Store inventory data is invalid; the refund was not applied.' } };
+          }
+          transaction.update(productRef, {
+            quantity: currentQuantity + quantity,
+            status: product.status === 'out_of_stock' ? 'published' : product.status,
+            updatedAt: now,
+          });
+        }
       }
       if (input.finalizeDispute) {
         const dispute = order.dispute && typeof order.dispute === 'object' ? order.dispute as Record<string, unknown> : null;
