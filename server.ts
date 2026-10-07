@@ -3427,6 +3427,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const customerWallet = validateWalletDocument(customerSnap.data(), uid), merchantWallet = validateWalletDocument(merchantSnap.data(), merchantWalletId);
         if (customerWallet.status !== 'active' || merchantWallet.status !== 'active') throw new RequestValidationError('UNAVAILABLE', 'The UniquePay wallets are not available.');
         if (customerWallet.availableBalanceMinor < amountMinor) throw new RequestValidationError('INSUFFICIENT_FUNDS', 'Your UniquePay balance is insufficient for this order.');
+        if (!Number.isSafeInteger(merchantWallet.availableBalanceMinor + amountMinor)) throw new RequestValidationError('INVALID_AMOUNT', 'The merchant wallet cannot safely receive this payment.');
         const now = Timestamp.now(), transactionId = adminDb.collection('transactions').doc().id, reference = 'UP-RS-' + transactionId;
         const transactionRef = adminDb.collection('transactions').doc(transactionId);
         transaction.create(transactionRef, { id: transactionId, reference, senderId: uid, recipientId: merchantWalletId, amount: amountMinor, currency: 'NGN', type: 'merchant_payment', sourceModule: 'unique_restaurant.checkout', provider: 'unique_pay_internal_wallet', status: 'completed', relatedOrderIds: [orderId], createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' });
