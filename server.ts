@@ -3899,6 +3899,178 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.post("/api/store/orders/:orderId/return-request", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('storeReturnRequestRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Store return requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const orderId = req.params.orderId;
+      const idempotencyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey.trim() : '';
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : '';
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId) || !/^[A-Za-z0-9_-]{1,200}$/.test(idempotencyKey) || !reason) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid order, idempotency key, and return reason are required.');
+      }
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const orderRef = adminDb.collection('orders').doc(orderId);
+        const idempotencyRef = adminDb.collection('storeReturnRequestIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
+        const existing = await transaction.get(idempotencyRef);
+        if (existing.exists) return existing.data();
+        const orderSnap = await transaction.get(orderRef);
+        if (!orderSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
+        const order = orderSnap.data() as Record<string, unknown>;
+        if (order.customerId !== uid) throw new RequestValidationError('FORBIDDEN', 'You can only request a return for your own Store order.');
+        if (order.currency !== 'NGN' || order.paymentStatus !== 'paid') throw new RequestValidationError('INVALID_REQUEST', 'Only paid NGN Store orders can be returned.');
+        const status = String(order.status || '');
+        if (!new Set(['confirmed','processing','ready_for_pickup','shipped','out_for_delivery','delivered','completed']).has(status)) {
+          throw new RequestValidationError('INVALID_REQUEST', 'This Store order is not eligible for a return request.');
+        }
+        if (order.returnRequest && typeof order.returnRequest === 'object') {
+          throw new RequestValidationError('INVALID_REQUEST', 'A return request already exists for this order.');
+        }
+        const sourceItems = Array.isArray(order.items) ? order.items : [];
+        const items = sourceItems.map((item: any) => ({
+          productId: typeof item?.productId === 'string' ? item.productId : '',
+          quantity: Number(item?.quantity),
+          returnable: item?.returnable !== false,
+        }));
+        if (!items.length || items.some((item) => !/^[A-Za-z0-9_-]{1,128}$/.test(item.productId) || !Number.isSafeInteger(item.quantity) || item.quantity <= 0 || !item.returnable)) {
+          throw new RequestValidationError('INVALID_REQUEST', 'This order does not contain eligible inventory-backed items for return.');
+        }
+        const now = Timestamp.now().toDate().toISOString();
+        const returnRequest = { status: 'requested', reason, items, requestedBy: uid, requestedAt: now, restocked: false };
+        transaction.update(orderRef, { returnRequest, updatedAt: now });
+        transaction.create(idempotencyRef, { uid, orderId, idempotencyKey, status: 'requested', createdAt: now, updatedAt: now });
+        transaction.create(adminDb.collection('audit_logs').doc(), {
+          action: 'store.return.requested', actorUid: uid, targetUid: uid, resource: 'store_order',
+          resourceId: orderId, reason, items, timestamp: Timestamp.now(), createdAt: now,
+        });
+        return { orderId, status: 'requested', returnRequest };
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Store return request failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The Store return request could not be created safely.');
+    }
+  });
+
+  app.post("/api/store/orders/:orderId/return-approve", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('storeReturnApprovalRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Store return approval requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const orderId = req.params.orderId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId)) return errorResponse(res, 'INVALID_REQUEST', 'The order ID is invalid.');
+      const orderSnap = await adminDb.collection('orders').doc(orderId).get();
+      if (!orderSnap.exists) return errorResponse(res, 'NOT_FOUND', 'The Store order was not found.');
+      const order = orderSnap.data() as Record<string, unknown>;
+      const rolesSnap = await adminDb.collection('users').doc(uid).get();
+      const roles = Array.isArray(rolesSnap.data()?.roles) ? rolesSnap.data()?.roles.filter((r: unknown) => typeof r === 'string') as any[] : [];
+      const permissions = Array.isArray(rolesSnap.data()?.permissions) ? rolesSnap.data()?.permissions.filter((p: unknown) => typeof p === 'string') as any[] : [];
+      if (uid !== order.sellerId && !hasRolePermission(roles, permissions, 'manage:disputes')) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to approve this Store return.');
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const ref = adminDb.collection('orders').doc(orderId);
+        const snap = await transaction.get(ref);
+        if (!snap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
+        const current = snap.data() as Record<string, unknown>;
+        const rr = current.returnRequest as Record<string, unknown> | undefined;
+        if (!rr) throw new RequestValidationError('INVALID_REQUEST', 'No return request exists for this order.');
+        if (rr.status === 'approved' || rr.status === 'received') return { orderId, status: rr.status, replayed: true };
+        if (rr.status !== 'requested') throw new RequestValidationError('INVALID_REQUEST', 'This return request cannot be approved in its current state.');
+        const now = Timestamp.now().toDate().toISOString();
+        transaction.update(ref, { returnRequest: { ...rr, status: 'approved', approvedBy: uid, approvedAt: now }, updatedAt: now });
+        transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.return.approved', actorUid: uid, targetUid: current.customerId, resource: 'store_order', resourceId: orderId, timestamp: Timestamp.now(), createdAt: now });
+        return { orderId, status: 'approved', replayed: false };
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Store return approval failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The Store return could not be approved safely.');
+    }
+  });
+
+  app.post("/api/store/orders/:orderId/return-receive", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('storeReturnReceiveRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Store return receipt requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const orderId = req.params.orderId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId)) return errorResponse(res, 'INVALID_REQUEST', 'The order ID is invalid.');
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const ref = adminDb.collection('orders').doc(orderId);
+        const snap = await transaction.get(ref);
+        if (!snap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
+        const order = snap.data() as Record<string, unknown>;
+        const rolesSnap = await transaction.get(adminDb.collection('users').doc(uid));
+        const roles = Array.isArray(rolesSnap.data()?.roles) ? rolesSnap.data()?.roles.filter((r: unknown) => typeof r === 'string') as any[] : [];
+        const permissions = Array.isArray(rolesSnap.data()?.permissions) ? rolesSnap.data()?.permissions.filter((p: unknown) => typeof p === 'string') as any[] : [];
+        if (uid !== order.sellerId && !hasRolePermission(roles, permissions, 'manage:disputes')) throw new RequestValidationError('FORBIDDEN', 'You are not permitted to receive this Store return.');
+        const rr = order.returnRequest as Record<string, unknown> | undefined;
+        if (!rr || rr.status !== 'approved' || rr.restocked === true) {
+          if (rr?.status === 'received' && rr.restocked === true) return { orderId, status: 'received', restocked: true, replayed: true };
+          throw new RequestValidationError('INVALID_REQUEST', 'This return is not approved for receipt and restocking.');
+        }
+        const items = Array.isArray(rr.items) ? rr.items : [];
+        const quantities = new Map<string, number>();
+        for (const item of items) {
+          const productId = typeof (item as any)?.productId === 'string' ? (item as any).productId : '';
+          const quantity = Number((item as any)?.quantity);
+          if (!/^[A-Za-z0-9_-]{1,128}$/.test(productId) || !Number.isSafeInteger(quantity) || quantity <= 0) throw new RequestValidationError('INVALID_REQUEST', 'The approved return contains invalid inventory data.');
+          quantities.set(productId, (quantities.get(productId) || 0) + quantity);
+        }
+        const productSnaps = await Promise.all(Array.from(quantities.keys()).map((id) => transaction.get(adminDb.collection('products').doc(id))));
+        const now = Timestamp.now().toDate().toISOString();
+        productSnaps.forEach((productSnap, index) => {
+          if (!productSnap.exists) throw new RequestValidationError('INVALID_REQUEST', 'A returned product no longer exists; inventory was not restored.');
+          const product = productSnap.data() as Record<string, unknown>;
+          const currentQuantity = Number(product.quantity);
+          const restore = quantities.get(Array.from(quantities.keys())[index]) || 0;
+          if (!Number.isSafeInteger(currentQuantity) || currentQuantity < 0) throw new RequestValidationError('INVALID_REQUEST', 'Inventory data is invalid; return receipt was not applied.');
+          transaction.update(productSnap.ref, { quantity: currentQuantity + restore, status: 'published', updatedAt: now });
+        });
+        transaction.update(ref, {
+          returnRequest: { ...rr, status: 'received', receivedBy: uid, receivedAt: now, restocked: true },
+          updatedAt: now,
+        });
+        transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.return.received_restocked', actorUid: uid, targetUid: order.customerId, resource: 'store_order', resourceId: orderId, quantities: Object.fromEntries(quantities), timestamp: Timestamp.now(), createdAt: now });
+        return { orderId, status: 'received', restocked: true, replayed: false };
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Store return receipt/restock failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The Store return could not be received safely.');
+    }
+  });
+
   app.post("/api/store/orders/:orderId/refund", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 10,
