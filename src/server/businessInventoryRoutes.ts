@@ -52,7 +52,7 @@ export function registerBusinessInventoryRoutes(
           const branchSnap = await transaction.get(branchRef);
           if (!branchSnap.exists) throw new Error('BRANCH_NOT_FOUND');
           const branch = branchSnap.data() || {};
-          if (String(branch.businessId || '') !== businessId || String(branch.ownerUid || '') !== String((req as any).user?.uid || '') || String(branch.status || '') !== 'active') {
+          if (String(branch.businessId || '') !== businessId || String(branch.status || '') !== 'active') {
             throw new Error('BRANCH_FORBIDDEN');
           }
         }
