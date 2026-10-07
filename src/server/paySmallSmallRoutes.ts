@@ -457,8 +457,9 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
     const token = typeof req.header('x-pay-small-small-cron-token') === 'string' ? req.header('x-pay-small-small-cron-token') : '';
     if (!process.env.PAY_SMALL_SMALL_CRON_TOKEN || token !== process.env.PAY_SMALL_SMALL_CRON_TOKEN) return fail(res, 'FORBIDDEN', 'Forbidden.', 403);
     try {
-      const [plansSnap, depositTxSnap, installmentTxSnap, settlementTxSnap, refundTxSnap, holdSnap, sellerCreditSnap, customerRefundSnap, walletsSnap, allLedgerSnap] = await Promise.all([
+      const [plansSnap, ordersSnap, depositTxSnap, installmentTxSnap, settlementTxSnap, refundTxSnap, holdSnap, sellerCreditSnap, customerRefundSnap, walletsSnap, allLedgerSnap] = await Promise.all([
         db.collection('paySmallSmallPlans').get(),
+        db.collection('orders').get(),
         db.collection('transactions').where('sourceModule', '==', 'unique_pay_small_small.deposit').get(),
         db.collection('transactions').where('sourceModule', '==', 'unique_pay_small_small.installment').get(),
         db.collection('transactions').where('sourceModule', '==', 'unique_pay_small_small.settlement').get(),
@@ -508,6 +509,8 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
       }
       const planMap = new Map<string, any>();
       const orderMap = new Map<string, string>();
+      const orderDocs = new Map<string, any>();
+      for (const doc of ordersSnap.docs) orderDocs.set(doc.id, doc.data() || {});
       for (const doc of plansSnap.docs) {
         const plan = doc.data() || {};
         const planId = String(plan.planId || doc.id);
@@ -564,6 +567,25 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const plan = planMap.get(planId) || {};
         const customerId = String(plan.customerId || '');
         const orderId = String(plan.orderId || '');
+        const order = orderDocs.get(orderId);
+        if (!order) {
+          addFinding({ code: 'PLAN_ORDER_NOT_FOUND', severity: 'critical', planId, transactionId: txId, detail: 'Pay Small Small plan references a Store order that does not exist.' });
+        } else {
+          if (String(order.customerId || '') !== customerId) {
+            addFinding({ code: 'PLAN_ORDER_CUSTOMER_MISMATCH', severity: 'critical', planId, transactionId: txId, detail: 'Plan customer does not match the Store order customer.' });
+          }
+          if (String(order.paySmallSmallPlanId || '') !== planId) {
+            addFinding({ code: 'PLAN_ORDER_LINK_MISMATCH', severity: 'critical', planId, transactionId: txId, detail: 'Store order does not point back to the Pay Small Small plan.' });
+          }
+          if (String(order.currency || '') !== 'NGN' || Number(order.totalMinor) !== Number(plan.totalAmountMinor)) {
+            addFinding({ code: 'PLAN_ORDER_AMOUNT_CURRENCY_MISMATCH', severity: 'critical', planId, transactionId: txId, detail: 'Plan and Store order currency/total do not match.' });
+          }
+        }
+        if (String(tx.currency || '') !== 'NGN' || String(tx.status || '') !== 'completed' ||
+            String(tx.recordKind || '') !== 'financial' || Number(tx.schemaVersion) !== 2 ||
+            String(tx.amountUnit || '') !== 'minor' || String(tx.provider || '') !== 'unique_pay_internal_wallet') {
+          addFinding({ code: 'NON_CANONICAL_PSS_TRANSACTION', severity: 'critical', planId, transactionId: txId, amountMinor: amount, detail: 'Pay Small Small transaction is missing required canonical financial metadata.' });
+        }
         const expectedFlow = module === 'unique_pay_small_small.deposit' || module === 'unique_pay_small_small.installment'
           ? { senderId: customerId, recipientId: planId, debitUid: customerId, debitAccountType: '', creditUid: planId, creditAccountType: 'pay_small_small_hold' }
           : module === 'unique_pay_small_small.settlement'
