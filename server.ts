@@ -3566,6 +3566,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             price: product.price,
             quantity: Number(cart.data.quantity),
             productStatusAtCheckout: product.status,
+            returnable: product.returnable !== false,
           }));
           const totalAmountMinor = items.reduce((sum, item) => sum + Math.round(Number(item.price) * 100) * item.quantity, 0);
           if (!Number.isSafeInteger(totalAmountMinor) || totalAmountMinor <= 0) {
