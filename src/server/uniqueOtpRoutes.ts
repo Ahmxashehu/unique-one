@@ -240,7 +240,7 @@ export function registerUniqueOtpRoutes(app: Express, authenticate?: RequestHand
   });
 
   app.post('/api/auth/unique-otp/recovery/reset-pin', rateLimit({
-    windowMs: 10 * 10 * 60_000,
+    windowMs: 10 * 60_000,
     limit: 5,
     standardHeaders: true,
     legacyHeaders: true,
