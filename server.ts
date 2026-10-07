@@ -3984,6 +3984,83 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.post("/api/store/orders/:orderId/dispute-resolve", authenticate, rateLimit({
+    windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false,
+    store: createFirestoreRateLimitStore('storeDisputeResolutionRateLimits', 60_000),
+    keyGenerator: (req) => isSafeFirebaseUid((req as any).user?.uid) ? (req as any).user.uid : ipKeyGenerator(req.ip),
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Store dispute resolution requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const orderId = req.params.orderId;
+      const decision = req.body?.decision === 'approve_refund' || req.body?.decision === 'deny' ? req.body.decision : '';
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : '';
+      const idempotencyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey.trim() : '';
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId) || !decision || !reason || !/^[A-Za-z0-9_-]{1,200}$/.test(idempotencyKey)) return errorResponse(res, 'INVALID_REQUEST', 'A valid decision, reason, and idempotency key are required.');
+      const rolesSnap = await adminDb.collection('users').doc(uid).get();
+      const roles = Array.isArray(rolesSnap.data()?.roles) ? rolesSnap.data()?.roles.filter((v: unknown) => typeof v === 'string') as any[] : [];
+      const permissions = Array.isArray(rolesSnap.data()?.permissions) ? rolesSnap.data()?.permissions.filter((v: unknown) => typeof v === 'string') as any[] : [];
+      if (!hasRolePermission(roles, permissions, 'manage:disputes')) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to resolve Store disputes.');
+      const snap = await adminDb.collection('orders').doc(orderId).get();
+      if (!snap.exists) return errorResponse(res, 'NOT_FOUND', 'The Store order was not found.');
+      const order = snap.data() as Record<string, unknown>;
+      const dispute = order.dispute && typeof order.dispute === 'object' ? order.dispute as Record<string, unknown> : null;
+      if (!dispute || !['opened','seller_responded','under_review'].includes(String(dispute.status))) return errorResponse(res, 'INVALID_REQUEST', 'This dispute is not awaiting resolution.');
+      const amountMinor = Number(order.amountMinor);
+      if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) return errorResponse(res, 'INVALID_REQUEST', 'The Store order amount is invalid.');
+      if (decision === 'deny') {
+        const now = Timestamp.now();
+        await adminDb.runTransaction(async transaction => {
+          const ref = adminDb.collection('orders').doc(orderId);
+          const currentSnap = await transaction.get(ref);
+          if (!currentSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
+          const current = currentSnap.data() as Record<string, unknown>;
+          const currentDispute = current.dispute && typeof current.dispute === 'object' ? current.dispute as Record<string, unknown> : null;
+          if (!currentDispute || !['opened','seller_responded','under_review'].includes(String(currentDispute.status))) throw new RequestValidationError('INVALID_REQUEST', 'This dispute has already been resolved.');
+          const next = { ...currentDispute, status: 'resolved', decision: 'deny', resolutionReason: reason, resolvedBy: uid, resolvedAt: now };
+          transaction.update(ref, { dispute: next, updatedAt: now });
+          transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.dispute.denied', actorUid: uid, resource: 'store_order', resourceId: orderId, reason, timestamp: now, createdAt: now });
+        });
+        return res.status(200).json({ orderId, status: 'resolved', decision: 'deny' });
+      }
+      const paymentTransactionIds = Array.isArray(order.paymentTransactionIds) ? order.paymentTransactionIds.filter((v: unknown) => typeof v === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(v)) : [];
+      const payments = await Promise.all(paymentTransactionIds.map(id => adminDb.collection('transactions').doc(id).get()));
+      const candidates = payments.filter(s => s.exists).map(s => ({ id: s.id, data: s.data() as Record<string, unknown> })).filter(({data:p}) => p.recordKind === 'financial' && p.schemaVersion === 2 && p.amountUnit === 'minor' && p.currency === 'NGN' && p.status === 'completed' && p.type === 'merchant_payment' && p.sourceModule === 'unique_store.checkout' && p.senderId === order.customerId && p.recipientId === order.sellerId && Array.isArray(p.relatedOrderIds) && p.relatedOrderIds.includes(orderId) && Number.isSafeInteger(Number(p.amount)) && Number(p.amount) >= amountMinor);
+      if (candidates.length !== 1) return errorResponse(res, candidates.length === 0 ? 'NOT_FOUND' : 'INVALID_REQUEST', 'The original Store payment could not be uniquely matched for dispute refund.');
+      const refund = await executeFinancialRefund(adminDb, {
+        originalTransactionId: candidates[0].id,
+        amountMinor,
+        currency: 'NGN',
+        idempotencyKey,
+        actorUid: uid,
+        reason: 'Store dispute approved: ' + reason,
+        relatedOrderId: orderId,
+        sourceModule: 'unique_store.dispute',
+        finalizeOrder: 'full',
+      });
+      if ('error' in refund) {
+        const status = ['REFUND_IN_PROGRESS','REFUND_EXCEEDS_REMAINING','IDEMPOTENCY_CONFLICT','INSUFFICIENT_FUNDS'].includes(refund.error.code) ? 409 : refund.error.code === 'ORIGINAL_NOT_FOUND' ? 404 : 400;
+        return res.status(status).json({ error: refund.error });
+      }
+      const now = Timestamp.now();
+      await adminDb.runTransaction(async transaction => {
+        const ref = adminDb.collection('orders').doc(orderId);
+        const currentSnap = await transaction.get(ref);
+        if (!currentSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
+        const current = currentSnap.data() as Record<string, unknown>;
+        const currentDispute = current.dispute && typeof current.dispute === 'object' ? current.dispute as Record<string, unknown> : null;
+        if (!currentDispute || !['opened','seller_responded','under_review'].includes(String(currentDispute.status))) throw new RequestValidationError('INVALID_REQUEST', 'This dispute has already been resolved.');
+        transaction.update(ref, { dispute: { ...currentDispute, status: 'resolved', decision: 'approve_refund', resolutionReason: reason, resolvedBy: uid, resolvedAt: now, refundTransactionId: refund.transactionId }, updatedAt: now });
+        transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.dispute.refund_approved', actorUid: uid, resource: 'store_order', resourceId: orderId, refundTransactionId: refund.transactionId, amountMinor, reason, timestamp: now, createdAt: now });
+      });
+      return res.status(200).json({ orderId, status: 'resolved', decision: 'approve_refund', refund });
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Store dispute resolution failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The Store dispute resolution could not be completed safely.');
+    }
+  });
+
   app.post("/api/store/orders/:orderId/return-request", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 10,
