@@ -4,7 +4,7 @@ import { addDoc, collection, getDocs, query, where, serverTimestamp } from 'fire
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 
-type StaffInvite = { id: string; inviteeEmail: string; role: string; branchName?: string; status: string };
+type StaffInvite = { id: string; businessId?: string; inviteeEmail: string; role: string; branchName?: string; status: string };
 const roles = ['admin', 'manager', 'sales', 'cashier', 'accountant', 'inventory', 'support', 'delivery', 'branch_manager', 'viewer'];
 
 export default function StaffPage() {
@@ -16,15 +16,19 @@ export default function StaffPage() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('manager');
   const [branchName, setBranchName] = useState('');
+  const [businessId, setBusinessId] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const loadInvites = async () => {
     if (!currentUser) return;
+    const activeBusinessId = localStorage.getItem('unique_business_id') || '';
+    if (!activeBusinessId) { setError('Business workspace context is missing. Please unlock Business Platform again.'); setLoading(false); return; }
+    setBusinessId(activeBusinessId);
     setLoading(true);
     setError('');
     try {
-      const snapshot = await getDocs(query(collection(db, 'staffInvites'), where('businessOwnerUid', '==', currentUser.uid)));
+      const snapshot = await getDocs(query(collection(db, 'staffInvites'), where('businessOwnerUid', '==', currentUser.uid), where('businessId', '==', businessId)));
       setInvites(snapshot.docs.map(item => ({ id: item.id, ...item.data() } as StaffInvite)));
     } catch (err) {
       console.error('Staff invites load failed:', err);
@@ -32,15 +36,20 @@ export default function StaffPage() {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { void loadInvites(); }, [currentUser?.uid]);
+  useEffect(() => {
+    const id = localStorage.getItem('unique_business_id') || '';
+    setBusinessId(id);
+    void loadInvites();
+  }, [currentUser?.uid]);
 
   const inviteStaff = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!currentUser || !email.trim()) return;
+    if (!currentUser || !email.trim() || !businessId) { setError('Business workspace context is missing. Please unlock Business Platform again.'); return; }
     setSaving(true); setError(''); setSuccess('');
     try {
       await addDoc(collection(db, 'staffInvites'), {
         businessOwnerUid: currentUser.uid,
+        businessId,
         inviteeEmail: email.trim().toLowerCase(),
         role,
         branchName: branchName.trim() || null,
