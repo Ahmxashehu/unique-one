@@ -4244,8 +4244,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const permissions = Array.isArray(rolesSnap.data()?.permissions) ? rolesSnap.data()?.permissions.filter((p: unknown) => typeof p === 'string') as any[] : [];
         if (uid !== order.sellerId && !hasRolePermission(roles, permissions, 'manage:disputes')) throw new RequestValidationError('FORBIDDEN', 'You are not permitted to receive this Store return.');
         const rr = order.returnRequest as Record<string, unknown> | undefined;
-        if (!rr || rr.status !== 'approved' || rr.restocked === true) {
-          if (rr?.status === 'received' && rr.restocked === true) return { orderId, status: 'received', restocked: true, replayed: true };
+        if (!rr || rr.status !== 'approved' || rr.quarantined === true) {
+          if (rr?.status === 'received' && rr.quarantined === true) return { orderId, status: 'received', restocked: false, quarantined: true, replayed: true };
           throw new RequestValidationError('INVALID_REQUEST', 'This return is not approved for receipt and restocking.');
         }
         const items = Array.isArray(rr.items) ? rr.items : [];
@@ -4267,11 +4267,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           transaction.update(productSnap.ref, { quantity: currentQuantity, quarantineQuantity: Number(product.quarantineQuantity || 0) + restore, updatedAt: now });
         });
         transaction.update(ref, {
-          returnRequest: { ...rr, status: 'received', receivedBy: uid, receivedAt: now, restocked: true },
+          returnRequest: { ...rr, status: 'received', receivedBy: uid, receivedAt: now, restocked: false, quarantined: true },
           updatedAt: now,
         });
         transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.return.received_restocked', actorUid: uid, targetUid: order.customerId, resource: 'store_order', resourceId: orderId, quantities: Object.fromEntries(quantities), timestamp: Timestamp.now(), createdAt: now });
-        return { orderId, status: 'received', restocked: true, replayed: false };
+        return { orderId, status: 'received', restocked: false, quarantined: true, replayed: false };
       });
       return res.status(200).json(result);
     } catch (error) {
