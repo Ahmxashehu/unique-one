@@ -451,7 +451,16 @@ const app = express();
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
     if (!token || /\s/.test(token)) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required to access this resource.');
     try {
-      (req as any).user = await getAuth().verifyIdToken(token);
+      const decoded = await getAuth().verifyIdToken(token);
+      const userSnapshot = await adminDb.collection('users').doc(decoded.uid).get();
+      if (!userSnapshot.exists) {
+        return errorResponse(res, 'UNAUTHENTICATED', 'The authenticated account could not be found.');
+      }
+      const status = userSnapshot.data()?.status;
+      if (status === 'banned' || status === 'suspended') {
+        return errorResponse(res, 'FORBIDDEN', 'This account is suspended or unavailable.');
+      }
+      (req as any).user = decoded;
       return next();
     } catch (_) {
       return errorResponse(res, 'UNAUTHENTICATED', 'The supplied Firebase token is invalid or expired.');
