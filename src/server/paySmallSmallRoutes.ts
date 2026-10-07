@@ -11,8 +11,8 @@ function fail(res: any, code: string, message: string, status = 400) {
 const PLAN_ID = /^[A-Za-z0-9_-]{1,128}$/;
 function verifyPinCredential(data: any, pin: string): boolean {
   if (!/^\d{4}$/.test(pin)) return false;
-  const salt = typeof data?.transactionPinSalt === 'string' ? Buffer.from(data.transactionPinSalt, 'base64') : null;
-  const digest = typeof data?.transactionPinHash === 'string' ? Buffer.from(data.transactionPinHash, 'base64') : null;
+  const salt = typeof data?.transactionPinSalt === 'string' ? Buffer.from(data.transactionPinSalt, 'utf8') : null;
+  const digest = typeof data?.transactionPinHash === 'string' ? Buffer.from(data.transactionPinHash, 'hex') : null;
   if (!salt || !digest || salt.length < 16 || digest.length !== 64) return false;
   const candidate = scryptSync(pin, salt, 64);
   return timingSafeEqual(candidate, digest);
@@ -97,17 +97,17 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const userRef = db.collection('users').doc(uid);
         const walletRef = db.collection('wallets').doc(uid);
         const idemRef = db.collection('paySmallSmallPaymentIdempotency').doc(uid + '_' + idempotencyKey);
-        const [planSnap, userSnap, walletSnap, idemSnap] = await Promise.all([
-          transaction.get(planRef), transaction.get(userRef), transaction.get(walletRef), transaction.get(idemRef)
+        const credentialRef = db.collection('authCredentials').doc(uid);\n        const [planSnap, credentialSnap, walletSnap, idemSnap] = await Promise.all([
+          transaction.get(planRef), transaction.get(credentialRef), transaction.get(walletRef), transaction.get(idemRef)
         ]);
         if (idemSnap.exists) return { ...(idemSnap.data()?.result || {}), replayed: true };
         if (!planSnap.exists) throw new Error('PLAN_NOT_FOUND');
-        if (!userSnap.exists) throw new Error('USER_NOT_FOUND');
+        if (!credentialSnap.exists) throw new Error('USER_NOT_FOUND');
         if (!walletSnap.exists) throw new Error('WALLET_NOT_FOUND');
         const plan = planSnap.data() || {};
         if (String(plan.customerId || '') !== uid) throw new Error('FORBIDDEN');
         if (String(plan.currency || '') !== 'NGN' || String(plan.status || '') !== 'draft') throw new Error('PLAN_NOT_ELIGIBLE');
-        const credential = userSnap.data()?.authCredentials || {};
+        const credential = credentialSnap.data() || {};
         if (!verifyPinCredential(credential, transactionPin)) throw new Error('BAD_PIN');
         const deposit = Number(plan.depositAmountMinor);
         if (!Number.isSafeInteger(deposit) || deposit <= 0) throw new Error('INVALID_AMOUNT');
