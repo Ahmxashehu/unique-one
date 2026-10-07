@@ -4447,12 +4447,33 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         };
       });
 
+      const originalPaidMinor = settlements
+        .filter((tx) => tx.type === 'merchant_payment' && tx.status === 'completed' && tx.currency === 'NGN')
+        .reduce((sum, tx) => sum + (tx.amountMinor || 0), 0);
+      const refundedMinor = settlements
+        .filter((tx) => tx.type === 'refund' && tx.status === 'completed' && tx.currency === 'NGN')
+        .reduce((sum, tx) => sum + (tx.amountMinor || 0), 0);
+      const netPaidMinor = Math.max(0, originalPaidMinor - refundedMinor);
+      const declaredPaymentStatus = ['paid', 'partially_refunded', 'refunded'].includes(String(order.paymentStatus))
+        ? String(order.paymentStatus)
+        : 'unpaid';
+      const derivedPaymentStatus = refundedMinor >= originalPaidMinor && originalPaidMinor > 0
+        ? 'refunded'
+        : refundedMinor > 0
+          ? 'partially_refunded'
+          : originalPaidMinor > 0
+            ? 'paid'
+            : 'unpaid';
       return res.status(200).json({
         orderId,
-        paymentStatus: order.paymentStatus === 'paid' ? 'paid' : 'unpaid',
+        paymentStatus: declaredPaymentStatus,
+        derivedPaymentStatus,
+        originalPaidMinor,
+        refundedMinor,
+        netPaidMinor,
         orderStatus: typeof order.status === 'string' ? order.status : null,
         settlements,
-        reconciled: order.paymentStatus === 'paid' && settlements.some((tx) => tx.status === 'completed'),
+        reconciled: originalPaidMinor > 0 && netPaidMinor >= 0,
       });
     } catch (error) {
       console.error('Store settlement reconciliation read failed:', error);
