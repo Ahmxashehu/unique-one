@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Building2, Search, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface AdminBusiness {
   id: string;
@@ -32,6 +31,7 @@ export default function AdminBusinessesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const { currentUser } = useAuth();
 
   useEffect(() => {
     let active = true;
@@ -40,9 +40,13 @@ export default function AdminBusinessesPage() {
       setLoading(true);
       setError('');
       try {
-        const snapshot = await getDocs(collection(db, 'businesses'));
+        if (!currentUser) return;
+        const token = await currentUser.getIdToken();
+        const response = await fetch('/api/admin/overview', { headers: { Authorization: 'Bearer ' + token } });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error?.message || 'Unable to load businesses.');
         if (!active) return;
-        setBusinesses(snapshot.docs.map(item => ({ id: item.id, ...item.data() } as AdminBusiness)));
+        setBusinesses(payload.businesses || []);
       } catch (loadError) {
         console.error('Failed to load admin businesses:', loadError);
         if (active) setError('Unable to load businesses. Check administrator access and try again.');
@@ -53,14 +57,18 @@ export default function AdminBusinessesPage() {
 
     void loadBusinesses();
     return () => { active = false; };
-  }, []);
+  }, [currentUser]);
 
   const refreshBusinesses = async () => {
     setRefreshing(true);
     setError('');
     try {
-      const snapshot = await getDocs(collection(db, 'businesses'));
-      setBusinesses(snapshot.docs.map(item => ({ id: item.id, ...item.data() }) as AdminBusiness));
+      if (!currentUser) return;
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/admin/overview', { headers: { Authorization: 'Bearer ' + token } });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error?.message || 'Unable to refresh businesses.');
+      setBusinesses(payload.businesses || []);
     } catch (loadError) {
       console.error('Failed to refresh businesses:', loadError);
       setError('Unable to refresh businesses. Check administrator access and try again.');
