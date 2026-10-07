@@ -60,8 +60,12 @@ export default function AdminVerificationPage() {
     setLoading(true);
     setError('');
     try {
-      const snapshot = await getDocs(collection(db, 'users'));
-      setUsers(snapshot.docs.map(item => ({ id: item.id, ...item.data() } as UserRecord)));
+      if (!currentUser) return;
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/admin/overview', { headers: { Authorization: 'Bearer ' + token } });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error?.message || 'Failed to load verification records.');
+      setUsers(payload.users || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load verification records.');
     } finally {
@@ -70,10 +74,8 @@ export default function AdminVerificationPage() {
   };
 
   useEffect(() => {
-    let active = true;
     void loadUsers().catch(() => undefined);
-    return () => { active = false; };
-  }, []);
+  }, [currentUser]);
 
   const counts = useMemo(() => {
     const result: Record<string, number> = { all: users.length };
