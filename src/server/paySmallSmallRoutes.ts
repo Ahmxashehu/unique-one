@@ -517,7 +517,6 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
 
       const txDocs = [...depositTxSnap.docs, ...installmentTxSnap.docs, ...settlementTxSnap.docs, ...refundTxSnap.docs];
       const txMap = new Map<string, any>();
-      const addFinding = (finding: Finding) => findings.push(finding);
       for (const doc of txDocs) {
         const tx = doc.data() || {};
         const txId = String(tx.id || doc.id);
