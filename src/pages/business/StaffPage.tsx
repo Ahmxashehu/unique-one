@@ -17,8 +17,8 @@ export default function StaffPage() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('manager');
   const [branchId, setBranchId] = useState('');
-  const branchName = branches.find(branch => branch.id === branchId)?.name || '';
   const [branches, setBranches] = useState<BusinessBranch[]>([]);
+  const branchName = branches.find(branch => branch.id === branchId)?.name || '';
   const [businessId, setBusinessId] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
