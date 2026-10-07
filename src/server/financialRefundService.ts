@@ -95,7 +95,7 @@ export async function executeFinancialRefund(
     !input.reason.trim() ||
     (input.relatedOrderId !== undefined && !isSafeId(input.relatedOrderId)) ||
     (input.finalizeOrder !== undefined && input.finalizeOrder !== 'full' && input.finalizeOrder !== 'partial') ||
-    (input.finalizeDispute !== undefined && (input.finalizeDispute.decision !== 'approve_refund' || !input.finalizeDispute.reason.trim() || !isSafeId(input.finalizeDispute.actorUid)))
+    (input.finalizeDispute !== undefined && (input.finalizeDispute.decision !== 'approve_refund' || !input.finalizeDispute.reason.trim() || !isSafeId(input.finalizeDispute.actorUid) || input.finalizeDispute.actorUid !== input.actorUid))
   ) {
     return { error: { code: 'INVALID_REQUEST', message: 'Invalid refund request.' } };
   }
@@ -180,7 +180,7 @@ export async function executeFinancialRefund(
       }
       if (input.finalizeDispute) {
         const dispute = order.dispute && typeof order.dispute === 'object' ? order.dispute as Record<string, unknown> : null;
-        if (!dispute || !['opened', 'seller_responded'].includes(String(dispute.status))) {
+        if (!dispute || !['opened', 'seller_responded', 'under_review'].includes(String(dispute.status))) {
           return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Store dispute is no longer awaiting resolution.' } };
         }
         if (String(order.paymentStatus) !== 'paid' || order.returnRequest !== undefined) {
