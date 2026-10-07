@@ -320,66 +320,106 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
       const now = Timestamp.now();
       const graceMs = 3 * 24 * 60 * 60 * 1000;
       const cancelMs = 7 * 24 * 60 * 60 * 1000;
-      const snap = await db.collection('paySmallSmallPlans').where('status', '==', 'active').limit(100).get();
-      let overdue = 0, grace = 0, cancelled = 0, reminded = 0;
-      for (const doc of snap.docs) {
-        await db.runTransaction(async (transaction) => {
-          const ref = doc.ref;
-          const current = await transaction.get(ref);
-          if (!current.exists) return;
-          const plan = current.data() || {};
-          if (String(plan.status || '') !== 'active') return;
-          const installments = Array.isArray(plan.installments) ? plan.installments : [];
-          let changed = false;
-          const next = installments.map((item: any) => {
-            if (String(item.status || '') === 'pending' && item.dueAt && typeof item.dueAt.toMillis === 'function' && item.dueAt.toMillis() <= now.toMillis()) {
-              overdue++;
-              changed = true;
-              return { ...item, status: 'overdue', overdueAt: now };
+      const pageSize = 100;
+      let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+      let scanned = 0, overdue = 0, grace = 0, cancelled = 0, reminded = 0;
+
+      while (true) {
+        let query = db.collection('paySmallSmallPlans')
+          .where('status', '==', 'active')
+          .orderBy('__name__')
+          .limit(pageSize);
+        if (lastDoc) query = query.startAfter(lastDoc);
+        const snap = await query.get();
+        if (snap.empty) break;
+        lastDoc = snap.docs[snap.docs.length - 1];
+
+        for (const doc of snap.docs) {
+          scanned++;
+          await db.runTransaction(async (transaction) => {
+            const ref = doc.ref;
+            const current = await transaction.get(ref);
+            if (!current.exists) return;
+            const plan = current.data() || {};
+            if (String(plan.status || '') !== 'active') return;
+            const installments = Array.isArray(plan.installments) ? plan.installments : [];
+            let changed = false;
+            const next = installments.map((item: any) => {
+              if (String(item.status || '') === 'pending' && item.dueAt && typeof item.dueAt.toMillis === 'function' && item.dueAt.toMillis() <= now.toMillis()) {
+                overdue++;
+                changed = true;
+                return { ...item, status: 'overdue', overdueAt: now };
+              }
+              return item;
+            });
+            const oldestOverdue = next
+              .filter((x: any) => String(x.status || '') === 'overdue' && x.overdueAt && typeof x.overdueAt.toMillis === 'function')
+              .sort((a: any, b: any) => a.overdueAt.toMillis() - b.overdueAt.toMillis())[0];
+            const oldestMs = oldestOverdue?.overdueAt?.toMillis?.() || 0;
+            const age = oldestMs ? now.toMillis() - oldestMs : 0;
+            const update: any = { updatedAt: now };
+            if (changed) update.installments = next;
+
+            if (oldestMs && age >= graceMs && age < cancelMs && String(plan.missedPaymentState || '') !== 'grace') {
+              update.missedPaymentState = 'grace';
+              update.graceStartedAt = now;
+              grace++;
             }
-            return item;
+
+            if (oldestMs && age >= cancelMs) {
+              const customerId = String(plan.customerId || '');
+              const walletRef = db.collection('wallets').doc(customerId);
+              const walletSnap = await transaction.get(walletRef);
+              if (!walletSnap.exists) throw new Error('WALLET_NOT_FOUND');
+              const wallet = walletSnap.data() || {};
+              const balance = Number(wallet.availableBalanceMinor);
+              if (!Number.isSafeInteger(balance) || String(wallet.status || '') !== 'active') throw new Error('WALLET_UNAVAILABLE');
+
+              const refundAmount = Number(plan.paidAmountMinor || 0);
+              if (!Number.isSafeInteger(refundAmount) || refundAmount < 0) throw new Error('INVALID_REFUND');
+              if (refundAmount > 0) {
+                const refundTx = db.collection('transactions').doc();
+                const refundRef = 'UP-PSS-REF-' + refundTx.id;
+                const holdDebit = db.collection('ledgerEntries').doc();
+                const customerCredit = db.collection('ledgerEntries').doc();
+                transaction.create(refundTx, { id: refundTx.id, reference: refundRef, senderId: String(plan.planId), recipientId: customerId, amount: refundAmount, currency: 'NGN', type: 'refund', sourceModule: 'unique_pay_small_small.cancellation_refund', provider: 'unique_pay_internal_wallet', status: 'completed', relatedOrderIds: [String(plan.orderId)], createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' });
+                transaction.create(holdDebit, { id: holdDebit.id, transactionId: refundTx.id, reference: refundRef, uid: String(plan.planId), direction: 'debit', amountMinor: refundAmount, currency: 'NGN', status: 'completed', createdAt: now, accountType: 'pay_small_small_hold' });
+                transaction.create(customerCredit, { id: customerCredit.id, transactionId: refundTx.id, reference: refundRef, uid: customerId, direction: 'credit', amountMinor: refundAmount, currency: 'NGN', status: 'completed', createdAt: now, accountType: 'wallet_refund' });
+                transaction.update(walletRef, { availableBalanceMinor: balance + refundAmount, updatedAt: now });
+                update.cancellationRefundTransactionId = refundTx.id;
+              }
+              update.status = 'cancelled';
+              update.missedPaymentState = 'cancelled';
+              update.cancelledAt = now;
+              update.cancelReason = 'missed_payment';
+              update.paidAmountMinor = 0;
+              update.remainingAmountMinor = Number(plan.totalAmountMinor || 0);
+              transaction.update(db.collection('orders').doc(String(plan.orderId)), { paySmallSmallStatus: 'cancelled', paymentStatus: 'refunded', status: 'cancelled', updatedAt: now });
+              transaction.create(db.collection('audit_logs').doc(), { action: 'pay_small_small.cancelled_for_missed_payment', actorUid: 'system', targetUid: customerId, resource: 'pay_small_pay_small_plan', resourceId: String(plan.planId), orderId: String(plan.orderId), refundAmountMinor: refundAmount, createdAt: now, timestamp: now });
+              cancelled++;
+            } else if (oldestMs && age >= graceMs) {
+              const notificationRef = db.collection('notifications').doc('pss_overdue_' + String(plan.planId) + '_' + String(oldestMs));
+              const notificationSnap = await transaction.get(notificationRef);
+              if (!notificationSnap.exists) {
+                transaction.create(notificationRef, { uid: String(plan.customerId), type: 'pay_small_small.payment_overdue', title: 'Pay Small Small payment overdue', message: 'Your installment is overdue. Please make the payment during the grace period to keep your plan active.', planId: String(plan.planId), createdAt: now, read: false });
+                reminded++;
+              }
+            } else if (changed) {
+              const notificationRef = db.collection('notifications').doc('pss_due_' + String(plan.planId) + '_' + String(now.toMillis()));
+              const notificationSnap = await transaction.get(notificationRef);
+              if (!notificationSnap.exists) {
+                transaction.create(notificationRef, { uid: String(plan.customerId), type: 'pay_small_small.payment_due', title: 'Pay Small Small payment due', message: 'An installment on your Pay Small Small plan is now due.', planId: String(plan.planId), createdAt: now, read: false });
+                reminded++;
+              }
+            }
+            if (Object.keys(update).length > 1) transaction.update(ref, update);
           });
-          const oldestOverdue = next.filter((x: any) => String(x.status || '') === 'overdue' && x.overdueAt && typeof x.overdueAt.toMillis === 'function').sort((a: any,b: any)=>a.overdueAt.toMillis()-b.overdueAt.toMillis())[0];
-          const oldestMs = oldestOverdue?.overdueAt?.toMillis?.() || 0;
-          const age = oldestMs ? now.toMillis() - oldestMs : 0;
-          const update: any = { updatedAt: now };
-          if (changed) update.installments = next;
-          if (oldestMs && age >= graceMs && age < cancelMs && String(plan.missedPaymentState || '') !== 'grace') { update.missedPaymentState = 'grace'; update.graceStartedAt = now; grace++; }
-          if (oldestMs && age >= cancelMs) {
-            const customerId = String(plan.customerId || '');
-            const walletRef = db.collection('wallets').doc(customerId);
-            const walletSnap = await transaction.get(walletRef);
-            if (!walletSnap.exists) throw new Error('WALLET_NOT_FOUND');
-            const wallet = walletSnap.data() || {};
-            const balance = Number(wallet.availableBalanceMinor);
-            if (!Number.isSafeInteger(balance) || String(wallet.status || '') !== 'active') throw new Error('WALLET_UNAVAILABLE');
-            const refundAmount = Number(plan.paidAmountMinor || 0);
-            if (!Number.isSafeInteger(refundAmount) || refundAmount < 0) throw new Error('INVALID_REFUND');
-            if (refundAmount > 0) {
-              const refundTx = db.collection('transactions').doc();
-              const refundRef = 'UP-PSS-REF-' + refundTx.id;
-              const holdDebit = db.collection('ledgerEntries').doc();
-              const customerCredit = db.collection('ledgerEntries').doc();
-              transaction.create(refundTx, { id: refundTx.id, reference: refundRef, senderId: String(plan.planId), recipientId: customerId, amount: refundAmount, currency: 'NGN', type: 'refund', sourceModule: 'unique_pay_small_small.cancellation_refund', provider: 'unique_pay_internal_wallet', status: 'completed', relatedOrderIds: [String(plan.orderId)], createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' });
-              transaction.create(holdDebit, { id: holdDebit.id, transactionId: refundTx.id, reference: refundRef, uid: String(plan.planId), direction: 'debit', amountMinor: refundAmount, currency: 'NGN', status: 'completed', createdAt: now, accountType: 'pay_small_small_hold' });
-              transaction.create(customerCredit, { id: customerCredit.id, transactionId: refundTx.id, reference: refundRef, uid: customerId, direction: 'credit', amountMinor: refundAmount, currency: 'NGN', status: 'completed', createdAt: now, accountType: 'wallet_refund' });
-              transaction.update(walletRef, { availableBalanceMinor: balance + refundAmount, updatedAt: now });
-              update.cancellationRefundTransactionId = refundTx.id;
-            }
-            update.status = 'cancelled'; update.missedPaymentState = 'cancelled'; update.cancelledAt = now; update.cancelReason = 'missed_payment';
-            update.paidAmountMinor = 0; update.remainingAmountMinor = Number(plan.totalAmountMinor || 0);
-            transaction.update(db.collection('orders').doc(String(plan.orderId)), { paySmallSmallStatus: 'cancelled', paymentStatus: 'refunded', status: 'cancelled', updatedAt: now });
-            transaction.create(db.collection('audit_logs').doc(), { action: 'pay_small_small.cancelled_for_missed_payment', actorUid: 'system', targetUid: customerId, resource: 'pay_small_pay_small_plan', resourceId: String(plan.planId), orderId: String(plan.orderId), refundAmountMinor: refundAmount, createdAt: now, timestamp: now });
-            cancelled++;
-          } else if (oldestMs && age >= graceMs) {
-            transaction.create(db.collection('notifications').doc(), { uid: String(plan.customerId), type: 'pay_small_small.payment_overdue', title: 'Pay Small Small payment overdue', message: 'Your installment is overdue. Please make the payment during the grace period to keep your plan active.', planId: String(plan.planId), createdAt: now, read: false }); reminded++;
-          } else if (changed) {
-            transaction.create(db.collection('notifications').doc(), { uid: String(plan.customerId), type: 'pay_small_small.payment_due', title: 'Pay Small Small payment due', message: 'An installment on your Pay Small Small plan is now due.', planId: String(plan.planId), createdAt: now, read: false }); reminded++;
-          }
-          if (Object.keys(update).length > 1) transaction.update(ref, update);
-        });
+        }
+
+        if (snap.size < pageSize) break;
       }
-      return res.json({ ok: true, scanned: snap.size, overdue, grace, cancelled, reminded });
+
+      return res.json({ ok: true, scanned, overdue, grace, cancelled, reminded });
     } catch (error) {
       console.error('Pay Small Small system sync failed:', error);
       return fail(res, 'SERVICE_UNAVAILABLE', 'Pay Small Small scheduled processing failed safely.', 503);
