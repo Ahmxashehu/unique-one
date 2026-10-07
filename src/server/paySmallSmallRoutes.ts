@@ -67,7 +67,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         transaction.create(planRef, plan);
         transaction.update(orderRef, { paySmallSmallPlanId: planRef.id, paySmallSmallStatus: 'draft', updatedAt: now });
         transaction.create(idemRef, { uid, planId: planRef.id, orderId, createdAt: now });
-        transaction.create(db.collection('audit_logs').doc(), { action: 'pay_small_small.plan_created', actorUid: uid, targetUid: uid, resource: 'pay_small_small_plan', resourceId: planRef.id, orderId, timestamp: now, createdAt: now });
+        transaction.create(db.collection('audit_logs').doc(), { action: 'pay_small_small.plan_created', actorUid: uid, targetUid: uid, resource: 'pay_small_pay_small_plan', resourceId: planRef.id, orderId, timestamp: now, createdAt: now });
         return { ...plan, replayed: false };
       });
       return res.status(201).json(result);
@@ -81,7 +81,6 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
       return fail(res, 'SERVICE_UNAVAILABLE', 'The Pay Small Small plan could not be created safely.', 503);
     }
   });
-
 
   app.post('/api/pay-small-small/plans/:planId/deposit', limiter, authenticate, async (req, res) => {
     const uid = String((req as any).user?.uid || '');
@@ -127,8 +126,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         });
         transaction.create(debitRef, {
           id: debitRef.id, transactionId: txRef.id, reference, uid, direction: 'debit',
-          amountMinor: deposit, currency: 'NGN', status: 'completed', idempotencyKey,
-          createdAt: now
+          amountMinor: deposit, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now
         });
         transaction.create(holdRef, { id: holdRef.id, transactionId: txRef.id, reference, uid: String(plan.planId), direction: 'credit', amountMinor: deposit, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now, accountType: 'pay_small_small_hold' });
         transaction.update(walletRef, { availableBalanceMinor: balance - deposit, updatedAt: now });
@@ -321,19 +319,14 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
       const graceMs = 3 * 24 * 60 * 60 * 1000;
       const cancelMs = 7 * 24 * 60 * 60 * 1000;
       const pageSize = 100;
-      let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+      let lastDoc: any = null;
       let scanned = 0, overdue = 0, grace = 0, cancelled = 0, reminded = 0;
-
       while (true) {
-        let query = db.collection('paySmallSmallPlans')
-          .where('status', '==', 'active')
-          .orderBy('__name__')
-          .limit(pageSize);
+        let query = db.collection('paySmallSmallPlans').where('status', '==', 'active').orderBy('__name__').limit(pageSize);
         if (lastDoc) query = query.startAfter(lastDoc);
         const snap = await query.get();
         if (snap.empty) break;
         lastDoc = snap.docs[snap.docs.length - 1];
-
         for (const doc of snap.docs) {
           scanned++;
           await db.runTransaction(async (transaction) => {
@@ -352,20 +345,16 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
               }
               return item;
             });
-            const oldestOverdue = next
-              .filter((x: any) => String(x.status || '') === 'overdue' && x.overdueAt && typeof x.overdueAt.toMillis === 'function')
-              .sort((a: any, b: any) => a.overdueAt.toMillis() - b.overdueAt.toMillis())[0];
+            const oldestOverdue = next.filter((x: any) => String(x.status || '') === 'overdue' && x.overdueAt && typeof x.overdueAt.toMillis === 'function').sort((a: any, b: any) => a.overdueAt.toMillis() - b.overdueAt.toMillis())[0];
             const oldestMs = oldestOverdue?.overdueAt?.toMillis?.() || 0;
             const age = oldestMs ? now.toMillis() - oldestMs : 0;
             const update: any = { updatedAt: now };
             if (changed) update.installments = next;
-
             if (oldestMs && age >= graceMs && age < cancelMs && String(plan.missedPaymentState || '') !== 'grace') {
               update.missedPaymentState = 'grace';
               update.graceStartedAt = now;
               grace++;
             }
-
             if (oldestMs && age >= cancelMs) {
               const customerId = String(plan.customerId || '');
               const walletRef = db.collection('wallets').doc(customerId);
@@ -374,7 +363,6 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
               const wallet = walletSnap.data() || {};
               const balance = Number(wallet.availableBalanceMinor);
               if (!Number.isSafeInteger(balance) || String(wallet.status || '') !== 'active') throw new Error('WALLET_UNAVAILABLE');
-
               const refundAmount = Number(plan.paidAmountMinor || 0);
               if (!Number.isSafeInteger(refundAmount) || refundAmount < 0) throw new Error('INVALID_REFUND');
               if (refundAmount > 0) {
@@ -415,14 +403,177 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
             if (Object.keys(update).length > 1) transaction.update(ref, update);
           });
         }
-
         if (snap.size < pageSize) break;
       }
-
       return res.json({ ok: true, scanned, overdue, grace, cancelled, reminded });
     } catch (error) {
       console.error('Pay Small Small system sync failed:', error);
       return fail(res, 'SERVICE_UNAVAILABLE', 'Pay Small Small scheduled processing failed safely.', 503);
+    }
+  });
+
+  app.get('/api/pay-small-small/system/reconcile', async (req, res) => {
+    const token = typeof req.header('x-pay-small-small-cron-token') === 'string' ? req.header('x-pay-small-small-cron-token') : '';
+    if (!process.env.PAY_SMALL_SMALL_CRON_TOKEN || token !== process.env.PAY_SMALL_SMALL_CRON_TOKEN) return fail(res, 'FORBIDDEN', 'Forbidden.', 403);
+    try {
+      const [plansSnap, depositTxSnap, installmentTxSnap, settlementTxSnap, refundTxSnap, holdSnap, sellerCreditSnap, customerRefundSnap] = await Promise.all([
+        db.collection('paySmallSmallPlans').get(),
+        db.collection('transactions').where('sourceModule', '==', 'unique_pay_small_small.deposit').get(),
+        db.collection('transactions').where('sourceModule', '==', 'unique_pay_small_small.installment').get(),
+        db.collection('transactions').where('sourceModule', '==', 'unique_pay_small_small.settlement').get(),
+        db.collection('transactions').where('sourceModule', '==', 'unique_pay_small_small.cancellation_refund').get(),
+        db.collection('ledgerEntries').where('accountType', '==', 'pay_small_small_hold').get(),
+        db.collection('ledgerEntries').where('accountType', '==', 'seller_settlement').get(),
+        db.collection('ledgerEntries').where('accountType', '==', 'wallet_refund').get()
+      ]);
+
+      type Finding = { code: string; severity: 'critical' | 'high' | 'medium'; planId?: string; transactionId?: string; amountMinor?: number; detail: string };
+      const findings: Finding[] = [];
+      const planMap = new Map<string, any>();
+      const orderMap = new Map<string, string>();
+      for (const doc of plansSnap.docs) {
+        const plan = doc.data() || {};
+        const planId = String(plan.planId || doc.id);
+        planMap.set(planId, plan);
+        orderMap.set(String(plan.orderId || ''), planId);
+      }
+
+      const txDocs = [...depositTxSnap.docs, ...installmentTxSnap.docs, ...settlementTxSnap.docs, ...refundTxSnap.docs];
+      const txMap = new Map<string, any>();
+      const addFinding = (finding: Finding) => findings.push(finding);
+      for (const doc of txDocs) {
+        const tx = doc.data() || {};
+        const txId = String(tx.id || doc.id);
+        if (txMap.has(txId)) {
+          addFinding({ code: 'DUPLICATE_TRANSACTION_ID', severity: 'critical', transactionId: txId, detail: 'The same transaction ID appears in multiple Pay Small Small transaction streams.' });
+        }
+        txMap.set(txId, tx);
+      }
+
+      const ledgerByTx = new Map<string, any[]>();
+      const allLedgerDocs = [...holdSnap.docs, ...sellerCreditSnap.docs, ...customerRefundSnap.docs];
+      for (const doc of allLedgerDocs) {
+        const entry = doc.data() || {};
+        const txId = String(entry.transactionId || '');
+        if (!txId) {
+          addFinding({ code: 'ORPHAN_LEDGER_ENTRY', severity: 'high', detail: 'Pay Small Small ledger entry has no transactionId.' });
+          continue;
+        }
+        const list = ledgerByTx.get(txId) || [];
+        list.push(entry);
+        ledgerByTx.set(txId, list);
+      }
+
+      const fundingByPlan = new Map<string, number>();
+      const settlementByPlan = new Map<string, number>();
+      const refundByPlan = new Map<string, number>();
+      const installmentTxByPlan = new Map<string, Set<string>>();
+      const settlementTxByPlan = new Map<string, Set<string>>();
+      const refundTxByPlan = new Map<string, Set<string>>();
+
+      const expectedLedgerCount = new Map<string, number>();
+      for (const [txId, tx] of txMap) {
+        const module = String(tx.sourceModule || '');
+        const planId = String(tx.recipientId || tx.senderId || '');
+        const amount = Number(tx.amount);
+        if (!PLAN_ID.test(planId) || !planMap.has(planId)) {
+          addFinding({ code: 'ORPHAN_TRANSACTION', severity: 'critical', transactionId: txId, amountMinor: Number.isSafeInteger(amount) ? amount : undefined, detail: 'Pay Small Small transaction references a plan that does not exist.' });
+          continue;
+        }
+        if (!Number.isSafeInteger(amount) || amount <= 0) {
+          addFinding({ code: 'INVALID_TRANSACTION_AMOUNT', severity: 'critical', planId, transactionId: txId, detail: 'Pay Small Small transaction has an invalid amount.' });
+          continue;
+        }
+        const ledgers = ledgerByTx.get(txId) || [];
+        const required = module === 'unique_pay_small_small.deposit' || module === 'unique_pay_small_small.installment' || module === 'unique_pay_small_small.settlement' || module === 'unique_pay_small_small.cancellation_refund' ? 2 : 0;
+        expectedLedgerCount.set(txId, required);
+        if (ledgers.length !== required) {
+          addFinding({ code: 'LEDGER_TRANSACTION_MISMATCH', severity: 'critical', planId, transactionId: txId, amountMinor: amount, detail: 'Expected exactly two balanced ledger entries for this Pay Small Small transaction.' });
+        }
+        const debit = ledgers.filter(x => String(x.direction || '') === 'debit').reduce((s, x) => s + Number(x.amountMinor || 0), 0);
+        const credit = ledgers.filter(x => String(x.direction || '') === 'credit').reduce((s, x) => s + Number(x.amountMinor || 0), 0);
+        if (debit !== amount || credit !== amount) {
+          addFinding({ code: 'LEDGER_AMOUNT_IMBALANCE', severity: 'critical', planId, transactionId: txId, amountMinor: amount, detail: 'Ledger debit/credit does not balance to the transaction amount.' });
+        }
+        if (module === 'unique_pay_small_small.deposit' || module === 'unique_pay_small_small.installment') {
+          const fundingPlanId = String(tx.recipientId || '');
+          fundingByPlan.set(fundingPlanId, (fundingByPlan.get(fundingPlanId) || 0) + amount);
+          if (module === 'unique_pay_small_small.installment') {
+            const set = installmentTxByPlan.get(fundingPlanId) || new Set<string>();
+            set.add(txId);
+            installmentTxByPlan.set(fundingPlanId, set);
+          }
+        } else if (module === 'unique_pay_small_small.settlement') {
+          const settlementPlanId = String(tx.senderId || '');
+          settlementByPlan.set(settlementPlanId, (settlementByPlan.get(settlementPlanId) || 0) + amount);
+          const set = settlementTxByPlan.get(settlementPlanId) || new Set<string>();
+          set.add(txId);
+          settlementTxByPlan.set(settlementPlanId, set);
+        } else if (module === 'unique_pay_small_small.cancellation_refund') {
+          const refundPlanId = String(tx.senderId || '');
+          refundByPlan.set(refundPlanId, (refundByPlan.get(refundPlanId) || 0) + amount);
+          const set = refundTxByPlan.get(refundPlanId) || new Set<string>();
+          set.add(txId);
+          refundTxByPlan.set(refundPlanId, set);
+        }
+      }
+
+      for (const [txId] of ledgerByTx) {
+        if (!txMap.has(txId)) addFinding({ code: 'ORPHAN_LEDGER_TRANSACTION', severity: 'critical', transactionId: txId, detail: 'Pay Small Small ledger entry references a transaction that is not a Pay Small Small transaction.' });
+      }
+
+      for (const [planId, plan] of planMap) {
+        const total = Number(plan.totalAmountMinor);
+        const paid = Number(plan.paidAmountMinor || 0);
+        const remaining = Number(plan.remainingAmountMinor);
+        const funding = fundingByPlan.get(planId) || 0;
+        const settlement = settlementByPlan.get(planId) || 0;
+        const refund = refundByPlan.get(planId) || 0;
+        const installmentPaid = Array.isArray(plan.installments) ? plan.installments.filter((x: any) => String(x.status || '') === 'paid').reduce((s: number, x: any) => s + Number(x.amountMinor || 0), 0) : 0;
+        const expectedPaid = funding;
+        if (!Number.isSafeInteger(total) || total <= 0 || !Number.isSafeInteger(paid) || !Number.isSafeInteger(remaining)) {
+          addFinding({ code: 'PLAN_AMOUNT_INVALID', severity: 'critical', planId, detail: 'Plan contains invalid monetary totals.' });
+          continue;
+        }
+        if (plan.status === 'draft' && funding !== 0) addFinding({ code: 'DRAFT_FUNDED', severity: 'high', planId, amountMinor: funding, detail: 'Draft plan has Pay Small Small funding transactions.' });
+        if (plan.status === 'active' && paid !== expectedPaid) addFinding({ code: 'PLAN_PAID_AMOUNT_MISMATCH', severity: 'critical', planId, amountMinor: paid, detail: 'Plan paidAmountMinor does not equal the sum of deposit and installment funding.' });
+        if (plan.status === 'completed' && (paid !== total || settlement !== total)) addFinding({ code: 'COMPLETED_PLAN_SETTLEMENT_MISMATCH', severity: 'critical', planId, amountMinor: settlement, detail: 'Completed plan does not have exactly one full settlement equal to the plan total.' });
+        if (plan.status === 'cancelled' && refund > funding) addFinding({ code: 'OVER_REFUND', severity: 'critical', planId, amountMinor: refund, detail: 'Cancellation refunds exceed total customer funding.' });
+        if (plan.status === 'cancelled' && paid !== 0) addFinding({ code: 'CANCELLED_PAID_BALANCE', severity: 'high', planId, amountMinor: paid, detail: 'Cancelled plan still reports a non-zero paidAmountMinor after refund processing.' });
+        if (remaining !== Math.max(total - paid, 0)) addFinding({ code: 'PLAN_REMAINING_MISMATCH', severity: 'critical', planId, amountMinor: remaining, detail: 'Plan remainingAmountMinor does not equal totalAmountMinor minus paidAmountMinor.' });
+        if (installmentPaid !== Math.max(paid - Number(plan.depositAmountMinor || 0), 0) && ['active', 'completed'].includes(String(plan.status || ''))) {
+          addFinding({ code: 'INSTALLMENT_TOTAL_MISMATCH', severity: 'high', planId, amountMinor: installmentPaid, detail: 'Paid installment amounts do not reconcile to plan paid amount after deposit.' });
+        }
+        if (settlement > 0 && settlementTxByPlan.get(planId)?.size !== 1) addFinding({ code: 'DUPLICATE_SETTLEMENT', severity: 'critical', planId, amountMinor: settlement, detail: 'More than one settlement transaction exists for this plan.' });
+        if (refund > 0 && refundTxByPlan.get(planId)?.size !== 1) addFinding({ code: 'DUPLICATE_REFUND', severity: 'critical', planId, amountMinor: refund, detail: 'More than one cancellation refund transaction exists for this plan.' });
+        if (settlement > funding) addFinding({ code: 'SETTLEMENT_EXCEEDS_FUNDING', severity: 'critical', planId, amountMinor: settlement, detail: 'Seller settlement exceeds customer funding.' });
+        if (refund > funding) addFinding({ code: 'REFUND_EXCEEDS_FUNDING', severity: 'critical', planId, amountMinor: refund, detail: 'Customer refunds exceed customer funding.' });
+        const expectedHold = funding - settlement - refund;
+        const actualHold = allLedgerDocs
+          .filter(x => String(x.data?.().uid || '') === planId)
+          .reduce((s, x) => s + (String(x.data?.().direction || '') === 'credit' ? Number(x.data?.().amountMinor || 0) : -Number(x.data?.().amountMinor || 0)), 0);
+        if (actualHold !== expectedHold) addFinding({ code: 'HOLD_BALANCE_MISMATCH', severity: 'critical', planId, amountMinor: actualHold, detail: 'Pay Small Small hold ledger balance does not reconcile to funding minus settlements and refunds.' });
+      }
+
+      return res.json({
+        ok: findings.length === 0,
+        readOnly: true,
+        checkedAt: Timestamp.now(),
+        counts: {
+          plans: plansSnap.size,
+          transactions: txDocs.length,
+          ledgerEntries: allLedgerDocs.length,
+          findings: findings.length,
+          critical: findings.filter(x => x.severity === 'critical').length,
+          high: findings.filter(x => x.severity === 'high').length,
+          medium: findings.filter(x => x.severity === 'medium').length
+        },
+        findings: findings.slice(0, 500),
+        truncatedFindings: findings.length > 500
+      });
+    } catch (error) {
+      console.error('Pay Small Small reconciliation failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'Pay Small Small reconciliation could not be completed safely.', 503);
     }
   });
 
