@@ -3900,6 +3900,90 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.post("/api/store/orders/:orderId/dispute", authenticate, rateLimit({
+    windowMs: 60_000, limit: 5, standardHeaders: true, legacyHeaders: false,
+    store: createFirestoreRateLimitStore('storeDisputeRateLimits', 60_000),
+    keyGenerator: (req) => isSafeFirebaseUid((req as any).user?.uid) ? (req as any).user.uid : ipKeyGenerator(req.ip),
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Store dispute requests. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const orderId = req.params.orderId;
+      const idempotencyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey.trim() : '';
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : '';
+      const evidence = Array.isArray(req.body?.evidence) ? req.body.evidence.filter((v: unknown) => typeof v === 'string').map((v: string) => v.trim().slice(0, 500)).filter(Boolean).slice(0, 10) : [];
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId) || !/^[A-Za-z0-9_-]{1,200}$/.test(idempotencyKey) || !reason) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid order, idempotency key, and dispute reason are required.');
+      }
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const orderRef = adminDb.collection('orders').doc(orderId);
+        const idemRef = adminDb.collection('storeDisputeIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
+        const existing = await transaction.get(idemRef);
+        if (existing.exists) return existing.data();
+        const orderSnap = await transaction.get(orderRef);
+        if (!orderSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
+        const order = orderSnap.data() as Record<string, unknown>;
+        if (order.customerId !== uid) throw new RequestValidationError('FORBIDDEN', 'You can only dispute your own Store order.');
+        if (order.currency !== 'NGN' || order.paymentStatus !== 'paid') throw new RequestValidationError('INVALID_REQUEST', 'Only paid NGN Store orders can be disputed.');
+        if (!['confirmed','processing','ready_for_pickup','shipped','out_for_delivery','delivered','completed'].includes(String(order.status))) throw new RequestValidationError('INVALID_REQUEST', 'This Store order is not eligible for dispute.');
+        const existingDispute = order.dispute && typeof order.dispute === 'object' ? order.dispute as Record<string, unknown> : null;
+        if (existingDispute && ['opened','seller_responded','under_review','resolved'].includes(String(existingDispute.status))) {
+          throw new RequestValidationError('INVALID_REQUEST', 'A dispute already exists for this order.');
+        }
+        const now = Timestamp.now().toDate().toISOString();
+        const dispute = { status: 'opened', reason, evidence, openedBy: uid, openedAt: now, updatedAt: now };
+        transaction.update(orderRef, { dispute, updatedAt: now });
+        transaction.create(idemRef, { uid, orderId, idempotencyKey, status: 'opened', createdAt: now, updatedAt: now });
+        transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.dispute.opened', actorUid: uid, targetUid: order.sellerId, resource: 'store_order', resourceId: orderId, reason, evidence, timestamp: Timestamp.now(), createdAt: now });
+        return { orderId, status: 'opened', dispute };
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Store dispute creation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The Store dispute could not be created safely.');
+    }
+  });
+
+  app.post("/api/store/orders/:orderId/dispute-response", authenticate, rateLimit({
+    windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false,
+    store: createFirestoreRateLimitStore('storeDisputeResponseRateLimits', 60_000),
+    keyGenerator: (req) => isSafeFirebaseUid((req as any).user?.uid) ? (req as any).user.uid : ipKeyGenerator(req.ip),
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Store dispute responses. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const orderId = req.params.orderId;
+      const response = typeof req.body?.response === 'string' ? req.body.response.trim().slice(0, 2000) : '';
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId) || !response) return errorResponse(res, 'INVALID_REQUEST', 'A valid order and seller response are required.');
+      const rolesSnap = await adminDb.collection('users').doc(uid).get();
+      const roles = Array.isArray(rolesSnap.data()?.roles) ? rolesSnap.data()?.roles.filter((v: unknown) => typeof v === 'string') as any[] : [];
+      const permissions = Array.isArray(rolesSnap.data()?.permissions) ? rolesSnap.data()?.permissions.filter((v: unknown) => typeof v === 'string') as any[] : [];
+      const ref = adminDb.collection('orders').doc(orderId);
+      const snap = await ref.get();
+      if (!snap.exists) return errorResponse(res, 'NOT_FOUND', 'The Store order was not found.');
+      const order = snap.data() as Record<string, unknown>;
+      if (uid !== order.sellerId && !hasRolePermission(roles, permissions, 'manage:disputes')) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to respond to this dispute.');
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const currentSnap = await transaction.get(ref);
+        if (!currentSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
+        const current = currentSnap.data() as Record<string, unknown>;
+        const dispute = current.dispute && typeof current.dispute === 'object' ? current.dispute as Record<string, unknown> : null;
+        if (!dispute || dispute.status !== 'opened') throw new RequestValidationError('INVALID_REQUEST', 'This dispute is not awaiting a seller response.');
+        const now = Timestamp.now().toDate().toISOString();
+        const next = { ...dispute, status: 'seller_responded', sellerResponse: response, respondedBy: uid, respondedAt: now, updatedAt: now };
+        transaction.update(ref, { dispute: next, updatedAt: now });
+        transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.dispute.seller_responded', actorUid: uid, targetUid: current.customerId, resource: 'store_order', resourceId: orderId, timestamp: Timestamp.now(), createdAt: now });
+        return { orderId, status: 'seller_responded', dispute: next };
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Store dispute response failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'The Store dispute response could not be recorded safely.');
+    }
+  });
+
   app.post("/api/store/orders/:orderId/return-request", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 10,
