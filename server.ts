@@ -4448,7 +4448,6 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         .where('relatedOrderIds', 'array-contains', orderId)
         .where('recordKind', '==', 'financial')
         .where('amountUnit', '==', 'minor')
-        .limit(20)
         .get();
 
       const settlements = txSnap.docs.map((doc) => {
@@ -4462,27 +4461,64 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           currency: data.currency === 'NGN' ? 'NGN' : null,
           status: typeof data.status === 'string' ? data.status : null,
           type: typeof data.type === 'string' ? data.type : null,
+          reversalOfTransactionId: typeof data.reversalOfTransactionId === 'string' ? data.reversalOfTransactionId : null,
           createdAt: typeof (data.createdAt as { toDate?: unknown })?.toDate === 'function' ? (data.createdAt as { toDate: () => Date }).toDate().toISOString() : null,
         };
       });
 
-      const originalPaidMinor = settlements
-        .filter((tx) => tx.type === 'merchant_payment' && tx.status === 'completed' && tx.currency === 'NGN')
-        .reduce((sum, tx) => sum + (tx.amountMinor || 0), 0);
-      const refundedMinor = settlements
-        .filter((tx) => tx.type === 'refund' && tx.status === 'completed' && tx.currency === 'NGN')
-        .reduce((sum, tx) => sum + (tx.amountMinor || 0), 0);
+      const validFinancialTransactions = settlements.filter((tx) =>
+        tx.currency === 'NGN' &&
+        tx.status === 'completed' &&
+        Number.isSafeInteger(tx.amountMinor) &&
+        (tx.amountMinor || 0) > 0
+      );
+      const originalPayments = validFinancialTransactions.filter((tx) =>
+        tx.type === 'merchant_payment' &&
+        tx.senderId === customerId &&
+        tx.recipientId === sellerId
+      );
+      const refunds = validFinancialTransactions.filter((tx) =>
+        tx.type === 'refund' &&
+        tx.senderId === sellerId &&
+        tx.recipientId === customerId &&
+        Boolean(tx.reversalOfTransactionId)
+      );
+      const originalPaidMinor = originalPayments.reduce((sum, tx) => sum + (tx.amountMinor || 0), 0);
+      const refundedMinor = refunds.reduce((sum, tx) => sum + (tx.amountMinor || 0), 0);
+      const orderAmountMinor = Number(order.amountMinor);
+      const amountsValid = Number.isSafeInteger(orderAmountMinor) && orderAmountMinor > 0;
+      const overRefunded = refundedMinor > originalPaidMinor && originalPaidMinor > 0;
+      const paymentMatchesOrder = amountsValid && originalPaidMinor === orderAmountMinor;
+      const refundWithinPayment = refundedMinor <= originalPaidMinor;
       const netPaidMinor = Math.max(0, originalPaidMinor - refundedMinor);
       const declaredPaymentStatus = ['paid', 'partially_refunded', 'refunded'].includes(String(order.paymentStatus))
         ? String(order.paymentStatus)
         : 'unpaid';
-      const derivedPaymentStatus = refundedMinor >= originalPaidMinor && originalPaidMinor > 0
+      const derivedPaymentStatus = originalPaidMinor > 0 && refundedMinor === originalPaidMinor
         ? 'refunded'
         : refundedMinor > 0
           ? 'partially_refunded'
           : originalPaidMinor > 0
             ? 'paid'
             : 'unpaid';
+      const reconciliationStatus = !amountsValid
+        ? 'invalid_order_amount'
+        : originalPaidMinor === 0
+          ? 'missing_payment'
+          : !paymentMatchesOrder
+            ? 'payment_amount_mismatch'
+            : overRefunded
+              ? 'over_refunded'
+              : !refundWithinPayment
+                ? 'refund_amount_mismatch'
+                : refundedMinor === orderAmountMinor
+                  ? 'refunded'
+                  : refundedMinor > 0
+                    ? 'partially_refunded'
+                    : 'matched';
+      const reconciled = reconciliationStatus === 'matched' ||
+        reconciliationStatus === 'partially_refunded' ||
+        reconciliationStatus === 'refunded';
       return res.status(200).json({
         orderId,
         paymentStatus: declaredPaymentStatus,
@@ -4492,7 +4528,10 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         netPaidMinor,
         orderStatus: typeof order.status === 'string' ? order.status : null,
         settlements,
-        reconciled: originalPaidMinor > 0 && netPaidMinor >= 0,
+        reconciliationStatus,
+        paymentMatchesOrder,
+        refundWithinPayment,
+        reconciled,
       });
     } catch (error) {
       console.error('Store settlement reconciliation read failed:', error);
