@@ -109,6 +109,7 @@ export async function executeFinancialRefund(
   const originalRef = db.collection('transactions').doc(input.originalTransactionId);
 
   return db.runTransaction(async (transaction) => {
+    const now = Timestamp.now();
     const idemSnap = await transaction.get(idempotencyRef);
     const requestFingerprint = fingerprint(input);
 
