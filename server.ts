@@ -4411,6 +4411,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         relatedOrderId: orderId,
         sourceModule: 'unique_store.refund',
         finalizeOrder: partialReturnRefund ? 'partial' : 'full',
+        releaseInventory: customerMayUseDirectRefund && !partialReturnRefund,
       });
       if ('error' in result) {
         const status = result.error.code === 'REFUND_IN_PROGRESS' || result.error.code === 'REFUND_EXCEEDS_REMAINING' || result.error.code === 'IDEMPOTENCY_CONFLICT' ? 409 :
