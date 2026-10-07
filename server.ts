@@ -4048,22 +4048,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         relatedOrderId: orderId,
         sourceModule: 'unique_store.dispute',
         finalizeOrder: 'full',
+        finalizeDispute: { decision: 'approve_refund', reason, actorUid: uid },
       });
       if ('error' in refund) {
         const status = ['REFUND_IN_PROGRESS','REFUND_EXCEEDS_REMAINING','IDEMPOTENCY_CONFLICT','INSUFFICIENT_FUNDS'].includes(refund.error.code) ? 409 : refund.error.code === 'ORIGINAL_NOT_FOUND' ? 404 : 400;
         return res.status(status).json({ error: refund.error });
       }
-      const now = Timestamp.now();
-      await adminDb.runTransaction(async transaction => {
-        const ref = adminDb.collection('orders').doc(orderId);
-        const currentSnap = await transaction.get(ref);
-        if (!currentSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
-        const current = currentSnap.data() as Record<string, unknown>;
-        const currentDispute = current.dispute && typeof current.dispute === 'object' ? current.dispute as Record<string, unknown> : null;
-        if (!currentDispute || currentDispute.status !== 'under_review' || currentDispute.reviewStartedBy !== uid) throw new RequestValidationError('INVALID_REQUEST', 'This dispute is not locked to the current reviewer.');
-        transaction.update(ref, { dispute: { ...currentDispute, status: 'resolved', decision: 'approve_refund', resolutionReason: reason, resolvedBy: uid, resolvedAt: now, refundTransactionId: refund.transactionId }, updatedAt: now });
-        transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.dispute.refund_approved', actorUid: uid, resource: 'store_order', resourceId: orderId, refundTransactionId: refund.transactionId, amountMinor, reason, timestamp: now, createdAt: now });
-      });
       return res.status(200).json({ orderId, status: 'resolved', decision: 'approve_refund', refund });
     } catch (error) {
       if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
