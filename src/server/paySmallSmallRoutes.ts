@@ -99,7 +99,12 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const [planSnap, credentialSnap, walletSnap, idemSnap] = await Promise.all([
           transaction.get(planRef), transaction.get(credentialRef), transaction.get(walletRef), transaction.get(idemRef)
         ]);
-        if (idemSnap.exists) return { ...(idemSnap.data()?.result || {}), replayed: true };
+        if (idemSnap.exists) {
+          const existing = idemSnap.data() || {};
+          const expectedFingerprint = planId + '|deposit';
+          if (String(existing.requestFingerprint || '') !== expectedFingerprint) throw new Error('IDEMPOTENCY_CONFLICT');
+          return { ...(existing.result || {}), replayed: true };
+        }
         if (!planSnap.exists) throw new Error('PLAN_NOT_FOUND');
         if (!credentialSnap.exists) throw new Error('USER_NOT_FOUND');
         if (!walletSnap.exists) throw new Error('WALLET_NOT_FOUND');
@@ -151,7 +156,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
           updatedAt: now
         });
         const result = { status: 'active', planId, transactionId: txRef.id, amountMinor: deposit, idempotencyKey };
-        transaction.create(idemRef, { uid, planId, transactionId: txRef.id, requestFingerprint: planId + '|' + deposit, result, createdAt: now });
+        transaction.create(idemRef, { uid, planId, transactionId: txRef.id, requestFingerprint: planId + '|deposit', result, createdAt: now });
         transaction.create(db.collection('audit_logs').doc(), {
           action: 'pay_small_small.deposit_completed', actorUid: uid, targetUid: uid,
           resource: 'pay_small_small_plan', resourceId: planId, orderId: String(plan.orderId),
