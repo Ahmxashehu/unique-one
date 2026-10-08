@@ -226,7 +226,11 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
         if (membershipSnap.exists && String(membershipSnap.data()?.status || '') === 'active') {
           const currentRole = String(membershipSnap.data()?.role || '');
           if (currentRole !== role) throw Object.assign(new Error('MEMBERSHIP_ALREADY_ACTIVE'), { code: 'MEMBERSHIP_ALREADY_ACTIVE' });
-        } else {
+        } else if (membershipSnap.exists && String(membershipSnap.data()?.status || '') === 'inactive') {
+          const previousSourceInviteId = String(membershipSnap.data()?.sourceInviteId || '');
+          if (previousSourceInviteId && previousSourceInviteId === inviteId) {
+            throw Object.assign(new Error('MEMBERSHIP_REAUTH_REQUIRED'), { code: 'MEMBERSHIP_REAUTH_REQUIRED' });
+          }
           const now = Timestamp.now();
           transaction.set(membershipRef, {
             uid, businessId, role,
@@ -252,7 +256,7 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
       return res.json({ ok: true, businessId: result.businessId, role: result.role, alreadyAccepted: result.alreadyAccepted });
     } catch (error: any) {
       const code = String(error?.code || '');
-      const statusMap: Record<string, number> = { INVITE_NOT_FOUND: 404, INVITE_NOT_PENDING: 409, INVITE_EMAIL_MISMATCH: 403, INVALID_INVITE: 400, INVALID_BUSINESS_OWNER: 403, INVALID_BRANCH: 403, MEMBERSHIP_ALREADY_ACTIVE: 409 };
+      const statusMap: Record<string, number> = { INVITE_NOT_FOUND: 404, INVITE_NOT_PENDING: 409, INVITE_EMAIL_MISMATCH: 403, INVALID_INVITE: 400, INVALID_BUSINESS_OWNER: 403, INVALID_BRANCH: 403, MEMBERSHIP_ALREADY_ACTIVE: 409, MEMBERSHIP_REAUTH_REQUIRED: 409 };
       const messageMap: Record<string, string> = {
         INVITE_NOT_FOUND: 'Invitation not found.', INVITE_NOT_PENDING: 'This invitation is no longer pending.',
         INVITE_EMAIL_MISMATCH: 'This invitation belongs to a different account email.', INVALID_INVITE: 'This invitation is invalid or incomplete.',
