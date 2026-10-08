@@ -462,4 +462,44 @@ export function registerRestaurantRoutes(app: Express, authenticate: RequestHand
     }
   });
 
+  app.get('/api/restaurants/:restaurantId/menu', limiter, async (req, res) => {
+    const restaurantId = clean(req.params.restaurantId, 128);
+    if (!restaurantId) return fail(res, 'INVALID_REQUEST', 'A valid Restaurant ID is required.');
+    try {
+      const restaurantSnap = await db.collection('restaurants').doc(restaurantId).get();
+      if (!restaurantSnap.exists) return fail(res, 'NOT_FOUND', 'Restaurant not found.', 404);
+      const restaurant = restaurantSnap.data() || {};
+      if (String(restaurant.status || '') !== 'active' || String(restaurant.verificationStatus || '') !== 'verified') {
+        return fail(res, 'UNAVAILABLE', 'This Restaurant is not currently available.', 409);
+      }
+      const snapshot = await db.collection('restaurants').doc(restaurantId).collection('menuItems')
+        .where('available', '==', true).limit(500).get();
+      const items = snapshot.docs.map((doc) => {
+        const item = doc.data() || {};
+        return {
+          id: doc.id,
+          restaurantId,
+          businessId: String(item.businessId || ''),
+          branchId: String(item.branchId || ''),
+          name: String(item.name || ''),
+          category: String(item.category || ''),
+          description: String(item.description || ''),
+          priceMinor: Number(item.priceMinor),
+          currency: 'NGN',
+          available: true,
+        };
+      }).filter((item) =>
+        item.businessId === String(restaurant.businessId || '') &&
+        item.branchId === String(restaurant.branchId || '') &&
+        item.name.length > 0 &&
+        item.category.length > 0 &&
+        Number.isSafeInteger(item.priceMinor) && item.priceMinor > 0
+      );
+      return res.json({ ok: true, restaurantId, items });
+    } catch (error) {
+      console.error('Restaurant menu read failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'Restaurant menu is temporarily unavailable.', 503);
+    }
+  });
+
 }
