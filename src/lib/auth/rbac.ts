@@ -5,7 +5,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
   customer: ['view:profile', 'edit:profile', 'view:transactions'],
   buyer: ['view:profile', 'edit:profile', 'view:transactions', 'manage:orders', 'manage:bookings'],
   seller: ['view:profile', 'edit:profile', 'create:products', 'edit:products', 'manage:inventory', 'manage:orders', 'manage:bookings', 'view:customer_info', 'view:transactions'],
-  business_owner: ['view:profile', 'edit:profile', 'create:products', 'edit:products', 'manage:inventory', 'create:invoices', 'send:payment_requests', 'view:customer_info', 'manage:orders', 'manage:bookings', 'manage:business_staff', 'view:transactions'],
+  business_owner: ['view:profile', 'edit:profile', 'manage:restaurant', 'create:products', 'edit:products', 'manage:inventory', 'create:invoices', 'send:payment_requests', 'view:customer_info', 'manage:orders', 'manage:bookings', 'manage:business_staff', 'view:transactions'],
   staff_member: ['view:profile', 'edit:profile', 'manage:orders', 'manage:bookings'],
   service_provider: ['view:profile', 'edit:profile', 'manage:bookings', 'manage:orders', 'view:customer_info'],
   school_administrator: ['view:profile', 'edit:profile', 'manage:orders', 'manage:bookings', 'view:transactions'],
