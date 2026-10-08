@@ -114,6 +114,19 @@ async function sessionValid(db: Firestore, uid: string, businessId: string, toke
   const session = await getActiveSession(db, uid, token);
   return Boolean(session && session.businessId === businessId);
 }
+\nasync function getAuthorizedBusinessMembership(db: Firestore, uid: string, businessId: string) {
+  const membershipSnap = await db.collection('businessMemberships').doc(credentialId(uid, businessId)).get();
+  if (!membershipSnap.exists || String(membershipSnap.data()?.status || '') !== 'active') return null;
+  const businessSnap = await db.collection('businesses').doc(businessId).get();
+  if (
+    !businessSnap.exists ||
+    String(businessSnap.data()?.status || '') !== 'active' ||
+    String(businessSnap.data()?.verificationStatus || '') !== 'verified' ||
+    !String(businessSnap.data()?.ownerUid || '')
+  ) return null;
+  return { membership: membershipSnap.data() || {}, business: businessSnap.data() || {} };
+}
+
 
 export function registerBusinessAccessRoutes(app: Express, authenticate: RequestHandler, db: Firestore, requirePermission?: (permission: Permission) => RequestHandler) {
   const setupLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 8, standardHeaders: true, legacyHeaders: false });
@@ -316,8 +329,8 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
     if (passwordError) return fail(res, 'INVALID_REQUEST', passwordError);
 
     try {
-      const membershipSnap = await db.collection('businessMemberships').doc(`${uid}__${businessId}`).get();
-      if (!membershipSnap.exists || membershipSnap.data()?.status !== 'active') return fail(res, 'FORBIDDEN', 'You do not have approved access to this business.', 403);
+      const access = await getAuthorizedBusinessMembership(db, uid, businessId);
+      if (!access) return fail(res, 'FORBIDDEN', 'Your Business Platform access is no longer active or the Business is not currently verified.', 403);
 
       const salt = randomBytes(16).toString('hex');
       const hash = scryptSync(password, salt, 64).toString('hex');
@@ -341,8 +354,8 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
     if (!uid || !businessId || !password) return fail(res, 'INVALID_REQUEST', 'Business ID and password are required.');
 
     try {
-      const membershipSnap = await db.collection('businessMemberships').doc(`${uid}__${businessId}`).get();
-      if (!membershipSnap.exists || membershipSnap.data()?.status !== 'active') return fail(res, 'FORBIDDEN', 'You do not have approved access to this business.', 403);
+      const access = await getAuthorizedBusinessMembership(db, uid, businessId);
+      if (!access) return fail(res, 'FORBIDDEN', 'Your Business Platform access is no longer active or the Business is not currently verified.', 403);
 
       const credentialSnap = await db.collection('businessAccessCredentials').doc(credentialId(uid, businessId)).get();
       if (!credentialSnap.exists) return fail(res, 'SETUP_REQUIRED', 'Set your Business Platform password before signing in.', 409);
@@ -377,6 +390,8 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
     try {
       const session = await getActiveSession(db, uid, token);
       if (!session || session.businessId !== businessId) return fail(res, 'BUSINESS_AUTH_REQUIRED', 'Business Platform authentication is required.', 401);
+      const access = await getAuthorizedBusinessMembership(db, uid, businessId);
+      if (!access) return fail(res, 'BUSINESS_AUTH_REQUIRED', 'Your Business Platform access is no longer active or the Business is not currently verified.', 403);
       const credentialSnap = await db.collection('businessAccessCredentials').doc(credentialId(uid, businessId)).get();
       if (!credentialSnap.exists || credentialSnap.data()?.status !== 'active') return fail(res, 'SETUP_REQUIRED', 'Business password setup is required.', 409);
       const credential = credentialSnap.data() || {};
@@ -414,6 +429,8 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
     if (passwordError) return fail(res, 'INVALID_REQUEST', passwordError);
 
     try {
+      const access = await getAuthorizedBusinessMembership(db, uid, businessId);
+      if (!access) return fail(res, 'FORBIDDEN', 'Your Business Platform access is no longer active or the Business is not currently verified.', 403);
       const ref = db.collection('businessAccessCredentials').doc(credentialId(uid, businessId));
       const snap = await ref.get();
       if (!snap.exists || snap.data()?.status !== 'active') return fail(res, 'SETUP_REQUIRED', 'Business password setup is required.', 409);
