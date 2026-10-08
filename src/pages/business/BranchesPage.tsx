@@ -33,19 +33,21 @@ export default function BranchesPage() {
     setLoading(true);
     setError('');
     try {
-      const businessSnap = await getDocs(query(collection(db, 'businesses'), where('ownerUid', '==', currentUser.uid)));
-      if (businessSnap.empty) {
+      const activeBusinessId = localStorage.getItem('unique_business_id') || '';
+      if (!activeBusinessId) {
         setBusinessId(null);
         setBranches([]);
         return;
       }
-      const currentBusiness = businessSnap.docs[0];
-      setBusinessId(currentBusiness.id);
-      const branchSnap = await getDocs(query(collection(db, 'branches'), where('ownerUid', '==', currentUser.uid)));
+      setBusinessId(activeBusinessId);
+      const branchSnap = await getDocs(query(
+        collection(db, 'branches'),
+        where('ownerUid', '==', currentUser.uid),
+        where('businessId', '==', activeBusinessId),
+      ));
       setBranches(
         branchSnap.docs
           .map(item => ({ id: item.id, ...item.data() } as Branch))
-          .filter(branch => branch.businessId === currentBusiness.id)
           .sort((a, b) => String(a.name).localeCompare(String(b.name)))
       );
     } catch (err) {
