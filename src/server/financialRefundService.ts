@@ -22,6 +22,7 @@ export interface FinancialRefundInput {
   actorUid: string;
   reason: string;
   relatedOrderId?: string;
+  relatedRestaurantOrderId?: string;
   sourceModule?: string;
   finalizeOrder?: 'full' | 'partial';
   /** Restore Store inventory for an early full refund before fulfillment. */
@@ -52,6 +53,7 @@ function fingerprint(input: FinancialRefundInput): string {
       input.amountMinor,
       input.currency,
       input.relatedOrderId ?? '',
+      input.relatedRestaurantOrderId ?? '',
       input.reason,
       input.sourceModule ?? '',
       input.finalizeOrder ?? 'full',
@@ -98,6 +100,8 @@ export async function executeFinancialRefund(
     input.currency !== 'NGN' ||
     !input.reason.trim() ||
     (input.relatedOrderId !== undefined && !isSafeId(input.relatedOrderId)) ||
+    (input.relatedRestaurantOrderId !== undefined && !isSafeId(input.relatedRestaurantOrderId)) ||
+    (input.relatedOrderId !== undefined && input.relatedRestaurantOrderId !== undefined) ||
     (input.finalizeOrder !== undefined && input.finalizeOrder !== 'full' && input.finalizeOrder !== 'partial') ||
     (input.releaseInventory === true && (input.sourceModule !== 'unique_store.refund' || input.finalizeOrder !== 'full')) ||
     (input.finalizeDispute !== undefined && (input.finalizeDispute.decision !== 'approve_refund' || !input.finalizeDispute.reason.trim() || !isSafeId(input.finalizeDispute.actorUid) || input.finalizeDispute.actorUid !== input.actorUid))
@@ -164,6 +168,32 @@ export async function executeFinancialRefund(
     const sellerUid = String(original.recipientId);
     if (customerUid === sellerUid) {
       return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'A refund requires distinct customer and seller accounts.' } };
+    }
+    const relatedRestaurantOrderRef = input.relatedRestaurantOrderId ? db.collection('restaurantOrders').doc(input.relatedRestaurantOrderId) : null;
+    let relatedRestaurantOrderData: Record<string, unknown> | null = null;
+    if (relatedRestaurantOrderRef) {
+      if (input.sourceModule !== 'unique_restaurant.refund') {
+        return { error: { code: 'INVALID_REQUEST', message: 'Restaurant refunds must use the Restaurant refund source module.' } };
+      }
+      const restaurantOrderSnap = await transaction.get(relatedRestaurantOrderRef);
+      if (!restaurantOrderSnap.exists) return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Restaurant order was not found.' } };
+      const restaurantOrder = restaurantOrderSnap.data() ?? {};
+      relatedRestaurantOrderData = restaurantOrder as Record<string, unknown>;
+      if (
+        String(restaurantOrder.customerId || '') !== customerUid ||
+        String(restaurantOrder.currency || '') !== 'NGN' ||
+        !['paid', 'cancelled'].includes(String(restaurantOrder.status || '')) ||
+        String(restaurantOrder.paymentStatus || '') !== 'paid'
+      ) {
+        return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Restaurant order is not eligible for refund.' } };
+      }
+      const orderAmount = Number(restaurantOrder.totalMinor);
+      if (!Number.isSafeInteger(orderAmount) || orderAmount <= 0 || orderAmount !== originalAmount || input.amountMinor !== orderAmount) {
+        return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Restaurant payment amount must exactly match the cancelled order amount.' } };
+      }
+      if (String(original.sourceModule || '') !== 'unique_restaurant.checkout' || String(original.relatedOrderIds?.[0] || '') !== input.relatedRestaurantOrderId) {
+        return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The original transaction is not the payment for this Restaurant order.' } };
+      }
     }
     const relatedOrderRef = input.relatedOrderId ? db.collection('orders').doc(input.relatedOrderId) : null;
     let relatedOrderData: Record<string, unknown> | null = null;
@@ -369,6 +399,17 @@ export async function executeFinancialRefund(
       createdAt: now,
     });
 
+    if (relatedRestaurantOrderRef) {
+      transaction.update(relatedRestaurantOrderRef, {
+        status: 'refunded',
+        paymentStatus: 'refunded',
+        refundedAt: now,
+        refundTransactionId: refundRef.id,
+        cancellationReason: (relatedRestaurantOrderData?.cancellationReason as string) || 'customer_requested',
+        updatedAt: now,
+      });
+    }
+
     if (relatedOrderRef) {
       if (input.finalizeOrder === 'partial') {
         const order = relatedOrderData;
@@ -416,7 +457,7 @@ export async function executeFinancialRefund(
       originalTransactionId: input.originalTransactionId,
       amountMinor: input.amountMinor,
       currency: 'NGN',
-      relatedOrderId: input.relatedOrderId ?? null,
+      relatedOrderId: input.relatedOrderId ?? input.relatedRestaurantOrderId ?? null,
       requestFingerprint,
       status: 'completed',
       result,
@@ -432,7 +473,7 @@ export async function executeFinancialRefund(
       resourceId: refundRef.id,
       transactionId: refundRef.id,
       originalTransactionId: input.originalTransactionId,
-      relatedOrderId: input.relatedOrderId ?? null,
+      relatedOrderId: input.relatedOrderId ?? input.relatedRestaurantOrderId ?? null,
       amountMinor: input.amountMinor,
       currency: 'NGN',
       reason: input.reason.trim(),
