@@ -42,8 +42,12 @@ export function registerStoreReturnInspectionRoutes(
         const businessMembership = (req as any).businessMembership as Record<string, unknown> | undefined;
         const activeBusinessId = typeof businessMembership?.businessId === 'string' ? businessMembership.businessId : '';
         const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
+        const orderBranchId = typeof order.branchId === 'string' ? order.branchId : '';
+        const memberBranchId = typeof businessMembership?.branchId === 'string' ? businessMembership.branchId : '';
+        const ownerRole = String(businessMembership?.role || '') === 'business_owner';
+        const branchScopedAccess = ownerRole || (!!memberBranchId && memberBranchId === orderBranchId);
         const globalAdmin = roles.includes('super_admin') || roles.includes('platform_admin');
-        const tenantAccess = Boolean(activeBusinessId && orderBusinessId && orderBusinessId === activeBusinessId);
+        const tenantAccess = Boolean(activeBusinessId && orderBusinessId && orderBusinessId === activeBusinessId && branchScopedAccess);
         const sellerAccess = uid === order.sellerId && (!orderBusinessId || tenantAccess);
         const privilegedBusinessAccess = canManage && (orderBusinessId ? (globalAdmin || tenantAccess) : globalAdmin);
         if (!sellerAccess && !privilegedBusinessAccess) throw new Error('FORBIDDEN');
