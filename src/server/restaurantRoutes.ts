@@ -209,4 +209,85 @@ export function registerRestaurantRoutes(app: Express, authenticate: RequestHand
       }
     });
   }
+  app.post('/api/business/restaurants/:restaurantId/uniquepay/connect', authenticate, limiter, async (req, res) => {
+    const uid = clean((req as any).user?.uid, 128);
+    const membership = ((req as any).businessMembership || {}) as Record<string, unknown>;
+    const session = ((req as any).businessSession || {}) as Record<string, unknown>;
+    const businessId = clean(session.businessId, 128);
+    const restaurantId = clean(req.params.restaurantId, 128);
+    const role = clean(membership.role, 64) as Role;
+    const customPermissions = Array.isArray(membership.permissions)
+      ? membership.permissions.filter((v): v is Permission => typeof v === 'string') as Permission[] : [];
+    if (!uid || !businessId || clean(membership.businessId, 128) !== businessId) {
+      return fail(res, 'BUSINESS_AUTH_REQUIRED', 'An active Business Platform session is required.', 401);
+    }
+    if (!hasRolePermission([role], customPermissions, 'manage:restaurant')) {
+      return fail(res, 'FORBIDDEN', 'Your Business role does not allow Restaurant payment setup.', 403);
+    }
+    const restaurantRef = db.collection('restaurants').doc(restaurantId);
+    const businessRef = db.collection('businesses').doc(businessId);
+    const walletRef = db.collection('wallets').doc(uid);
+    const now = Timestamp.now();
+    try {
+      await db.runTransaction(async (transaction) => {
+        const [restaurantSnap, businessSnap, walletSnap] = await Promise.all([
+          transaction.get(restaurantRef), transaction.get(businessRef), transaction.get(walletRef),
+        ]);
+        if (!restaurantSnap.exists || !businessSnap.exists) throw Object.assign(new Error('NOT_FOUND'), { code: 'NOT_FOUND' });
+        const restaurant = restaurantSnap.data() || {};
+        const business = businessSnap.data() || {};
+        if (
+          String(restaurant.businessId || '') !== businessId ||
+          String(restaurant.ownerUid || '') !== uid ||
+          String(business.ownerUid || '') !== uid ||
+          String(business.status || '') !== 'active' ||
+          String(business.verificationStatus || '') !== 'verified'
+        ) throw Object.assign(new Error('FORBIDDEN'), { code: 'FORBIDDEN' });
+        if (String(restaurant.status || '') !== 'active' || String(restaurant.verificationStatus || '') !== 'verified') {
+          throw Object.assign(new Error('RESTAURANT_NOT_VERIFIED'), { code: 'RESTAURANT_NOT_VERIFIED' });
+        }
+        if (!walletSnap.exists) throw Object.assign(new Error('WALLET_UNAVAILABLE'), { code: 'WALLET_UNAVAILABLE' });
+        const wallet = walletSnap.data() || {};
+        if (String(wallet.currency || '') !== 'NGN' || String(wallet.status || '') !== 'active' ||
+            !Number.isSafeInteger(Number(wallet.availableBalanceMinor)) || Number(wallet.availableBalanceMinor) < 0) {
+          throw Object.assign(new Error('WALLET_UNAVAILABLE'), { code: 'WALLET_UNAVAILABLE' });
+        }
+        const existingWalletId = clean(restaurant.merchantWalletId, 128);
+        if (existingWalletId && existingWalletId !== uid) {
+          throw Object.assign(new Error('WALLET_LOCKED'), { code: 'WALLET_LOCKED' });
+        }
+        if (restaurant.uniquePayStatus === 'verified' && existingWalletId === uid) {
+          throw Object.assign(new Error('ALREADY_CONNECTED'), { code: 'ALREADY_CONNECTED' });
+        }
+        transaction.update(restaurantRef, {
+          merchantWalletId: uid,
+          uniquePayStatus: 'verified',
+          uniquePayConnectedAt: now,
+          uniquePayConnectedBy: uid,
+          updatedAt: now,
+        });
+        transaction.create(db.collection('audit_logs').doc(), {
+          action: 'restaurant.uniquepay.connected',
+          actorUid: uid,
+          targetUid: uid,
+          resource: 'restaurant',
+          resourceId: restaurantId,
+          businessId,
+          branchId: String(restaurant.branchId || ''),
+          details: { merchantWalletId: uid, uniquePayStatus: 'verified' },
+          timestamp: now,
+        });
+      });
+      return res.json({ ok: true, restaurantId, uniquePayStatus: 'verified' });
+    } catch (error: any) {
+      if (error?.code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'Restaurant not found.', 404);
+      if (error?.code === 'FORBIDDEN') return fail(res, 'FORBIDDEN', 'Only the verified Business owner can connect this Restaurant wallet.', 403);
+      if (error?.code === 'RESTAURANT_NOT_VERIFIED') return fail(res, 'CONFLICT', 'The Restaurant must be approved before UniquePay can be connected.', 409);
+      if (error?.code === 'WALLET_UNAVAILABLE') return fail(res, 'UNAVAILABLE', 'The Business owner UniquePay wallet is not available.', 503);
+      if (error?.code === 'WALLET_LOCKED') return fail(res, 'CONFLICT', 'The Restaurant UniquePay wallet binding is already locked.', 409);
+      if (error?.code === 'ALREADY_CONNECTED') return fail(res, 'CONFLICT', 'UniquePay is already connected to this Restaurant.', 409);
+      console.error('Restaurant UniquePay connection failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'Restaurant UniquePay connection is temporarily unavailable.', 503);
+    }
+  });
 }
