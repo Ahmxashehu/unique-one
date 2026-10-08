@@ -193,37 +193,10 @@ service cloud.firestore {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isPlatformAdmin();
       // Product creation is server-authoritative so the product and opening inventory ledger entry commit atomically.
       allow create: if false;
-      allow update: if isAuthenticated()
-        && resource.data.sellerId == request.auth.uid
-        && request.resource.data.sellerId == resource.data.sellerId
-        && request.resource.data.id == resource.data.id
-        && request.resource.data.createdAt == resource.data.createdAt
-        && (!('businessId' in request.resource.data)
-          || (
-            request.resource.data.businessId is string
-            && exists(/databases/$(database)/documents/businesses/$(request.resource.data.businessId))
-            && (
-              get(/databases/$(database)/documents/businesses/$(request.resource.data.businessId)).data.ownerUid == request.auth.uid
-              || (
-                exists(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId))
-                && get(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId)).data.status == 'active'
-              )
-            )
-          )
-        )
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'businessId','name','description','category','images','hasVideo','price','currency',
-          'discount','condition','minOrderQuantity','wholesalePrice','bulkPrice',
-          'variants','location','deliveryOptions','pickupOptions','status','updatedAt'
-        ])
-        && request.resource.data.status in ['draft','published','out_of_stock']
-        && request.resource.data.price is number
-        && request.resource.data.price >= 0
-        && request.resource.data.quantity is number
-        && request.resource.data.quantity >= 0
-        && request.resource.data.minOrderQuantity is number
-        && request.resource.data.minOrderQuantity >= 1
-        || isPlatformAdmin();
+      // Product edits are server-authoritative. This prevents direct client changes to
+      // price, status, ownership, catalog metadata, or any future financial fields.
+      // Inventory quantity is already excluded from client mutation paths.
+      allow update: if false;
       allow delete: if isPlatformAdmin();
     }
     match /orders/{orderId} {
