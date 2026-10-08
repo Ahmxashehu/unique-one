@@ -1184,67 +1184,6 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
   // This prevents inventory and future /api/business routes from bypassing the separate business session.
   registerAdminRbacRoutes(app, authenticate, requirePermission);
 
-  app.post("/api/business/inventory/adjust", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
-    const uid = (req as any).user?.uid as string | undefined;
-    if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
-    try {
-      const body = req.body as Record<string, unknown>;
-      const productId = typeof body?.productId === 'string' ? body.productId.trim() : '';
-      const direction = body?.direction === 'in' ? 'in' : body?.direction === 'out' ? 'out' : '';
-      const quantity = body?.quantity;
-      const note = typeof body?.note === 'string' ? body.note.trim().slice(0, 300) : '';
-      if (!productId || !direction || !Number.isInteger(quantity) || (quantity as number) < 1 || (quantity as number) > 100000000) {
-        return errorResponse(res, 'INVALID_REQUEST', 'A valid product, direction, and positive whole quantity are required.');
-      }
-
-      const productRef = adminDb.collection('products').doc(productId);
-      const movementRef = adminDb.collection('inventory_movements').doc();
-      let remaining = 0;
-      await adminDb.runTransaction(async transaction => {
-        const snapshot = await transaction.get(productRef);
-        if (!snapshot.exists) throw new Error('PRODUCT_NOT_FOUND');
-        const product = snapshot.data() as Record<string, unknown>;
-        if (product.sellerId !== uid) throw new Error('NOT_OWNER');
-        const currentQuantity = Number.isInteger(product.quantity) && (product.quantity as number) >= 0 ? product.quantity as number : 0;
-        const nextQuantity = direction === 'in' ? currentQuantity + (quantity as number) : currentQuantity - (quantity as number);
-        if (nextQuantity < 0) throw new Error('INSUFFICIENT_STOCK');
-        remaining = nextQuantity;
-        const status = nextQuantity === 0 ? 'out_of_stock' : product.status === 'out_of_stock' ? 'published' : product.status;
-        transaction.update(productRef, { quantity: nextQuantity, status, updatedAt: Timestamp.now() });
-        transaction.set(movementRef, {
-          productId, sellerId: uid, direction, quantity, previousQuantity: currentQuantity,
-          remainingQuantity: nextQuantity, note, createdAt: Timestamp.now(),
-        });
-        const auditRef = adminDb.collection('audit_logs').doc();
-        transaction.create(auditRef, {
-          action: 'business.inventory.adjusted',
-          actorUid: uid,
-          targetUid: uid,
-          resource: 'inventory',
-          resourceId: productId,
-          productId,
-          movementId: movementRef.id,
-          direction,
-          quantity,
-          previousQuantity: currentQuantity,
-          remainingQuantity: nextQuantity,
-          note,
-          timestamp: Timestamp.now(),
-        });
-      });
-
-      return res.status(200).json({ productId, direction, quantity, remainingQuantity: remaining });
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === 'PRODUCT_NOT_FOUND') return errorResponse(res, 'NOT_FOUND', 'Product not found.', 404);
-        if (error.message === 'NOT_OWNER') return errorResponse(res, 'FORBIDDEN', 'You can only adjust inventory for your own product.', 403);
-        if (error.message === 'INSUFFICIENT_STOCK') return errorResponse(res, 'INSUFFICIENT_STOCK', 'Stock out quantity cannot exceed available inventory.', 409);
-      }
-      console.error('Inventory adjustment failed:', error);
-      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to adjust inventory right now.');
-    }
-  });
-
   app.post("/api/business/register", rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = (req as any).user?.uid as string | undefined;
     if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
