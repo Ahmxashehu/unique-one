@@ -68,6 +68,80 @@ class RequestValidationError extends Error {
     this.code = code;
   }
 }
+const RESTAURANT_REFUND_OBLIGATIONS = 'restaurantRefundObligations';
+const RESTAURANT_REFUND_LEASE_MS = 5 * 60_000;
+
+function restaurantRefundOperationKey(orderId: string): string {
+  return 'restaurant_refund_' + orderId;
+}
+
+async function createRestaurantRefundObligation(
+  transaction: FirebaseFirestore.Transaction,
+  orderId: string,
+  order: Record<string, any>,
+  actorUid: string,
+  now: FirebaseFirestore.Timestamp,
+): Promise<void> {
+  const paymentTransactionId = typeof order.paymentTransactionId === 'string' ? order.paymentTransactionId.trim() : '';
+  const amountMinor = Number(order.totalMinor);
+  if (String(order.paymentStatus || '') !== 'paid' || !/^[A-Za-z0-9_-]{1,128}$/.test(paymentTransactionId) ||
+      !Number.isSafeInteger(amountMinor) || amountMinor <= 0 || String(order.customerId || '') !== actorUid) {
+    throw new RequestValidationError('INVALID_STATE', 'The Restaurant payment record is not eligible for a refund obligation.');
+  }
+  const paymentRef = adminDb.collection('transactions').doc(paymentTransactionId);
+  const obligationRef = adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).doc(orderId);
+  const [paymentSnap, obligationSnap] = await Promise.all([transaction.get(paymentRef), transaction.get(obligationRef)]);
+  if (!paymentSnap.exists) throw new RequestValidationError('INVALID_STATE', 'The Restaurant payment transaction could not be verified.');
+  const payment = paymentSnap.data() || {};
+  if (payment.recordKind !== 'financial' || payment.schemaVersion !== 2 || payment.amountUnit !== 'minor' ||
+      payment.status !== 'completed' || payment.currency !== 'NGN' || Number(payment.amount) !== amountMinor ||
+      String(payment.senderId || '') !== actorUid || !/^[A-Za-z0-9_-]{1,128}$/.test(String(payment.recipientId || '')) ||
+      String(payment.sourceModule || '') !== 'unique_restaurant.checkout' || String(payment.relatedOrderIds?.[0] || '') !== orderId) {
+    throw new RequestValidationError('INVALID_STATE', 'The Restaurant payment transaction failed refund verification.');
+  }
+  if (obligationSnap.exists) {
+    const existing = obligationSnap.data() || {};
+    if (String(existing.originalTransactionId || '') !== paymentTransactionId || Number(existing.amountMinor) !== amountMinor ||
+        String(existing.customerUid || '') !== actorUid || String(existing.merchantUid || '') !== String(payment.recipientId || '')) {
+      throw new RequestValidationError('INVALID_STATE', 'The existing Restaurant refund obligation does not match the payment.');
+    }
+    return;
+  }
+  transaction.create(obligationRef, {
+    id: orderId, orderId, originalTransactionId: paymentTransactionId, customerUid: actorUid,
+    merchantUid: String(payment.recipientId), amountMinor, currency: 'NGN',
+    reason: 'restaurant_order_cancelled', sourceModule: 'unique_restaurant.refund',
+    operationKey: restaurantRefundOperationKey(orderId), status: 'required', attemptCount: 0,
+    createdAt: now, updatedAt: now, nextAttemptAt: now,
+  });
+}
+
+async function claimRestaurantRefundObligation(orderId: string, actorUid: string) {
+  const ref = adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).doc(orderId);
+  const now = Timestamp.now();
+  return adminDb.runTransaction(async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists) throw new RequestValidationError('NOT_FOUND', 'Restaurant refund obligation not found.');
+    const obligation = snap.data() as Record<string, any>;
+    if (String(obligation.customerUid || '') !== actorUid) throw new RequestValidationError('FORBIDDEN', 'You cannot process this Restaurant refund.');
+    const status = String(obligation.status || '');
+    const leaseExpiresAt = obligation.leaseExpiresAt?.toMillis?.() ?? 0;
+    const leaseExpired = status === 'processing' && leaseExpiresAt <= Date.now();
+    if (!['required', 'retryable'].includes(status) && !leaseExpired) {
+      if (status === 'completed') return { ...obligation, alreadyCompleted: true };
+      throw new RequestValidationError('REFUND_IN_PROGRESS', 'This Restaurant refund is already being processed.');
+    }
+    const attemptCount = Number(obligation.attemptCount || 0);
+    if (!Number.isSafeInteger(attemptCount) || attemptCount < 0) throw new RequestValidationError('INVALID_STATE', 'The Restaurant refund obligation is invalid.');
+    transaction.update(ref, {
+      status: 'processing', attemptCount: attemptCount + 1,
+      leaseExpiresAt: Timestamp.fromMillis(Date.now() + RESTAURANT_REFUND_LEASE_MS),
+      updatedAt: now, lastAttemptAt: now,
+    });
+    return { ...obligation, status: 'processing', attemptCount: attemptCount + 1 };
+  });
+}
+
 function getFirebaseAdminCredential() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) return applicationDefault();
@@ -3502,8 +3576,10 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         }
         const nextStatus = 'cancelled';
         refundRequired = ['paid', 'accepted'].includes(String(order.status || ''));
+        if (refundRequired) await createRestaurantRefundObligation(transaction, orderId, order, uid, now);
         transaction.update(orderRef, {
           status: nextStatus, cancellationReason: 'customer_requested', cancelledBy: uid, cancelledAt: now, updatedAt: now,
+          ...(refundRequired ? { refundStatus: 'required' } : {}),
           orderTimeline: [...(Array.isArray(order.orderTimeline) ? order.orderTimeline : []), { status: nextStatus, at: now }],
         });
         transaction.create(adminDb.collection('audit_logs').doc(), {
@@ -3540,11 +3616,13 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (!orderSnap.exists) return errorResponse(res, 'NOT_FOUND', 'Restaurant order not found.');
       const order = orderSnap.data() as Record<string, any>;
       if (String(order.customerId || '') !== uid) return errorResponse(res, 'FORBIDDEN', 'You cannot refund this Restaurant order.');
-      if (String(order.status || '') !== 'cancelled' || String(order.paymentStatus || '') !== 'paid') {
-        return errorResponse(res, 'INVALID_STATE', 'Only a paid, cancelled Restaurant order can be refunded.');
+      if (String(order.status || '') !== 'cancelled' || String(order.paymentStatus || '') !== 'paid' || String(order.refundStatus || '') !== 'required') {
+        return errorResponse(res, 'INVALID_STATE', 'Only a cancelled Restaurant order with a required refund can be refunded.');
       }
-      const originalTransactionId = typeof order.paymentTransactionId === 'string' ? order.paymentTransactionId.trim() : '';
-      const amountMinor = Number(order.totalMinor);
+      const obligation = await claimRestaurantRefundObligation(orderId, uid);
+      if (obligation.alreadyCompleted) return res.json({ ok: true, status: 'refunded', refundTransactionId: obligation.refundTransactionId });
+      const originalTransactionId = String(obligation.originalTransactionId || '');
+      const amountMinor = Number(obligation.amountMinor);
       if (!isSafeId(originalTransactionId) || !Number.isSafeInteger(amountMinor) || amountMinor <= 0) {
         return errorResponse(res, 'INVALID_STATE', 'The Restaurant payment record is not eligible for refund.');
       }
@@ -3552,18 +3630,69 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         originalTransactionId,
         amountMinor,
         currency: 'NGN',
-        idempotencyKey,
+        idempotencyKey: String(obligation.operationKey || restaurantRefundOperationKey(orderId)),
         actorUid: uid,
         reason: 'restaurant_order_cancelled',
         relatedRestaurantOrderId: orderId,
         sourceModule: 'unique_restaurant.refund',
         finalizeOrder: 'full',
       });
-      if ('error' in result) return errorResponse(res, result.error.code, result.error.message);
+      if ('error' in result) {
+        await adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).doc(orderId).update({ status: 'retryable', lastError: result.error.message, updatedAt: Timestamp.now(), nextAttemptAt: Timestamp.now(), leaseExpiresAt: null });
+        return errorResponse(res, result.error.code, result.error.message);
+      }
+      await adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).doc(orderId).update({ status: 'completed', refundTransactionId: result.transactionId, completedAt: Timestamp.now(), updatedAt: Timestamp.now(), leaseExpiresAt: null });
       return res.json({ ok: true, ...result });
     } catch (error) {
       console.error('Restaurant refund failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Restaurant refund is temporarily unavailable.');
+    }
+  });
+
+  app.post("/api/restaurant/system/refund-sync", async (req, res) => {
+    const token = typeof req.header('x-restaurant-refund-cron-token') === 'string' ? req.header('x-restaurant-refund-cron-token') : '';
+    if (!process.env.RESTAURANT_REFUND_CRON_TOKEN || token !== process.env.RESTAURANT_REFUND_CRON_TOKEN) return errorResponse(res, 'FORBIDDEN', 'Forbidden.');
+    try {
+      const results: any[] = [];
+      for (const status of ['required', 'retryable']) {
+        const snap = await adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).where('status', '==', status).limit(50).get();
+        for (const doc of snap.docs) {
+          const obligation = doc.data() as Record<string, any>;
+          const orderId = doc.id;
+          const customerUid = String(obligation.customerUid || '');
+          if (!isSafeId(orderId) || !isSafeId(customerUid)) continue;
+          try {
+            const claimed = await claimRestaurantRefundObligation(orderId, customerUid);
+            if (claimed.alreadyCompleted) continue;
+            const result = await executeFinancialRefund(adminDb, {
+              originalTransactionId: String(claimed.originalTransactionId || ''),
+              amountMinor: Number(claimed.amountMinor),
+              currency: 'NGN',
+              idempotencyKey: String(claimed.operationKey || restaurantRefundOperationKey(orderId)),
+              actorUid: customerUid,
+              reason: 'restaurant_order_cancelled',
+              relatedRestaurantOrderId: orderId,
+              sourceModule: 'unique_restaurant.refund',
+              finalizeOrder: 'full',
+            });
+            if ('error' in result) {
+              await doc.ref.update({ status: 'retryable', lastError: result.error.message, updatedAt: Timestamp.now(), nextAttemptAt: Timestamp.now(), leaseExpiresAt: null });
+              results.push({ orderId, status: 'retryable', error: result.error.code });
+            } else {
+              await doc.ref.update({ status: 'completed', refundTransactionId: result.transactionId, completedAt: Timestamp.now(), updatedAt: Timestamp.now(), leaseExpiresAt: null });
+              results.push({ orderId, status: 'completed', refundTransactionId: result.transactionId });
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown refund processing error.';
+            await doc.ref.update({ status: 'retryable', lastError: message, updatedAt: Timestamp.now(), nextAttemptAt: Timestamp.now(), leaseExpiresAt: null }).catch(() => undefined);
+            results.push({ orderId, status: 'retryable', error: 'PROCESSING_FAILED' });
+          }
+        }
+      }
+      return res.json({ ok: true, processed: results.length, results });
+    } catch (error) {
+      console.error('Restaurant refund sync failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Restaurant refund sync is temporarily unavailable.');
     }
   });
 
