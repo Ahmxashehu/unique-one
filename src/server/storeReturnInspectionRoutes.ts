@@ -81,6 +81,9 @@ export function registerStoreReturnInspectionRoutes(
         productSnaps.forEach((productSnap, index) => {
           if (!productSnap.exists) throw new Error('PRODUCT_NOT_FOUND');
           const product = productSnap.data() || {};
+          const orderBranchId = typeof order.branchId === 'string' ? order.branchId : '';
+          const productBranchId = typeof product.branchId === 'string' ? product.branchId : '';
+          if (orderBranchId && productBranchId !== orderBranchId) throw new Error('BRANCH_MISMATCH');
           const currentQuantity = Number(product.quantity);
           const quarantineQuantity = Number(product.quarantineQuantity || 0);
           const returnedQuantity = productEntries[index][1];
@@ -143,6 +146,7 @@ export function registerStoreReturnInspectionRoutes(
         ALREADY_INSPECTED: 'This return has already been inspected.',
         INVALID_ITEMS: 'The return contains invalid inventory data.',
         PRODUCT_NOT_FOUND: 'A returned product no longer exists.',
+        BRANCH_MISMATCH: 'The returned product does not belong to this Store branch.',
         INVALID_STOCK: 'The returned inventory quantity is inconsistent.',
       };
       return res.status(status).json({ error: { code: code || 'INVALID_REQUEST', message: messages[code] || 'The return inspection could not be completed safely.' } });
