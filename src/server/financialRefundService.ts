@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Firestore, Timestamp } from 'firebase-admin/firestore';
+import { recordStoreInventoryMovement } from './storeInventoryLedger';
 
 export type FinancialRefundErrorCode =
   | 'INVALID_REQUEST'
