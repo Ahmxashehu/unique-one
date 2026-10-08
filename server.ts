@@ -3892,6 +3892,19 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             status: product.status === 'out_of_stock' ? 'published' : product.status,
             updatedAt: now,
           });
+          recordStoreInventoryMovement(transaction, adminDb, {
+            productId: Array.from(quantities.keys())[index],
+            movementType: 'order_cancellation_release',
+            quantity: restoreQuantity,
+            previousQuantity: currentQuantity,
+            resultingQuantity: restoredQuantity,
+            direction: 'in',
+            sourceId: orderId,
+            sourceModule: 'unique_store.cancellation',
+            actorUid: uid,
+            orderId,
+            businessId: typeof order.businessId === 'string' ? order.businessId : null,
+          });
         });
         transaction.update(orderRef, {
           status: 'cancelled',
