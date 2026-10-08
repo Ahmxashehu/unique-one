@@ -1400,6 +1400,77 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.patch("/api/admin/businesses/:id/status", authenticate, requirePermission('access:admin_tools'), async (req, res) => {
+    const adminUid = String((req as any).user?.uid || '');
+    if (!adminUid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+    const action = req.body?.action === 'suspend' ? 'suspend' : req.body?.action === 'reactivate' ? 'reactivate' : '';
+    if (!action) return errorResponse(res, 'INVALID_REQUEST', 'Choose suspend or reactivate.');
+    try {
+      const adminSnapshot = await adminDb.collection('users').doc(adminUid).get();
+      const roles = Array.isArray(adminSnapshot.data()?.roles) ? adminSnapshot.data()?.roles : [];
+      if (!roles.some((role: unknown) => ['platform_admin', 'super_admin'].includes(String(role)))) {
+        return errorResponse(res, 'FORBIDDEN', 'Platform or Super Admin access is required.', 403);
+      }
+      const businessId = String(req.params.id || '').trim();
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(businessId)) return errorResponse(res, 'INVALID_REQUEST', 'A valid business ID is required.');
+      const businessRef = adminDb.collection('businesses').doc(businessId);
+      const now = Timestamp.now();
+      let changedMemberships = 0;
+      let revokedSessions = 0;
+      let cancelledInvites = 0;
+      await adminDb.runTransaction(async transaction => {
+        const businessSnap = await transaction.get(businessRef);
+        if (!businessSnap.exists) throw new Error('BUSINESS_NOT_FOUND');
+        const business = businessSnap.data() || {};
+        const membershipSnap = await adminDb.collection('businessMemberships')
+          .where('businessId', '==', businessId).where('status', '==', 'active').limit(450).get();
+        const sessionSnap = await adminDb.collection('businessAccessSessions')
+          .where('businessId', '==', businessId).where('status', '==', 'active').limit(450).get();
+        const inviteSnap = action === 'suspend'
+          ? await adminDb.collection('staffInvites').where('businessId', '==', businessId).where('status', '==', 'pending').limit(450).get()
+          : { docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] };
+
+        if (action === 'suspend') {
+          transaction.update(businessRef, { status: 'suspended', verificationStatus: 'suspended', suspendedAt: now, suspendedBy: adminUid, updatedAt: now });
+          for (const doc of membershipSnap.docs) {
+            transaction.update(doc.ref, { status: 'inactive', inactiveReason: 'business_suspended', deactivatedBy: adminUid, updatedAt: now });
+          }
+          for (const doc of sessionSnap.docs) {
+            transaction.update(doc.ref, { status: 'revoked', revokedAt: now, revokedBy: adminUid });
+          }
+          for (const doc of inviteSnap.docs) {
+            transaction.update(doc.ref, { status: 'cancelled', cancelledAt: now, cancelledBy: adminUid });
+          }
+          changedMemberships = membershipSnap.docs.length;
+          revokedSessions = sessionSnap.docs.length;
+          cancelledInvites = inviteSnap.docs.length;
+        } else {
+          if (String(business.verificationStatus || '') !== 'suspended' || String(business.status || '') !== 'suspended') {
+            throw new Error('BUSINESS_NOT_SUSPENDED');
+          }
+          transaction.update(businessRef, { status: 'active', verificationStatus: 'verified', reactivatedAt: now, reactivatedBy: adminUid, updatedAt: now });
+        }
+        const auditRef = adminDb.collection('audit_logs').doc();
+        transaction.set(auditRef, {
+          action: action === 'suspend' ? 'business_suspended' : 'business_reactivated',
+          actorUid: adminUid,
+          businessId,
+          ownerUid: String(business.ownerUid || ''),
+          createdAt: now,
+          changedMemberships,
+          revokedSessions,
+          cancelledInvites,
+        });
+      });
+      return res.json({ ok: true, businessId, status: action === 'suspend' ? 'suspended' : 'active', changedMemberships, revokedSessions, cancelledInvites });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'BUSINESS_NOT_FOUND') return errorResponse(res, 'NOT_FOUND', 'Business was not found.', 404);
+      if (error instanceof Error && error.message === 'BUSINESS_NOT_SUSPENDED') return errorResponse(res, 'INVALID_REQUEST', 'Only a suspended Business can be reactivated.', 409);
+      console.error('Admin business status update failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to update Business status right now.');
+    }
+  });
+
   app.get("/api/admin/overview", authenticate, requirePermission('access:admin_tools'), rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), async (_req, res) => {
     try {
       const [usersSnap, businessesSnap, productsCount, transactionsSnap] = await Promise.all([
