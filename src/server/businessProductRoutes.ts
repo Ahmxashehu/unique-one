@@ -6,7 +6,13 @@ import { recordStoreInventoryMovement } from './storeInventoryLedger';
 import rateLimit from 'express-rate-limit';
 
 const PRODUCT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
-const CURRENCY_SET = new Set(['NGN', 'USD']);
+const CATEGORY_SET = new Set<ProductCategory>([
+  'electronics', 'electricity_power', 'phones_accessories', 'fashion', 'shoes', 'beauty',
+  'home_furniture', 'building_materials', 'cement', 'agriculture', 'fertilizer', 'seeds',
+  'farm_equipment', 'food_groceries', 'machinery', 'vehicles', 'property', 'services',
+  'digital_products', 'other',
+]);
+const CURRENCY_SET = new Set(['NGN']);
 const STATUS_SET = new Set<ProductStatus>(['draft', 'published', 'out_of_stock']);
 const CONDITION_SET = new Set<ProductCondition>(['new', 'used', 'refurbished']);
 
@@ -34,12 +40,15 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
     const membership = ((req as any).businessMembership || {}) as Record<string, unknown>;
     const businessSession = ((req as any).businessSession || {}) as Record<string, unknown>;
     const businessId = cleanString(businessSession.businessId, 128);
+    const membershipBusinessId = cleanString(membership.businessId, 128);
     const membershipRole = cleanString(membership.role, 64) as Role;
     const customPermissions = Array.isArray(membership.permissions)
       ? membership.permissions.filter((value): value is Permission => typeof value === 'string') as Permission[]
       : [];
 
-    if (!uid || !businessId) return fail(res, 'BUSINESS_AUTH_REQUIRED', 'An active Business Platform session is required.', 401);
+    if (!uid || !businessId || membershipBusinessId !== businessId) {
+      return fail(res, 'BUSINESS_AUTH_REQUIRED', 'An active Business Platform session is required.', 401);
+    }
     if (!hasRolePermission([membershipRole], customPermissions, 'create:products')) {
       return fail(res, 'FORBIDDEN', 'Your Business role does not allow product creation.', 403);
     }
@@ -64,8 +73,9 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
     const pickupOptions = Array.isArray(req.body?.pickupOptions) ? req.body.pickupOptions.filter((value: unknown) => typeof value === 'string').slice(0, 10) : [];
 
     if (!PRODUCT_ID_PATTERN.test(productId) || !name || !description) return fail(res, 'INVALID_REQUEST', 'A valid product ID, name and description are required.');
-    if (!category || !condition || !status || !CURRENCY_SET.has(currency)) return fail(res, 'INVALID_REQUEST', 'Product category, condition, status and currency are invalid.');
-    if (!CONDITION_SET.has(condition) || !STATUS_SET.has(status)) return fail(res, 'INVALID_REQUEST', 'Product condition or status is invalid.');
+    if (!CATEGORY_SET.has(category) || !CONDITION_SET.has(condition) || !STATUS_SET.has(status) || !CURRENCY_SET.has(currency)) {
+      return fail(res, 'INVALID_REQUEST', 'Product category, condition, status and currency are invalid.');
+    }
     if (price === null || price < 0 || price > Number.MAX_SAFE_INTEGER) return fail(res, 'INVALID_REQUEST', 'Product price is invalid.');
     if (quantity === null || quantity < 0) return fail(res, 'INVALID_REQUEST', 'Product quantity is invalid.');
     if (minOrderQuantity === null || minOrderQuantity < 1) return fail(res, 'INVALID_REQUEST', 'Minimum order quantity must be at least 1.');
@@ -83,7 +93,12 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
 
         const businessRef = db.collection('businesses').doc(businessId);
         const businessSnap = await transaction.get(businessRef);
-        if (!businessSnap.exists || String(businessSnap.data()?.ownerUid || '') === '') {
+        const business = businessSnap.data() ?? {};
+        if (
+          !businessSnap.exists ||
+          String(business.ownerUid || '') === '' ||
+          !['verified'].includes(String(business.status || ''))
+        ) {
           throw Object.assign(new Error('INVALID_BUSINESS'), { code: 'INVALID_BUSINESS' });
         }
 
@@ -140,7 +155,7 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
       return res.status(201).json({ ok: true, productId: result.productId, quantity: result.quantity });
     } catch (error: any) {
       if (String(error?.code || '') === 'PRODUCT_EXISTS') return fail(res, 'PRODUCT_EXISTS', 'A product with this ID already exists.', 409);
-      if (String(error?.code || '') === 'INVALID_BUSINESS') return fail(res, 'INVALID_BUSINESS', 'The selected Business account is invalid.', 403);
+      if (String(error?.code || '') === 'INVALID_BUSINESS') return fail(res, 'INVALID_BUSINESS', 'The selected Business account is invalid or not verified.', 403);
       console.error('Business product creation failed:', error);
       return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to create the product right now.', 503);
     }
