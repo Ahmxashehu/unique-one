@@ -9,6 +9,7 @@ type BusinessMembership = {
   role?: string;
   status?: string;
   branchId?: string;
+  permissions?: string[];
 };
 
 function fail(res: any, code: string, message: string, status = 400) {
@@ -17,7 +18,8 @@ function fail(res: any, code: string, message: string, status = 400) {
 
 function can(membership: BusinessMembership, permission: Permission) {
   const role = typeof membership.role === 'string' ? membership.role : '';
-  return hasRolePermission([role as any], [], permission);
+  const customPermissions = Array.isArray(membership.permissions) ? membership.permissions as any[] : [];
+  return hasRolePermission([role as any], customPermissions, permission);
 }
 
 function serializeTimestamp(value: unknown) {
@@ -81,7 +83,10 @@ export function registerBusinessDataRoutes(
           if (seen.has(doc.id)) return false;
           seen.add(doc.id);
           const data = doc.data() || {};
-          return data.businessId === businessId || (!data.businessId && data.sellerId === uid);
+          const belongsToBusiness = data.businessId === businessId || (!data.businessId && data.sellerId === uid);
+          const assignedBranchId = typeof membership.branchId === 'string' ? membership.branchId.trim() : '';
+          const productBranchId = typeof data.branchId === 'string' ? data.branchId.trim() : '';
+          return belongsToBusiness && (!assignedBranchId || productBranchId === assignedBranchId);
         })
         .map(minimalOrder)
         .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
@@ -143,7 +148,10 @@ export function registerBusinessDataRoutes(
           if (seen.has(doc.id)) return false;
           seen.add(doc.id);
           const data = doc.data() || {};
-          return data.businessId === businessId || (!data.businessId && data.sellerId === uid);
+          const belongsToBusiness = data.businessId === businessId || (!data.businessId && data.sellerId === uid);
+          const assignedBranchId = typeof membership.branchId === 'string' ? membership.branchId.trim() : '';
+          const productBranchId = typeof data.branchId === 'string' ? data.branchId.trim() : '';
+          return belongsToBusiness && (!assignedBranchId || productBranchId === assignedBranchId);
         })
         .map((doc) => {
           const data = doc.data() || {};
