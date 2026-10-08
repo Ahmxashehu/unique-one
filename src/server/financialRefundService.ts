@@ -224,6 +224,10 @@ export async function executeFinancialRefund(
         ? order.returnRequest as Record<string, unknown>
         : null;
       if (rr) {
+        const expiresAtMs = typeof rr.expiresAt === 'string' ? Date.parse(rr.expiresAt) : NaN;
+        if (!Number.isFinite(expiresAtMs) || Date.now() > expiresAtMs) {
+          return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Store return request has expired and cannot be refunded.' } };
+        }
         const disposition = rr.inventoryDisposition;
         if (
           rr.status !== 'received' ||
