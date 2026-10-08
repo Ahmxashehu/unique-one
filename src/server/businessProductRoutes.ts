@@ -213,6 +213,11 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
         if (String(product.sellerId || '') !== uid || String(product.businessId || '') !== businessId) {
           throw Object.assign(new Error('FORBIDDEN'), { code: 'FORBIDDEN' });
         }
+        const membershipBranchId = cleanString(membership.branchId, 128);
+        const productBranchId = cleanString(product.branchId, 128);
+        if (membershipBranchId && productBranchId && membershipBranchId !== productBranchId) {
+          throw Object.assign(new Error('BRANCH_FORBIDDEN'), { code: 'BRANCH_FORBIDDEN' });
+        }
         const businessSnap = await transaction.get(db.collection('businesses').doc(businessId));
         if (!businessSnap.exists || String(businessSnap.data()?.status || '') !== 'verified') {
           throw Object.assign(new Error('INVALID_BUSINESS'), { code: 'INVALID_BUSINESS' });
@@ -249,6 +254,7 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
       const code = String(error?.code || '');
       if (code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'Product was not found.', 404);
       if (code === 'FORBIDDEN') return fail(res, 'FORBIDDEN', 'You do not control this product.', 403);
+      if (code === 'BRANCH_FORBIDDEN') return fail(res, 'FORBIDDEN', 'You are not authorized to edit products in this branch.', 403);
       if (code === 'INVALID_BUSINESS') return fail(res, 'INVALID_BUSINESS', 'The Business account is not verified.', 403);
       if (code === 'INVALID_STOCK' || code === 'INVALID_MIN_ORDER' || code === 'INVALID_STATUS') return fail(res, 'INVALID_REQUEST', 'The requested product update conflicts with current inventory.', 409);
       console.error('Business product update failed:', error);
