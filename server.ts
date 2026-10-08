@@ -1422,13 +1422,19 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const businessSnap = await transaction.get(businessRef);
         if (!businessSnap.exists) throw new Error('BUSINESS_NOT_FOUND');
         const business = businessSnap.data() || {};
-        const membershipSnap = await adminDb.collection('businessMemberships')
-          .where('businessId', '==', businessId).where('status', '==', 'active').limit(450).get();
-        const sessionSnap = await adminDb.collection('businessAccessSessions')
-          .where('businessId', '==', businessId).where('status', '==', 'active').limit(450).get();
+        const membershipQuery = adminDb.collection('businessMemberships')
+          .where('businessId', '==', businessId).where('status', '==', 'active').limit(500);
+        const sessionQuery = adminDb.collection('businessAccessSessions')
+          .where('businessId', '==', businessId).where('status', '==', 'active').limit(500);
+        const inviteQuery = adminDb.collection('staffInvites')
+          .where('businessId', '==', businessId).where('status', '==', 'pending').limit(500);
+        const membershipSnap = await transaction.get(membershipQuery);
+        const sessionSnap = await transaction.get(sessionQuery);
         const inviteSnap = action === 'suspend'
-          ? await adminDb.collection('staffInvites').where('businessId', '==', businessId).where('status', '==', 'pending').limit(450).get()
-          : { docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] };
+          ? await transaction.get(inviteQuery)
+          : null;
+        const writeCount = membershipSnap.size + sessionSnap.size + (inviteSnap?.size || 0) + 1;
+        if (writeCount > 499) throw new Error('BUSINESS_ACCESS_TOO_LARGE');
 
         if (action === 'suspend') {
           transaction.update(businessRef, { status: 'suspended', verificationStatus: 'suspended', suspendedAt: now, suspendedBy: adminUid, updatedAt: now });
@@ -1438,12 +1444,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           for (const doc of sessionSnap.docs) {
             transaction.update(doc.ref, { status: 'revoked', revokedAt: now, revokedBy: adminUid });
           }
-          for (const doc of inviteSnap.docs) {
+          for (const doc of (inviteSnap?.docs || [])) {
             transaction.update(doc.ref, { status: 'cancelled', cancelledAt: now, cancelledBy: adminUid });
           }
           changedMemberships = membershipSnap.docs.length;
           revokedSessions = sessionSnap.docs.length;
-          cancelledInvites = inviteSnap.docs.length;
+          cancelledInvites = inviteSnap?.size || 0;
         } else {
           if (String(business.verificationStatus || '') !== 'suspended' || String(business.status || '') !== 'suspended') {
             throw new Error('BUSINESS_NOT_SUSPENDED');
@@ -1466,6 +1472,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     } catch (error) {
       if (error instanceof Error && error.message === 'BUSINESS_NOT_FOUND') return errorResponse(res, 'NOT_FOUND', 'Business was not found.', 404);
       if (error instanceof Error && error.message === 'BUSINESS_NOT_SUSPENDED') return errorResponse(res, 'INVALID_REQUEST', 'Only a suspended Business can be reactivated.', 409);
+      if (error instanceof Error && error.message === 'BUSINESS_ACCESS_TOO_LARGE') return errorResponse(res, 'CONFLICT', 'This Business has too many active access records to suspend atomically. Reduce active access records and retry.', 409);
       console.error('Admin business status update failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Unable to update Business status right now.');
     }
