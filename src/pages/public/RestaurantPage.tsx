@@ -6,7 +6,9 @@ import {
   Utensils, Users, X, Navigation, Heart, SlidersHorizontal, CreditCard, Landmark
 } from 'lucide-react';
 
-type MenuItem = { id: string; restaurantId: string; businessId: string; branchId: string; name: string; category: string; description: string; priceMinor: number; currency: 'NGN'; available: boolean; };\n\ntype Restaurant = {
+type MenuItem = { id: string; restaurantId: string; businessId: string; branchId: string; name: string; category: string; description: string; priceMinor: number; currency: 'NGN'; available: boolean; };
+
+type Restaurant = {
   id: string;
   name: string;
   cuisine: string;
