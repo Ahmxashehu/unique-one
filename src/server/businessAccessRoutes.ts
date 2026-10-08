@@ -228,7 +228,7 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
         if (
           !businessSnap.exists ||
           String(businessSnap.data()?.ownerUid || '') !== ownerUid ||
-          String(businessSnap.data()?.status || '') !== 'verified' ||
+          String(businessSnap.data()?.status || '') !== 'active' ||
           String(businessSnap.data()?.verificationStatus || '') !== 'verified'
         ) {
           throw Object.assign(new Error('INVALID_BUSINESS_OWNER'), { code: 'INVALID_BUSINESS_OWNER' });
