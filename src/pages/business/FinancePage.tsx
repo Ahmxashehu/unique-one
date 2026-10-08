@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { CreditCard, ArrowDownRight, ArrowUpRight } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function FinancePage() {
@@ -22,15 +20,15 @@ export default function FinancePage() {
       setLoading(true);
       setError('');
       try {
-        const snapshot = await getDocs(query(
-          collection(db, 'orders'),
-          where('sellerId', '==', currentUser.uid),
-        ));
+        const token=await currentUser.getIdToken();
+        const businessSession=localStorage.getItem('unique_business_session')||'';
+        const response=await fetch('/api/business/orders',{headers:{Authorization:`Bearer ${token}`,'X-Business-Session':businessSession}});
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok) throw new Error(data?.error?.message||'Business orders could not be loaded.');
         const completedStatuses = new Set(['delivered', 'completed']);
-        const total = snapshot.docs.reduce((sum, order) => {
-          const data = order.data();
-          if (!completedStatuses.has(String(data.status))) return sum;
-          const amount = Number(data.totalAmount);
+        const total = (Array.isArray(data?.orders)?data.orders:[]).reduce((sum: number, order: any) => {
+          if (!completedStatuses.has(String(order?.status))) return sum;
+          const amount = Number(order?.totalAmount);
           if (!Number.isFinite(amount) || amount < 0) return sum;
           return sum + amount;
         }, 0);

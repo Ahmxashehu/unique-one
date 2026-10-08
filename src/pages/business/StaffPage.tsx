@@ -58,6 +58,7 @@ export default function StaffPage() {
         inviteeEmail: email.trim().toLowerCase(),
         role,
         branchName: branchName.trim() || null,
+        branchId: branchId || null,
         status: 'pending',
         invitedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
