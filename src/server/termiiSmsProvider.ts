@@ -8,7 +8,8 @@ function purposeLabel(purpose: UniqueOtpPurpose): string {
     case 'password_reset': return 'password reset';
     case 'phone_change': return 'phone number change';
     case 'transaction_step_up': return 'transaction verification';
-    case 'email_verification': return 'email verification';\n    case 'store_delivery_confirmation': return 'delivery confirmation';
+    case 'email_verification': return 'email verification';
+    case 'store_delivery_confirmation': return 'delivery confirmation';
   }
 }
 
