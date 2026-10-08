@@ -20,6 +20,7 @@ import { registerAdminRbacRoutes } from "./src/server/adminRbacRoutes";
 import { registerAdminAuditRoutes } from "./src/server/adminAuditRoutes";
 import { hasRolePermission } from "./src/lib/auth/rbac";
 import { executeFinancialRefund } from "./src/server/financialRefundService";
+import { recordStoreInventoryMovement } from "./src/server/storeInventoryLedger";
 
 interface WalletDocument {
   uid: string;
@@ -3542,11 +3543,29 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const snapshot = productSnapshots.get(productId);
           if (!snapshot?.exists) throw new RequestValidationError('INVALID_REQUEST', 'A product in your cart is no longer available.');
           const product = snapshot.data() || {};
-          const remainingQuantity = Number(product.quantity) - requestedQuantity;
+          const previousQuantity = Number(product.quantity);
+          const remainingQuantity = previousQuantity - requestedQuantity;
+          if (!Number.isSafeInteger(previousQuantity) || previousQuantity < 0 ||
+              !Number.isSafeInteger(requestedQuantity) || requestedQuantity <= 0 ||
+              !Number.isSafeInteger(remainingQuantity) || remainingQuantity < 0) {
+            throw new RequestValidationError('INVALID_REQUEST', 'Inventory data is invalid; checkout was not applied.');
+          }
           transaction.update(snapshot.ref, {
             quantity: remainingQuantity,
             status: remainingQuantity === 0 ? 'out_of_stock' : product.status,
             updatedAt: now,
+          });
+          recordStoreInventoryMovement(transaction, adminDb, {
+            productId,
+            movementType: 'checkout_reservation',
+            quantity: requestedQuantity,
+            previousQuantity,
+            resultingQuantity: remainingQuantity,
+            direction: 'out',
+            sourceId: uid + ':' + idempotencyKey,
+            sourceModule: 'unique_store.checkout',
+            actorUid: uid,
+            businessId: typeof product.businessId === 'string' ? product.businessId : null,
           });
         }
         for (const [, sellerItems] of groups) {
