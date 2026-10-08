@@ -69,6 +69,11 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
   app.post('/api/business/branches', async (req, res) => {
     if (!can(req, 'manage:business_staff')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage branches.', 403);
     const { uid, businessId } = ctx(req);
+    const businessSnap = await db.collection('businesses').doc(businessId).get();
+    const business = businessSnap.exists ? businessSnap.data() || {} : {};
+    if (!businessSnap.exists || String(business.ownerUid || '') !== uid || String(business.status || '') !== 'verified') {
+      return fail(res, 'FORBIDDEN', 'Only the verified Business owner can create branches.', 403);
+    }
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
     const type = typeof req.body?.type === 'string' ? req.body.type.trim() : '';
     const address = typeof req.body?.address === 'string' ? req.body.address.trim() : '';
@@ -89,6 +94,11 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
       try {
         const snap = await ref.get(), branch = snap.exists ? snap.data() || {} : {};
         if (!snap.exists || !inTenant(branch, businessId)) return fail(res, 'NOT_FOUND', 'Branch not found.', 404);
+        const businessSnap = await db.collection('businesses').doc(businessId).get();
+        const business = businessSnap.exists ? businessSnap.data() || {} : {};
+        if (!businessSnap.exists || String(business.ownerUid || '') !== String(branch.ownerUid || '') || String(business.status || '') !== 'verified') {
+          return fail(res, 'FORBIDDEN', 'This branch is not owned by the verified Business.', 403);
+        }
         if (method === 'patch') {
           const updates: Record<string, unknown> = {};
           if (typeof req.body?.status === 'string' && ['active','inactive'].includes(req.body.status)) updates.status = req.body.status;
