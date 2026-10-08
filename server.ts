@@ -4291,9 +4291,16 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
           if (!productSnap.exists) throw new RequestValidationError('INVALID_REQUEST', 'A returned product no longer exists; inventory was not restored.');
           const product = productSnap.data() as Record<string, unknown>;
           const currentQuantity = Number(product.quantity);
+          const currentQuarantineQuantity = Number(product.quarantineQuantity || 0);
           const restore = quantities.get(Array.from(quantities.keys())[index]) || 0;
-          if (!Number.isSafeInteger(currentQuantity) || currentQuantity < 0) throw new RequestValidationError('INVALID_REQUEST', 'Inventory data is invalid; return receipt was not applied.');
-          transaction.update(productSnap.ref, { quantity: currentQuantity, quarantineQuantity: Number(product.quarantineQuantity || 0) + restore, updatedAt: now });
+          const nextQuarantineQuantity = currentQuarantineQuantity + restore;
+          if (!Number.isSafeInteger(currentQuantity) || currentQuantity < 0 ||
+              !Number.isSafeInteger(currentQuarantineQuantity) || currentQuarantineQuantity < 0 ||
+              !Number.isSafeInteger(restore) || restore <= 0 ||
+              !Number.isSafeInteger(nextQuarantineQuantity)) {
+            throw new RequestValidationError('INVALID_REQUEST', 'Inventory data is invalid; return receipt was not applied.');
+          }
+          transaction.update(productSnap.ref, { quantity: currentQuantity, quarantineQuantity: nextQuarantineQuantity, updatedAt: now });
         });
         transaction.update(ref, {
           returnRequest: { ...rr, status: 'received', receivedBy: uid, receivedAt: now, restocked: false, quarantined: true },
