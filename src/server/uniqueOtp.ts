@@ -6,7 +6,8 @@ export type UniqueOtpPurpose =
   | 'phone_change'
   | 'transaction_step_up'
   | 'transaction_pin_reset'
-  | 'email_verification'\n  | 'store_delivery_confirmation';
+  | 'email_verification'
+  | 'store_delivery_confirmation';
 
 export type UniqueOtpChannel = 'sms' | 'whatsapp' | 'email';
 
