@@ -2,6 +2,7 @@ import type { Express, RequestHandler, Response } from 'express';
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import type { Permission } from '../lib/os/types';
 import { hasRolePermission } from '../lib/auth/rbac';
+import { getUniqueOtpService } from './uniqueOtpRuntime';
 
 function fail(res: Response, code: string, message: string, status = 400) {
   return res.status(status).json({ error: { code, message } });
