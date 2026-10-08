@@ -108,6 +108,76 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
     }
   });
 
+
+  app.post('/api/business/orders/:orderId/delivery-assign', async (req, res) => {
+    if (!can(req, 'manage:orders')) return fail(res, 'FORBIDDEN', 'You do not have permission to assign Store deliveries.', 403);
+    const { uid, businessId } = ctx(req);
+    const orderId = typeof req.params.orderId === 'string' ? req.params.orderId.trim() : '';
+    const deliveryUid = typeof req.body?.deliveryUid === 'string' ? req.body.deliveryUid.trim() : '';
+    const actorMembership = req.businessMembership || {};
+    const actorBranchId = typeof actorMembership.branchId === 'string' ? actorMembership.branchId.trim() : '';
+    if (!uid || !businessId || !/^[A-Za-z0-9_-]{1,128}$/.test(orderId) || !/^[A-Za-z0-9_-]{1,128}$/.test(deliveryUid)) {
+      return fail(res, 'INVALID_REQUEST', 'A valid Store order and delivery staff account are required.');
+    }
+    if (deliveryUid === uid) return fail(res, 'INVALID_REQUEST', 'A delivery assignment must target another staff account.');
+    try {
+      const orderRef = db.collection('orders').doc(orderId);
+      const membershipRef = db.collection('businessMemberships').doc(`${deliveryUid}__${businessId}`);
+      const now = Timestamp.now();
+      await db.runTransaction(async (transaction) => {
+        const [orderSnap, membershipSnap] = await Promise.all([
+          transaction.get(orderRef),
+          transaction.get(membershipRef),
+        ]);
+        if (!orderSnap.exists) throw new Error('ORDER_NOT_FOUND');
+        if (!membershipSnap.exists) throw new Error('DELIVERY_STAFF_NOT_FOUND');
+        const order = orderSnap.data() || {};
+        const deliveryMembership = membershipSnap.data() || {};
+        const orderBusinessId = String(order.businessId || '').trim();
+        const orderBranchId = String(order.branchId || '').trim();
+        const deliveryBranchId = String(deliveryMembership.branchId || '').trim();
+        if (orderBusinessId !== businessId || !orderBranchId) throw new Error('ORDER_SCOPE_MISMATCH');
+        if (actorBranchId && actorBranchId !== orderBranchId) throw new Error('ACTOR_BRANCH_MISMATCH');
+        if (String(deliveryMembership.businessId || '') !== businessId || String(deliveryMembership.status || '') !== 'active' || String(deliveryMembership.role || '') !== 'delivery') {
+          throw new Error('DELIVERY_STAFF_NOT_ELIGIBLE');
+        }
+        if (!deliveryBranchId || deliveryBranchId !== orderBranchId) throw new Error('DELIVERY_BRANCH_MISMATCH');
+        const status = String(order.status || '');
+        if (!new Set(['ready_for_pickup', 'shipped', 'out_for_delivery']).has(status)) throw new Error('ORDER_NOT_DELIVERY_READY');
+        if (order.deliveryActorUid && String(order.deliveryActorUid) !== deliveryUid) throw new Error('DELIVERY_ALREADY_ASSIGNED');
+        transaction.update(orderRef, {
+          deliveryActorUid: deliveryUid,
+          deliveryBusinessId: businessId,
+          deliveryBranchId: orderBranchId,
+          deliveryAssignedAt: now,
+          deliveryAssignedBy: uid,
+          updatedAt: now,
+        });
+        transaction.create(db.collection('audit_logs').doc(), {
+          action: 'store.order.delivery_assigned',
+          actorUid: uid,
+          targetUid: deliveryUid,
+          resource: 'store_order',
+          resourceId: orderId,
+          orderId,
+          businessId,
+          branchId: orderBranchId,
+          createdAt: now,
+        });
+      });
+      return res.status(200).json({ ok: true, orderId, deliveryActorUid: deliveryUid, branchId: actorBranchId || undefined });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'ORDER_NOT_FOUND') return fail(res, 'NOT_FOUND', 'The Store order was not found.', 404);
+      if (code === 'DELIVERY_STAFF_NOT_FOUND' || code === 'DELIVERY_STAFF_NOT_ELIGIBLE') return fail(res, 'INVALID_REQUEST', 'The selected delivery staff member is not active in this Business.', 400);
+      if (code === 'ORDER_SCOPE_MISMATCH' || code === 'ACTOR_BRANCH_MISMATCH' || code === 'DELIVERY_BRANCH_MISMATCH') return fail(res, 'FORBIDDEN', 'The order and delivery staff must belong to the same Business branch.', 403);
+      if (code === 'ORDER_NOT_DELIVERY_READY') return fail(res, 'INVALID_REQUEST', 'The Store order is not ready for delivery assignment.', 400);
+      if (code === 'DELIVERY_ALREADY_ASSIGNED') return fail(res, 'CONFLICT', 'This Store order is already assigned to another delivery staff member.', 409);
+      console.error('Store delivery assignment failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'The delivery assignment could not be completed safely.', 503);
+    }
+  });
+
   app.get('/api/business/branches', async (req, res) => {
     if (!can(req, 'manage:business_staff') && !can(req, 'create:products') && !can(req, 'edit:products') && !can(req, 'manage:inventory')) return fail(res, 'FORBIDDEN', 'You do not have permission to view branches.', 403);
     const { businessId } = ctx(req), membership = req.businessMembership || {};
