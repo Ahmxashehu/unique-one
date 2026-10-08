@@ -98,7 +98,8 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
         if (
           !businessSnap.exists ||
           String(business.ownerUid || '') === '' ||
-          !['verified'].includes(String(business.status || ''))
+          String(business.status || '') !== 'active' ||
+          String(business.verificationStatus || '') !== 'verified'
         ) {
           throw Object.assign(new Error('INVALID_BUSINESS'), { code: 'INVALID_BUSINESS' });
         }
@@ -111,7 +112,10 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
         if (branchId) {
           const branchSnap = await transaction.get(db.collection('branches').doc(branchId));
           const branch = branchSnap.data() ?? {};
-          if (!branchSnap.exists || String(branch.businessId || '') !== businessId || String(branch.status || 'active') !== 'active') {
+          if (!branchSnap.exists ||
+              String(branch.businessId || '') !== businessId ||
+              String(branch.ownerUid || '') !== String(business.ownerUid || '') ||
+              String(branch.status || 'active') !== 'active') {
             throw Object.assign(new Error('INVALID_BRANCH'), { code: 'INVALID_BRANCH' });
           }
         }
@@ -234,7 +238,9 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
           throw Object.assign(new Error('BRANCH_FORBIDDEN'), { code: 'BRANCH_FORBIDDEN' });
         }
         const businessSnap = await transaction.get(db.collection('businesses').doc(businessId));
-        if (!businessSnap.exists || String(businessSnap.data()?.status || '') !== 'verified') {
+        if (!businessSnap.exists ||
+          String(businessSnap.data()?.status || '') !== 'active' ||
+          String(businessSnap.data()?.verificationStatus || '') !== 'verified') {
           throw Object.assign(new Error('INVALID_BUSINESS'), { code: 'INVALID_BUSINESS' });
         }
         const quantity = safeInteger(product.quantity);
