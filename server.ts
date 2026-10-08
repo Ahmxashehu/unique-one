@@ -3563,7 +3563,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const productId = String(cart.data.productId).trim();
           productSnapshots.set(productId, await transaction.get(adminDb.collection('products').doc(productId)));
         }
-        const groups = new Map<string, { cart: typeof carts[number]; product: Record<string, unknown>; productId: string; sellerId: string; businessId: string | null }[]>();
+        const groups = new Map<string, { cart: typeof carts[number]; product: Record<string, unknown>; productId: string; sellerId: string; businessId: string | null; branchId: string | null }[]>();
         const requestedByProduct = new Map<string, number>();
         for (const cart of carts) {
           const productId = String(cart.data.productId).trim();
@@ -3573,6 +3573,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const quantity = Number(cart.data.quantity);
           const sellerId = product.sellerId;
           const businessId = typeof product.businessId === 'string' && product.businessId.trim() ? product.businessId.trim() : null;
+          const branchId = typeof product.branchId === 'string' && product.branchId.trim() ? product.branchId.trim() : null;
+          if (businessId && branchId) {
+            const branchSnap = await transaction.get(adminDb.collection('branches').doc(branchId));
+            const branch = branchSnap.data() || {};
+            if (!branchSnap.exists || String(branch.businessId || '') !== businessId || String(branch.status || '') !== 'active') throw new RequestValidationError('INVALID_REQUEST', 'A business product is linked to an invalid or inactive branch.');
+          }
           const price = product.price;
           const available = product.quantity;
           const minOrderQuantity = Number(product.minOrderQuantity || 1);
@@ -3588,9 +3594,9 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             throw new RequestValidationError('INVALID_REQUEST', 'One or more products in your cart are no longer available in the requested quantity.');
           }
           requestedByProduct.set(productId, requested);
-          const groupKey = `${sellerId}::${businessId || ''}`;
+          const groupKey = `${sellerId}::${businessId || ''}::${branchId || ''}`;
           const group = groups.get(groupKey) || [];
-          group.push({ cart, product, productId, sellerId, businessId });
+          group.push({ cart, product, productId, sellerId, businessId, branchId });
           groups.set(groupKey, group);
         }
         const orderIds: string[] = [];
@@ -3610,6 +3616,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const orderRef = adminDb.collection('orders').doc();
           const sellerId = sellerItems[0].sellerId;
           const businessId = sellerItems[0].businessId;
+          const branchId = sellerItems[0].branchId;
           const items = sellerItems.map(({ product, productId, cart }) => ({
             productId,
             name: typeof product.name === 'string' ? product.name : 'Product',
@@ -3626,6 +3633,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           transaction.create(orderRef, {
             id: orderRef.id, customerId: uid, sellerId,
             ...(businessId ? { businessId } : {}),
+            ...(businessId && branchId ? { branchId } : {}),
             items, totalAmount, amountMinor: totalAmountMinor, currency: 'NGN',
             status: 'pending', shippingAddress, createdAt: now, updatedAt: now,
           });
