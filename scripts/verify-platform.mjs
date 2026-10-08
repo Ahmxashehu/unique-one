@@ -13,6 +13,13 @@ assert(packageJson.scripts?.lint === "tsc --noEmit", "TypeScript lint script is 
 assert(packageJson.scripts?.build === "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs", "production build script is present");
 assert(packageJson.scripts?.["store:reconcile-inventory"] === "node scripts/reconcile-store-inventory.mjs", "Store inventory reconciliation command is present");
 assert(fs.existsSync(path.join(root, "scripts/reconcile-store-inventory.mjs")), "Store inventory reconciliation script exists");
+assert(packageJson.scripts?.["store:migrate-legacy-inventory"] === "node scripts/migrate-legacy-store-inventory.mjs", "Controlled legacy inventory migration command is present");
+assert(fs.existsSync(path.join(root, "scripts/migrate-legacy-store-inventory.mjs")), "Legacy inventory migration script exists");
+const legacyMigration = read("scripts/migrate-legacy-store-inventory.mjs");
+for (const required of ["--apply", "LEGACY_INVENTORY_OPERATOR_UID", "LEGACY_INVENTORY_APPROVAL_REF", "LEGACY_MIGRATION_OPERATOR_UNAUTHORIZED", "store_inventory_legacy_migration"]) {
+  assert(legacyMigration.includes(required), `legacy inventory migration safeguard exists: ${required}`);
+}
+assert(legacyMigration.includes("PRODUCT_ALREADY_HAS_LEDGER"), "legacy migration refuses products with existing ledger history");
 
 const i18n = read("src/lib/i18n.ts");
 for (const language of ["en", "ha", "fr", "ig", "yo", "pcm"]) {
