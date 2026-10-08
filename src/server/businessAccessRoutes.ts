@@ -76,13 +76,16 @@ async function getMemberships(db: Firestore, uid: string) {
     const allowedRoles = new Set(['business_owner', 'seller', 'staff_member', 'service_provider', 'school_administrator', 'finance_officer', 'risk_security_officer']);
     if (!allowedRoles.has(role)) continue;
     const membershipRef = db.collection('businessMemberships').doc(`${uid}__${businessId}`);
+    const membershipSnap = await membershipRef.get();
+    // Never resurrect an explicitly deactivated membership from a stale approval.
+    if (membershipSnap.exists && String(membershipSnap.data()?.status || '') === 'inactive') continue;
     await membershipRef.set({
       uid,
       businessId,
       role,
       businessName: String(business.name || application.organizationName || application.name || 'Unique Business'),
       status: 'active',
-      createdAt: Timestamp.now(),
+      createdAt: membershipSnap.exists ? (membershipSnap.data()?.createdAt || Timestamp.now()) : Timestamp.now(),
       updatedAt: Timestamp.now(),
       sourceApplicationId: approvalDoc.id,
     }, { merge: true });
