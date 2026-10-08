@@ -114,7 +114,8 @@ async function sessionValid(db: Firestore, uid: string, businessId: string, toke
   const session = await getActiveSession(db, uid, token);
   return Boolean(session && session.businessId === businessId);
 }
-\nasync function getAuthorizedBusinessMembership(db: Firestore, uid: string, businessId: string) {
+
+async function getAuthorizedBusinessMembership(db: Firestore, uid: string, businessId: string) {
   const membershipSnap = await db.collection('businessMemberships').doc(credentialId(uid, businessId)).get();
   if (!membershipSnap.exists || String(membershipSnap.data()?.status || '') !== 'active') return null;
   const businessSnap = await db.collection('businesses').doc(businessId).get();
