@@ -3338,7 +3338,6 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const seating = typeof body.seating === 'string' ? body.seating.trim().slice(0, 80) : '';
       const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 500) : '';
       const cart = body.cart;
-      const subtotal = body.subtotal;
       if (!restaurantId || !['dine-in', 'delivery', 'pickup'].includes(String(mode)) ||
           !['uniquepay', 'bank-transfer'].includes(String(paymentMethod)) ||
           !customerName || !customerPhone || !isPlainObject(cart)) {
@@ -3347,14 +3346,19 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (mode === 'delivery' && !deliveryAddress) return errorResponse(res, 'INVALID_REQUEST', 'A delivery address is required.');
       if (mode === 'dine-in' && (!date || !time)) return errorResponse(res, 'INVALID_REQUEST', 'Date and time are required for dine-in.');
       if (mode === 'pickup' && (!date || !time)) return errorResponse(res, 'INVALID_REQUEST', 'Pickup date and time are required.');
-      if (typeof subtotal !== 'number' || !Number.isSafeInteger(subtotal) || subtotal <= 0) return errorResponse(res, 'INVALID_AMOUNT', 'The restaurant subtotal is invalid.');
-      const deliveryFee = mode === 'delivery' ? 1500 : 0;
-      const serviceFee = Math.max(300, Math.round(subtotal * 0.03));
-      const total = subtotal + deliveryFee + serviceFee;
-      if (!Number.isSafeInteger(total) || total <= 0) return errorResponse(res, 'INVALID_AMOUNT', 'The restaurant order total is invalid.');
-      const items = Object.entries(cart).map(([itemId, quantity]) => ({ itemId, quantity })).filter((item) => Number.isSafeInteger(item.quantity) && Number(item.quantity) > 0);
-      if (!items.length) return errorResponse(res, 'INVALID_REQUEST', 'Add at least one menu item before checkout.');
-      const fingerprint = createHash('sha256').update(JSON.stringify({ uid, restaurantId, mode, paymentMethod, customerName, customerPhone, deliveryAddress, date, time, seating, notes, items, subtotal, deliveryFee, serviceFee, total })).digest('hex');
+      const cartItems = Object.entries(cart).map(([itemId, quantity]) => ({
+        itemId: String(itemId).trim(),
+        quantity: Number(quantity),
+      }));
+      if (!cartItems.length || cartItems.some((item) => !/^[A-Za-z0-9_-]{1,128}$/.test(item.itemId) || !Number.isSafeInteger(item.quantity) || item.quantity <= 0 || item.quantity > 1000)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Restaurant cart items are invalid.');
+      }
+      const uniqueItems = new Map<string, number>();
+      for (const item of cartItems) uniqueItems.set(item.itemId, (uniqueItems.get(item.itemId) || 0) + item.quantity);
+      const items = Array.from(uniqueItems, ([itemId, quantity]) => ({ itemId, quantity }));
+      const fingerprint = createHash('sha256').update(JSON.stringify({
+        uid, restaurantId, mode, paymentMethod, customerName, customerPhone, deliveryAddress, date, time, seating, notes, items,
+      })).digest('hex');
       const idempotencyRef = adminDb.collection('restaurantOrderIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
       const result = await adminDb.runTransaction(async (transaction) => {
         const existing = await transaction.get(idempotencyRef);
@@ -3363,20 +3367,51 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           if (data.requestFingerprint !== fingerprint) throw new RequestValidationError('INVALID_REQUEST', 'This order idempotency key was already used with different order data.');
           return data.result;
         }
+        const restaurantRef = adminDb.collection('restaurants').doc(restaurantId);
+        const restaurantSnap = await transaction.get(restaurantRef);
+        if (!restaurantSnap.exists) throw new RequestValidationError('NOT_FOUND', 'Restaurant could not be found.');
+        const restaurant = restaurantSnap.data() as Record<string, any>;
+        if (restaurant.status !== 'active' || restaurant.verificationStatus !== 'verified') {
+          throw new RequestValidationError('UNAVAILABLE', 'This restaurant is not currently accepting orders.');
+        }
+        if (restaurant.uniquePayStatus !== 'verified' && paymentMethod === 'uniquepay') {
+          throw new RequestValidationError('UNAVAILABLE', 'This restaurant is not yet connected to UniquePay.');
+        }
+        const menuRefs = items.map((item) => restaurantRef.collection('menuItems').doc(item.itemId));
+        const menuSnaps = await Promise.all(menuRefs.map((ref) => transaction.get(ref)));
+        let subtotal = 0;
+        const pricedItems = items.map((item, index) => {
+          const snap = menuSnaps[index];
+          if (!snap.exists) throw new RequestValidationError('INVALID_REQUEST', 'One or more Restaurant menu items are unavailable.');
+          const menu = snap.data() as Record<string, any>;
+          if (String(menu.restaurantId || '') !== restaurantId || String(menu.businessId || '') !== String(restaurant.businessId || '') ||
+              String(menu.branchId || '') !== String(restaurant.branchId || '') || menu.currency !== 'NGN' ||
+              menu.available !== true || !Number.isSafeInteger(Number(menu.priceMinor)) || Number(menu.priceMinor) <= 0) {
+            throw new RequestValidationError('INVALID_REQUEST', 'One or more Restaurant menu items are unavailable or invalid.');
+          }
+          const lineTotal = Number(menu.priceMinor) * item.quantity;
+          if (!Number.isSafeInteger(lineTotal) || !Number.isSafeInteger(subtotal + lineTotal)) {
+            throw new RequestValidationError('INVALID_AMOUNT', 'The Restaurant order total is invalid.');
+          }
+          subtotal += lineTotal;
+          return { itemId: item.itemId, quantity: item.quantity, name: String(menu.name || ''), unitPriceMinor: Number(menu.priceMinor) };
+        });
+        const deliveryFee = mode === 'delivery' ? 1500 : 0;
+        const serviceFee = Math.max(300, Math.round(subtotal * 0.03));
+        const total = subtotal + deliveryFee + serviceFee;
+        if (!Number.isSafeInteger(total) || total <= 0) throw new RequestValidationError('INVALID_AMOUNT', 'The Restaurant order total is invalid.');
         const orderRef = adminDb.collection('restaurantOrders').doc();
         const now = Timestamp.now();
         const order = {
           id: orderRef.id, customerId: uid, restaurantId, mode, paymentMethod,
-          customerName, customerPhone, deliveryAddress, date, time, seating, notes, items,
-          subtotalMinor: subtotal, deliveryFeeMinor: deliveryFee, serviceFeeMinor: serviceFee, totalMinor: total,
-          currency: 'NGN', paymentStatus: 'pending', status: 'pending_payment',
-          // Restaurant totals currently originate from client checkout data; never permit this unverified amount to fund a wallet payment.
-          pricingStatus: 'client_unverified',
-          createdAt: now, updatedAt: now,
-          orderTimeline: [{ status: 'pending_payment', at: now }],
+          customerName, customerPhone, deliveryAddress, date, time, seating, notes,
+          items: pricedItems, subtotalMinor: subtotal, deliveryFeeMinor: deliveryFee, serviceFeeMinor: serviceFee, totalMinor: total,
+          currency: 'NGN', paymentStatus: 'pending', status: 'pending_payment', pricingStatus: 'server_verified',
+          businessId: String(restaurant.businessId || ''), branchId: String(restaurant.branchId || ''),
+          createdAt: now, updatedAt: now, orderTimeline: [{ status: 'pending_payment', at: now }],
         };
         transaction.create(orderRef, order);
-        const result = { orderId: orderRef.id, status: 'pending_payment', paymentStatus: 'pending', paymentMethod, totalMinor: total };
+        const result = { orderId: orderRef.id, status: 'pending_payment', paymentStatus: 'pending', paymentMethod, totalMinor: total, pricingStatus: 'server_verified' };
         transaction.create(idempotencyRef, { uid, idempotencyKey, requestFingerprint: fingerprint, result, createdAt: now, updatedAt: now });
         return result;
       });
