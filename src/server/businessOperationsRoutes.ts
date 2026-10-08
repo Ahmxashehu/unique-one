@@ -1,0 +1,133 @@
+import type { Express, RequestHandler, Response } from 'express';
+import { Timestamp, type Firestore } from 'firebase-admin/firestore';
+import type { Permission } from '../lib/os/types';
+import { hasRolePermission } from '../lib/auth/rbac';
+
+function fail(res: Response, code: string, message: string, status = 400) {
+  return res.status(status).json({ error: { code, message } });
+}
+function ctx(req: any) {
+  const m = req.businessMembership || {}, s = req.businessSession || {};
+  return { uid: String(s.uid || ''), businessId: String(s.businessId || ''), role: String(m.role || ''), permissions: Array.isArray(m.permissions) ? m.permissions : [] };
+}
+function can(req: any, permission: Permission) {
+  const c = ctx(req);
+  return hasRolePermission([c.role as any], c.permissions, permission);
+}
+function inTenant(data: any, businessId: string) { return String(data?.businessId || '') === businessId; }
+
+export function registerBusinessOperationsRoutes(app: Express, _authenticate: RequestHandler, db: Firestore) {
+  app.get('/api/business/staff', async (req, res) => {
+    if (!can(req, 'manage:business_staff')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage business staff.', 403);
+    const { businessId } = ctx(req);
+    try {
+      const [i, b] = await Promise.all([
+        db.collection('staffInvites').where('businessId', '==', businessId).limit(200).get(),
+        db.collection('branches').where('businessId', '==', businessId).limit(200).get(),
+      ]);
+      return res.json({
+        invites: i.docs.map(d => ({ id: d.id, ...d.data() })).filter((x: any) => inTenant(x, businessId)),
+        branches: b.docs.map(d => ({ id: d.id, ...d.data() })).filter((x: any) => inTenant(x, businessId)),
+      });
+    } catch (e) { console.error('Business staff read failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Staff data is temporarily unavailable.', 503); }
+  });
+
+  app.post('/api/business/staff/invite', async (req, res) => {
+    if (!can(req, 'manage:business_staff')) return fail(res, 'FORBIDDEN', 'You do not have permission to invite staff.', 403);
+    const { uid, businessId } = ctx(req);
+    const email = typeof req.body?.inviteeEmail === 'string' ? req.body.inviteeEmail.trim().toLowerCase() : '';
+    const role = typeof req.body?.role === 'string' ? req.body.role.trim() : '';
+    const branchId = typeof req.body?.branchId === 'string' ? req.body.branchId.trim() : '';
+    const allowedRoles = new Set(['admin','manager','sales','cashier','accountant','inventory','support','delivery','branch_manager','viewer']);
+    if (!uid || !businessId || !email || !allowedRoles.has(role)) return fail(res, 'INVALID_REQUEST', 'Valid invitation details are required.');
+    try {
+      let branchName: string | null = null;
+      if (branchId) {
+        const snap = await db.collection('branches').doc(branchId).get(), branch = snap.exists ? snap.data() || {} : {};
+        if (!snap.exists || !inTenant(branch, businessId) || String(branch.ownerUid || '') !== uid || String(branch.status || '') !== 'active') return fail(res, 'INVALID_BRANCH', 'The selected branch is invalid or inactive.', 403);
+        branchName = String(branch.name || '').trim() || null;
+      }
+      const now = Timestamp.now(), ref = db.collection('staffInvites').doc();
+      await ref.set({ businessOwnerUid: uid, businessId, inviteeEmail: email, role, branchName, branchId: branchId || null, status: 'pending', invitedAt: now, createdAt: now });
+      await db.collection('audit_logs').add({ action: 'business_staff_invite_created', actorUid: uid, businessId, inviteId: ref.id, role, branchId: branchId || null, createdAt: now });
+      return res.status(201).json({ ok: true, invite: { id: ref.id, businessId, inviteeEmail: email, role, branchName, branchId: branchId || null, status: 'pending' } });
+    } catch (e) { console.error('Business staff invite failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to create the staff invitation.', 503); }
+  });
+
+  app.get('/api/business/branches', async (req, res) => {
+    if (!can(req, 'manage:business_staff')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage branches.', 403);
+    const { businessId } = ctx(req);
+    try {
+      const snap = await db.collection('branches').where('businessId', '==', businessId).limit(200).get();
+      return res.json({ branches: snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((x: any) => inTenant(x, businessId)) });
+    } catch (e) { console.error('Business branches read failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Branch data is temporarily unavailable.', 503); }
+  });
+
+  app.post('/api/business/branches', async (req, res) => {
+    if (!can(req, 'manage:business_staff')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage branches.', 403);
+    const { uid, businessId } = ctx(req);
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const type = typeof req.body?.type === 'string' ? req.body.type.trim() : '';
+    const address = typeof req.body?.address === 'string' ? req.body.address.trim() : '';
+    const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+    if (!uid || !businessId || !name || !new Set(['headquarters','branch','warehouse','farm_site','storefront']).has(type)) return fail(res, 'INVALID_REQUEST', 'Valid branch details are required.');
+    try {
+      const now = Timestamp.now(), ref = db.collection('branches').doc();
+      await ref.set({ ownerUid: uid, businessId, name, type, address: address || null, phone: phone || null, status: 'active', createdAt: now, updatedAt: now });
+      await db.collection('audit_logs').add({ action: 'business_branch_created', actorUid: uid, businessId, branchId: ref.id, createdAt: now });
+      return res.status(201).json({ ok: true, branch: { id: ref.id, ownerUid: uid, businessId, name, type, address: address || null, phone: phone || null, status: 'active' } });
+    } catch (e) { console.error('Business branch create failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to create the branch.', 503); }
+  });
+
+  for (const method of ['patch','delete'] as const) {
+    app[method]('/api/business/branches/:branchId', async (req, res) => {
+      if (!can(req, 'manage:business_staff')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage branches.', 403);
+      const { uid, businessId } = ctx(req), ref = db.collection('branches').doc(String(req.params.branchId || ''));
+      try {
+        const snap = await ref.get(), branch = snap.exists ? snap.data() || {} : {};
+        if (!snap.exists || !inTenant(branch, businessId)) return fail(res, 'NOT_FOUND', 'Branch not found.', 404);
+        if (method === 'patch') {
+          const updates: Record<string, unknown> = {};
+          if (typeof req.body?.status === 'string' && ['active','inactive'].includes(req.body.status)) updates.status = req.body.status;
+          if (typeof req.body?.name === 'string' && req.body.name.trim()) updates.name = req.body.name.trim();
+          if (!Object.keys(updates).length) return fail(res, 'INVALID_REQUEST', 'No valid branch changes were supplied.');
+          updates.updatedAt = Timestamp.now(); await ref.update(updates);
+          await db.collection('audit_logs').add({ action: 'business_branch_updated', actorUid: uid, businessId, branchId: ref.id, createdAt: Timestamp.now() });
+          return res.json({ ok: true, branchId: ref.id });
+        }
+        await ref.delete();
+        await db.collection('audit_logs').add({ action: 'business_branch_deleted', actorUid: uid, businessId, branchId: ref.id, createdAt: Timestamp.now() });
+        return res.json({ ok: true, branchId: ref.id });
+      } catch (e) { console.error('Business branch mutation failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to update the branch.', 503); }
+    });
+  }
+
+  app.get('/api/business/suppliers', async (req, res) => {
+    if (!can(req, 'manage:inventory')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage suppliers.', 403);
+    const { businessId } = ctx(req);
+    try {
+      const snap = await db.collection('suppliers').where('businessId', '==', businessId).limit(300).get();
+      return res.json({ suppliers: snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((x: any) => inTenant(x, businessId)) });
+    } catch (e) { console.error('Business suppliers read failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Supplier data is temporarily unavailable.', 503); }
+  });
+
+  app.post('/api/business/suppliers', async (req, res) => {
+    if (!can(req, 'manage:inventory')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage suppliers.', 403);
+    const { uid, businessId } = ctx(req);
+    const f = {
+      name: typeof req.body?.name === 'string' ? req.body.name.trim() : '',
+      companyName: typeof req.body?.companyName === 'string' ? req.body.companyName.trim() : '',
+      phone: typeof req.body?.phone === 'string' ? req.body.phone.trim() : '',
+      email: typeof req.body?.email === 'string' ? req.body.email.trim() : '',
+      address: typeof req.body?.address === 'string' ? req.body.address.trim() : '',
+      category: typeof req.body?.category === 'string' ? req.body.category.trim() : '',
+    };
+    if (!uid || !businessId || !f.name || !f.companyName || !f.phone || !f.category) return fail(res, 'INVALID_REQUEST', 'Required supplier details are missing.');
+    try {
+      const now = Timestamp.now(), ref = db.collection('suppliers').doc();
+      await ref.set({ businessOwnerUid: uid, businessId, ...f, email: f.email || null, address: f.address || null, outstandingAmount: 0, verificationStatus: 'unverified', createdAt: now, updatedAt: now });
+      await db.collection('audit_logs').add({ action: 'business_supplier_created', actorUid: uid, businessId, supplierId: ref.id, createdAt: now });
+      return res.status(201).json({ ok: true, supplier: { id: ref.id, businessId, ...f, outstandingAmount: 0, verificationStatus: 'unverified' } });
+    } catch (e) { console.error('Business supplier create failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to add the supplier.', 503); }
+  });
+}

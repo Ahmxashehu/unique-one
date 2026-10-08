@@ -5,6 +5,7 @@ import { ROLE_PERMISSIONS, hasRolePermission } from '../lib/auth/rbac';
 import { registerBusinessAccessRoutes } from './businessAccessRoutes';
 import { registerBusinessDataRoutes } from './businessDataRoutes';
 import { registerBusinessInventoryRoutes } from './businessInventoryRoutes';
+import { registerBusinessOperationsRoutes } from './businessOperationsRoutes';
 import { registerStoreOrderLifecycleRoutes } from './storeOrderLifecycleRoutes';
 import { registerStoreReturnInspectionRoutes } from './storeReturnInspectionRoutes';
 import { registerPaySmallSmallRoutes } from './paySmallSmallRoutes';
@@ -118,6 +119,7 @@ export function registerAdminRbacRoutes(
   registerBusinessAccessRoutes(app, authenticate, db, requirePermission);
   registerBusinessDataRoutes(app, authenticate, db);
   registerBusinessInventoryRoutes(app, authenticate, db);
+  registerBusinessOperationsRoutes(app, authenticate, db);
   registerStoreOrderLifecycleRoutes(app, authenticate, db);
   registerStoreReturnInspectionRoutes(app, authenticate, db);
   registerPaySmallSmallRoutes(app, authenticate, db);
