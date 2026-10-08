@@ -11,6 +11,8 @@ const assert = (condition, message) => {
 const packageJson = JSON.parse(read("package.json"));
 assert(packageJson.scripts?.lint === "tsc --noEmit", "TypeScript lint script is present");
 assert(packageJson.scripts?.build === "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs", "production build script is present");
+assert(packageJson.scripts?.["store:reconcile-inventory"] === "node scripts/reconcile-store-inventory.mjs", "Store inventory reconciliation command is present");
+assert(fs.existsSync(path.join(root, "scripts/reconcile-store-inventory.mjs")), "Store inventory reconciliation script exists");
 
 const i18n = read("src/lib/i18n.ts");
 for (const language of ["en", "ha", "fr", "ig", "yo", "pcm"]) {
