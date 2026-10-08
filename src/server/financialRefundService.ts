@@ -180,6 +180,13 @@ export async function executeFinancialRefund(
       ) {
         return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order is not eligible for refund.' } };
       }
+      const relatedOrderAmount = Number(order.amountMinor);
+      if (!Number.isSafeInteger(relatedOrderAmount) || relatedOrderAmount <= 0 || originalAmount !== relatedOrderAmount) {
+        return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Store payment amount must exactly match the related order amount.' } };
+      }
+      if (input.finalizeOrder === 'full' && order.paymentStatus !== 'paid') {
+        return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'A full Store refund requires an order that has not already been partially refunded.' } };
+      }
       if (input.finalizeOrder === 'partial') {
         const rr = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest as Record<string, unknown> : null;
         const disposition = rr?.inventoryDisposition;
