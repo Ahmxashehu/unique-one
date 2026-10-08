@@ -2,11 +2,10 @@ import React, { useState } from 'react';
 import { PackagePlus, Save, Loader2, AlertCircle, X, ImagePlus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { db, storage } from '../../lib/firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
 import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { uploadMedia } from '../../lib/media/upload';
 import { useNavigate } from 'react-router-dom';
-import { ProductCategory, ProductCondition, ProductStatus, Product } from '../../lib/os/types';
+import { ProductCategory, ProductCondition, ProductStatus } from '../../lib/os/types';
 import { takeStagedMedia } from '../../lib/media/shareBridge';
 
 const CATEGORIES: { value: ProductCategory; label: string }[] = [
@@ -122,7 +121,7 @@ export default function AddProductPage() {
     setLoading(true); setError(''); setSuccess(false); setUploadProgress(0);
     let uploadedStoragePaths: string[] = [];
     try {
-      const productId = doc(collection(db, 'products')).id;
+      const productId = crypto.randomUUID();
       const uploadedImages: string[] = [];
       uploadedStoragePaths = [];
       for (let i = 0; i < imageFiles.length; i++) {
@@ -130,21 +129,27 @@ export default function AddProductPage() {
         uploadedImages.push(result.downloadUrl);
         uploadedStoragePaths.push(result.storagePath);
       }
-      const now = new Date().toISOString();
       const businessSession = localStorage.getItem('unique_business_session') || '';
-      const businessId = businessSession ? (localStorage.getItem('unique_business_id') || '') : '';
-      const productData: Product = {
-        id: productId, sellerId: currentUser.uid, name: cleanName, description: cleanDescription, category,
-        images: uploadedImages, hasVideo, price: parsedPrice, currency, condition, quantity: parsedQuantity,
-        minOrderQuantity: parsedMinOrder, location: { address: locationAddress.trim(), lat: 0, lng: 0 },
-        deliveryOptions: deliveryOption ? ['standard_delivery'] : [], pickupOptions: pickupOption ? ['in_store_pickup'] : [],
-        status, createdAt: now, updatedAt: now,
-        ...(businessId ? { businessId } : {}),
-        ...(parsedDiscount !== undefined ? { discount: parsedDiscount } : {}),
-        ...(parsedWholesale !== undefined ? { wholesalePrice: parsedWholesale } : {}),
-        ...(parsedBulk !== undefined ? { bulkPrice: parsedBulk } : {}),
-      };
-      await setDoc(doc(db, 'products', productId), productData);
+      if (!businessSession) throw new Error('Business Platform session is required to create a product.');
+      const idToken = await currentUser.getIdToken();
+      const response = await fetch('/api/business/products/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}`, 'x-business-session': businessSession },
+        body: JSON.stringify({
+          id: productId, name: cleanName, description: cleanDescription, category,
+          images: uploadedImages, hasVideo, price: parsedPrice, currency, condition,
+          quantity: parsedQuantity, minOrderQuantity: parsedMinOrder,
+          locationAddress: locationAddress.trim(),
+          deliveryOptions: deliveryOption ? ['standard_delivery'] : [],
+          pickupOptions: pickupOption ? ['in_store_pickup'] : [],
+          status,
+          ...(parsedDiscount !== undefined ? { discount: parsedDiscount } : {}),
+          ...(parsedWholesale !== undefined ? { wholesalePrice: parsedWholesale } : {}),
+          ...(parsedBulk !== undefined ? { bulkPrice: parsedBulk } : {}),
+        }),
+      });
+      const responseData = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(String(responseData?.error?.message || 'Unable to save product.'));
       imagePreviews.forEach(URL.revokeObjectURL);
       setSuccess(true);
       window.setTimeout(() => navigate('/os/business/dashboard'), 800);
