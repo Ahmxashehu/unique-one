@@ -9,7 +9,7 @@ function fail(res: Response, code: string, message: string, status = 400) {
   return res.status(status).json({ error: { code, message } });
 }
 function ctx(req: any) {
-  const m = req.businessMembership || {}, s = req.businessSession || {};
+  const m = (req as any).businessMembership || {}, s = req.businessSession || {};
   return { uid: String(s.uid || ''), businessId: String(s.businessId || ''), role: String(m.role || ''), permissions: Array.isArray(m.permissions) ? m.permissions : [] };
 }
 function can(req: any, permission: Permission) {
@@ -17,6 +17,7 @@ function can(req: any, permission: Permission) {
   return hasRolePermission([c.role as any], c.permissions, permission);
 }
 function inTenant(data: any, businessId: string) { return String(data?.businessId || '') === businessId; }
+function credentialId(uid: string, businessId: string) { return `${uid}__${businessId}`; }
 
 export function registerBusinessOperationsRoutes(app: Express, _authenticate: RequestHandler, db: Firestore) {
   const deliveryConfirmationLimiter = rateLimit({ windowMs: 10 * 60_000, limit: 10, standardHeaders: true, legacyHeaders: false });
@@ -28,7 +29,7 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
         db.collection('staffInvites').where('businessId', '==', businessId).limit(200).get(),
         db.collection('branches').where('businessId', '==', businessId).limit(200).get(),
       ]);
-      const assignedBranchId = typeof (req.businessMembership || {}).branchId === 'string' ? String((req.businessMembership || {}).branchId).trim() : '';
+      const assignedBranchId = typeof ((req as any).businessMembership || {}).branchId === 'string' ? String(((req as any).businessMembership || {}).branchId).trim() : '';
       const invites = i.docs.map(d => ({ id: d.id, ...d.data() })).filter((x: any) =>
         inTenant(x, businessId) &&
         (!assignedBranchId || String(x.branchId || '').trim() === assignedBranchId)
@@ -117,7 +118,7 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
     const { uid, businessId } = ctx(req);
     const orderId = typeof req.params.orderId === 'string' ? req.params.orderId.trim() : '';
     const deliveryUid = typeof req.body?.deliveryUid === 'string' ? req.body.deliveryUid.trim() : '';
-    const actorMembership = req.businessMembership || {};
+    const actorMembership = (req as any).businessMembership || {};
     const actorBranchId = typeof actorMembership.branchId === 'string' ? actorMembership.branchId.trim() : '';
     if (!uid || !businessId || !/^[A-Za-z0-9_-]{1,128}$/.test(orderId) || !/^[A-Za-z0-9_-]{1,128}$/.test(deliveryUid)) {
       return fail(res, 'INVALID_REQUEST', 'A valid Store order and delivery staff account are required.');
@@ -183,7 +184,7 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
 
   app.post('/api/business/orders/:orderId/delivery-confirmation/request', deliveryConfirmationLimiter, async (req, res) => {
     const { uid, businessId } = ctx(req);
-    const membership = req.businessMembership || {};
+    const membership = (req as any).businessMembership || {};
     const role = String(membership.role || '').trim();
     const memberBranchId = String(membership.branchId || '').trim();
     if (role !== 'delivery' && !can(req, 'confirm:delivery')) return fail(res, 'FORBIDDEN', 'You do not have delivery confirmation authority.', 403);
@@ -208,7 +209,7 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
 
   app.post('/api/business/orders/:orderId/delivery-confirmation/verify', deliveryConfirmationLimiter, async (req, res) => {
     const { uid, businessId } = ctx(req);
-    const membership = req.businessMembership || {};
+    const membership = (req as any).businessMembership || {};
     const role = String(membership.role || '').trim();
     const memberBranchId = String(membership.branchId || '').trim();
     if (role !== 'delivery' && !can(req, 'confirm:delivery')) return fail(res, 'FORBIDDEN', 'You do not have delivery confirmation authority.', 403);
@@ -248,7 +249,7 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
 
   app.get('/api/business/branches', async (req, res) => {
     if (!can(req, 'manage:business_staff') && !can(req, 'create:products') && !can(req, 'edit:products') && !can(req, 'manage:inventory')) return fail(res, 'FORBIDDEN', 'You do not have permission to view branches.', 403);
-    const { businessId } = ctx(req), membership = req.businessMembership || {};
+    const { businessId } = ctx(req), membership = (req as any).businessMembership || {};
     const assignedBranchId = typeof membership.branchId === 'string' ? membership.branchId.trim() : '';
     try {
       const snap = await db.collection('branches').where('businessId', '==', businessId).limit(200).get();

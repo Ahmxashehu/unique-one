@@ -36,7 +36,7 @@ type TransferErrorCode =
   | 'SELF_TRANSFER_NOT_ALLOWED' | 'INVALID_AMOUNT' | 'INVALID_CURRENCY'
   | 'INVALID_IDEMPOTENCY_KEY' | 'IDEMPOTENCY_KEY_CONFLICT' | 'TRANSFER_ALREADY_COMPLETED'
   | 'TRANSFER_IN_PROGRESS' | 'WALLET_NOT_FOUND' | 'WALLET_UNAVAILABLE' | 'INSUFFICIENT_FUNDS' | 'RATE_LIMITED'
-  | 'TRANSACTION_FAILED' | 'SERVICE_UNAVAILABLE' | 'UNAVAILABLE' | 'NOT_FOUND' | 'BLOCKED' | 'FORBIDDEN' | 'INSUFFICIENT_STOCK' | 'BIOMETRIC_REQUIRED';
+  | 'TRANSACTION_FAILED' | 'SERVICE_UNAVAILABLE' | 'UNAVAILABLE' | 'NOT_FOUND' | 'BLOCKED' | 'FORBIDDEN' | 'INSUFFICIENT_STOCK' | 'BIOMETRIC_REQUIRED' | 'INVALID_STATE' | 'REFUND_IN_PROGRESS' | 'CONFLICT' | 'IDEMPOTENCY_CONFLICT' | 'ORIGINAL_NOT_FOUND' | 'ORIGINAL_NOT_REFUNDABLE' | 'REFUND_EXCEEDS_REMAINING';
 interface TransferErrorResponse { error: { code: TransferErrorCode; message: string } }
 interface TransferRequestInput { recipientId: string; amountMinor: number; currency: 'NGN'; idempotencyKey: string; description?: string; transactionPin: string }
 interface CreateConversationRequestInput { type: ConversationType; title?: string; avatarUrl?: string; memberUids: string[] }
@@ -59,6 +59,7 @@ const transferErrorStatus: Record<TransferErrorCode, number> = {
   IDEMPOTENCY_KEY_CONFLICT: 409, TRANSFER_ALREADY_COMPLETED: 200, TRANSFER_IN_PROGRESS: 409, RATE_LIMITED: 429, BIOMETRIC_REQUIRED: 403,
   WALLET_NOT_FOUND: 404, WALLET_UNAVAILABLE: 403, INSUFFICIENT_FUNDS: 409, TRANSACTION_FAILED: 500,
   SERVICE_UNAVAILABLE: 503, UNAVAILABLE: 503, NOT_FOUND: 404, BLOCKED: 403, FORBIDDEN: 403, INSUFFICIENT_STOCK: 409,
+  INVALID_STATE: 409, REFUND_IN_PROGRESS: 409, CONFLICT: 409, IDEMPOTENCY_CONFLICT: 409, ORIGINAL_NOT_FOUND: 404, ORIGINAL_NOT_REFUNDABLE: 409, REFUND_EXCEEDS_REMAINING: 409,
 };
 class RequestValidationError extends Error {
   code: TransferErrorCode;
@@ -120,7 +121,7 @@ async function createRestaurantRefundObligation(
   });
 }
 
-async function claimRestaurantRefundObligation(orderId: string, actorUid: string) {
+async function claimRestaurantRefundObligation(orderId: string, actorUid: string): Promise<Record<string, any>> {
   const ref = adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).doc(orderId);
   const now = Timestamp.now();
   return adminDb.runTransaction(async (transaction) => {
@@ -3596,6 +3597,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId)) return errorResponse(res, 'INVALID_REQUEST', 'Invalid Restaurant order ID.');
       const orderRef = adminDb.collection('restaurantOrders').doc(orderId);
       const now = Timestamp.now();
+      let refundRequired = false;
       await adminDb.runTransaction(async (transaction) => {
         const snap = await transaction.get(orderRef);
         if (!snap.exists) throw new RequestValidationError('NOT_FOUND', 'Restaurant order not found.');
@@ -4900,6 +4902,7 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
           const productSellerId = typeof product.sellerId === 'string' ? product.sellerId.trim() : '';
           const productBusinessId = typeof product.businessId === 'string' ? product.businessId.trim() : '';
           const productBranchId = typeof product.branchId === 'string' ? product.branchId.trim() : '';
+          const orderBranchId = typeof order.branchId === 'string' ? order.branchId.trim() : '';
           if (productSellerId !== String(order.sellerId || '').trim()) {
             throw new RequestValidationError('INVALID_REQUEST', 'A returned product no longer belongs to the Store seller; inventory was not restored.');
           }

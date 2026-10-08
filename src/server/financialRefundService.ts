@@ -416,10 +416,12 @@ export async function executeFinancialRefund(
     }
 
     if (relatedOrderRef) {
+      const order = relatedOrderData;
+      const rr = order && order.returnRequest && typeof order.returnRequest === 'object'
+        ? order.returnRequest as Record<string, unknown>
+        : null;
       if (input.finalizeOrder === 'partial') {
-        const order = relatedOrderData;
         if (!order) return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order was not found.' } };
-        const rr = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest as Record<string, unknown> : null;
         if (!rr || rr.status !== 'received' || Number(rr.requestedRefundAmountMinor) !== input.amountMinor) {
           return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The partial Store return is no longer eligible for this refund.' } };
         }
