@@ -15,7 +15,8 @@
     "localization:strict": "node scripts/audit-localization.mjs --strict",
     "store:expire-reservations": "node scripts/expire-store-reservations.mjs",
     "pay-small-small:sync": "node scripts/pay-small-small-sync.mjs",
-    "store:reconcile-inventory": "node scripts/reconcile-store-inventory.mjs"
+    "store:reconcile-inventory": "node scripts/reconcile-store-inventory.mjs",
+    "store:migrate-legacy-inventory": "node scripts/migrate-legacy-store-inventory.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
