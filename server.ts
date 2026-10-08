@@ -3450,11 +3450,13 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         if (!orderSnap.exists) throw new RequestValidationError('NOT_FOUND', 'Restaurant order not found.');
         const order = orderSnap.data() as Record<string, any>;
         const current = String(order.status || '');
-        if (order.customerId !== uid) throw new RequestValidationError('FORBIDDEN', 'You cannot change this Restaurant order.');
+        const actorIsCustomer = order.customerId === uid;
+        const actorIsOwner = Boolean(order.businessId && order.restaurantId && order.branchId) && false;
+        if (!actorIsCustomer) throw new RequestValidationError('FORBIDDEN', 'Only the customer may cancel a Restaurant order through this endpoint.');
         if (String(order.paymentStatus || '') !== 'paid' && nextStatus !== 'cancelled') {
           throw new RequestValidationError('INVALID_STATE', 'Only paid Restaurant orders can enter fulfilment.');
         }
-        if (!allowed[current]?.includes(nextStatus)) throw new RequestValidationError('INVALID_STATE', 'Invalid Restaurant order status transition.');
+        if (!allowed[current]?.includes(nextStatus) || (nextStatus !== 'cancelled' && !actorIsCustomer)) throw new RequestValidationError('INVALID_STATE', 'Invalid Restaurant order status transition.');
         transaction.update(orderRef, {
           status: nextStatus,
           updatedAt: now,
