@@ -1,6 +1,7 @@
 import type { Express, RequestHandler } from 'express';
 import rateLimit from 'express-rate-limit';
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
+import { recordStoreInventoryMovement } from './storeInventoryLedger';
 
 function fail(res: any, code: string, message: string, status = 400) {
   return res.status(status).json({ error: { code, message } });
@@ -65,6 +66,19 @@ export function registerBusinessInventoryRoutes(
         productName = String(product.name || 'Product');
 
         transaction.update(productRef, { quantity: newQuantity, updatedAt: now });
+        recordStoreInventoryMovement(transaction, db, {
+          productId,
+          movementType: 'manual_adjustment',
+          quantity,
+          previousQuantity: currentQuantity,
+          resultingQuantity: newQuantity,
+          direction: direction === 'in' ? 'in' : 'out',
+          sourceId: `business:${businessId}:${productId}:${uid}:${now.toMillis()}`,
+          sourceModule: 'unique_business.inventory_adjustment',
+          actorUid: uid,
+          businessId,
+          branchId: requestedBranchId || null,
+        });
         const logRef = db.collection('inventoryLogs').doc();
         transaction.set(logRef, {
           productId,
