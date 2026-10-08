@@ -48,9 +48,10 @@ export function registerStoreReturnInspectionRoutes(
         const orderBranchId = typeof order.branchId === 'string' ? order.branchId.trim() : '';
         const branchAccess = !assignedBranchId || orderBranchId === assignedBranchId;
         const tenantAccess = Boolean(activeBusinessId && orderBusinessId && orderBusinessId === activeBusinessId && branchAccess);
-        const sellerAccess = uid === order.sellerId && (!orderBusinessId || tenantAccess);
         const privilegedBusinessAccess = canManage && (orderBusinessId ? (globalAdmin || tenantAccess) : globalAdmin);
-        if (!sellerAccess && !privilegedBusinessAccess) throw new Error('FORBIDDEN');
+        // Inventory inspection determines whether returned goods become resalable and
+        // therefore can unlock a refund. Keep this decision separate from the seller.
+        if (!privilegedBusinessAccess) throw new Error('FORBIDDEN');
 
         const rr = order.returnRequest && typeof order.returnRequest === 'object'
           ? order.returnRequest as Record<string, unknown>
