@@ -67,7 +67,14 @@ async function getMemberships(db: Firestore, uid: string) {
     const businessSnap = await db.collection('businesses').doc(businessId).get();
     if (!businessSnap.exists) continue;
     const business = businessSnap.data() || {};
+    if (
+      String(business.status || '') !== 'active' ||
+      String(business.verificationStatus || '') !== 'verified' ||
+      !String(business.ownerUid || '')
+    ) continue;
     const role = String(application.requestedRole || 'staff_member');
+    const allowedRoles = new Set(['business_owner', 'seller', 'staff_member', 'service_provider', 'school_administrator', 'finance_officer', 'risk_security_officer']);
+    if (!allowedRoles.has(role)) continue;
     const membershipRef = db.collection('businessMemberships').doc(`${uid}__${businessId}`);
     await membershipRef.set({
       uid,
