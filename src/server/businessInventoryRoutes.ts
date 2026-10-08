@@ -33,7 +33,10 @@ export function registerBusinessInventoryRoutes(
     if (!['in', 'out'].includes(direction)) return fail(res, 'INVALID_REQUEST', 'Inventory direction must be in or out.');
     if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1000000) return fail(res, 'INVALID_REQUEST', 'Inventory quantity must be a positive whole number.');
     const role = typeof membership.role === 'string' ? membership.role : '';
-    if (!hasRolePermission([role as Role], [], 'manage:inventory' as Permission)) {
+    const customPermissions = Array.isArray(membership.permissions)
+      ? membership.permissions.filter((value: unknown): value is Permission => typeof value === 'string')
+      : [];
+    if (!hasRolePermission([role as Role], customPermissions, 'manage:inventory' as Permission)) {
       return fail(res, 'FORBIDDEN', 'You do not have permission to adjust inventory.', 403);
     }
 
@@ -58,7 +61,11 @@ export function registerBusinessInventoryRoutes(
           const branchSnap = await transaction.get(branchRef);
           if (!branchSnap.exists) throw new Error('BRANCH_NOT_FOUND');
           const branch = branchSnap.data() || {};
-          if (String(branch.businessId || '') !== businessId || String(branch.status || '') !== 'active') {
+          if (
+            String(branch.businessId || '') !== businessId ||
+            String(branch.ownerUid || '') !== String((await transaction.get(db.collection('businesses').doc(businessId))).data()?.ownerUid || '') ||
+            String(branch.status || '') !== 'active'
+          ) {
             throw new Error('BRANCH_FORBIDDEN');
           }
         }
