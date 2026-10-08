@@ -40,8 +40,12 @@ for (const doc of snap.docs) {
       const product = productSnap.data() || {};
       const quantity = Number(product.quantity);
       const restore = entries[i][1];
-      if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity + restore > Number.MAX_SAFE_INTEGER) throw new Error('INVALID_STOCK');
-      transaction.update(productSnap.ref, { quantity: quantity + restore, status: 'published', updatedAt: nowIso });
+      if (!Number.isSafeInteger(quantity) || quantity < 0 ||
+          !Number.isSafeInteger(restore) || restore <= 0 ||
+          quantity + restore > Number.MAX_SAFE_INTEGER) throw new Error('INVALID_STOCK');
+      const currentStatus = typeof product.status === 'string' ? product.status : 'published';
+      const restoredStatus = currentStatus === 'out_of_stock' && quantity + restore > 0 ? 'published' : currentStatus;
+      transaction.update(productSnap.ref, { quantity: quantity + restore, status: restoredStatus, updatedAt: nowIso });
     }
 
     transaction.update(doc.ref, { status: 'expired', paymentStatus: 'unpaid', expiredAt: nowIso, updatedAt: nowIso });
