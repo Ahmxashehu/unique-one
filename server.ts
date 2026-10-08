@@ -3520,6 +3520,53 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.post("/api/restaurant/orders/:orderId/refund", authenticate, rateLimit({
+    windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false,
+    store: createFirestoreRateLimitStore('restaurantOrderRefundRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Restaurant refund attempts.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const orderId = typeof req.params.orderId === 'string' ? req.params.orderId.trim() : '';
+      const idempotencyKey = typeof req.headers['idempotency-key'] === 'string' ? req.headers['idempotency-key'].trim() : '';
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId) || !/^[A-Za-z0-9_-]{1,200}$/.test(idempotencyKey)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'A valid order ID and idempotency key are required.');
+      }
+      const orderSnap = await adminDb.collection('restaurantOrders').doc(orderId).get();
+      if (!orderSnap.exists) return errorResponse(res, 'NOT_FOUND', 'Restaurant order not found.');
+      const order = orderSnap.data() as Record<string, any>;
+      if (String(order.customerId || '') !== uid) return errorResponse(res, 'FORBIDDEN', 'You cannot refund this Restaurant order.');
+      if (String(order.status || '') !== 'cancelled' || String(order.paymentStatus || '') !== 'paid') {
+        return errorResponse(res, 'INVALID_STATE', 'Only a paid, cancelled Restaurant order can be refunded.');
+      }
+      const originalTransactionId = typeof order.paymentTransactionId === 'string' ? order.paymentTransactionId.trim() : '';
+      const amountMinor = Number(order.totalMinor);
+      if (!isSafeId(originalTransactionId) || !Number.isSafeInteger(amountMinor) || amountMinor <= 0) {
+        return errorResponse(res, 'INVALID_STATE', 'The Restaurant payment record is not eligible for refund.');
+      }
+      const result = await executeFinancialRefund(adminDb, {
+        originalTransactionId,
+        amountMinor,
+        currency: 'NGN',
+        idempotencyKey,
+        actorUid: uid,
+        reason: 'restaurant_order_cancelled',
+        relatedRestaurantOrderId: orderId,
+        sourceModule: 'unique_restaurant.refund',
+        finalizeOrder: 'full',
+      });
+      if ('error' in result) return errorResponse(res, result.error.code, result.error.message);
+      return res.json({ ok: true, ...result });
+    } catch (error) {
+      console.error('Restaurant refund failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Restaurant refund is temporarily unavailable.');
+    }
+  });
+
   app.patch("/api/business/restaurants/orders/:orderId/status", authenticate, rateLimit({
     windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false,
     store: createFirestoreRateLimitStore('restaurantMerchantOrderStatusRateLimits', 60_000),
