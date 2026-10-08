@@ -1,7 +1,7 @@
 import type { Express, RequestHandler } from 'express';
 import type { Permission, Role } from '../lib/os/types';
 import { hasRolePermission } from '../lib/auth/rbac';
-import { randomUUID } from 'crypto';
+import { createHash } from 'crypto';
 import rateLimit from 'express-rate-limit';
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import { recordStoreInventoryMovement } from './storeInventoryLedger';
@@ -27,7 +27,7 @@ export function registerBusinessInventoryRoutes(
     const quantity = req.body?.quantity;
     const requestedBranchId = typeof req.body?.branchId === 'string' ? req.body.branchId.trim() : '';
     const membershipBranchId = typeof membership.branchId === 'string' ? membership.branchId.trim() : '';
-    const movementSourceId = `business:${businessId}:${productId}:${uid}:${randomUUID()}`;
+    const idempotencyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey.trim() : '';\n    if (!/^[A-Za-z0-9._:-]{8,128}$/.test(idempotencyKey)) return fail(res, 'INVALID_REQUEST', 'A valid inventory adjustment idempotency key is required.');\n    const idempotencyId = createHash('sha256').update([businessId, uid, productId, idempotencyKey].join('\\0')).digest('hex');\n    const movementSourceId = `business:${businessId}:${productId}:${uid}:${idempotencyId}`;
 
     if (!uid || !businessId || !productId) return fail(res, 'INVALID_REQUEST', 'Business, user and product are required.');
     if (!['in', 'out'].includes(direction)) return fail(res, 'INVALID_REQUEST', 'Inventory direction must be in or out.');
@@ -46,8 +46,8 @@ export function registerBusinessInventoryRoutes(
       let newQuantity = 0;
       let productName = '';
 
-      await db.runTransaction(async (transaction) => {
-        const productSnap = await transaction.get(productRef);
+      const result = await db.runTransaction(async (transaction) => {
+        const idempotencyRef = db.collection('inventoryAdjustmentIdempotency').doc(idempotencyId);\n        const existing = await transaction.get(idempotencyRef);\n        if (existing.exists) {\n          const prior = existing.data() || {};\n          const fingerprint = JSON.stringify({ businessId, uid, productId, direction, quantity, requestedBranchId });\n          if (prior.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT');\n          return prior.result || { ok: true, productId, quantity: prior.resultingQuantity };\n        }\n        const productSnap = await transaction.get(productRef);
         if (!productSnap.exists) throw new Error('PRODUCT_NOT_FOUND');
         const product = productSnap.data() || {};
 
@@ -119,10 +119,10 @@ export function registerBusinessInventoryRoutes(
         details: JSON.stringify({ productName, direction, quantity, resultingQuantity: newQuantity }),
         createdAt: now,
       });
-      return res.json({ ok: true, productId, quantity: newQuantity });
+      return res.json(result);
     } catch (error) {
       const code = error instanceof Error ? error.message : '';
-      if (code === 'PRODUCT_NOT_FOUND') return fail(res, 'NOT_FOUND', 'The product was not found.', 404);
+      if (code === 'IDEMPOTENCY_CONFLICT') return fail(res, 'IDEMPOTENCY_CONFLICT', 'This inventory adjustment key was already used for a different request.', 409);\n      if (code === 'PRODUCT_NOT_FOUND') return fail(res, 'NOT_FOUND', 'The product was not found.', 404);
       if (code === 'PRODUCT_BUSINESS_MISMATCH') return fail(res, 'FORBIDDEN', 'This product does not belong to the active business.', 403);
       if (code === 'BRANCH_FORBIDDEN') return fail(res, 'FORBIDDEN', 'You are not authorized to operate in this branch.', 403);
       if (code === 'BRANCH_NOT_FOUND') return fail(res, 'NOT_FOUND', 'The selected branch was not found.', 404);
