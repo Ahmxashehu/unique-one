@@ -528,6 +528,11 @@ function storeReturnEligibilityTimestamp(order: Record<string, unknown>): number
   return null;
 }
 
+function storeReturnExpired(returnRequest: Record<string, unknown>, nowMs = Date.now()): boolean {
+  const expiresAt = typeof returnRequest.expiresAt === 'string' ? Date.parse(returnRequest.expiresAt) : NaN;
+  return !Number.isFinite(expiresAt) || nowMs > expiresAt;
+}
+
 const app = express();
   const PORT = Number(process.env.PORT) || 3000;
   const httpServer = http.createServer(app);
@@ -4736,7 +4741,8 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
         const orderAmountMinor = Number(order.amountMinor);
         if (!Number.isSafeInteger(orderAmountMinor) || orderAmountMinor <= 0 || requestedRefundAmountMinor > orderAmountMinor) throw new RequestValidationError('INVALID_AMOUNT', 'The requested return amount cannot exceed the Store order amount.');
         const now = Timestamp.now().toDate().toISOString();
-        const returnRequest = { status: 'requested', reason, items, requestedRefundAmountMinor, requestedBy: uid, requestedAt: now, restocked: false };
+        const expiresAt = new Date(deliveredAtMs + STORE_RETURN_WINDOW_MS).toISOString();
+        const returnRequest = { status: 'requested', reason, items, requestedRefundAmountMinor, requestedBy: uid, requestedAt: now, expiresAt, restocked: false };
         transaction.update(orderRef, { returnRequest, updatedAt: now });
         transaction.create(idempotencyRef, { uid, orderId, idempotencyKey, status: 'requested', createdAt: now, updatedAt: now });
         transaction.create(adminDb.collection('audit_logs').doc(), {
@@ -4797,6 +4803,7 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
         if (!rr) throw new RequestValidationError('INVALID_REQUEST', 'No return request exists for this order.');
         if (rr.status === 'approved' || rr.status === 'received') return { orderId, status: rr.status, replayed: true };
         if (rr.status !== 'requested') throw new RequestValidationError('INVALID_REQUEST', 'This return request cannot be approved in its current state.');
+        if (storeReturnExpired(rr)) throw new RequestValidationError('INVALID_REQUEST', 'This Store return request has expired and can no longer be approved.');
         const now = Timestamp.now().toDate().toISOString();
         transaction.update(ref, { returnRequest: { ...rr, status: 'approved', approvedBy: uid, approvedAt: now }, updatedAt: now });
         transaction.create(adminDb.collection('audit_logs').doc(), { action: 'store.return.approved', actorUid: uid, targetUid: current.customerId, resource: 'store_order', resourceId: orderId, timestamp: Timestamp.now(), createdAt: now });
@@ -4845,6 +4852,7 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
           if (rr?.status === 'received' && rr.quarantined === true) return { orderId, status: 'received', restocked: false, quarantined: true, replayed: true };
           throw new RequestValidationError('INVALID_REQUEST', 'This return is not approved for receipt and restocking.');
         }
+        if (storeReturnExpired(rr)) throw new RequestValidationError('INVALID_REQUEST', 'This Store return request has expired and can no longer be received.');
         const items = Array.isArray(rr.items) ? rr.items : [];
         const quantities = new Map<string, number>();
         for (const item of items) {
