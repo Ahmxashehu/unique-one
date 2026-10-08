@@ -141,6 +141,16 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
         return fail(res, 'BUSINESS_AUTH_REQUIRED', 'Your approved Business Platform access is no longer active.', 403);
       }
       const membership = membershipSnap.data() || {};
+      const businessSnap = await db.collection('businesses').doc(String(session.businessId || '')).get();
+      const business = businessSnap.exists ? businessSnap.data() || {} : {};
+      if (
+        !businessSnap.exists ||
+        String(business.status || '') !== 'active' ||
+        String(business.verificationStatus || '') !== 'verified' ||
+        String(business.ownerUid || '') === ''
+      ) {
+        return fail(res, 'BUSINESS_AUTH_REQUIRED', 'This Business is not currently active and verified.', 403);
+      }
       (req as any).businessMembership = membership;
 
       // Sensitive Business actions require a recent password step-up.
