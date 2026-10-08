@@ -87,6 +87,22 @@ for (const productDoc of productsSnap.docs) {
   let expectedQuantity = null;
   let expectedQuarantine = null;
 
+  // A ledger chain can be internally consistent while still beginning from
+  // pre-ledger stock. If the first canonical movement starts above zero without
+  // an opening_balance, the product's historical stock is not independently
+  // accounted for and must be surfaced as legacy/unreconciled.
+  const firstMovement = movements[0];
+  if (firstMovement.previousQuantity > 0 && firstMovement.movementType !== 'opening_balance') {
+    legacyProducts += 1;
+    errors.push({
+      type: 'legacy_opening_balance_missing',
+      productId,
+      movementId: firstMovement.id,
+      openingQuantity: firstMovement.previousQuantity,
+      firstMovementType: firstMovement.movementType,
+    });
+  }
+
   for (const movement of movements) {
     if (expectedQuantity !== null && movement.previousQuantity !== expectedQuantity) {
       errors.push({
