@@ -42,11 +42,28 @@ export default function AddProductPage() {
   const [locationAddress, setLocationAddress] = useState(userData?.location?.address || '');
   const [deliveryOption, setDeliveryOption] = useState(true);
   const [pickupOption, setPickupOption] = useState(true);
+  const [branches, setBranches] = useState<Array<{ id: string; name?: string; status?: string }>>([]);
+  const [branchId, setBranchId] = useState('');
   const [hasVideo, setHasVideo] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
   React.useEffect(() => {
+    const loadBranches = async () => {
+      try {
+        if (!currentUser) return;
+        const businessSession = localStorage.getItem('unique_business_session') || '';
+        if (!businessSession) return;
+        const idToken = await currentUser.getIdToken();
+        const response = await fetch('/api/business/branches', { headers: { Authorization: `Bearer ${idToken}`, 'x-business-session': businessSession } });
+        if (!response.ok) return;
+        const data = await response.json();
+        const next = Array.isArray(data?.branches) ? data.branches.filter((b: any) => b && typeof b.id === 'string' && String(b.status || 'active') === 'active') : [];
+        setBranches(next);
+        if (next.length === 1) setBranchId(next[0].id);
+      } catch { /* branch selection is optional for business-wide products */ }
+    };
+    void loadBranches();
     const mediaId = new URLSearchParams(window.location.search).get('media');
     if (!mediaId || imageFiles.length >= MAX_IMAGES) return;
     let active = true;
@@ -143,6 +160,7 @@ export default function AddProductPage() {
           deliveryOptions: deliveryOption ? ['standard_delivery'] : [],
           pickupOptions: pickupOption ? ['in_store_pickup'] : [],
           status,
+          ...(branchId ? { branchId } : {}),
           ...(parsedDiscount !== undefined ? { discount: parsedDiscount } : {}),
           ...(parsedWholesale !== undefined ? { wholesalePrice: parsedWholesale } : {}),
           ...(parsedBulk !== undefined ? { bulkPrice: parsedBulk } : {}),
@@ -182,7 +200,7 @@ export default function AddProductPage() {
             <div><label className="block text-sm font-medium text-slate-700 mb-1">Min Order Quantity</label><input type="number" min="1" step="1" value={minOrderQuantity} onChange={e => setMinOrderQuantity(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="1" /></div>
             <div><label className="block text-sm font-medium text-slate-700 mb-1">Discount (Optional)</label><input type="number" min="0" step="0.01" value={discount} onChange={e => setDiscount(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="0" /></div>
           </div></section>
-          <section className="space-y-4"><h3 className="text-lg font-semibold text-slate-900 border-b border-slate-100 pb-2">Logistics</h3><div><label className="block text-sm font-medium text-slate-700 mb-1">Item Location</label><input type="text" value={locationAddress} onChange={e => setLocationAddress(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="City, State, or exact address" /></div><div className="flex flex-col gap-3 sm:flex-row sm:gap-6"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={deliveryOption} onChange={e => setDeliveryOption(e.target.checked)} className="w-5 h-5 rounded text-slate-900 focus:ring-slate-900" /><span className="text-sm font-medium text-slate-700">Offers Delivery</span></label><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={pickupOption} onChange={e => setPickupOption(e.target.checked)} className="w-5 h-5 rounded text-slate-900 focus:ring-slate-900" /><span className="text-sm font-medium text-slate-700">Allows Pickup</span></label></div></section>
+          <section className="space-y-4"><h3 className="text-lg font-semibold text-slate-900 border-b border-slate-100 pb-2">Business Branch</h3><div><label className="block text-sm font-medium text-slate-700 mb-1">Branch (Optional)</label><select value={branchId} onChange={e => setBranchId(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-slate-900"><option value="">Business-wide product</option>{branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name || branch.id}</option>)}</select><p className="text-xs text-slate-500 mt-1">Branch-scoped staff can only select their assigned branch.</p></div></section><section className="space-y-4"><h3 className="text-lg font-semibold text-slate-900 border-b border-slate-100 pb-2">Logistics</h3><div><label className="block text-sm font-medium text-slate-700 mb-1">Item Location</label><input type="text" value={locationAddress} onChange={e => setLocationAddress(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="City, State, or exact address" /></div><div className="flex flex-col gap-3 sm:flex-row sm:gap-6"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={deliveryOption} onChange={e => setDeliveryOption(e.target.checked)} className="w-5 h-5 rounded text-slate-900 focus:ring-slate-900" /><span className="text-sm font-medium text-slate-700">Offers Delivery</span></label><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={pickupOption} onChange={e => setPickupOption(e.target.checked)} className="w-5 h-5 rounded text-slate-900 focus:ring-slate-900" /><span className="text-sm font-medium text-slate-700">Allows Pickup</span></label></div></section>
           <section className="space-y-4"><h3 className="text-lg font-semibold text-slate-900 border-b border-slate-100 pb-2">Media</h3><div>
             <label htmlFor="product-images" className="block cursor-pointer border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors"><div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3"><ImagePlus className="w-6 h-6 text-slate-400" /></div><p className="font-medium text-slate-900">Choose product images</p><p className="text-sm text-slate-500 mt-1">Up to 5 images, maximum 5 MB each. Images are optimized automatically.</p></label>
             <input id="product-images" type="file" accept="image/*" multiple onChange={handleImageSelect} className="hidden" disabled={loading} />
