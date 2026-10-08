@@ -4014,7 +4014,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
   });
 
 
-async function storeBusinessAccessMatches(req: any, uid: string, businessId: string): Promise<boolean> {
+async async function storeBusinessBranchAccessMatches(
+  req: any,
+  uid: string,
+  businessId: string,
+  orderBranchId: string,
+): Promise<boolean> {
   if (!businessId) return false;
   const token = typeof req.headers?.['x-business-session'] === 'string' ? req.headers['x-business-session'] : '';
   if (!token || token.length < 32) return false;
@@ -4025,7 +4030,16 @@ async function storeBusinessAccessMatches(req: any, uid: string, businessId: str
   if (String(session.uid || '') !== uid || String(session.businessId || '') !== businessId || String(session.status || '') !== 'active') return false;
   if (typeof session.expiresAt?.toMillis !== 'function' || session.expiresAt.toMillis() <= Date.now()) return false;
   const membershipSnap = await adminDb.collection('businessMemberships').doc(uid + '__' + businessId).get();
-  return membershipSnap.exists && String(membershipSnap.data()?.status || '') === 'active';
+  if (!membershipSnap.exists || String(membershipSnap.data()?.status || '') !== 'active') return false;
+
+  const membership = membershipSnap.data() || {};
+  const role = String(membership.role || '');
+  // Business owners may operate across branches. Staff are restricted to
+  // their assigned branch, and branch-less legacy records are not exposed
+  // to branch-scoped staff.
+  if (role === 'business_owner') return true;
+  const memberBranchId = typeof membership.branchId === 'string' ? membership.branchId : '';
+  return Boolean(memberBranchId && orderBranchId && memberBranchId === orderBranchId);
 }
 
 function isGlobalStoreAdmin(roles: unknown[]): boolean {
@@ -4052,7 +4066,7 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
       const order = snap.data() as Record<string, unknown>;
       const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
       const globalAdmin = isGlobalStoreAdmin(roles);
-      const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
+      const tenantAccess = orderBusinessId ? await storeBusinessBranchAccessMatches(req, uid, orderBusinessId, typeof order.branchId === 'string' ? order.branchId : '') : false;
       const sellerAccess = uid === order.sellerId && (!orderBusinessId || tenantAccess);
       const privilegedAccess = hasRolePermission(roles, permissions, 'manage:disputes') && (orderBusinessId ? (globalAdmin || tenantAccess) : globalAdmin);
       if (!sellerAccess && !privilegedAccess) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to respond to this dispute.');
@@ -4097,7 +4111,7 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
       const order = snap.data() as Record<string, unknown>;
       const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
       const globalAdmin = isGlobalStoreAdmin(roles);
-      const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
+      const tenantAccess = orderBusinessId ? await storeBusinessBranchAccessMatches(req, uid, orderBusinessId, typeof order.branchId === 'string' ? order.branchId : '') : false;
       if (!hasRolePermission(roles, permissions, 'manage:disputes') || (orderBusinessId ? (!globalAdmin && !tenantAccess) : !globalAdmin)) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to resolve Store disputes.');
       const dispute = order.dispute && typeof order.dispute === 'object' ? order.dispute as Record<string, unknown> : null;
       if (!dispute || !['opened','seller_responded','under_review'].includes(String(dispute.status))) return errorResponse(res, 'INVALID_REQUEST', 'This dispute is not awaiting resolution.');
@@ -4280,7 +4294,7 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
       const permissions = Array.isArray(rolesSnap.data()?.permissions) ? rolesSnap.data()?.permissions.filter((p: unknown) => typeof p === 'string') as any[] : [];
       const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
       const globalAdmin = isGlobalStoreAdmin(roles);
-      const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
+      const tenantAccess = orderBusinessId ? await storeBusinessBranchAccessMatches(req, uid, orderBusinessId, typeof order.branchId === 'string' ? order.branchId : '') : false;
       const sellerAccess = uid === order.sellerId && (!orderBusinessId || tenantAccess);
       const privilegedAccess = hasRolePermission(roles, permissions, 'manage:disputes') && (orderBusinessId ? (globalAdmin || tenantAccess) : globalAdmin);
       if (!sellerAccess && !privilegedAccess) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to approve this Store return.');
@@ -4332,7 +4346,7 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
         const permissions = Array.isArray(rolesSnap.data()?.permissions) ? rolesSnap.data()?.permissions.filter((p: unknown) => typeof p === 'string') as any[] : [];
         const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
         const globalAdmin = isGlobalStoreAdmin(roles);
-        const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
+        const tenantAccess = orderBusinessId ? await storeBusinessBranchAccessMatches(req, uid, orderBusinessId, typeof order.branchId === 'string' ? order.branchId : '') : false;
         const sellerAccess = uid === order.sellerId && (!orderBusinessId || tenantAccess);
         const privilegedAccess = hasRolePermission(roles, permissions, 'manage:disputes') && (orderBusinessId ? (globalAdmin || tenantAccess) : globalAdmin);
         if (!sellerAccess && !privilegedAccess) throw new RequestValidationError('FORBIDDEN', 'You are not permitted to receive this Store return.');
@@ -4409,7 +4423,7 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
       const canManageDisputes = hasRolePermission(roles, permissions, 'manage:disputes');
       const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
       const globalAdmin = isGlobalStoreAdmin(roles);
-      const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
+      const tenantAccess = orderBusinessId ? await storeBusinessBranchAccessMatches(req, uid, orderBusinessId, typeof order.branchId === 'string' ? order.branchId : '') : false;
       const privilegedRefundAccess = canManageDisputes && (orderBusinessId ? (globalAdmin || tenantAccess) : globalAdmin);
       if (uid !== customerId && !privilegedRefundAccess) {
         return errorResponse(res, 'FORBIDDEN', 'You are not permitted to refund this Store order.');
