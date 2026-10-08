@@ -43,8 +43,13 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
     try {
       const businessSnap = await db.collection('businesses').doc(businessId).get();
       const business = businessSnap.exists ? businessSnap.data() || {} : {};
-      if (!businessSnap.exists || String(business.status || '') !== 'verified') {
-        return fail(res, 'FORBIDDEN', 'Only a verified Business can issue staff invitations.', 403);
+      if (
+        !businessSnap.exists ||
+        String(business.status || '') !== 'active' ||
+        String(business.verificationStatus || '') !== 'verified' ||
+        String(business.ownerUid || '') !== uid
+      ) {
+        return fail(res, 'FORBIDDEN', 'Only the active verified Business owner can issue staff invitations.', 403);
       }
       const businessOwnerUid = String(business.ownerUid || '');
       const privilegedInviteRoles = new Set(['admin', 'manager', 'branch_manager']);
@@ -58,8 +63,33 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
         branchName = String(branch.name || '').trim() || null;
       }
       const now = Timestamp.now(), ref = db.collection('staffInvites').doc();
-      await ref.set({ businessOwnerUid: uid, businessId, inviteeEmail: email, role, branchName, branchId: branchId || null, status: 'pending', invitedAt: now, createdAt: now });
-      await db.collection('audit_logs').add({ action: 'business_staff_invite_created', actorUid: uid, businessId, inviteId: ref.id, role, branchId: branchId || null, createdAt: now });
+      await db.runTransaction(async transaction => {
+        const existingInvites = await transaction.get(
+          db.collection('staffInvites')
+            .where('businessId', '==', businessId)
+            .where('inviteeEmail', '==', email)
+            .where('status', '==', 'pending')
+            .limit(20)
+        );
+        for (const existingInvite of existingInvites.docs) {
+          transaction.update(existingInvite.ref, {
+            status: 'cancelled',
+            cancelledAt: now,
+            cancelledBy: uid,
+            cancellationReason: 'superseded_by_new_invitation',
+          });
+        }
+        transaction.set(ref, {
+          businessOwnerUid: uid, businessId, inviteeEmail: email, role,
+          branchName, branchId: branchId || null, status: 'pending',
+          invitedAt: now, createdAt: now,
+        });
+      });
+      await db.collection('audit_logs').add({
+        action: 'business_staff_invite_created',
+        actorUid: uid, businessId, inviteId: ref.id, role, branchId: branchId || null,
+        createdAt: now,
+      });
       return res.status(201).json({ ok: true, invite: { id: ref.id, businessId, inviteeEmail: email, role, branchName, branchId: branchId || null, status: 'pending' } });
     } catch (e) { console.error('Business staff invite failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to create the staff invitation.', 503); }
   });
