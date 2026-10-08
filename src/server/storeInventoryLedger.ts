@@ -60,9 +60,21 @@ export function recordStoreInventoryMovement(
   );
   const previousQuarantineQuantity = input.previousQuarantineQuantity;
   const resultingQuarantineQuantity = input.resultingQuarantineQuantity;
+  const expectedDirection: Record<StoreInventoryMovementType, StoreInventoryMovementInput['direction'][]> = {
+    checkout_reservation: ['out'],
+    order_cancellation_release: ['in'],
+    reservation_expiry_release: ['in'],
+    return_received_quarantine: ['quarantine_in'],
+    return_inspection_resalable: ['in'],
+    return_inspection_damaged: ['quarantine_out'],
+    refund_release: ['in'],
+    manual_adjustment: ['in', 'out'],
+    opening_balance: ['in'],
+  };
 
   if (
     !/^[A-Za-z0-9_-]{1,128}$/.test(input.productId) ||
+    !expectedDirection[input.movementType]?.includes(input.direction) ||
     !Number.isSafeInteger(input.quantity) || input.quantity <= 0 ||
     !Number.isSafeInteger(input.previousQuantity) || input.previousQuantity < 0 ||
     !Number.isSafeInteger(input.resultingQuantity) || input.resultingQuantity < 0 ||
