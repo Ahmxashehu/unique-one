@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -6,7 +6,7 @@ import {
   Utensils, Users, X, Navigation, Heart, SlidersHorizontal, CreditCard, Landmark
 } from 'lucide-react';
 
-type Restaurant = {
+type MenuItem = { id: string; restaurantId: string; businessId: string; branchId: string; name: string; category: string; description: string; priceMinor: number; currency: 'NGN'; available: boolean; };\n\ntype Restaurant = {
   id: string;
   name: string;
   cuisine: string;
@@ -95,14 +95,25 @@ export default function RestaurantPage() {
   const updateCustomerName = (value: string) => { setCustomerName(value); persistCheckout(cart, value, customerPhone); };
   const updateCustomerPhone = (value: string) => { setCustomerPhone(value); persistCheckout(cart, customerName, value); };
 
-  const menuItems = selected ? [
-    { id: `${selected.id}-1`, name: 'Signature Jollof Rice', price: 4500 },
-    { id: `${selected.id}-2`, name: 'Grilled Chicken', price: 6500 },
-    { id: `${selected.id}-3`, name: 'Beef Suya', price: 5000 },
-    { id: `${selected.id}-4`, name: 'Fresh Salad Bowl', price: 3500 },
-  ] : [];
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [menuLoading, setMenuLoading] = useState(false);
+  const [menuError, setMenuError] = useState('');
+  useEffect(() => {
+    if (!selected) { setMenuItems([]); return; }
+    let cancelled = false;
+    setMenuLoading(true); setMenuError('');
+    fetch(`/api/restaurants/${encodeURIComponent(selected.id)}/menu`)
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data?.error?.message || 'Restaurant menu is unavailable.');
+        if (!cancelled) setMenuItems(Array.isArray(data?.items) ? data.items : []);
+      })
+      .catch((error) => { if (!cancelled) { setMenuItems([]); setMenuError(error instanceof Error ? error.message : 'Restaurant menu is unavailable.'); } })
+      .finally(() => { if (!cancelled) setMenuLoading(false); });
+    return () => { cancelled = true; };
+  }, [selected?.id]);
   const cartCount = Object.values(cart).reduce((a,b) => a+b, 0);
-  const cartTotal = menuItems.reduce((sum, item) => sum + item.price * (cart[item.id] || 0), 0);
+  const cartTotal = menuItems.reduce((sum, item) => sum + item.priceMinor / 100 * (cart[item.id] || 0), 0);
   const deliveryFee = draft.mode === 'delivery' ? 1500 : 0;
   const serviceFee = cartTotal ? Math.max(300, Math.round(cartTotal * 0.03)) : 0;
   const finalTotal = cartTotal + deliveryFee + serviceFee;
@@ -146,7 +157,7 @@ export default function RestaurantPage() {
           idempotencyKey, restaurantId: selected.id, mode: draft.mode, paymentMethod: draft.paymentMethod,
           customerName, customerPhone, deliveryAddress: draft.deliveryAddress, date: draft.date, time: draft.time,
           guests: draft.guests, seating: draft.seating, notes: draft.notes, cart,
-          subtotal: cartTotal, deliveryFee, serviceFee, total: finalTotal,
+
         }),
       });
       const data = await response.json().catch(() => ({}));
