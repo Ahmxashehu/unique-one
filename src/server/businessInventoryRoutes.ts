@@ -1,4 +1,5 @@
 import type { Express, RequestHandler } from 'express';
+import { randomUUID } from 'crypto';
 import rateLimit from 'express-rate-limit';
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import { recordStoreInventoryMovement } from './storeInventoryLedger';
@@ -24,6 +25,7 @@ export function registerBusinessInventoryRoutes(
     const quantity = req.body?.quantity;
     const requestedBranchId = typeof req.body?.branchId === 'string' ? req.body.branchId.trim() : '';
     const membershipBranchId = typeof membership.branchId === 'string' ? membership.branchId.trim() : '';
+    const movementSourceId = `business:${businessId}:${productId}:${uid}:${randomUUID()}`;
 
     if (!uid || !businessId || !productId) return fail(res, 'INVALID_REQUEST', 'Business, user and product are required.');
     if (!['in', 'out'].includes(direction)) return fail(res, 'INVALID_REQUEST', 'Inventory direction must be in or out.');
@@ -73,7 +75,7 @@ export function registerBusinessInventoryRoutes(
           previousQuantity: currentQuantity,
           resultingQuantity: newQuantity,
           direction: direction === 'in' ? 'in' : 'out',
-          sourceId: `business:${businessId}:${productId}:${uid}:${now.toMillis()}`,
+          sourceId: movementSourceId,
           sourceModule: 'unique_business.inventory_adjustment',
           actorUid: uid,
           businessId,
