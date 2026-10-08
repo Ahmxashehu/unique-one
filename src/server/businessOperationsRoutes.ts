@@ -179,6 +179,29 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
     }
   });
 
+  app.post('/api/business/orders/:orderId/delivery-confirmation/request', async (req, res) => {
+    const { uid, businessId } = ctx(req);
+    const role = String((req.businessMembership || {}).role || '').trim();
+    if (role !== 'delivery' && !can(req, 'confirm:delivery')) return fail(res, 'FORBIDDEN', 'You do not have delivery confirmation authority.', 403);
+    const orderId = typeof req.params.orderId === 'string' ? req.params.orderId.trim() : '';
+    if (!uid || !businessId || !/^[A-Za-z0-9_-]{1,128}$/.test(orderId)) return fail(res, 'INVALID_REQUEST', 'A valid Store order is required.');
+    try {
+      const snap = await db.collection('orders').doc(orderId).get();
+      if (!snap.exists) return fail(res, 'NOT_FOUND', 'The Store order was not found.', 404);
+      const order = snap.data() || {};
+      if (String(order.businessId || '') !== businessId || String(order.deliveryActorUid || '') !== uid) return fail(res, 'FORBIDDEN', 'You are not assigned to this Store delivery.', 403);
+      if (String(order.status || '') !== 'out_for_delivery') return fail(res, 'INVALID_REQUEST', 'The Store order must be out for delivery before confirmation.');
+      const destination = String(order.customerPhone || '').trim();
+      const customerId = String(order.customerId || '');
+      if (!customerId || !destination) return fail(res, 'INVALID_REQUEST', 'A verified customer phone number is required for delivery confirmation.');
+      const ref = db.collection('storeDeliveryChallenges').doc();
+      const now = Timestamp.now();
+      await ref.create({ orderId, businessId, branchId: String(order.branchId || ''), deliveryActorUid: uid, customerId, destination, status: 'pending', createdAt: now });
+      await getUniqueOtpService('sms').issue({ destination, purpose: 'store_delivery_confirmation', channel: 'sms' });
+      return res.status(201).json({ ok: true, challengeId: ref.id, expiresInSeconds: 300, resendAfterSeconds: 30 });
+    } catch (e) { console.error('Store delivery confirmation request failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to start delivery confirmation safely.', 503); }
+  });
+
   app.get('/api/business/branches', async (req, res) => {
     if (!can(req, 'manage:business_staff') && !can(req, 'create:products') && !can(req, 'edit:products') && !can(req, 'manage:inventory')) return fail(res, 'FORBIDDEN', 'You do not have permission to view branches.', 403);
     const { businessId } = ctx(req), membership = req.businessMembership || {};
