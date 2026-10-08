@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 
@@ -63,6 +64,24 @@ for (const doc of snap.docs) {
         quantity: quantity + restore,
         status: restoredStatus,
         updatedAt: nowIso,
+      });
+      const movementId = createHash('sha256').update(['reservation_expiry', doc.id, entries[i][0]].join('\\0')).digest('hex');
+      transaction.create(db.collection('inventory_movements').doc(movementId), {
+        schemaVersion: 1,
+        id: movementId,
+        productId: entries[i][0],
+        movementType: 'reservation_expiry_release',
+        direction: 'in',
+        quantity: restore,
+        quantityDelta: restore,
+        previousQuantity: quantity,
+        resultingQuantity: quantity + restore,
+        sourceId: doc.id,
+        sourceModule: 'unique_store.expiry',
+        actorUid: 'system',
+        orderId: doc.id,
+        ...(typeof product.businessId === 'string' && product.businessId ? { businessId: product.businessId } : {}),
+        createdAt: Timestamp.now(),
       });
     }
 
