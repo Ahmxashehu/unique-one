@@ -4151,7 +4151,10 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
       const order = snap.data() as Record<string, unknown>;
       const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
       const globalAdmin = isGlobalStoreAdmin(roles);
-      const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
+      const assignedBranchId = typeof (req as any).businessMembership?.branchId === 'string' ? String((req as any).businessMembership.branchId).trim() : '';
+      const orderBranchId = typeof order.branchId === 'string' ? order.branchId.trim() : '';
+      const branchAccess = !assignedBranchId || orderBranchId === assignedBranchId;
+      const tenantAccess = orderBusinessId ? (await storeBusinessAccessMatches(req, uid, orderBusinessId) && branchAccess) : false;
       if (!hasRolePermission(roles, permissions, 'manage:disputes') || (orderBusinessId ? (!globalAdmin && !tenantAccess) : !globalAdmin)) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to resolve Store disputes.');
       const dispute = order.dispute && typeof order.dispute === 'object' ? order.dispute as Record<string, unknown> : null;
       if (!dispute || !['opened','seller_responded','under_review'].includes(String(dispute.status))) return errorResponse(res, 'INVALID_REQUEST', 'This dispute is not awaiting resolution.');
