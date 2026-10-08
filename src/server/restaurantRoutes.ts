@@ -348,4 +348,118 @@ export function registerRestaurantRoutes(app: Express, authenticate: RequestHand
       return fail(res, 'SERVICE_UNAVAILABLE', 'Restaurant menu management is temporarily unavailable.', 503);
     }
   });
+  app.patch('/api/business/restaurants/:restaurantId/menu-items/:itemId', authenticate, limiter, async (req, res) => {
+    const uid = clean((req as any).user?.uid, 128);
+    const membership = ((req as any).businessMembership || {}) as Record<string, unknown>;
+    const session = ((req as any).businessSession || {}) as Record<string, unknown>;
+    const businessId = clean(session.businessId, 128);
+    const restaurantId = clean(req.params.restaurantId, 128);
+    const itemId = clean(req.params.itemId, 128);
+    const role = clean(membership.role, 64) as Role;
+    const customPermissions = Array.isArray(membership.permissions)
+      ? membership.permissions.filter((v): v is Permission => typeof v === 'string') as Permission[] : [];
+    if (!uid || !businessId || clean(membership.businessId, 128) !== businessId) return fail(res, 'BUSINESS_AUTH_REQUIRED', 'An active Business Platform session is required.', 401);
+    if (!hasRolePermission([role], customPermissions, 'manage:restaurant_menu')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage the Restaurant menu.', 403);
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const allowed = ['name', 'category', 'description', 'priceMinor', 'available'];
+    for (const key of Object.keys(body)) if (!allowed.includes(key)) return fail(res, 'INVALID_REQUEST', 'Only Restaurant menu fields can be changed.');
+    const updates: Record<string, unknown> = {};
+    if ('name' in body) updates.name = clean(body.name, 200);
+    if ('category' in body) updates.category = clean(body.category, 100);
+    if ('description' in body) updates.description = clean(body.description, 1000);
+    if ('priceMinor' in body) {
+      const price = Number(body.priceMinor);
+      if (!Number.isSafeInteger(price) || price <= 0 || price > 1000000000) return fail(res, 'INVALID_AMOUNT', 'The menu item price is invalid.');
+      updates.priceMinor = price;
+    }
+    if ('available' in body) {
+      if (typeof body.available !== 'boolean') return fail(res, 'INVALID_REQUEST', 'Menu availability must be boolean.');
+      updates.available = body.available;
+    }
+    if (typeof updates.name === 'string' && !updates.name) return fail(res, 'INVALID_REQUEST', 'Menu item name cannot be empty.');
+    if (typeof updates.category === 'string' && !updates.category) return fail(res, 'INVALID_REQUEST', 'Menu item category cannot be empty.');
+    if (!Object.keys(updates).length) return fail(res, 'INVALID_REQUEST', 'No valid menu changes were supplied.');
+    const restaurantRef = db.collection('restaurants').doc(restaurantId);
+    const itemRef = restaurantRef.collection('menuItems').doc(itemId);
+    const now = Timestamp.now();
+    try {
+      await db.runTransaction(async (transaction) => {
+        const [restaurantSnap, itemSnap] = await Promise.all([transaction.get(restaurantRef), transaction.get(itemRef)]);
+        if (!restaurantSnap.exists || !itemSnap.exists) throw Object.assign(new Error('NOT_FOUND'), { code: 'NOT_FOUND' });
+        const restaurant = restaurantSnap.data() || {};
+        const item = itemSnap.data() || {};
+        if (String(restaurant.businessId || '') !== businessId || String(restaurant.ownerUid || '') !== uid ||
+            String(item.restaurantId || '') !== restaurantId || String(item.businessId || '') !== businessId ||
+            String(item.branchId || '') !== String(restaurant.branchId || '')) {
+          throw Object.assign(new Error('FORBIDDEN'), { code: 'FORBIDDEN' });
+        }
+        if (String(restaurant.status || '') !== 'active' || String(restaurant.verificationStatus || '') !== 'verified') {
+          throw Object.assign(new Error('RESTAURANT_NOT_ACTIVE'), { code: 'RESTAURANT_NOT_ACTIVE' });
+        }
+        const assignedBranchId = clean(membership.branchId, 128);
+        if (assignedBranchId && String(restaurant.branchId || '') !== assignedBranchId) throw Object.assign(new Error('BRANCH_FORBIDDEN'), { code: 'BRANCH_FORBIDDEN' });
+        transaction.update(itemRef, { ...updates, updatedAt: now });
+        transaction.create(db.collection('audit_logs').doc(), {
+          action: 'restaurant.menu_item_updated', actorUid: uid, resource: 'restaurant_menu_item', resourceId: itemId,
+          businessId, restaurantId, branchId: String(restaurant.branchId || ''), details: { changedFields: Object.keys(updates) }, timestamp: now,
+        });
+      });
+      return res.json({ ok: true, restaurantId, itemId, updatedFields: Object.keys(updates) });
+    } catch (error: any) {
+      if (error?.code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'Restaurant or menu item not found.', 404);
+      if (error?.code === 'FORBIDDEN') return fail(res, 'FORBIDDEN', 'You are not authorized to modify this menu item.', 403);
+      if (error?.code === 'RESTAURANT_NOT_ACTIVE') return fail(res, 'CONFLICT', 'The Restaurant must be approved and active.', 409);
+      if (error?.code === 'BRANCH_FORBIDDEN') return fail(res, 'FORBIDDEN', 'You cannot modify a menu item from another branch.', 403);
+      console.error('Restaurant menu item update failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'Restaurant menu management is temporarily unavailable.', 503);
+    }
+  });
+
+  app.delete('/api/business/restaurants/:restaurantId/menu-items/:itemId', authenticate, limiter, async (req, res) => {
+    const uid = clean((req as any).user?.uid, 128);
+    const membership = ((req as any).businessMembership || {}) as Record<string, unknown>;
+    const session = ((req as any).businessSession || {}) as Record<string, unknown>;
+    const businessId = clean(session.businessId, 128);
+    const restaurantId = clean(req.params.restaurantId, 128);
+    const itemId = clean(req.params.itemId, 128);
+    const role = clean(membership.role, 64) as Role;
+    const customPermissions = Array.isArray(membership.permissions)
+      ? membership.permissions.filter((v): v is Permission => typeof v === 'string') as Permission[] : [];
+    if (!uid || !businessId || clean(membership.businessId, 128) !== businessId) return fail(res, 'BUSINESS_AUTH_REQUIRED', 'An active Business Platform session is required.', 401);
+    if (!hasRolePermission([role], customPermissions, 'manage:restaurant_menu')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage the Restaurant menu.', 403);
+    const restaurantRef = db.collection('restaurants').doc(restaurantId);
+    const itemRef = restaurantRef.collection('menuItems').doc(itemId);
+    const now = Timestamp.now();
+    try {
+      await db.runTransaction(async (transaction) => {
+        const [restaurantSnap, itemSnap] = await Promise.all([transaction.get(restaurantRef), transaction.get(itemRef)]);
+        if (!restaurantSnap.exists || !itemSnap.exists) throw Object.assign(new Error('NOT_FOUND'), { code: 'NOT_FOUND' });
+        const restaurant = restaurantSnap.data() || {};
+        const item = itemSnap.data() || {};
+        if (String(restaurant.businessId || '') !== businessId || String(restaurant.ownerUid || '') !== uid ||
+            String(item.restaurantId || '') !== restaurantId || String(item.businessId || '') !== businessId) {
+          throw Object.assign(new Error('FORBIDDEN'), { code: 'FORBIDDEN' });
+        }
+        if (String(restaurant.status || '') !== 'active' || String(restaurant.verificationStatus || '') !== 'verified') {
+          throw Object.assign(new Error('RESTAURANT_NOT_ACTIVE'), { code: 'RESTAURANT_NOT_ACTIVE' });
+        }
+        const assignedBranchId = clean(membership.branchId, 128);
+        if (assignedBranchId && String(restaurant.branchId || '') !== assignedBranchId) throw Object.assign(new Error('BRANCH_FORBIDDEN'), { code: 'BRANCH_FORBIDDEN' });
+        transaction.update(itemRef, { available: false, archivedAt: now, updatedAt: now });
+        transaction.create(db.collection('audit_logs').doc(), {
+          action: 'restaurant.menu_item_archived', actorUid: uid, resource: 'restaurant_menu_item', resourceId: itemId,
+          businessId, restaurantId, branchId: String(restaurant.branchId || ''), details: { previousAvailable: item.available === true }, timestamp: now,
+        });
+      });
+      return res.json({ ok: true, restaurantId, itemId, archived: true });
+    } catch (error: any) {
+      if (error?.code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'Restaurant or menu item not found.', 404);
+      if (error?.code === 'FORBIDDEN') return fail(res, 'FORBIDDEN', 'You are not authorized to archive this menu item.', 403);
+      if (error?.code === 'RESTAURANT_NOT_ACTIVE') return fail(res, 'CONFLICT', 'The Restaurant must be approved and active.', 409);
+      if (error?.code === 'BRANCH_FORBIDDEN') return fail(res, 'FORBIDDEN', 'You cannot archive a menu item from another branch.', 403);
+      console.error('Restaurant menu item archive failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'Restaurant menu management is temporarily unavailable.', 503);
+    }
+  });
+
 }
