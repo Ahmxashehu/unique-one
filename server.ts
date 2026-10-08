@@ -4049,6 +4049,14 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             if (branchQuery.size > 1) {
               throw new RequestValidationError('INVALID_REQUEST', 'A branch must be assigned before checkout for this multi-branch product.');
             }
+            if (branchQuery.size === 1) {
+              const soleBranch = branchQuery.docs[0].data() || {};
+              const soleBranchId = branchQuery.docs[0].id;
+              if (String(soleBranch.businessId || '') !== businessId || String(soleBranch.status || '') !== 'active') {
+                throw new RequestValidationError('INVALID_REQUEST', 'The Business default branch could not be verified.');
+              }
+              product.branchId = soleBranchId;
+            }
           }
           const price = product.price;
           const available = product.quantity;
