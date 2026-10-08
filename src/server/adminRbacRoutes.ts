@@ -3,6 +3,7 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import type { Permission, Role } from '../lib/os/types';
 import { ROLE_PERMISSIONS, hasRolePermission } from '../lib/auth/rbac';
 import { registerBusinessAccessRoutes } from './businessAccessRoutes';
+import { registerBusinessDataRoutes } from './businessDataRoutes';
 import { registerBusinessInventoryRoutes } from './businessInventoryRoutes';
 import { registerStoreOrderLifecycleRoutes } from './storeOrderLifecycleRoutes';
 import { registerStoreReturnInspectionRoutes } from './storeReturnInspectionRoutes';
@@ -114,8 +115,8 @@ export function registerAdminRbacRoutes(
     }
   });
 
-  // Business Platform access/security is registered alongside the central RBAC routes.
   registerBusinessAccessRoutes(app, authenticate, db, requirePermission);
+  registerBusinessDataRoutes(app, authenticate, db);
   registerBusinessInventoryRoutes(app, authenticate, db);
   registerStoreOrderLifecycleRoutes(app, authenticate, db);
   registerStoreReturnInspectionRoutes(app, authenticate, db);
