@@ -162,6 +162,9 @@ export async function executeFinancialRefund(
 
     const customerUid = String(original.senderId);
     const sellerUid = String(original.recipientId);
+    if (customerUid === sellerUid) {
+      return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'A refund requires distinct customer and seller accounts.' } };
+    }
     const relatedOrderRef = input.relatedOrderId ? db.collection('orders').doc(input.relatedOrderId) : null;
     let relatedOrderData: Record<string, unknown> | null = null;
     if (relatedOrderRef) {
