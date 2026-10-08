@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Package, ArrowDownRight, ArrowUpRight, Loader2, RefreshCw } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { requestBusinessStepUp } from '../../components/auth/BusinessAccessGuard';
 
@@ -15,8 +13,12 @@ export default function InventoryPage() {
   const [error,setError]=useState('');
 
   const load=async()=>{ if(!currentUser)return; setLoading(true);setError(''); try {
-    const snap=await getDocs(query(collection(db,'products'),where('sellerId','==',currentUser.uid)));
-    setProducts(snap.docs.map(d=>({id:d.id,...d.data()} as Product)));
+    const token=await currentUser.getIdToken();
+    const businessSession=localStorage.getItem('unique_business_session')||'';
+    const response=await fetch('/api/business/catalog',{headers:{Authorization:`Bearer ${token}`,'X-Business-Session':businessSession}});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(data?.error?.message||'Inventory could not be loaded.');
+    setProducts(Array.isArray(data?.products)?data.products:[]);
   } catch(e){console.error(e);setError('We could not load your inventory. Please try again.');} finally{setLoading(false);} };
   useEffect(()=>{void load();},[currentUser?.uid]);
 
