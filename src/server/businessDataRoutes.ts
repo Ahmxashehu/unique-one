@@ -20,6 +20,21 @@ function can(membership: BusinessMembership, permission: Permission) {
   return hasRolePermission([role as any], [], permission);
 }
 
+
+function isBusinessOwner(membership: BusinessMembership) {
+  return membership.role === 'owner' || membership.role === 'business_owner';
+}
+
+function recordInMemberScope(data: Record<string, any>, membership: BusinessMembership) {
+  const businessId = String(membership.businessId || '');
+  const uid = String(membership.uid || '');
+  if (data.businessId === businessId) {
+    if (isBusinessOwner(membership)) return true;
+    return typeof membership.branchId === 'string' && membership.branchId.trim() !== '' && data.branchId === membership.branchId;
+  }
+  return !data.businessId && isBusinessOwner(membership) && data.sellerId === uid;
+}
+
 function serializeTimestamp(value: unknown) {
   return value && typeof (value as any).toDate === 'function'
     ? (value as any).toDate().toISOString()
@@ -81,7 +96,7 @@ export function registerBusinessDataRoutes(
           if (seen.has(doc.id)) return false;
           seen.add(doc.id);
           const data = doc.data() || {};
-          return data.businessId === businessId || (!data.businessId && data.sellerId === uid);
+          return recordInMemberScope(data, membership);
         })
         .map(minimalOrder)
         .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
@@ -105,7 +120,7 @@ export function registerBusinessDataRoutes(
       const customers = new Map<string, { customerId: string; orderCount: number; totalSpent: number; lastOrderAt: string | null; lastStatus: string }>();
       for (const doc of [...tenantSnap.docs, ...legacySnap.docs]) {
         const data = doc.data() || {};
-        if (!(data.businessId === businessId || (!data.businessId && data.sellerId === uid))) continue;
+        if (!recordInMemberScope(data, membership)) continue;
         const customerId = typeof data.customerId === 'string' ? data.customerId : '';
         if (!customerId) continue;
         const current = customers.get(customerId) || { customerId, orderCount: 0, totalSpent: 0, lastOrderAt: null, lastStatus: '' };
