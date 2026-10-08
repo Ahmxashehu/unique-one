@@ -4490,7 +4490,14 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
       const canManageDisputes = hasRolePermission(roles, permissions, 'manage:disputes');
       const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
       const globalAdmin = isGlobalStoreAdmin(roles);
-      const tenantAccess = orderBusinessId ? await storeBusinessAccessMatches(req, uid, orderBusinessId) : false;
+      const assignedBranchId = typeof (req as any).businessMembership?.branchId === 'string'
+        ? String((req as any).businessMembership.branchId).trim()
+        : '';
+      const orderBranchId = typeof order.branchId === 'string' ? order.branchId.trim() : '';
+      const branchAccess = !assignedBranchId || orderBranchId === assignedBranchId;
+      const tenantAccess = orderBusinessId
+        ? (await storeBusinessAccessMatches(req, uid, orderBusinessId) && branchAccess)
+        : false;
       const privilegedRefundAccess = canManageDisputes && (orderBusinessId ? (globalAdmin || tenantAccess) : globalAdmin);
       if (uid !== customerId && !privilegedRefundAccess) {
         return errorResponse(res, 'FORBIDDEN', 'You are not permitted to refund this Store order.');
