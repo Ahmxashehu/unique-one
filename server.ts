@@ -4756,7 +4756,7 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
         : false;
       const sellerAccess = uid === order.sellerId && (!orderBusinessId || tenantAccess);
       const privilegedAccess = hasRolePermission(roles, permissions, 'manage:disputes') && (orderBusinessId ? (globalAdmin || tenantAccess) : globalAdmin);
-      if (!sellerAccess && !privilegedAccess) return errorResponse(res, 'FORBIDDEN', 'You are not permitted to approve this Store return.');
+      if (!privilegedAccess) return errorResponse(res, 'FORBIDDEN', 'Store return approval requires an authorized dispute/returns officer or global administrator; the seller cannot self-approve a customer return.');
       const result = await adminDb.runTransaction(async (transaction) => {
         const ref = adminDb.collection('orders').doc(orderId);
         const snap = await transaction.get(ref);
