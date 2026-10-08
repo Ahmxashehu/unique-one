@@ -52,13 +52,31 @@ export function recordStoreInventoryMovement(
   db: Firestore,
   input: StoreInventoryMovementInput,
 ) {
+  const quantityDelta = input.quantityDelta ?? (
+    input.direction === 'in' ? input.quantity :
+    input.direction === 'out' ? -input.quantity :
+    0
+  );
+  const previousQuarantineQuantity = input.previousQuarantineQuantity;
+  const resultingQuarantineQuantity = input.resultingQuarantineQuantity;
+
   if (
     !/^[A-Za-z0-9_-]{1,128}$/.test(input.productId) ||
     !Number.isSafeInteger(input.quantity) || input.quantity <= 0 ||
     !Number.isSafeInteger(input.previousQuantity) || input.previousQuantity < 0 ||
     !Number.isSafeInteger(input.resultingQuantity) || input.resultingQuantity < 0 ||
-    !Number.isSafeInteger(input.previousQuantity + (input.direction === 'in' ? input.quantity : -input.quantity)) ||
-    (input.quantityDelta ?? (input.direction === 'in' ? input.quantity : input.direction === 'out' ? -input.quantity : 0)) + input.previousQuantity !== input.resultingQuantity ||
+    !Number.isSafeInteger(quantityDelta) ||
+    quantityDelta + input.previousQuantity !== input.resultingQuantity ||
+    (input.direction === 'in' && quantityDelta !== input.quantity) ||
+    (input.direction === 'out' && quantityDelta !== -input.quantity) ||
+    ((input.direction === 'quarantine_in' || input.direction === 'quarantine_out') && quantityDelta !== 0) ||
+    ((input.direction === 'quarantine_in' || input.direction === 'quarantine_out') && (
+      !Number.isSafeInteger(previousQuarantineQuantity) || previousQuarantineQuantity < 0 ||
+      !Number.isSafeInteger(resultingQuarantineQuantity) || resultingQuarantineQuantity < 0 ||
+      (input.direction === 'quarantine_in'
+        ? previousQuarantineQuantity + input.quantity !== resultingQuarantineQuantity
+        : previousQuarantineQuantity - input.quantity !== resultingQuarantineQuantity)
+    )) ||
     !safePart(input.sourceId) || !safePart(input.sourceModule) || !safePart(input.actorUid)
   ) {
     throw new Error('INVALID_INVENTORY_MOVEMENT');
@@ -74,7 +92,7 @@ export function recordStoreInventoryMovement(
     movementType: input.movementType,
     direction: input.direction,
     quantity: input.quantity,
-    quantityDelta: input.quantityDelta ?? (input.direction === 'in' ? input.quantity : input.direction === 'out' ? -input.quantity : 0),
+    quantityDelta,
     previousQuantity: input.previousQuantity,
     resultingQuantity: input.resultingQuantity,
     ...(input.previousQuarantineQuantity !== undefined ? { previousQuarantineQuantity: input.previousQuarantineQuantity } : {}),
