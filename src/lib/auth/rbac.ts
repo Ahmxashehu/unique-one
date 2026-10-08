@@ -10,9 +10,9 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
   service_provider: ['view:profile', 'edit:profile', 'manage:bookings', 'manage:orders', 'view:customer_info'],
   school_administrator: ['view:profile', 'edit:profile', 'manage:orders', 'manage:bookings', 'view:transactions'],
   finance_officer: ['view:profile', 'view:transactions', 'manage:disputes', 'view:audit_logs'],
-  risk_security_officer: ['view:profile', 'manage:verification', 'manage:disputes', 'access:admin_tools', 'view:audit_logs'],
+  risk_security_officer: ['view:profile', 'manage:verification', 'manage:restaurant_verification', 'manage:disputes', 'access:admin_tools', 'view:audit_logs'],
   platform_admin: ['view:profile', 'edit:profile', 'manage:roles', 'manage:permissions', 'view:audit_logs', 'create:products', 'edit:products', 'manage:inventory', 'create:invoices', 'send:payment_requests', 'view:customer_info', 'manage:orders', 'manage:bookings', 'manage:business_staff', 'view:transactions', 'manage:verification', 'manage:restaurant_verification', 'manage:restaurant', 'manage:restaurant_menu', 'manage:restaurant_orders', 'manage:disputes', 'access:admin_tools'],
-  super_admin: ['view:profile', 'edit:profile', 'manage:roles', 'manage:permissions', 'view:audit_logs', 'create:products', 'edit:products', 'manage:inventory', 'create:invoices', 'send:payment_requests', 'view:customer_info', 'manage:orders', 'manage:bookings', 'manage:business_staff', 'view:transactions', 'manage:verification', 'manage:disputes', 'access:admin_tools'],
+  super_admin: ['view:profile', 'edit:profile', 'manage:roles', 'manage:permissions', 'view:audit_logs', 'create:products', 'edit:products', 'manage:inventory', 'create:invoices', 'send:payment_requests', 'view:customer_info', 'manage:orders', 'manage:bookings', 'manage:business_staff', 'view:transactions', 'manage:verification', 'manage:restaurant_verification', 'manage:restaurant', 'manage:restaurant_menu', 'manage:restaurant_orders', 'manage:disputes', 'access:admin_tools'],
   // Administrator is a standard administrative role, not a platform or Super Admin role.
   // RBAC-management permissions remain exclusive to platform_admin/super_admin.
   administrator: ['view:profile', 'edit:profile', 'access:admin_tools', 'view:audit_logs'],
