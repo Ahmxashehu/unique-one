@@ -4827,6 +4827,18 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
         productSnaps.forEach((productSnap, index) => {
           if (!productSnap.exists) throw new RequestValidationError('INVALID_REQUEST', 'A returned product no longer exists; inventory was not restored.');
           const product = productSnap.data() as Record<string, unknown>;
+          const productSellerId = typeof product.sellerId === 'string' ? product.sellerId.trim() : '';
+          const productBusinessId = typeof product.businessId === 'string' ? product.businessId.trim() : '';
+          const productBranchId = typeof product.branchId === 'string' ? product.branchId.trim() : '';
+          if (productSellerId !== String(order.sellerId || '').trim()) {
+            throw new RequestValidationError('INVALID_REQUEST', 'A returned product no longer belongs to the Store seller; inventory was not restored.');
+          }
+          if (orderBusinessId && productBusinessId !== orderBusinessId) {
+            throw new RequestValidationError('INVALID_REQUEST', 'A returned product no longer belongs to the Store business; inventory was not restored.');
+          }
+          if (orderBranchId && productBranchId !== orderBranchId) {
+            throw new RequestValidationError('INVALID_REQUEST', 'A returned product no longer belongs to the Store branch; inventory was not restored.');
+          }
           const currentQuantity = Number(product.quantity);
           const currentQuarantineQuantity = Number(product.quarantineQuantity || 0);
           const restore = quantities.get(Array.from(quantities.keys())[index]) || 0;
