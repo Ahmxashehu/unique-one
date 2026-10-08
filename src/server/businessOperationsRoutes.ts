@@ -94,9 +94,36 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
           if (typeof req.body?.status === 'string' && ['active','inactive'].includes(req.body.status)) updates.status = req.body.status;
           if (typeof req.body?.name === 'string' && req.body.name.trim()) updates.name = req.body.name.trim();
           if (!Object.keys(updates).length) return fail(res, 'INVALID_REQUEST', 'No valid branch changes were supplied.');
-          updates.updatedAt = Timestamp.now(); await ref.update(updates);
+          updates.updatedAt = Timestamp.now();
+          if (updates.status === 'inactive' && String(branch.status || '') !== 'inactive') {
+            await db.runTransaction(async (transaction) => {
+              const membershipQuery = db.collection('businessMemberships')
+                .where('businessId', '==', businessId)
+                .where('branchId', '==', ref.id)
+                .where('status', '==', 'active')
+                .limit(200);
+              const memberships = await transaction.get(membershipQuery);
+              transaction.update(ref, updates);
+              for (const membership of memberships.docs) {
+                transaction.update(membership.ref, {
+                  status: 'inactive',
+                  inactiveReason: 'branch_deactivated',
+                  updatedAt: updates.updatedAt,
+                });
+              }
+            });
+            await db.collection('audit_logs').add({
+              action: 'business_branch_deactivated',
+              actorUid: uid,
+              businessId,
+              branchId: ref.id,
+              createdAt: Timestamp.now(),
+            });
+            return res.json({ ok: true, branchId: ref.id, status: 'inactive', suspendedMemberships: true });
+          }
+          await ref.update(updates);
           await db.collection('audit_logs').add({ action: 'business_branch_updated', actorUid: uid, businessId, branchId: ref.id, createdAt: Timestamp.now() });
-          return res.json({ ok: true, branchId: ref.id });
+          return res.json({ ok: true, branchId: ref.id, status: updates.status || branch.status });
         }
         // Branches are referenced by products, inventory and staff assignments.
         // Never hard-delete a branch and leave dangling references behind.
