@@ -502,4 +502,34 @@ export function registerRestaurantRoutes(app: Express, authenticate: RequestHand
     }
   });
 
+  app.get('/api/restaurants', limiter, async (_req, res) => {
+    try {
+      const snapshot = await db.collection('restaurants')
+        .where('status', '==', 'active')
+        .where('verificationStatus', '==', 'verified')
+        .limit(100).get();
+      const restaurants = snapshot.docs.map((doc) => {
+        const r = doc.data() || {};
+        return {
+          id: doc.id,
+          name: clean(r.name, 200),
+          description: clean(r.description, 1000),
+          businessId: clean(r.businessId, 128),
+          branchId: clean(r.branchId, 128),
+          ownerUid: clean(r.ownerUid, 128),
+          city: clean(r.city, 100),
+          area: clean(r.area, 100),
+          cuisine: clean(r.cuisine, 200),
+          rating: Number.isFinite(Number(r.rating)) ? Number(r.rating) : 0,
+          price: clean(r.price, 20),
+          time: clean(r.time, 40),
+          tags: Array.isArray(r.tags) ? r.tags.filter((v: unknown): v is string => typeof v === 'string').slice(0, 10) : [],
+        };
+      }).filter((r) => r.name && r.businessId && r.branchId && r.ownerUid);
+      return res.json({ ok: true, restaurants });
+    } catch (error) {
+      console.error('Restaurant discovery failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'Restaurant discovery is temporarily unavailable.', 503);
+    }
+  });
 }
