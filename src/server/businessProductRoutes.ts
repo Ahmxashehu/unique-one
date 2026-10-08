@@ -71,6 +71,7 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
     const locationAddress = cleanString(req.body?.locationAddress, 500);
     const deliveryOptions = Array.isArray(req.body?.deliveryOptions) ? req.body.deliveryOptions.filter((value: unknown) => typeof value === 'string').slice(0, 10) : [];
     const pickupOptions = Array.isArray(req.body?.pickupOptions) ? req.body.pickupOptions.filter((value: unknown) => typeof value === 'string').slice(0, 10) : [];
+    const branchId = req.body?.branchId === undefined ? '' : cleanString(req.body?.branchId, 128);
 
     if (!PRODUCT_ID_PATTERN.test(productId) || !name || !description) return fail(res, 'INVALID_REQUEST', 'A valid product ID, name and description are required.');
     if (!CATEGORY_SET.has(category) || !CONDITION_SET.has(condition) || !STATUS_SET.has(status) || !CURRENCY_SET.has(currency)) {
@@ -103,10 +104,22 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
         }
 
         const now = Timestamp.now();
+        const membershipBranchId = cleanString(membership.branchId, 128);
+        if (membershipBranchId && branchId !== membershipBranchId) {
+          throw Object.assign(new Error('BRANCH_FORBIDDEN'), { code: 'BRANCH_FORBIDDEN' });
+        }
+        if (branchId) {
+          const branchSnap = await transaction.get(db.collection('branches').doc(branchId));
+          const branch = branchSnap.data() ?? {};
+          if (!branchSnap.exists || String(branch.businessId || '') !== businessId || String(branch.status || 'active') !== 'active') {
+            throw Object.assign(new Error('INVALID_BRANCH'), { code: 'INVALID_BRANCH' });
+          }
+        }
         transaction.create(productRef, {
           id: productId,
           sellerId: uid,
           businessId,
+          ...(branchId ? { branchId } : {}),
           name,
           description,
           category,
@@ -156,6 +169,8 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
     } catch (error: any) {
       if (String(error?.code || '') === 'PRODUCT_EXISTS') return fail(res, 'PRODUCT_EXISTS', 'A product with this ID already exists.', 409);
       if (String(error?.code || '') === 'INVALID_BUSINESS') return fail(res, 'INVALID_BUSINESS', 'The selected Business account is invalid or not verified.', 403);
+      if (String(error?.code || '') === 'INVALID_BRANCH') return fail(res, 'INVALID_BRANCH', 'The selected branch is invalid or inactive.', 400);
+      if (String(error?.code || '') === 'BRANCH_FORBIDDEN') return fail(res, 'FORBIDDEN', 'You are not authorized to create products in this branch.', 403);
       console.error('Business product creation failed:', error);
       return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to create the product right now.', 503);
     }
