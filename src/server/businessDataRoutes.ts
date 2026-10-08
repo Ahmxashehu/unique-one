@@ -35,6 +35,7 @@ function minimalOrder(doc: QueryDocumentSnapshot) {
     customerId: String(data.customerId || ''),
     sellerId: String(data.sellerId || ''),
     businessId: typeof data.businessId === 'string' ? data.businessId : null,
+    branchId: typeof data.branchId === 'string' ? data.branchId : null,
     status: typeof data.status === 'string' ? data.status : 'pending',
     totalAmount: typeof data.totalAmount === 'number' ? data.totalAmount : null,
     currency: typeof data.currency === 'string' ? data.currency : 'NGN',
@@ -107,10 +108,13 @@ export function registerBusinessDataRoutes(
         db.collection('orders').where('businessId', '==', businessId).limit(500).get(),
         db.collection('orders').where('sellerId', '==', uid).limit(500).get(),
       ]);
+      const assignedBranchId = typeof membership.branchId === 'string' ? membership.branchId.trim() : '';
       const customers = new Map<string, { customerId: string; orderCount: number; totalSpent: number; lastOrderAt: string | null; lastStatus: string }>();
       for (const doc of [...tenantSnap.docs, ...legacySnap.docs]) {
         const data = doc.data() || {};
         if (!(data.businessId === businessId || (!data.businessId && data.sellerId === uid))) continue;
+        const orderBranchId = typeof data.branchId === 'string' ? data.branchId.trim() : '';
+        if (assignedBranchId && orderBranchId !== assignedBranchId) continue;
         const customerId = typeof data.customerId === 'string' ? data.customerId : '';
         if (!customerId) continue;
         const current = customers.get(customerId) || { customerId, orderCount: 0, totalSpent: 0, lastOrderAt: null, lastStatus: '' };
