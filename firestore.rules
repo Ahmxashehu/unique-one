@@ -191,33 +191,8 @@ service cloud.firestore {
     match /aiAuditLogs/{logId} { allow read, create, update, delete: if false; }
     match /products/{productId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isPlatformAdmin();
-      allow create: if isAuthenticated()
-        && request.resource.data.keys().hasOnly([
-          'id','sellerId','businessId','name','description','category','images','hasVideo',
-          'price','currency','discount','condition','quantity','minOrderQuantity',
-          'wholesalePrice','bulkPrice','variants','location','deliveryOptions',
-          'pickupOptions','status','createdAt','updatedAt'
-        ])
-        && request.resource.data.id == productId
-        && request.resource.data.sellerId == request.auth.uid
-        && (!('businessId' in request.resource.data)
-          || (request.resource.data.businessId is string
-            && exists(/databases/$(database)/documents/businesses/$(request.resource.data.businessId))
-            && (
-              get(/databases/$(database)/documents/businesses/$(request.resource.data.businessId)).data.ownerUid == request.auth.uid
-              || (
-                exists(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId))
-                && get(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId)).data.status == 'active'
-              )
-            )
-          ))
-        && request.resource.data.status in ['draft','published','out_of_stock']
-        && request.resource.data.price is number
-        && request.resource.data.price >= 0
-        && request.resource.data.quantity is number
-        && request.resource.data.quantity >= 0
-        && request.resource.data.minOrderQuantity is number
-        && request.resource.data.minOrderQuantity >= 1;
+      // Product creation is server-authoritative so the product and opening inventory ledger entry commit atomically.
+      allow create: if false;
       allow update: if isAuthenticated()
         && resource.data.sellerId == request.auth.uid
         && request.resource.data.sellerId == resource.data.sellerId
