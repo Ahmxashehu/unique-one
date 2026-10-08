@@ -73,6 +73,8 @@ export function registerStoreOrderLifecycleRoutes(
           throw new Error('FORBIDDEN');
         }
 
+        if (targetStatus === 'delivered') throw new Error('DELIVERY_CONFIRMATION_REQUIRES_PROOF');
+
         if (String(order.currency || '') !== 'NGN' || String(order.paymentStatus || '') !== 'paid') {
           throw new Error('ORDER_NOT_PAID');
         }
@@ -119,6 +121,7 @@ export function registerStoreOrderLifecycleRoutes(
       if (code === 'ORDER_NOT_FOUND') return fail(res, 'NOT_FOUND', 'The Store order was not found.', 404);
       if (code === 'ACTOR_NOT_FOUND') return fail(res, 'UNAUTHENTICATED', 'Your account profile could not be found.', 401);
       if (code === 'FORBIDDEN') return fail(res, 'FORBIDDEN', 'You are not permitted to update this Store order.', 403);
+      if (code === 'DELIVERY_CONFIRMATION_REQUIRES_PROOF') return fail(res, 'FORBIDDEN', 'Store delivery confirmation must use the dedicated proof flow.', 403);
       if (code === 'ORDER_NOT_PAID') return fail(res, 'INVALID_REQUEST', 'Only paid NGN Store orders can enter the fulfilment lifecycle.');
       if (code === 'INVALID_TRANSITION') return fail(res, 'INVALID_REQUEST', 'That Store order status transition is not allowed.');
       console.error('Store order lifecycle update failed:', error);
