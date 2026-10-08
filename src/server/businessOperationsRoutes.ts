@@ -25,10 +25,16 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
         db.collection('staffInvites').where('businessId', '==', businessId).limit(200).get(),
         db.collection('branches').where('businessId', '==', businessId).limit(200).get(),
       ]);
-      return res.json({
-        invites: i.docs.map(d => ({ id: d.id, ...d.data() })).filter((x: any) => inTenant(x, businessId)),
-        branches: b.docs.map(d => ({ id: d.id, ...d.data() })).filter((x: any) => inTenant(x, businessId)),
-      });
+      const assignedBranchId = typeof (req.businessMembership || {}).branchId === 'string' ? String((req.businessMembership || {}).branchId).trim() : '';
+      const invites = i.docs.map(d => ({ id: d.id, ...d.data() })).filter((x: any) =>
+        inTenant(x, businessId) &&
+        (!assignedBranchId || String(x.branchId || '').trim() === assignedBranchId)
+      );
+      const branches = b.docs.map(d => ({ id: d.id, ...d.data() })).filter((x: any) =>
+        inTenant(x, businessId) &&
+        (!assignedBranchId || x.id === assignedBranchId)
+      );
+      return res.json({ invites, branches });
     } catch (e) { console.error('Business staff read failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Staff data is temporarily unavailable.', 503); }
   });
 
