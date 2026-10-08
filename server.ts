@@ -1341,6 +1341,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const applicantUid = String(application.applicantUid || '');
       const userRef = adminDb.collection('users').doc(applicantUid);
       const businessRef = adminDb.collection('businesses').doc();
+      let refundRequired = false;
       await adminDb.runTransaction(async (transaction) => {
         const userSnapshot = await transaction.get(userRef);
         if (!userSnapshot.exists) throw new Error('APPLICANT_NOT_FOUND');
@@ -3500,6 +3501,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           throw new RequestValidationError('INVALID_STATE', 'This Restaurant order can no longer be cancelled.');
         }
         const nextStatus = 'cancelled';
+        refundRequired = ['paid', 'accepted'].includes(String(order.status || ''));
         transaction.update(orderRef, {
           status: nextStatus, cancellationReason: 'customer_requested', cancelledBy: uid, cancelledAt: now, updatedAt: now,
           orderTimeline: [...(Array.isArray(order.orderTimeline) ? order.orderTimeline : []), { status: nextStatus, at: now }],
@@ -3510,7 +3512,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           details: { previousStatus: String(order.status || '') }, timestamp: now,
         });
       });
-      return res.json({ ok: true, orderId, status: 'cancelled', refundRequired: ['paid', 'accepted'].includes(String((await orderRef.get()).data()?.status || '')) });
+      return res.json({ ok: true, orderId, status: 'cancelled', refundRequired });
     } catch (error) {
       if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
       console.error('Restaurant cancellation failed:', error);
