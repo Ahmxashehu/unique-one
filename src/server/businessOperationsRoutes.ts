@@ -55,11 +55,14 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
   });
 
   app.get('/api/business/branches', async (req, res) => {
-    if (!can(req, 'manage:business_staff')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage branches.', 403);
+    if (!can(req, 'manage:business_staff') && !can(req, 'create:products') && !can(req, 'edit:products') && !can(req, 'manage:inventory')) return fail(res, 'FORBIDDEN', 'You do not have permission to view branches.', 403);
     const { businessId } = ctx(req);
+    const membership = req.businessMembership || {};
+    const assignedBranchId = typeof membership.branchId === 'string' ? membership.branchId.trim() : '';
     try {
       const snap = await db.collection('branches').where('businessId', '==', businessId).limit(200).get();
-      return res.json({ branches: snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((x: any) => inTenant(x, businessId)) });
+      const branches = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((x: any) => inTenant(x, businessId));
+      return res.json({ branches: assignedBranchId ? branches.filter((x: any) => x.id === assignedBranchId) : branches });
     } catch (e) { console.error('Business branches read failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Branch data is temporarily unavailable.', 503); }
   });
 
