@@ -3476,6 +3476,67 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.patch("/api/business/restaurants/orders/:orderId/status", authenticate, rateLimit({
+    windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false,
+    store: createFirestoreRateLimitStore('restaurantMerchantOrderStatusRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Restaurant order status attempts.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const orderId = typeof req.params.orderId === 'string' ? req.params.orderId.trim() : '';
+      const nextStatus = typeof req.body?.status === 'string' ? req.body.status.trim() : '';
+      const membership = ((req as any).businessMembership || {}) as Record<string, unknown>;
+      const session = ((req as any).businessSession || {}) as Record<string, unknown>;
+      const businessId = typeof session.businessId === 'string' ? session.businessId.trim() : '';
+      const role = typeof membership.role === 'string' ? membership.role : '';
+      const permissions = Array.isArray(membership.permissions) ? membership.permissions.filter((v): v is string => typeof v === 'string') : [];
+      if (!businessId || String(membership.businessId || '') !== businessId) return errorResponse(res, 'FORBIDDEN', 'An active Business session is required.');
+      if (!hasRolePermission([role as any], permissions as any, 'manage:restaurant_orders')) return errorResponse(res, 'FORBIDDEN', 'You do not have permission to manage Restaurant orders.');
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId)) return errorResponse(res, 'INVALID_REQUEST', 'Invalid Restaurant order ID.');
+      const allowed: Record<string, string[]> = { paid: ['accepted', 'cancelled'], accepted: ['preparing', 'cancelled'], preparing: ['ready', 'cancelled'], ready: ['completed'] };
+      const orderRef = adminDb.collection('restaurantOrders').doc(orderId);
+      const restaurantRef = (id: string) => adminDb.collection('restaurants').doc(id);
+      const now = Timestamp.now();
+      await adminDb.runTransaction(async (transaction) => {
+        const orderSnap = await transaction.get(orderRef);
+        if (!orderSnap.exists) throw new RequestValidationError('NOT_FOUND', 'Restaurant order not found.');
+        const order = orderSnap.data() as Record<string, any>;
+        const restaurantId = String(order.restaurantId || '');
+        if (!restaurantId || String(order.businessId || '') !== businessId) throw new RequestValidationError('FORBIDDEN', 'This Restaurant order does not belong to your Business.');
+        const restaurantSnap = await transaction.get(restaurantRef(restaurantId));
+        if (!restaurantSnap.exists) throw new RequestValidationError('FORBIDDEN', 'Restaurant not found.');
+        const restaurant = restaurantSnap.data() as Record<string, any>;
+        const assignedBranchId = typeof membership.branchId === 'string' ? membership.branchId.trim() : '';
+        const orderBranchId = String(order.branchId || '');
+        if (String(restaurant.businessId || '') !== businessId || String(restaurant.branchId || '') !== orderBranchId ||
+            (assignedBranchId && assignedBranchId !== orderBranchId) ||
+            String(restaurant.status || '') !== 'active' || String(restaurant.verificationStatus || '') !== 'verified') {
+          throw new RequestValidationError('FORBIDDEN', 'You cannot manage this Restaurant order.');
+        }
+        const current = String(order.status || '');
+        if (String(order.paymentStatus || '') !== 'paid') throw new RequestValidationError('INVALID_STATE', 'Only paid Restaurant orders can be managed.');
+        if (!allowed[current]?.includes(nextStatus)) throw new RequestValidationError('INVALID_STATE', 'Invalid Restaurant order status transition.');
+        transaction.update(orderRef, {
+          status: nextStatus, updatedAt: now,
+          orderTimeline: [...(Array.isArray(order.orderTimeline) ? order.orderTimeline : []), { status: nextStatus, at: now }],
+        });
+        transaction.create(adminDb.collection('audit_logs').doc(), {
+          action: 'restaurant.order.merchant_status_changed', actorUid: uid, resource: 'restaurant_order', resourceId: orderId,
+          restaurantId, businessId, branchId: orderBranchId, details: { previousStatus: current, newStatus: nextStatus }, timestamp: now,
+        });
+      });
+      return res.json({ ok: true, orderId, status: nextStatus });
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Restaurant merchant order status update failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Restaurant order status is temporarily unavailable.');
+    }
+  });
+
   app.post("/api/restaurant/pay", authenticate, rateLimit({
     windowMs: 60_000, limit: 15, standardHeaders: true, legacyHeaders: false,
     store: createFirestoreRateLimitStore('restaurantPaymentRateLimits', 60_000),
