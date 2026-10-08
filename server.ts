@@ -4014,7 +4014,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
   });
 
 
-async async function storeBusinessBranchAccessMatches(
+async function storeBusinessBranchAccessMatches(
   req: any,
   uid: string,
   businessId: string,
