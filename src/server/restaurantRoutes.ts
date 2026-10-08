@@ -290,4 +290,62 @@ export function registerRestaurantRoutes(app: Express, authenticate: RequestHand
       return fail(res, 'SERVICE_UNAVAILABLE', 'Restaurant UniquePay connection is temporarily unavailable.', 503);
     }
   });
+  app.post('/api/business/restaurants/:restaurantId/menu-items', authenticate, limiter, async (req, res) => {
+    const uid = clean((req as any).user?.uid, 128);
+    const membership = ((req as any).businessMembership || {}) as Record<string, unknown>;
+    const session = ((req as any).businessSession || {}) as Record<string, unknown>;
+    const businessId = clean(session.businessId, 128);
+    const restaurantId = clean(req.params.restaurantId, 128);
+    const role = clean(membership.role, 64) as Role;
+    const customPermissions = Array.isArray(membership.permissions)
+      ? membership.permissions.filter((v): v is Permission => typeof v === 'string') as Permission[] : [];
+    if (!uid || !businessId || clean(membership.businessId, 128) !== businessId) return fail(res, 'BUSINESS_AUTH_REQUIRED', 'An active Business Platform session is required.', 401);
+    if (!hasRolePermission([role], customPermissions, 'manage:restaurant_menu')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage the Restaurant menu.', 403);
+    const name = clean(req.body?.name, 200);
+    const category = clean(req.body?.category, 100);
+    const description = clean(req.body?.description, 1000);
+    const priceMinor = Number(req.body?.priceMinor);
+    const available = req.body?.available !== false;
+    if (!name || !category || !Number.isSafeInteger(priceMinor) || priceMinor <= 0 || priceMinor > 1000000000) {
+      return fail(res, 'INVALID_REQUEST', 'Menu item name, category and a valid NGN price are required.');
+    }
+    const restaurantRef = db.collection('restaurants').doc(restaurantId);
+    const now = Timestamp.now();
+    const itemId = 'menu_' + randomUUID().replace(/-/g, '');
+    const itemRef = restaurantRef.collection('menuItems').doc(itemId);
+    try {
+      await db.runTransaction(async (transaction) => {
+        const restaurantSnap = await transaction.get(restaurantRef);
+        if (!restaurantSnap.exists) throw Object.assign(new Error('NOT_FOUND'), { code: 'NOT_FOUND' });
+        const restaurant = restaurantSnap.data() || {};
+        if (String(restaurant.businessId || '') !== businessId || String(restaurant.ownerUid || '') !== uid) {
+          throw Object.assign(new Error('FORBIDDEN'), { code: 'FORBIDDEN' });
+        }
+        if (String(restaurant.status || '') !== 'active' || String(restaurant.verificationStatus || '') !== 'verified') {
+          throw Object.assign(new Error('RESTAURANT_NOT_ACTIVE'), { code: 'RESTAURANT_NOT_ACTIVE' });
+        }
+        const assignedBranchId = clean(membership.branchId, 128);
+        if (assignedBranchId && String(restaurant.branchId || '') !== assignedBranchId) {
+          throw Object.assign(new Error('BRANCH_FORBIDDEN'), { code: 'BRANCH_FORBIDDEN' });
+        }
+        transaction.create(itemRef, {
+          id: itemId, restaurantId, businessId, branchId: String(restaurant.branchId || ''), ownerUid: uid,
+          name, category, description, priceMinor, currency: 'NGN', available,
+          createdAt: now, updatedAt: now,
+        });
+        transaction.create(db.collection('audit_logs').doc(), {
+          action: 'restaurant.menu_item_created', actorUid: uid, resource: 'restaurant_menu_item', resourceId: itemId,
+          businessId, restaurantId, branchId: String(restaurant.branchId || ''), details: { name, category, priceMinor, available }, timestamp: now,
+        });
+      });
+      return res.status(201).json({ ok: true, itemId, restaurantId, priceMinor, currency: 'NGN', available });
+    } catch (error: any) {
+      if (error?.code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'Restaurant not found.', 404);
+      if (error?.code === 'FORBIDDEN') return fail(res, 'FORBIDDEN', 'You are not authorized to manage this Restaurant menu.', 403);
+      if (error?.code === 'RESTAURANT_NOT_ACTIVE') return fail(res, 'CONFLICT', 'The Restaurant must be approved and active before menu items can be created.', 409);
+      if (error?.code === 'BRANCH_FORBIDDEN') return fail(res, 'FORBIDDEN', 'You cannot manage a Restaurant assigned to another branch.', 403);
+      console.error('Restaurant menu item creation failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'Restaurant menu management is temporarily unavailable.', 503);
+    }
+  });
 }
