@@ -3655,8 +3655,13 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     if (!process.env.RESTAURANT_REFUND_CRON_TOKEN || token !== process.env.RESTAURANT_REFUND_CRON_TOKEN) return errorResponse(res, 'FORBIDDEN', 'Forbidden.');
     try {
       const results: any[] = [];
-      for (const status of ['required', 'retryable', 'processing']) {
-        const snap = await adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).where('status', '==', status).limit(50).get();
+      const nowForRecovery = Timestamp.now();
+      const obligationQueries = [
+        adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).where('status', '==', 'required').limit(50).get(),
+        adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).where('status', '==', 'retryable').limit(50).get(),
+        adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).where('status', '==', 'processing').where('leaseExpiresAt', '<=', nowForRecovery).limit(50).get(),
+      ];
+      for (const snap of await Promise.all(obligationQueries)) {
         for (const doc of snap.docs) {
           const obligation = doc.data() as Record<string, any>;
           const orderId = doc.id;
