@@ -51,7 +51,7 @@ export function registerStoreReturnInspectionRoutes(
         const rr = order.returnRequest && typeof order.returnRequest === 'object'
           ? order.returnRequest as Record<string, unknown>
           : null;
-        if (!rr || rr.status !== 'received' || rr.restocked !== true) throw new Error('INVALID_STATE');
+        if (!rr || rr.status !== 'received' || rr.restocked !== false || rr.quarantined !== true) throw new Error('INVALID_STATE');
         if (rr.inventoryDisposition && rr.inventoryDisposition !== 'quarantined') {
           if (rr.inventoryDisposition === disposition) {
             return { orderId, disposition, replayed: true };
