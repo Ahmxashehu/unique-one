@@ -220,17 +220,18 @@ export async function executeFinancialRefund(
       if (input.finalizeOrder === 'full' && order.paymentStatus !== 'paid') {
         return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'A full Store refund requires an order that has not already been partially refunded.' } };
       }
-      if (input.finalizeOrder === 'partial') {
-        const rr = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest as Record<string, unknown> : null;
-        const disposition = rr?.inventoryDisposition;
+      const rr = order.returnRequest && typeof order.returnRequest === 'object'
+        ? order.returnRequest as Record<string, unknown>
+        : null;
+      if (rr) {
+        const disposition = rr.inventoryDisposition;
         if (
-          !rr ||
           rr.status !== 'received' ||
           Number(rr.requestedRefundAmountMinor) !== input.amountMinor ||
           !['resalable', 'damaged', 'non_resalable'].includes(String(disposition)) ||
           rr.quarantined !== false
         ) {
-          return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The partial Store return must complete inventory inspection before the refund.' } };
+          return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'A Store return must complete inventory inspection before any return-linked refund.' } };
         }
       }
       if (input.finalizeOrder === 'full' && originalAmount !== Number(order.amountMinor)) {
