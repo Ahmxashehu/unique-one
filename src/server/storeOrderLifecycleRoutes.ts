@@ -60,6 +60,11 @@ export function registerStoreOrderLifecycleRoutes(
         const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
         const hasBusinessContext = Boolean(activeBusinessId);
         const assignedBranchId = typeof businessMembership?.branchId === 'string' ? businessMembership.branchId.trim() : '';
+        const businessRole = typeof businessMembership?.role === 'string' ? businessMembership.role.trim() : '';
+        // Delivery staff must use a dedicated delivery-proof flow; the generic seller lifecycle
+        // endpoint must never become a delivery-agent mutation surface, even if a custom
+        // permission accidentally grants manage:orders.
+        if (businessRole === 'delivery') throw new Error('DELIVERY_ROLE_REQUIRES_DELIVERY_FLOW');
         const orderBranchId = typeof order.branchId === 'string' ? order.branchId.trim() : '';
         const branchAccess = !assignedBranchId || orderBranchId === assignedBranchId;
         const privilegedBusinessAccess = hasBusinessContext && orderBusinessId === activeBusinessId && branchAccess;
