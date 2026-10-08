@@ -19,6 +19,7 @@ const [productsSnap, movementsSnap] = await Promise.all([
 
 const movementsByProduct = new Map();
 const errors = [];
+const productIds = new Set(productsSnap.docs.map((doc) => doc.id));
 
 for (const movementDoc of movementsSnap.docs) {
   const movement = movementDoc.data() || {};
@@ -41,11 +42,16 @@ for (const movementDoc of movementsSnap.docs) {
   const list = movementsByProduct.get(productId) || [];
   list.push({ id: movementDoc.id, ...movement });
   movementsByProduct.set(productId, list);
+  if (!productIds.has(productId)) {
+    orphanMovements += 1;
+    errors.push({ type: 'orphan_inventory_movement', movementId: movementDoc.id, productId });
+  }
 }
 
 let checkedProducts = 0;
 let reconciledProducts = 0;
 let legacyProducts = 0;
+let orphanMovements = 0;
 
 for (const productDoc of productsSnap.docs) {
   const productId = productDoc.id;
@@ -62,19 +68,17 @@ for (const productDoc of productsSnap.docs) {
 
   checkedProducts += 1;
 
-  // A zero-stock product may legitimately have no movement history. Any product
-  // carrying sellable or quarantined stock without a canonical movement ledger
-  // is legacy/unreconciled and must not be silently treated as healthy.
+  // Every product must have canonical inventory history. We cannot invent an
+  // opening balance for a legacy product, so ledgerless products are explicitly
+  // reported for controlled migration instead of being silently accepted.
   if (movements.length === 0) {
-    if (currentQuantity > 0 || currentQuarantine > 0) {
-      legacyProducts += 1;
-      errors.push({
-        type: 'legacy_inventory_without_ledger',
-        productId,
-        productQuantity: currentQuantity,
-        productQuarantineQuantity: currentQuarantine,
-      });
-    }
+    legacyProducts += 1;
+    errors.push({
+      type: 'legacy_product_without_ledger',
+      productId,
+      productQuantity: currentQuantity,
+      productQuarantineQuantity: currentQuarantine,
+    });
     continue;
   }
 
@@ -172,6 +176,7 @@ console.log(JSON.stringify({
   productsWithLedger: movementsByProduct.size,
   reconciledProducts,
   legacyProducts,
+  orphanMovements,
   errors,
 }, null, 2));
 
