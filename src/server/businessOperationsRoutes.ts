@@ -114,6 +114,11 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
         const membership = membershipSnap.data() || {};
         if (String(membership.role || '') === 'business_owner') throw new Error('OWNER_MEMBERSHIP_PROTECTED');
         transaction.update(membershipRef, { status: 'inactive', inactiveReason: 'staff_deactivated', deactivatedBy: uid, updatedAt: now });
+        const credentialRef = db.collection('businessAccessCredentials').doc(credentialId(targetUid, businessId));
+        const credentialSnap = await transaction.get(credentialRef);
+        if (credentialSnap.exists) {
+          transaction.update(credentialRef, { status: 'reset_required', resetBy: uid, resetAt: now, updatedAt: now });
+        }
         const sessions = await transaction.get(
           db.collection('businessAccessSessions')
             .where('uid', '==', targetUid)
