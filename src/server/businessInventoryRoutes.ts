@@ -1,4 +1,6 @@
 import type { Express, RequestHandler } from 'express';
+import type { Permission, Role } from '../lib/os/types';
+import { hasRolePermission } from '../lib/auth/rbac';
 import { randomUUID } from 'crypto';
 import rateLimit from 'express-rate-limit';
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
@@ -30,7 +32,8 @@ export function registerBusinessInventoryRoutes(
     if (!uid || !businessId || !productId) return fail(res, 'INVALID_REQUEST', 'Business, user and product are required.');
     if (!['in', 'out'].includes(direction)) return fail(res, 'INVALID_REQUEST', 'Inventory direction must be in or out.');
     if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1000000) return fail(res, 'INVALID_REQUEST', 'Inventory quantity must be a positive whole number.');
-    if (!['business_owner', 'seller', 'admin', 'manager', 'inventory'].includes(String(membership.role || ''))) {
+    const role = typeof membership.role === 'string' ? membership.role : '';
+    if (!hasRolePermission([role as Role], [], 'manage:inventory' as Permission)) {
       return fail(res, 'FORBIDDEN', 'You do not have permission to adjust inventory.', 403);
     }
 
@@ -59,6 +62,10 @@ export function registerBusinessInventoryRoutes(
             throw new Error('BRANCH_FORBIDDEN');
           }
         }
+        const productBranchId = typeof product.branchId === 'string' ? product.branchId.trim() : '';
+        if (membershipBranchId && productBranchId && productBranchId !== membershipBranchId) throw new Error('BRANCH_FORBIDDEN');
+        if (requestedBranchId && productBranchId && productBranchId !== requestedBranchId) throw new Error('BRANCH_FORBIDDEN');
+
         const productStatus = String(product.status || '');
         if (!['published', 'out_of_stock'].includes(productStatus)) throw new Error('PRODUCT_NOT_PUBLISHED');
 
