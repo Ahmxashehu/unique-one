@@ -8,7 +8,7 @@ import { hasRolePermission } from '../lib/auth/rbac';
 function fail(res: Response, code: string, message: string, status = 400) { return res.status(status).json({ error: { code, message } }); }
 function clean(value: unknown, max: number) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
 
-export function registerRestaurantRoutes(app: Express, authenticate: RequestHandler, db: Firestore) {
+export function registerRestaurantRoutes(app: Express, authenticate: RequestHandler, db: Firestore, requirePermission: (permission: Permission) => RequestHandler) {
   const limiter = rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHeaders: true, legacyHeaders: true });
   app.post('/api/business/restaurants', authenticate, limiter, async (req, res) => {
     const uid = clean((req as any).user?.uid, 128);
