@@ -4024,7 +4024,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const productId = String(cart.data.productId).trim();
           productSnapshots.set(productId, await transaction.get(adminDb.collection('products').doc(productId)));
         }
-        const groups = new Map<string, { cart: typeof carts[number]; product: Record<string, unknown>; productId: string; sellerId: string; businessId: string | null }[]>();
+        const groups = new Map<string, { cart: typeof carts[number]; product: Record<string, unknown>; productId: string; sellerId: string; businessId: string; branchId: string | null }[]>();
         const requestedByProduct = new Map<string, number>();
         for (const cart of carts) {
           const productId = String(cart.data.productId).trim();
@@ -4034,6 +4034,22 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const quantity = Number(cart.data.quantity);
           const sellerId = product.sellerId;
           const businessId = typeof product.businessId === 'string' && product.businessId.trim() ? product.businessId.trim() : null;
+          const branchId = typeof product.branchId === 'string' && product.branchId.trim() ? product.branchId.trim() : null;
+          if (!businessId) {
+            throw new RequestValidationError('INVALID_REQUEST', 'This legacy product must be assigned to a Business before checkout.');
+          }
+          if (branchId) {
+            const branchSnap = await transaction.get(adminDb.collection('branches').doc(branchId));
+            const branch = branchSnap.data() || {};
+            if (!branchSnap.exists || String(branch.businessId || '') !== businessId || String(branch.status || 'active') !== 'active') {
+              throw new RequestValidationError('INVALID_REQUEST', 'A product in your cart is assigned to an invalid or inactive branch.');
+            }
+          } else {
+            const branchQuery = await transaction.get(adminDb.collection('branches').where('businessId', '==', businessId).where('status', '==', 'active'));
+            if (branchQuery.size > 1) {
+              throw new RequestValidationError('INVALID_REQUEST', 'A branch must be assigned before checkout for this multi-branch product.');
+            }
+          }
           const price = product.price;
           const available = product.quantity;
           const minOrderQuantity = Number(product.minOrderQuantity || 1);
@@ -4049,9 +4065,9 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             throw new RequestValidationError('INVALID_REQUEST', 'One or more products in your cart are no longer available in the requested quantity.');
           }
           requestedByProduct.set(productId, requested);
-          const groupKey = `${sellerId}::${businessId || ''}`;
+          const groupKey = `${sellerId}::${businessId}::${branchId || ''}`;
           const group = groups.get(groupKey) || [];
-          group.push({ cart, product, productId, sellerId, businessId });
+          group.push({ cart, product, productId, sellerId, businessId, branchId });
           groups.set(groupKey, group);
         }
         const orderIds: string[] = [];
@@ -4083,13 +4099,19 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             sourceModule: 'unique_store.checkout',
             actorUid: uid,
             businessId: typeof product.businessId === 'string' ? product.businessId : null,
+            branchId: typeof product.branchId === 'string' && product.branchId.trim() ? product.branchId.trim() : null,
           });
         }
         for (const [, sellerItems] of groups) {
           const orderRef = adminDb.collection('orders').doc();
           const sellerId = sellerItems[0].sellerId;
           const businessId = sellerItems[0].businessId;
-          const items = sellerItems.map(({ product, productId, cart }) => ({
+          const branchId = sellerItems[0].branchId;
+          if (sellerItems.some((item) => item.businessId !== businessId || item.branchId !== branchId)) {
+            throw new RequestValidationError('INVALID_REQUEST', 'Store order items cannot cross Business branches.');
+          }
+          const items = sellerItems.map(({ product, productId, cart, branchId: itemBranchId }) => ({
+            branchId: itemBranchId,
             productId,
             name: typeof product.name === 'string' ? product.name : 'Product',
             price: product.price,
@@ -4104,7 +4126,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const totalAmount = totalAmountMinor / 100;
           transaction.create(orderRef, {
             id: orderRef.id, customerId: uid, sellerId,
-            ...(businessId ? { businessId } : {}),
+            businessId,
+            ...(branchId ? { branchId } : {}),
             items, totalAmount, amountMinor: totalAmountMinor, currency: 'NGN',
             status: 'pending', shippingAddress, createdAt: now, updatedAt: now,
           });
