@@ -504,6 +504,30 @@ async function startServer() {
   mutations: [],
 } as const;
 
+const STORE_RETURN_WINDOW_DAYS = (() => {
+  const parsed = Number(process.env.STORE_RETURN_WINDOW_DAYS ?? 14);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 60 ? parsed : 14;
+})();
+const STORE_RETURN_WINDOW_MS = STORE_RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+function storeReturnEligibilityTimestamp(order: Record<string, unknown>): number | null {
+  const timeline = Array.isArray(order.orderTimeline) ? order.orderTimeline : [];
+  for (let i = timeline.length - 1; i >= 0; i -= 1) {
+    const entry = timeline[i];
+    if (!entry || typeof entry !== 'object' || String((entry as any).status || '') !== 'delivered') continue;
+    const at = (entry as any).at;
+    if (typeof at === 'string') {
+      const parsed = Date.parse(at);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    if (at && typeof at.toMillis === 'function') {
+      const parsed = at.toMillis();
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
 const app = express();
   const PORT = Number(process.env.PORT) || 3000;
   const httpServer = http.createServer(app);
@@ -4667,6 +4691,13 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
         }
         if (order.returnRequest && typeof order.returnRequest === 'object') {
           throw new RequestValidationError('INVALID_REQUEST', 'A return request already exists for this order.');
+        }
+        const deliveredAtMs = storeReturnEligibilityTimestamp(order);
+        if (deliveredAtMs === null) {
+          throw new RequestValidationError('INVALID_REQUEST', 'This Store order has no authoritative delivery timestamp for return eligibility.');
+        }
+        if (Date.now() - deliveredAtMs > STORE_RETURN_WINDOW_MS) {
+          throw new RequestValidationError('INVALID_REQUEST', `The Store return window has expired (${STORE_RETURN_WINDOW_DAYS} days after delivery).`);
         }
         const existingDispute = order.dispute && typeof order.dispute === 'object' ? order.dispute as Record<string, unknown> : null;
         if (existingDispute && ['opened','seller_responded','under_review','resolved'].includes(String(existingDispute.status))) {
