@@ -19,7 +19,8 @@ export interface StoreInventoryMovementInput {
   resultingQuantity: number;
   previousQuarantineQuantity?: number;
   resultingQuarantineQuantity?: number;
-  direction: 'in' | 'out';
+  direction: 'in' | 'out' | 'quarantine_in' | 'quarantine_out';
+  quantityDelta?: number;
   sourceId: string;
   sourceModule: string;
   actorUid: string;
@@ -56,7 +57,7 @@ export function recordStoreInventoryMovement(
     !Number.isSafeInteger(input.previousQuantity) || input.previousQuantity < 0 ||
     !Number.isSafeInteger(input.resultingQuantity) || input.resultingQuantity < 0 ||
     !Number.isSafeInteger(input.previousQuantity + (input.direction === 'in' ? input.quantity : -input.quantity)) ||
-    input.previousQuantity + (input.direction === 'in' ? input.quantity : -input.quantity) !== input.resultingQuantity ||
+    (input.quantityDelta ?? (input.direction === 'in' ? input.quantity : input.direction === 'out' ? -input.quantity : 0)) + input.previousQuantity !== input.resultingQuantity ||
     !safePart(input.sourceId) || !safePart(input.sourceModule) || !safePart(input.actorUid)
   ) {
     throw new Error('INVALID_INVENTORY_MOVEMENT');
@@ -72,7 +73,7 @@ export function recordStoreInventoryMovement(
     movementType: input.movementType,
     direction: input.direction,
     quantity: input.quantity,
-    quantityDelta: input.direction === 'in' ? input.quantity : -input.quantity,
+    quantityDelta: input.quantityDelta ?? (input.direction === 'in' ? input.quantity : input.direction === 'out' ? -input.quantity : 0),
     previousQuantity: input.previousQuantity,
     resultingQuantity: input.resultingQuantity,
     ...(input.previousQuarantineQuantity !== undefined ? { previousQuarantineQuantity: input.previousQuarantineQuantity } : {}),
