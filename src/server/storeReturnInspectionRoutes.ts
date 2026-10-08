@@ -91,7 +91,9 @@ export function registerStoreReturnInspectionRoutes(
             transaction.update(productSnap.ref, {
               quantity: newQuantity,
               quarantineQuantity: quarantineQuantity - returnedQuantity,
-              status: 'published',
+              // Returned stock can restore sellability from out_of_stock, but must
+              // never silently reactivate an intentionally archived/suspended product.
+              status: product.status === 'out_of_stock' ? 'published' : product.status,
               updatedAt: now,
             });
           } else {
