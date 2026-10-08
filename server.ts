@@ -1428,12 +1428,17 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           .where('businessId', '==', businessId).where('status', '==', 'active').limit(500);
         const inviteQuery = adminDb.collection('staffInvites')
           .where('businessId', '==', businessId).where('status', '==', 'pending').limit(500);
+        const credentialQuery = adminDb.collection('businessAccessCredentials')
+          .where('businessId', '==', businessId).where('status', '==', 'active').limit(500);
         const membershipSnap = await transaction.get(membershipQuery);
         const sessionSnap = await transaction.get(sessionQuery);
         const inviteSnap = action === 'suspend'
           ? await transaction.get(inviteQuery)
           : null;
-        const writeCount = membershipSnap.size + sessionSnap.size + (inviteSnap?.size || 0) + 1;
+        const credentialSnap = action === 'suspend'
+          ? await transaction.get(credentialQuery)
+          : null;
+        const writeCount = membershipSnap.size + sessionSnap.size + (inviteSnap?.size || 0) + (credentialSnap?.size || 0) + 1;
         if (writeCount > 499) throw new Error('BUSINESS_ACCESS_TOO_LARGE');
 
         if (action === 'suspend') {
@@ -1443,6 +1448,9 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           }
           for (const doc of sessionSnap.docs) {
             transaction.update(doc.ref, { status: 'revoked', revokedAt: now, revokedBy: adminUid });
+          }
+          for (const doc of (credentialSnap?.docs || [])) {
+            transaction.update(doc.ref, { status: 'reset_required', resetBy: adminUid, resetAt: now, updatedAt: now });
           }
           for (const doc of (inviteSnap?.docs || [])) {
             transaction.update(doc.ref, { status: 'cancelled', cancelledAt: now, cancelledBy: adminUid });
