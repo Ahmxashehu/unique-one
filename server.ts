@@ -3769,8 +3769,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const current = String(order.status || '');
         if (String(order.paymentStatus || '') !== 'paid') throw new RequestValidationError('INVALID_STATE', 'Only paid Restaurant orders can be managed.');
         if (!allowed[current]?.includes(nextStatus)) throw new RequestValidationError('INVALID_STATE', 'Invalid Restaurant order status transition.');
+        if (nextStatus === 'cancelled') {
+          await createRestaurantRefundObligation(transaction, orderId, order, uid, now);
+        }
         transaction.update(orderRef, {
           status: nextStatus, updatedAt: now,
+          ...(nextStatus === 'cancelled' ? { refundStatus: 'required' } : {}),
           orderTimeline: [...(Array.isArray(order.orderTimeline) ? order.orderTimeline : []), { status: nextStatus, at: now }],
         });
         transaction.create(adminDb.collection('audit_logs').doc(), {
