@@ -43,9 +43,34 @@ export default function AddProductPage() {
   const [locationAddress, setLocationAddress] = useState(userData?.location?.address || '');
   const [deliveryOption, setDeliveryOption] = useState(true);
   const [pickupOption, setPickupOption] = useState(true);
+  const [businessBranchId, setBusinessBranchId] = useState('');
   const [hasVideo, setHasVideo] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+
+
+  React.useEffect(() => {
+    let active = true;
+    const loadBusinessScope = async () => {
+      if (!currentUser) return;
+      const businessId = localStorage.getItem('unique_business_id') || '';
+      if (!businessId) return;
+      try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch('/api/business/access/status?businessId=' + encodeURIComponent(businessId), {
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        const data = await response.json().catch(() => ({}));
+        if (active && response.ok && typeof data?.selectedBusiness?.branchId === 'string') {
+          setBusinessBranchId(data.selectedBusiness.branchId.trim());
+        }
+      } catch {
+        // Firestore rules remain authoritative if the scope lookup is unavailable.
+      }
+    };
+    void loadBusinessScope();
+    return () => { active = false; };
+  }, [currentUser?.uid]);
 
   React.useEffect(() => {
     const mediaId = new URLSearchParams(window.location.search).get('media');
@@ -140,6 +165,7 @@ export default function AddProductPage() {
         deliveryOptions: deliveryOption ? ['standard_delivery'] : [], pickupOptions: pickupOption ? ['in_store_pickup'] : [],
         status, createdAt: now, updatedAt: now,
         ...(businessId ? { businessId } : {}),
+        ...(businessId && businessBranchId ? { branchId: businessBranchId } : {}),
         ...(parsedDiscount !== undefined ? { discount: parsedDiscount } : {}),
         ...(parsedWholesale !== undefined ? { wholesalePrice: parsedWholesale } : {}),
         ...(parsedBulk !== undefined ? { bulkPrice: parsedBulk } : {}),
