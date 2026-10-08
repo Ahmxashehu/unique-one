@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PackagePlus, Save, Loader2, AlertCircle, X, ImagePlus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { db, storage } from '../../lib/firebase';
+import { storage } from '../../lib/firebase';
 import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { uploadMedia } from '../../lib/media/upload';
 import { useNavigate } from 'react-router-dom';
