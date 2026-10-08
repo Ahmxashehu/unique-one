@@ -113,10 +113,12 @@ export default function RestaurantPage() {
     return () => { cancelled = true; };
   }, [selected?.id]);
   const cartCount = Object.values(cart).reduce((a,b) => a+b, 0);
-  const cartTotal = menuItems.reduce((sum, item) => sum + item.priceMinor / 100 * (cart[item.id] || 0), 0);
+  const cartTotalMinor = menuItems.reduce((sum, item) => sum + item.priceMinor * (cart[item.id] || 0), 0);
+  const cartTotal = cartTotalMinor / 100;
   const deliveryFee = draft.mode === 'delivery' ? 1500 : 0;
-  const serviceFee = cartTotal ? Math.max(300, Math.round(cartTotal * 0.03)) : 0;
-  const finalTotal = cartTotal + deliveryFee + serviceFee;
+  const serviceFee = cartTotalMinor ? Math.max(300, Math.round(cartTotalMinor * 0.03)) : 0;
+  const finalTotalMinor = cartTotalMinor + deliveryFee + serviceFee;
+  const finalTotal = finalTotalMinor / 100;
   const checkoutReady = Boolean(customerName.trim() && customerPhone.trim() && (draft.paymentMethod !== 'uniquepay' || /^\d{4}$/.test(transactionPin)) && (draft.mode !== 'delivery' || draft.deliveryAddress.trim()) && (draft.mode !== 'dine-in' || (draft.date && draft.time)) && (draft.mode !== 'pickup' || (draft.date && draft.time)));
 
   const openBooking = (restaurant: Restaurant) => { setSelected(restaurant); saveDraft({ ...draft, restaurantId: restaurant.id, cart, customerName, customerPhone }); setBookingOpen(true); setStage('menu'); };
@@ -288,9 +290,12 @@ export default function RestaurantPage() {
               <button onClick={() => setBookingOpen(false)} className="rounded-full bg-slate-100 p-2"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-2 p-4">
-              {menuItems.map(item => <div key={item.id} className="flex items-center justify-between rounded-2xl border border-slate-200 p-3"><div><p className="text-sm font-black">{item.name}</p><p className="text-xs text-slate-500">Prototype menu item · ₦{Number(item.price).toLocaleString()}</p></div><div className="flex items-center gap-2"><button onClick={() => updateCart({...cart,[item.id]:Math.max(0,(cart[item.id]||0)-1)})} className="h-8 w-8 rounded-full border">−</button><span className="w-4 text-center text-xs font-black">{cart[item.id]||0}</span><button onClick={() => updateCart({...cart,[item.id]:(cart[item.id]||0)+1})} className="h-8 w-8 rounded-full bg-slate-950 text-white">+</button></div></div>)}
-              <button disabled={!cartCount} onClick={() => { setStage('reservation'); setBookingOpen(true); }} className="mt-3 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-40">Review order · ₦{cartTotal.toLocaleString()}</button>
-              <p className="text-center text-[10px] text-slate-500">Prototype menu prices are not live restaurant pricing.</p>
+              {menuItems.map(item => <div key={item.id} className="flex items-center justify-between rounded-2xl border border-slate-200 p-3"><div><p className="text-sm font-black">{item.name}</p><p className="text-xs text-slate-500">{item.description || item.category} · ₦{(item.priceMinor / 100).toLocaleString()}</p></div><div className="flex items-center gap-2"><button onClick={() => updateCart({...cart,[item.id]:Math.max(0,(cart[item.id]||0)-1)})} className="h-8 w-8 rounded-full border">−</button><span className="w-4 text-center text-xs font-black">{cart[item.id]||0}</span><button onClick={() => updateCart({...cart,[item.id]:(cart[item.id]||0)+1})} className="h-8 w-8 rounded-full bg-slate-950 text-white">+</button></div></div>)}
+              {menuLoading && <p className="py-4 text-center text-xs text-slate-500">Loading live menu…</p>}
+              {!menuLoading && menuError && <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">{menuError}</p>}
+              {!menuLoading && !menuError && !menuItems.length && <p className="py-4 text-center text-xs text-slate-500">No menu items are currently available.</p>}
+              <button disabled={!cartCount || menuLoading} onClick={() => { setStage('reservation'); setBookingOpen(true); }} className="mt-3 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-40">Review order · ₦{cartTotal.toLocaleString()}</button>
+              <p className="text-center text-[10px] text-slate-500">Prices shown are live Restaurant menu prices.</p>
             </div>
           </section>
         </div>
