@@ -4333,6 +4333,23 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
             throw new RequestValidationError('INVALID_REQUEST', 'Inventory data is invalid; return receipt was not applied.');
           }
           transaction.update(productSnap.ref, { quantity: currentQuantity, quarantineQuantity: nextQuarantineQuantity, updatedAt: now });
+          recordStoreInventoryMovement(transaction, adminDb, {
+            productId: Array.from(quantities.keys())[index],
+            movementType: 'return_received_quarantine',
+            quantity: restore,
+            previousQuantity: currentQuantity,
+            resultingQuantity: currentQuantity,
+            previousQuarantineQuantity: currentQuarantineQuantity,
+            resultingQuarantineQuantity: nextQuarantineQuantity,
+            direction: 'quarantine_in',
+            quantityDelta: 0,
+            sourceId: orderId + ':return-receive',
+            sourceModule: 'unique_store.return',
+            actorUid: uid,
+            orderId,
+            returnId: orderId,
+            businessId: orderBusinessId || null,
+          });
         });
         transaction.update(ref, {
           returnRequest: { ...rr, status: 'received', receivedBy: uid, receivedAt: now, restocked: false, quarantined: true },
