@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
-import type { Firestore, Transaction, Timestamp } from 'firebase-admin/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
+import type { Firestore, Transaction } from 'firebase-admin/firestore';
 
 export type StoreInventoryMovementType =
   | 'checkout_reservation'
