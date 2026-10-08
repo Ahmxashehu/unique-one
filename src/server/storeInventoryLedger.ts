@@ -10,7 +10,8 @@ export type StoreInventoryMovementType =
   | 'return_inspection_resalable'
   | 'return_inspection_damaged'
   | 'refund_release'
-  | 'manual_adjustment';
+  | 'manual_adjustment'
+  | 'opening_balance';
 
 export interface StoreInventoryMovementInput {
   productId: string;
