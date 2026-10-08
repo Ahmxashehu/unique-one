@@ -1,6 +1,7 @@
 import type { Express, RequestHandler } from 'express';
 import rateLimit from 'express-rate-limit';
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
+import { recordStoreInventoryMovement } from './storeInventoryLedger';
 
 type ReturnDisposition = 'resalable' | 'damaged' | 'non_resalable';
 
@@ -96,10 +97,43 @@ export function registerStoreReturnInspectionRoutes(
               status: product.status === 'out_of_stock' ? 'published' : product.status,
               updatedAt: now,
             });
+            recordStoreInventoryMovement(transaction, db, {
+              productId: productEntries[index][0],
+              movementType: 'return_inspection_resalable',
+              quantity: returnedQuantity,
+              previousQuantity: currentQuantity,
+              resultingQuantity: newQuantity,
+              previousQuarantineQuantity: quarantineQuantity,
+              resultingQuarantineQuantity: quarantineQuantity - returnedQuantity,
+              direction: 'in',
+              sourceId: orderId + ':inspection:resalable',
+              sourceModule: 'unique_store.return_inspection',
+              actorUid: uid,
+              orderId,
+              returnId: orderId,
+              businessId: orderBusinessId || null,
+            });
           } else {
             transaction.update(productSnap.ref, {
               quarantineQuantity: quarantineQuantity - returnedQuantity,
               updatedAt: now,
+            });
+            recordStoreInventoryMovement(transaction, db, {
+              productId: productEntries[index][0],
+              movementType: 'return_inspection_damaged',
+              quantity: returnedQuantity,
+              previousQuantity: currentQuantity,
+              resultingQuantity: currentQuantity,
+              previousQuarantineQuantity: quarantineQuantity,
+              resultingQuarantineQuantity: quarantineQuantity - returnedQuantity,
+              direction: 'quarantine_out',
+              quantityDelta: 0,
+              sourceId: orderId + ':inspection:' + disposition,
+              sourceModule: 'unique_store.return_inspection',
+              actorUid: uid,
+              orderId,
+              returnId: orderId,
+              businessId: orderBusinessId || null,
             });
           }
         });
