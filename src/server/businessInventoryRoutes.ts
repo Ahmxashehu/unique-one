@@ -59,15 +59,17 @@ export function registerBusinessInventoryRoutes(
             throw new Error('BRANCH_FORBIDDEN');
           }
         }
-        if (String(product.status || '') !== 'published') throw new Error('PRODUCT_NOT_PUBLISHED');
+        const productStatus = String(product.status || '');
+        if (!['published', 'out_of_stock'].includes(productStatus)) throw new Error('PRODUCT_NOT_PUBLISHED');
 
         const currentQuantity = Number(product.quantity);
         if (!Number.isSafeInteger(currentQuantity) || currentQuantity < 0) throw new Error('INVALID_STOCK');
         newQuantity = direction === 'in' ? currentQuantity + quantity : currentQuantity - quantity;
         if (!Number.isSafeInteger(newQuantity) || newQuantity < 0) throw new Error('INSUFFICIENT_STOCK');
         productName = String(product.name || 'Product');
+        const resultingStatus = newQuantity === 0 ? 'out_of_stock' : (productStatus === 'out_of_stock' ? 'published' : productStatus);
 
-        transaction.update(productRef, { quantity: newQuantity, updatedAt: now });
+        transaction.update(productRef, { quantity: newQuantity, status: resultingStatus, updatedAt: now });
         recordStoreInventoryMovement(transaction, db, {
           productId,
           movementType: 'manual_adjustment',
@@ -110,7 +112,7 @@ export function registerBusinessInventoryRoutes(
       if (code === 'PRODUCT_BUSINESS_MISMATCH') return fail(res, 'FORBIDDEN', 'This product does not belong to the active business.', 403);
       if (code === 'BRANCH_FORBIDDEN') return fail(res, 'FORBIDDEN', 'You are not authorized to operate in this branch.', 403);
       if (code === 'BRANCH_NOT_FOUND') return fail(res, 'NOT_FOUND', 'The selected branch was not found.', 404);
-      if (code === 'PRODUCT_NOT_PUBLISHED') return fail(res, 'INVALID_REQUEST', 'Only published products can be adjusted.');
+      if (code === 'PRODUCT_NOT_PUBLISHED') return fail(res, 'INVALID_REQUEST', 'Only published or out-of-stock products can be adjusted.');
       if (code === 'INVALID_STOCK') return fail(res, 'INVALID_REQUEST', 'The product has an invalid inventory quantity.');
       if (code === 'INSUFFICIENT_STOCK') return fail(res, 'INVALID_REQUEST', 'There is not enough stock for this adjustment.');
       console.error('Business inventory adjustment failed:', error);
