@@ -181,7 +181,9 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
 
   app.post('/api/business/orders/:orderId/delivery-confirmation/request', async (req, res) => {
     const { uid, businessId } = ctx(req);
-    const role = String((req.businessMembership || {}).role || '').trim();
+    const membership = req.businessMembership || {};
+    const role = String(membership.role || '').trim();
+    const memberBranchId = String(membership.branchId || '').trim();
     if (role !== 'delivery' && !can(req, 'confirm:delivery')) return fail(res, 'FORBIDDEN', 'You do not have delivery confirmation authority.', 403);
     const orderId = typeof req.params.orderId === 'string' ? req.params.orderId.trim() : '';
     if (!uid || !businessId || !/^[A-Za-z0-9_-]{1,128}$/.test(orderId)) return fail(res, 'INVALID_REQUEST', 'A valid Store order is required.');
@@ -189,7 +191,7 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
       const snap = await db.collection('orders').doc(orderId).get();
       if (!snap.exists) return fail(res, 'NOT_FOUND', 'The Store order was not found.', 404);
       const order = snap.data() || {};
-      if (String(order.businessId || '') !== businessId || String(order.deliveryActorUid || '') !== uid) return fail(res, 'FORBIDDEN', 'You are not assigned to this Store delivery.', 403);
+      if (String(order.businessId || '') !== businessId || String(order.deliveryActorUid || '') !== uid || !memberBranchId || memberBranchId !== String(order.branchId || '').trim()) return fail(res, 'FORBIDDEN', 'You are not assigned to this Store delivery branch.', 403);
       if (String(order.status || '') !== 'out_for_delivery') return fail(res, 'INVALID_REQUEST', 'The Store order must be out for delivery before confirmation.');
       const destination = String(order.customerPhone || '').trim();
       const customerId = String(order.customerId || '');
@@ -204,7 +206,9 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
 
   app.post('/api/business/orders/:orderId/delivery-confirmation/verify', async (req, res) => {
     const { uid, businessId } = ctx(req);
-    const role = String((req.businessMembership || {}).role || '').trim();
+    const membership = req.businessMembership || {};
+    const role = String(membership.role || '').trim();
+    const memberBranchId = String(membership.branchId || '').trim();
     if (role !== 'delivery' && !can(req, 'confirm:delivery')) return fail(res, 'FORBIDDEN', 'You do not have delivery confirmation authority.', 403);
     const orderId = typeof req.params.orderId === 'string' ? req.params.orderId.trim() : '';
     const challengeId = typeof req.body?.challengeId === 'string' ? req.body.challengeId.trim() : '';
@@ -217,7 +221,7 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
       if (!cs.exists || !os.exists) return fail(res, 'NOT_FOUND', 'The delivery confirmation challenge or order was not found.', 404);
       const c = cs.data() || {}, o = os.data() || {};
       if (String(c.status || '') !== 'pending' || String(c.orderId || '') !== orderId || String(c.businessId || '') !== businessId || String(c.deliveryActorUid || '') !== uid) return fail(res, 'FORBIDDEN', 'This delivery confirmation challenge is not valid.', 403);
-      if (String(o.businessId || '') !== businessId || String(o.deliveryActorUid || '') !== uid || String(o.customerId || '') !== String(c.customerId || '') || String(o.status || '') !== 'out_for_delivery') return fail(res, 'FORBIDDEN', 'The delivery assignment or order state no longer matches this challenge.', 403);
+      if (String(o.businessId || '') !== businessId || String(o.deliveryActorUid || '') !== uid || String(o.branchId || '').trim() !== memberBranchId || String(o.customerId || '') !== String(c.customerId || '') || String(o.status || '') !== 'out_for_delivery') return fail(res, 'FORBIDDEN', 'The delivery assignment or order state no longer matches this challenge.', 403);
       const verified = await getUniqueOtpService('sms').verify({ destination: String(c.destination || ''), purpose: 'store_delivery_confirmation', channel: 'sms', code });
       if (!verified) return fail(res, 'OTP_INVALID', 'The UniqueOTP is invalid, expired, or already used.', 403);
       const now = Timestamp.now();
