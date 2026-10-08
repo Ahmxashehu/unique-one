@@ -71,6 +71,10 @@ class RequestValidationError extends Error {
 const RESTAURANT_REFUND_OBLIGATIONS = 'restaurantRefundObligations';
 const RESTAURANT_REFUND_LEASE_MS = 5 * 60_000;
 
+function isSafeId(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+}
+
 function restaurantRefundOperationKey(orderId: string): string {
   return 'restaurant_refund_' + orderId;
 }
@@ -3514,10 +3518,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId)) return errorResponse(res, 'INVALID_REQUEST', 'Invalid Restaurant order ID.');
       // Customer-facing endpoint: cancellation only. Fulfillment transitions are
       // reserved for the protected Business/merchant order-status endpoint.
-      const allowed: Record<string, string[]> = {
-        paid: ['cancelled'],
-        accepted: ['cancelled'],
-      };
+      const allowed: Record<string, string[]> = {};
       const orderRef = adminDb.collection('restaurantOrders').doc(orderId);
       const now = Timestamp.now();
       let refundRequired = false;
@@ -3654,7 +3655,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     if (!process.env.RESTAURANT_REFUND_CRON_TOKEN || token !== process.env.RESTAURANT_REFUND_CRON_TOKEN) return errorResponse(res, 'FORBIDDEN', 'Forbidden.');
     try {
       const results: any[] = [];
-      for (const status of ['required', 'retryable']) {
+      for (const status of ['required', 'retryable', 'processing']) {
         const snap = await adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).where('status', '==', status).limit(50).get();
         for (const doc of snap.docs) {
           const obligation = doc.data() as Record<string, any>;
