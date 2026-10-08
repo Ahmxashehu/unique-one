@@ -212,8 +212,19 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
 
         const businessRef = db.collection('businesses').doc(businessId);
         const businessSnap = await transaction.get(businessRef);
-        if (!businessSnap.exists || String(businessSnap.data()?.ownerUid || '') !== ownerUid) {
+        if (
+          !businessSnap.exists ||
+          String(businessSnap.data()?.ownerUid || '') !== ownerUid ||
+          String(businessSnap.data()?.status || '') !== 'verified' ||
+          String(businessSnap.data()?.verificationStatus || '') !== 'verified'
+        ) {
           throw Object.assign(new Error('INVALID_BUSINESS_OWNER'), { code: 'INVALID_BUSINESS_OWNER' });
+        }
+
+        const invitedAtMillis = typeof invite.invitedAt?.toMillis === 'function' ? invite.invitedAt.toMillis() : 0;
+        const inviteMaxAgeMs = 7 * 24 * 60 * 60 * 1000;
+        if (!invitedAtMillis || invitedAtMillis + inviteMaxAgeMs <= Date.now()) {
+          throw Object.assign(new Error('INVITE_EXPIRED'), { code: 'INVITE_EXPIRED' });
         }
 
         if (branchId) {
@@ -259,7 +270,7 @@ export function registerBusinessAccessRoutes(app: Express, authenticate: Request
       return res.json({ ok: true, businessId: result.businessId, role: result.role, alreadyAccepted: result.alreadyAccepted });
     } catch (error: any) {
       const code = String(error?.code || '');
-      const statusMap: Record<string, number> = { INVITE_NOT_FOUND: 404, INVITE_NOT_PENDING: 409, INVITE_EMAIL_MISMATCH: 403, INVALID_INVITE: 400, INVALID_BUSINESS_OWNER: 403, INVALID_BRANCH: 403, MEMBERSHIP_ALREADY_ACTIVE: 409, MEMBERSHIP_REAUTH_REQUIRED: 409 };
+      const statusMap: Record<string, number> = { INVITE_NOT_FOUND: 404, INVITE_NOT_PENDING: 409, INVITE_EMAIL_MISMATCH: 403, INVALID_INVITE: 400, INVALID_BUSINESS_OWNER: 403, INVALID_BRANCH: 403, MEMBERSHIP_ALREADY_ACTIVE: 409, MEMBERSHIP_REAUTH_REQUIRED: 409, INVITE_EXPIRED: 410 };
       const messageMap: Record<string, string> = {
         INVITE_NOT_FOUND: 'Invitation not found.', INVITE_NOT_PENDING: 'This invitation is no longer pending.',
         INVITE_EMAIL_MISMATCH: 'This invitation belongs to a different account email.', INVALID_INVITE: 'This invitation is invalid or incomplete.',
