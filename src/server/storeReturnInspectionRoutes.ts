@@ -44,7 +44,10 @@ export function registerStoreReturnInspectionRoutes(
         const activeBusinessId = typeof businessMembership?.businessId === 'string' ? businessMembership.businessId : '';
         const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
         const globalAdmin = roles.includes('super_admin') || roles.includes('platform_admin');
-        const tenantAccess = Boolean(activeBusinessId && orderBusinessId && orderBusinessId === activeBusinessId);
+        const assignedBranchId = typeof businessMembership?.branchId === 'string' ? businessMembership.branchId.trim() : '';
+        const orderBranchId = typeof order.branchId === 'string' ? order.branchId.trim() : '';
+        const branchAccess = !assignedBranchId || orderBranchId === assignedBranchId;
+        const tenantAccess = Boolean(activeBusinessId && orderBusinessId && orderBusinessId === activeBusinessId && branchAccess);
         const sellerAccess = uid === order.sellerId && (!orderBusinessId || tenantAccess);
         const privilegedBusinessAccess = canManage && (orderBusinessId ? (globalAdmin || tenantAccess) : globalAdmin);
         if (!sellerAccess && !privilegedBusinessAccess) throw new Error('FORBIDDEN');
@@ -78,6 +81,10 @@ export function registerStoreReturnInspectionRoutes(
         productSnaps.forEach((productSnap, index) => {
           if (!productSnap.exists) throw new Error('PRODUCT_NOT_FOUND');
           const product = productSnap.data() || {};
+          const productBusinessId = typeof product.businessId === 'string' ? product.businessId.trim() : '';
+          const productBranchId = typeof product.branchId === 'string' ? product.branchId.trim() : '';
+          if (orderBusinessId && productBusinessId !== orderBusinessId) throw new Error('PRODUCT_TENANT_MISMATCH');
+          if (orderBranchId && productBranchId !== orderBranchId) throw new Error('PRODUCT_BRANCH_MISMATCH');
           const currentQuantity = Number(product.quantity);
           const quarantineQuantity = Number(product.quarantineQuantity || 0);
           const returnedQuantity = productEntries[index][1];
@@ -176,6 +183,8 @@ export function registerStoreReturnInspectionRoutes(
         INVALID_ITEMS: 'The return contains invalid inventory data.',
         PRODUCT_NOT_FOUND: 'A returned product no longer exists.',
         INVALID_STOCK: 'The returned inventory quantity is inconsistent.',
+        PRODUCT_TENANT_MISMATCH: 'A returned product does not belong to this Store business.',
+        PRODUCT_BRANCH_MISMATCH: 'A returned product does not belong to this Store branch.',
       };
       return res.status(status).json({ error: { code: code || 'INVALID_REQUEST', message: messages[code] || 'The return inspection could not be completed safely.' } });
     }
