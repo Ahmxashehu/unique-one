@@ -3,6 +3,7 @@ import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import type { Permission } from '../lib/os/types';
 import { hasRolePermission } from '../lib/auth/rbac';
 import { getUniqueOtpService } from './uniqueOtpRuntime';
+import rateLimit from 'express-rate-limit';
 
 function fail(res: Response, code: string, message: string, status = 400) {
   return res.status(status).json({ error: { code, message } });
@@ -18,6 +19,7 @@ function can(req: any, permission: Permission) {
 function inTenant(data: any, businessId: string) { return String(data?.businessId || '') === businessId; }
 
 export function registerBusinessOperationsRoutes(app: Express, _authenticate: RequestHandler, db: Firestore) {
+  const deliveryConfirmationLimiter = rateLimit({ windowMs: 10 * 60_000, limit: 10, standardHeaders: true, legacyHeaders: false });
   app.get('/api/business/staff', async (req, res) => {
     if (!can(req, 'manage:business_staff')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage business staff.', 403);
     const { businessId } = ctx(req);
@@ -179,7 +181,7 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
     }
   });
 
-  app.post('/api/business/orders/:orderId/delivery-confirmation/request', async (req, res) => {
+  app.post('/api/business/orders/:orderId/delivery-confirmation/request', deliveryConfirmationLimiter, async (req, res) => {
     const { uid, businessId } = ctx(req);
     const membership = req.businessMembership || {};
     const role = String(membership.role || '').trim();
@@ -198,13 +200,13 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
       if (!customerId || !destination) return fail(res, 'INVALID_REQUEST', 'A verified customer phone number is required for delivery confirmation.');
       const ref = db.collection('storeDeliveryChallenges').doc();
       const now = Timestamp.now();
-      await ref.create({ orderId, businessId, branchId: String(order.branchId || ''), deliveryActorUid: uid, customerId, destination, status: 'pending', createdAt: now });
+      await ref.create({ orderId, businessId, branchId: String(order.branchId || ''), deliveryActorUid: uid, customerId, destination, status: 'pending', createdAt: now, expiresAt: Timestamp.fromMillis(now.toMillis() + 5 * 60_000) });
       await getUniqueOtpService('sms').issue({ destination, purpose: 'store_delivery_confirmation', channel: 'sms' });
       return res.status(201).json({ ok: true, challengeId: ref.id, expiresInSeconds: 300, resendAfterSeconds: 30 });
     } catch (e) { console.error('Store delivery confirmation request failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to start delivery confirmation safely.', 503); }
   });
 
-  app.post('/api/business/orders/:orderId/delivery-confirmation/verify', async (req, res) => {
+  app.post('/api/business/orders/:orderId/delivery-confirmation/verify', deliveryConfirmationLimiter, async (req, res) => {
     const { uid, businessId } = ctx(req);
     const membership = req.businessMembership || {};
     const role = String(membership.role || '').trim();
@@ -220,7 +222,7 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
       const [cs, os] = await Promise.all([challengeRef.get(), orderRef.get()]);
       if (!cs.exists || !os.exists) return fail(res, 'NOT_FOUND', 'The delivery confirmation challenge or order was not found.', 404);
       const c = cs.data() || {}, o = os.data() || {};
-      if (String(c.status || '') !== 'pending' || String(c.orderId || '') !== orderId || String(c.businessId || '') !== businessId || String(c.deliveryActorUid || '') !== uid) return fail(res, 'FORBIDDEN', 'This delivery confirmation challenge is not valid.', 403);
+      if (String(c.status || '') !== 'pending' || String(c.orderId || '') !== orderId || String(c.businessId || '') !== businessId || String(c.deliveryActorUid || '') !== uid || !c.expiresAt || c.expiresAt.toMillis() <= Date.now()) return fail(res, 'FORBIDDEN', 'This delivery confirmation challenge is expired or invalid.', 403);
       if (String(o.businessId || '') !== businessId || String(o.deliveryActorUid || '') !== uid || String(o.branchId || '').trim() !== memberBranchId || String(o.customerId || '') !== String(c.customerId || '') || String(o.status || '') !== 'out_for_delivery') return fail(res, 'FORBIDDEN', 'The delivery assignment or order state no longer matches this challenge.', 403);
       const verified = await getUniqueOtpService('sms').verify({ destination: String(c.destination || ''), purpose: 'store_delivery_confirmation', channel: 'sms', code });
       if (!verified) return fail(res, 'OTP_INVALID', 'The UniqueOTP is invalid, expired, or already used.', 403);
@@ -229,7 +231,7 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
         const [freshC, freshO] = await Promise.all([transaction.get(challengeRef), transaction.get(orderRef)]);
         if (!freshC.exists || !freshO.exists) throw new Error('NOT_FOUND');
         const fc = freshC.data() || {}, fo = freshO.data() || {};
-        if (String(fc.status || '') !== 'pending' || String(fc.deliveryActorUid || '') !== uid || String(fc.orderId || '') !== orderId) throw new Error('CHALLENGE_USED');
+        if (String(fc.status || '') !== 'pending' || String(fc.deliveryActorUid || '') !== uid || String(fc.orderId || '') !== orderId || !fc.expiresAt || fc.expiresAt.toMillis() <= Date.now()) throw new Error('CHALLENGE_USED');
         if (String(fo.businessId || '') !== businessId || String(fo.deliveryActorUid || '') !== uid || String(fo.customerId || '') !== String(fc.customerId || '') || String(fo.status || '') !== 'out_for_delivery') throw new Error('ORDER_CHANGED');
         transaction.update(orderRef, { status: 'delivered', delivery: { actorUid: uid, businessId, branchId: String(fo.branchId || ''), assignedAt: fo.deliveryAssignedAt || null, confirmedAt: now, confirmationMethod: 'unique_otp', verificationId: challengeId }, deliveryConfirmedAt: now, deliveryConfirmedBy: uid, statusChangedAt: now, statusChangedBy: uid, updatedAt: now, orderTimeline: [...(Array.isArray(fo.orderTimeline) ? fo.orderTimeline.slice(-49) : []), { status: 'delivered', at: now, actorUid: uid, confirmationMethod: 'unique_otp', verificationId: challengeId }] });
         transaction.update(challengeRef, { status: 'consumed', consumedAt: now, verificationId: challengeId });
