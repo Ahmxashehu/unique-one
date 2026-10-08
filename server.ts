@@ -3476,6 +3476,48 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.post("/api/restaurant/orders/:orderId/cancel", authenticate, rateLimit({
+    windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false,
+    store: createFirestoreRateLimitStore('restaurantOrderCancellationRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Restaurant cancellation attempts.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const orderId = typeof req.params.orderId === 'string' ? req.params.orderId.trim() : '';
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId)) return errorResponse(res, 'INVALID_REQUEST', 'Invalid Restaurant order ID.');
+      const orderRef = adminDb.collection('restaurantOrders').doc(orderId);
+      const now = Timestamp.now();
+      await adminDb.runTransaction(async (transaction) => {
+        const snap = await transaction.get(orderRef);
+        if (!snap.exists) throw new RequestValidationError('NOT_FOUND', 'Restaurant order not found.');
+        const order = snap.data() as Record<string, any>;
+        if (String(order.customerId || '') !== uid) throw new RequestValidationError('FORBIDDEN', 'You cannot cancel this Restaurant order.');
+        if (!['pending', 'paid', 'accepted'].includes(String(order.status || ''))) {
+          throw new RequestValidationError('INVALID_STATE', 'This Restaurant order can no longer be cancelled.');
+        }
+        const nextStatus = 'cancelled';
+        transaction.update(orderRef, {
+          status: nextStatus, cancellationReason: 'customer_requested', cancelledBy: uid, cancelledAt: now, updatedAt: now,
+          orderTimeline: [...(Array.isArray(order.orderTimeline) ? order.orderTimeline : []), { status: nextStatus, at: now }],
+        });
+        transaction.create(adminDb.collection('audit_logs').doc(), {
+          action: 'restaurant.order.customer_cancelled', actorUid: uid, resource: 'restaurant_order', resourceId: orderId,
+          restaurantId: String(order.restaurantId || ''), businessId: String(order.businessId || ''), branchId: String(order.branchId || ''),
+          details: { previousStatus: String(order.status || '') }, timestamp: now,
+        });
+      });
+      return res.json({ ok: true, orderId, status: 'cancelled', refundRequired: ['paid', 'accepted'].includes(String((await orderRef.get()).data()?.status || '')) });
+    } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
+      console.error('Restaurant cancellation failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Restaurant cancellation is temporarily unavailable.');
+    }
+  });
+
   app.patch("/api/business/restaurants/orders/:orderId/status", authenticate, rateLimit({
     windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false,
     store: createFirestoreRateLimitStore('restaurantMerchantOrderStatusRateLimits', 60_000),
