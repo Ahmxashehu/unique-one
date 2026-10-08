@@ -19,6 +19,7 @@ const [productsSnap, movementsSnap] = await Promise.all([
 
 const movementsByProduct = new Map();
 const errors = [];
+let orphanMovements = 0;
 const productIds = new Set(productsSnap.docs.map((doc) => doc.id));
 
 for (const movementDoc of movementsSnap.docs) {
@@ -51,7 +52,6 @@ for (const movementDoc of movementsSnap.docs) {
 let checkedProducts = 0;
 let reconciledProducts = 0;
 let legacyProducts = 0;
-let orphanMovements = 0;
 
 for (const productDoc of productsSnap.docs) {
   const productId = productDoc.id;
@@ -105,6 +105,23 @@ for (const productDoc of productsSnap.docs) {
       openingQuantity: firstMovement.previousQuantity,
       firstMovementType: firstMovement.movementType,
     });
+  }
+
+  const firstQuarantineMovement = movements.find((movement) =>
+    movement.previousQuarantineQuantity !== undefined || movement.resultingQuarantineQuantity !== undefined
+  );
+  if (firstQuarantineMovement) {
+    const firstPreviousQuarantine = Number(firstQuarantineMovement.previousQuarantineQuantity ?? 0);
+    if (firstPreviousQuarantine > 0 && firstQuarantineMovement.movementType !== 'opening_balance') {
+      legacyProducts += 1;
+      errors.push({
+        type: 'legacy_quarantine_opening_balance_missing',
+        productId,
+        movementId: firstQuarantineMovement.id,
+        openingQuarantineQuantity: firstPreviousQuarantine,
+        firstQuarantineMovementType: firstQuarantineMovement.movementType,
+      });
+    }
   }
 
   for (const movement of movements) {
