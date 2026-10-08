@@ -81,8 +81,10 @@ export function registerStoreReturnInspectionRoutes(
         productSnaps.forEach((productSnap, index) => {
           if (!productSnap.exists) throw new Error('PRODUCT_NOT_FOUND');
           const product = productSnap.data() || {};
+          const productSellerId = typeof product.sellerId === 'string' ? product.sellerId.trim() : '';
           const productBusinessId = typeof product.businessId === 'string' ? product.businessId.trim() : '';
           const productBranchId = typeof product.branchId === 'string' ? product.branchId.trim() : '';
+          if (productSellerId !== String(order.sellerId || '').trim()) throw new Error('PRODUCT_SELLER_MISMATCH');
           if (orderBusinessId && productBusinessId !== orderBusinessId) throw new Error('PRODUCT_TENANT_MISMATCH');
           if (orderBranchId && productBranchId !== orderBranchId) throw new Error('PRODUCT_BRANCH_MISMATCH');
           const currentQuantity = Number(product.quantity);
@@ -183,6 +185,7 @@ export function registerStoreReturnInspectionRoutes(
         INVALID_ITEMS: 'The return contains invalid inventory data.',
         PRODUCT_NOT_FOUND: 'A returned product no longer exists.',
         INVALID_STOCK: 'The returned inventory quantity is inconsistent.',
+        PRODUCT_SELLER_MISMATCH: 'A returned product does not belong to the Store seller.',
         PRODUCT_TENANT_MISMATCH: 'A returned product does not belong to this Store business.',
         PRODUCT_BRANCH_MISMATCH: 'A returned product does not belong to this Store branch.',
       };
