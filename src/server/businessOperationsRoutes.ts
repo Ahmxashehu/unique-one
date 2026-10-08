@@ -98,9 +98,11 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
           await db.collection('audit_logs').add({ action: 'business_branch_updated', actorUid: uid, businessId, branchId: ref.id, createdAt: Timestamp.now() });
           return res.json({ ok: true, branchId: ref.id });
         }
-        await ref.delete();
-        await db.collection('audit_logs').add({ action: 'business_branch_deleted', actorUid: uid, businessId, branchId: ref.id, createdAt: Timestamp.now() });
-        return res.json({ ok: true, branchId: ref.id });
+        // Branches are referenced by products, inventory and staff assignments.
+        // Never hard-delete a branch and leave dangling references behind.
+        await ref.update({ status: 'inactive', updatedAt: Timestamp.now() });
+        await db.collection('audit_logs').add({ action: 'business_branch_deactivated', actorUid: uid, businessId, branchId: ref.id, createdAt: Timestamp.now() });
+        return res.json({ ok: true, branchId: ref.id, status: 'inactive' });
       } catch (e) { console.error('Business branch mutation failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to update the branch.', 503); }
     });
   }
