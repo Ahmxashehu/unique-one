@@ -186,6 +186,19 @@ for (const productDoc of productsSnap.docs) {
   }
 }
 
+const migrationCandidates = [];
+for (const productDoc of productsSnap.docs) {
+  const product = productDoc.data() || {};
+  const movements = movementsByProduct.get(productDoc.id) || [];
+  if (movements.length === 0) {
+    const quantity = Number(product.quantity ?? 0);
+    const quarantineQuantity = Number(product.quarantineQuantity ?? 0);
+    if (Number.isSafeInteger(quantity) && quantity >= 0 && Number.isSafeInteger(quarantineQuantity) && quarantineQuantity >= 0) {
+      migrationCandidates.push({ productId: productDoc.id, quantity, quarantineQuantity, businessId: product.businessId || null, branchId: product.branchId || null });
+    }
+  }
+}
+
 console.log(JSON.stringify({
   ok: errors.length === 0,
   scannedProducts: productsSnap.size,
@@ -195,6 +208,7 @@ console.log(JSON.stringify({
   legacyProducts,
   orphanMovements,
   errors,
+  migrationCandidates,
 }, null, 2));
 
 if (errors.length > 0) process.exitCode = 1;
