@@ -57,6 +57,8 @@ export function registerStoreReturnInspectionRoutes(
           ? order.returnRequest as Record<string, unknown>
           : null;
         if (!rr || rr.status !== 'received' || rr.restocked !== false || rr.quarantined !== true) throw new Error('INVALID_STATE');
+        const expiresAt = typeof rr.expiresAt === 'string' ? Date.parse(rr.expiresAt) : NaN;
+        if (!Number.isFinite(expiresAt) || Date.now() > expiresAt) throw new Error('RETURN_EXPIRED');
         if (rr.inventoryDisposition && rr.inventoryDisposition !== 'quarantined') {
           if (rr.inventoryDisposition === disposition) {
             return { orderId, disposition, replayed: true };
@@ -182,6 +184,7 @@ export function registerStoreReturnInspectionRoutes(
         FORBIDDEN: 'You are not permitted to inspect this return.',
         NOT_FOUND: 'The Store order was not found.',
         INVALID_STATE: 'This return is not ready for inventory inspection.',
+        RETURN_EXPIRED: 'This Store return request has expired and can no longer be inspected.',
         ALREADY_INSPECTED: 'This return has already been inspected.',
         INVALID_ITEMS: 'The return contains invalid inventory data.',
         PRODUCT_NOT_FOUND: 'A returned product no longer exists.',
