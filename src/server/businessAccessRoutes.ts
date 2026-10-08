@@ -35,7 +35,7 @@ async function getMemberships(db: Firestore, uid: string) {
     .limit(20)
     .get();
 
-  const existing = new Map<string, { businessId: string; role: string; businessName: string; status: string }>();
+  const existing = new Map<string, { businessId: string; role: string; businessName: string; status: string; branchId?: string }>();
   for (const doc of membershipSnapshot.docs) {
     const data = doc.data();
     const businessId = String(data.businessId || '');
@@ -47,6 +47,7 @@ async function getMemberships(db: Firestore, uid: string) {
       role: String(data.role || 'staff_member'),
       businessName: String(business.name || data.businessName || 'Unique Business'),
       status: String(data.status || 'active'),
+      ...(typeof data.branchId === 'string' && data.branchId.trim() ? { branchId: data.branchId.trim() } : {}),
     });
   }
 
