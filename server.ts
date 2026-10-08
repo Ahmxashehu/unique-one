@@ -3864,12 +3864,13 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const product = snap.data() as Record<string, unknown>;
           const currentQuantity = Number(product.quantity);
           const restoreQuantity = quantities.get(Array.from(quantities.keys())[index]) || 0;
-          if (!Number.isSafeInteger(currentQuantity) || currentQuantity < 0 || !Number.isSafeInteger(restoreQuantity)) {
+          const restoredQuantity = currentQuantity + restoreQuantity;
+          if (!Number.isSafeInteger(currentQuantity) || currentQuantity < 0 || !Number.isSafeInteger(restoreQuantity) || restoreQuantity <= 0 || !Number.isSafeInteger(restoredQuantity)) {
             throw new RequestValidationError('INVALID_REQUEST', 'Inventory data is invalid; cancellation was not applied.');
           }
           transaction.update(snap.ref, {
-            quantity: currentQuantity + restoreQuantity,
-            status: product.status,
+            quantity: restoredQuantity,
+            status: product.status === 'out_of_stock' ? 'published' : product.status,
             updatedAt: now,
           });
         });
