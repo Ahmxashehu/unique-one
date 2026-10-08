@@ -3283,6 +3283,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           customerName, customerPhone, deliveryAddress, date, time, seating, notes, items,
           subtotalMinor: subtotal, deliveryFeeMinor: deliveryFee, serviceFeeMinor: serviceFee, totalMinor: total,
           currency: 'NGN', paymentStatus: 'pending', status: 'pending_payment',
+          // Restaurant totals currently originate from client checkout data; never permit this unverified amount to fund a wallet payment.
+          pricingStatus: 'client_unverified',
           createdAt: now, updatedAt: now,
           orderTimeline: [{ status: 'pending_payment', at: now }],
         };
@@ -3318,6 +3320,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (!preflightOrder.exists) return errorResponse(res, 'NOT_FOUND', 'Restaurant order could not be found.');
       const preflightData = preflightOrder.data() as Record<string, any>;
       if (preflightData.customerId !== uid || preflightData.currency !== 'NGN' || preflightData.paymentMethod !== 'uniquepay' || preflightData.status !== 'pending_payment') return errorResponse(res, 'INVALID_REQUEST', 'This restaurant order is not available for UniquePay payment.');
+      if (preflightData.pricingStatus !== 'server_verified') return errorResponse(res, 'UNAVAILABLE', 'Restaurant UniquePay payment is temporarily unavailable until the order total is verified by the restaurant catalog.');
       const preflightAmountMinor = Number(preflightData.totalMinor);
       if (!Number.isSafeInteger(preflightAmountMinor) || preflightAmountMinor <= 0) return errorResponse(res, 'INVALID_AMOUNT', 'The restaurant payment amount is invalid.');
       const preflightPolicy = getTransactionAuthPolicy({ amountMinor: preflightAmountMinor, transactionType: 'merchant_payment' });
@@ -3379,6 +3382,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const order = orderSnap.data() as Record<string, any>;
         if (order.customerId !== uid) throw new RequestValidationError('FORBIDDEN', 'You can only pay for your own restaurant order.');
         if (order.currency !== 'NGN' || order.paymentMethod !== 'uniquepay') throw new RequestValidationError('INVALID_REQUEST', 'This order is not configured for UniquePay.');
+        if (order.pricingStatus !== 'server_verified') throw new RequestValidationError('UNAVAILABLE', 'Restaurant UniquePay payment is temporarily unavailable until the order total is verified by the restaurant catalog.');
         if (order.paymentStatus === 'paid') return { orderId, paymentStatus: 'paid', status: order.status, replayed: true };
         if (order.status !== 'pending_payment') throw new RequestValidationError('INVALID_REQUEST', 'This restaurant order is no longer awaiting payment.');
         const amountMinor = Number(order.totalMinor);
