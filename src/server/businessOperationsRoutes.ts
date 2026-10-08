@@ -147,9 +147,25 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
         }
         // Branches are referenced by products, inventory and staff assignments.
         // Never hard-delete a branch and leave dangling references behind.
-        await ref.update({ status: 'inactive', updatedAt: Timestamp.now() });
-        await db.collection('audit_logs').add({ action: 'business_branch_deactivated', actorUid: uid, businessId, branchId: ref.id, createdAt: Timestamp.now() });
-        return res.json({ ok: true, branchId: ref.id, status: 'inactive' });
+        const now = Timestamp.now();
+        await db.runTransaction(async (transaction) => {
+          const membershipQuery = db.collection('businessMemberships')
+            .where('businessId', '==', businessId)
+            .where('branchId', '==', ref.id)
+            .where('status', '==', 'active')
+            .limit(200);
+          const memberships = await transaction.get(membershipQuery);
+          transaction.update(ref, { status: 'inactive', updatedAt: now });
+          for (const membership of memberships.docs) {
+            transaction.update(membership.ref, {
+              status: 'inactive',
+              inactiveReason: 'branch_deactivated',
+              updatedAt: now,
+            });
+          }
+        });
+        await db.collection('audit_logs').add({ action: 'business_branch_deactivated', actorUid: uid, businessId, branchId: ref.id, createdAt: now });
+        return res.json({ ok: true, branchId: ref.id, status: 'inactive', suspendedMemberships: true });
       } catch (e) { console.error('Business branch mutation failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to update the branch.', 503); }
     });
   }
