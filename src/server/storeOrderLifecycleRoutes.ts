@@ -58,8 +58,12 @@ export function registerStoreOrderLifecycleRoutes(
         const businessMembership = (req as any).businessMembership as Record<string, unknown> | undefined;
         const activeBusinessId = typeof businessMembership?.businessId === 'string' ? businessMembership.businessId : '';
         const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
+        const orderBranchId = typeof order.branchId === 'string' ? order.branchId : '';
+        const memberBranchId = typeof businessMembership?.branchId === 'string' ? businessMembership.branchId : '';
+        const ownerRole = String(businessMembership?.role || '') === 'business_owner';
+        const branchScopedAccess = ownerRole || (!memberBranchId ? false : memberBranchId === orderBranchId);
         const hasBusinessContext = Boolean(activeBusinessId);
-        const privilegedBusinessAccess = hasBusinessContext && orderBusinessId === activeBusinessId;
+        const privilegedBusinessAccess = hasBusinessContext && orderBusinessId === activeBusinessId && branchScopedAccess;
         if (!isSeller && (!hasRolePermission(roles, permissions, 'manage:orders') || !privilegedBusinessAccess)) {
           throw new Error('FORBIDDEN');
         }

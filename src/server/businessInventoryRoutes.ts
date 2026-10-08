@@ -46,7 +46,9 @@ export function registerBusinessInventoryRoutes(
         if (String(product.businessId || '') !== businessId) throw new Error('PRODUCT_BUSINESS_MISMATCH');
 
         // Branch-scoped members may only operate within their assigned branch.
-        if (membershipBranchId && requestedBranchId !== membershipBranchId) throw new Error('BRANCH_FORBIDDEN');
+        const isOwner = String(membership.role || '') === 'business_owner';
+        if (!isOwner && (!membershipBranchId || requestedBranchId !== membershipBranchId)) throw new Error('BRANCH_FORBIDDEN');
+        if (!requestedBranchId && !isOwner) throw new Error('BRANCH_REQUIRED');
         if (requestedBranchId) {
           const branchRef = db.collection('branches').doc(requestedBranchId);
           const branchSnap = await transaction.get(branchRef);
@@ -94,6 +96,7 @@ export function registerBusinessInventoryRoutes(
       if (code === 'PRODUCT_BUSINESS_MISMATCH') return fail(res, 'FORBIDDEN', 'This product does not belong to the active business.', 403);
       if (code === 'BRANCH_FORBIDDEN') return fail(res, 'FORBIDDEN', 'You are not authorized to operate in this branch.', 403);
       if (code === 'BRANCH_NOT_FOUND') return fail(res, 'NOT_FOUND', 'The selected branch was not found.', 404);
+      if (code === 'BRANCH_REQUIRED') return fail(res, 'INVALID_REQUEST', 'A branch is required for this inventory operation.');
       if (code === 'PRODUCT_NOT_PUBLISHED') return fail(res, 'INVALID_REQUEST', 'Only published products can be adjusted.');
       if (code === 'INVALID_STOCK') return fail(res, 'INVALID_REQUEST', 'The product has an invalid inventory quantity.');
       if (code === 'INSUFFICIENT_STOCK') return fail(res, 'INVALID_REQUEST', 'There is not enough stock for this adjustment.');
