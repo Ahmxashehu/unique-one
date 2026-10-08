@@ -778,7 +778,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const allowedRefund = originalModule === 'unique_store.checkout'
           ? new Set(['unique_store.refund', 'unique_store.dispute', 'unique_pay.financial_refund'])
           : originalModule === 'unique_restaurant.checkout'
-            ? new Set(['unique_pay.financial_refund'])
+            ? new Set(['unique_restaurant.refund', 'unique_pay.financial_refund'])
             : new Set(['unique_pay.financial_refund', 'unique_store.refund', 'unique_store.dispute']);
         for (const [refundId, refund] of txById) {
           if (String(refund.type || '') === 'refund' && String(refund.reversalOfTransactionId || '') === id && !allowedRefund.has(String(refund.sourceModule || ''))) {
