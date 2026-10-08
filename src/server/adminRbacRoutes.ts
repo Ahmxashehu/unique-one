@@ -95,8 +95,27 @@ export function registerAdminRbacRoutes(
       const now = Timestamp.now();
       const auditRef = db.collection('audit_logs').doc();
       await db.runTransaction(async (transaction) => {
+        const actorSnapshot = await transaction.get(db.collection('users').doc(actorUid));
         const targetSnapshot = await transaction.get(ref);
+        if (!actorSnapshot.exists) throw new Error('ACTOR_NOT_FOUND');
         if (!targetSnapshot.exists) throw new Error('TARGET_NOT_FOUND');
+
+        // Re-evaluate the actor's authority inside the same transaction that writes RBAC,
+        // preventing a concurrent role downgrade from leaving a stale authorization decision.
+        const liveActorRoles = Array.isArray(actorSnapshot.data()?.roles)
+          ? actorSnapshot.data()?.roles.filter(isRole)
+          : [];
+        const liveActorIsSuperAdmin = liveActorRoles.includes('super_admin');
+        if (!liveActorIsSuperAdmin && roles.some((role) => RESTRICTED_ROLES.has(role))) {
+          throw new Error('RESTRICTED_ROLE_FORBIDDEN');
+        }
+        if (!liveActorIsSuperAdmin && permissions.some((permission) => ['manage:roles','manage:permissions'].includes(permission))) {
+          throw new Error('RBAC_PERMISSION_FORBIDDEN');
+        }
+        if (targetUid === actorUid && liveActorIsSuperAdmin && !roles.includes('super_admin')) {
+          throw new Error('SELF_SUPER_ADMIN_REMOVAL');
+        }
+
         transaction.update(ref, { roles, permissions, rbacUpdatedAt: now, rbacUpdatedBy: actorUid });
         transaction.set(auditRef, {
           uid: actorUid,
@@ -111,6 +130,18 @@ export function registerAdminRbacRoutes(
     } catch (error) {
       if (error instanceof Error && error.message === 'TARGET_NOT_FOUND') {
         return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User was not found.' } });
+      }
+      if (error instanceof Error && error.message === 'ACTOR_NOT_FOUND') {
+        return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'The acting administrator is no longer authorized.' } });
+      }
+      if (error instanceof Error && error.message === 'RESTRICTED_ROLE_FORBIDDEN') {
+        return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can assign restricted platform roles.' } });
+      }
+      if (error instanceof Error && error.message === 'RBAC_PERMISSION_FORBIDDEN') {
+        return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can grant RBAC-management permissions.' } });
+      }
+      if (error instanceof Error && error.message === 'SELF_SUPER_ADMIN_REMOVAL') {
+        return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'A Super Admin cannot remove their own Super Admin role.' } });
       }
       console.error('RBAC update failed:', error);
       return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'The role update could not be saved.' } });
