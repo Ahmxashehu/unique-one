@@ -3655,6 +3655,29 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     if (!process.env.RESTAURANT_REFUND_CRON_TOKEN || token !== process.env.RESTAURANT_REFUND_CRON_TOKEN) return errorResponse(res, 'FORBIDDEN', 'Forbidden.');
     try {
       const results: any[] = [];
+      // Recover legacy paid/cancelled orders created before durable refund obligations existed.
+      // Query only by status to avoid requiring a new composite Firestore index; paymentStatus is revalidated below.
+      const legacyCancelledSnap = await adminDb.collection('restaurantOrders').where('status', '==', 'cancelled').limit(100).get();
+      for (const orderDoc of legacyCancelledSnap.docs) {
+        const order = orderDoc.data() as Record<string, any>;
+        if (String(order.paymentStatus || '') !== 'paid' || String(order.refundStatus || '') === 'completed') continue;
+        const customerUid = String(order.customerId || '');
+        if (!isSafeId(orderDoc.id) || !isSafeId(customerUid)) continue;
+        try {
+          await adminDb.runTransaction(async (transaction) => {
+            const orderRef = adminDb.collection('restaurantOrders').doc(orderDoc.id);
+            const freshOrderSnap = await transaction.get(orderRef);
+            if (!freshOrderSnap.exists) return;
+            const freshOrder = freshOrderSnap.data() as Record<string, any>;
+            if (String(freshOrder.status || '') !== 'cancelled' || String(freshOrder.paymentStatus || '') !== 'paid') return;
+            await createRestaurantRefundObligation(transaction, orderDoc.id, freshOrder, customerUid, Timestamp.now());
+            transaction.update(orderRef, { refundStatus: 'required', updatedAt: Timestamp.now() });
+          });
+          results.push({ orderId: orderDoc.id, status: 'obligation_created' });
+        } catch (error) {
+          results.push({ orderId: orderDoc.id, status: 'obligation_failed', error: 'RECOVERY_FAILED' });
+        }
+      }
       const obligationQueries = [
         adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).where('status', '==', 'required').limit(50).get(),
         adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).where('status', '==', 'retryable').limit(50).get(),
