@@ -19,19 +19,6 @@ type MenuItem = { id: string; restaurantId: string; businessId: string; branchId
   description: string;
 };
 
-const restaurants: Restaurant[] = [
-  { id: 'r1', name: 'Unique Grill House', cuisine: 'Nigerian • Grill', city: 'Abuja', area: 'Wuse 2', rating: 4.8, price: '₦₦', time: '15–25 min', tags: ['Popular', 'Family'], description: 'Grills, rice dishes and local favourites.' },
-  { id: 'r2', name: 'Savanna Kitchen', cuisine: 'Nigerian • Northern', city: 'Abuja', area: 'Maitama', rating: 4.7, price: '₦₦', time: '20–30 min', tags: ['Halal', 'Popular'], description: 'Northern-inspired meals and family dining.' },
-  { id: 'r3', name: 'Lagos Table', cuisine: 'Nigerian • Seafood', city: 'Lagos', area: 'Victoria Island', rating: 4.6, price: '₦₦₦', time: '25–35 min', tags: ['Seafood', 'Dinner'], description: 'Contemporary Nigerian plates and seafood.' },
-  { id: 'r4', name: 'Kano Heritage Kitchen', cuisine: 'Northern • Local', city: 'Kano', area: 'Nassarawa', rating: 4.5, price: '₦₦', time: '15–25 min', tags: ['Local', 'Family'], description: 'Traditional northern dishes in a relaxed setting.' },
-  { id: 'r5', name: 'Green Bowl', cuisine: 'Healthy • Continental', city: 'Abuja', area: 'Garki', rating: 4.6, price: '₦₦', time: '15–25 min', tags: ['Healthy', 'Vegetarian'], description: 'Fresh bowls, salads and lighter meals.' },
-  { id: 'r6', name: 'City Pizza & Pasta', cuisine: 'Italian • Pizza', city: 'Abuja', area: 'Jabi', rating: 4.4, price: '₦₦', time: '20–30 min', tags: ['Pizza', 'Family'], description: 'Pizza, pasta and casual family dining.' },
-  { id: 'r7', name: 'Naija Bites', cuisine: 'Fast Food • Nigerian', city: 'Lagos', area: 'Ikeja', rating: 4.5, price: '₦', time: '10–20 min', tags: ['Quick', 'Budget'], description: 'Quick Nigerian meals and snacks.' },
-  { id: 'r8', name: 'Abuja Continental', cuisine: 'Continental • Grill', city: 'Abuja', area: 'Asokoro', rating: 4.7, price: '₦₦₦', time: '25–40 min', tags: ['Business', 'Dinner'], description: 'Continental dining for business and special occasions.' },
-  { id: 'r9', name: 'Spice Route', cuisine: 'Indian • Asian', city: 'Abuja', area: 'Central Area', rating: 4.5, price: '₦₦₦', time: '25–35 min', tags: ['Spicy', 'Dinner'], description: 'Indian and Asian-inspired dishes.' },
-  { id: 'r10', name: 'Garden Breakfast Club', cuisine: 'Breakfast • Café', city: 'Abuja', area: 'Wuse', rating: 4.4, price: '₦₦', time: '10–20 min', tags: ['Breakfast', 'Café'], description: 'Breakfast, coffee and light meals.' },
-];
-
 const cuisineFilters = ['All', 'Nigerian', 'Grill', 'Fast Food', 'Healthy', 'Pizza', 'Continental', 'Asian'];
 const KEY = 'uniqueplatform:guest-restaurant-draft';
 
@@ -69,6 +56,9 @@ export default function RestaurantPage() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [restaurantLoading, setRestaurantLoading] = useState(true);
+  const [restaurantError, setRestaurantError] = useState('');
   const [query, setQuery] = useState('');
   const [city, setCity] = useState('Abuja');
   const [cuisine, setCuisine] = useState('All');
@@ -88,6 +78,22 @@ export default function RestaurantPage() {
   const [orderError, setOrderError] = useState('');
   const [transactionPin, setTransactionPin] = useState('');
   const [customerPhone, setCustomerPhone] = useState(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').customerPhone || ''; } catch { return ''; } });
+
+  useEffect(() => {
+    let cancelled = false;
+    setRestaurantLoading(true);
+    fetch('/api/restaurants')
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data?.error?.message || 'Restaurants are temporarily unavailable.');
+        if (!cancelled) setRestaurants(Array.isArray(data?.restaurants) ? data.restaurants : []);
+      })
+      .catch((error) => {
+        if (!cancelled) { setRestaurants([]); setRestaurantError(error instanceof Error ? error.message : 'Restaurants are temporarily unavailable.'); }
+      })
+      .finally(() => { if (!cancelled) setRestaurantLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const saveDraft = (next: Draft) => { setDraft(next); try { sessionStorage.setItem(KEY, JSON.stringify(next)); } catch {} };
   const persistCheckout = (nextCart = cart, nextName = customerName, nextPhone = customerPhone) => { try { sessionStorage.setItem(KEY, JSON.stringify({ ...draft, cart: nextCart, customerName: nextName, customerPhone: nextPhone })); } catch {} };
