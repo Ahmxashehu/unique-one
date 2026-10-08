@@ -10,7 +10,13 @@ const db = getFirestore();
 const args = process.argv.slice(2);
 const apply = args.includes('--apply');
 const approvals = args.filter((arg) => arg.startsWith('--approve=')).map((arg) => arg.slice(10));
+const operatorUid = process.env.LEGACY_INVENTORY_OPERATOR_UID || '';
+const approvalRef = process.env.LEGACY_INVENTORY_APPROVAL_REF || '';
 
+if (apply && (!operatorUid || !approvalRef)) {
+  console.error('Refusing --apply without LEGACY_INVENTORY_OPERATOR_UID and LEGACY_INVENTORY_APPROVAL_REF.');
+  process.exit(2);
+}
 if (apply && approvals.length === 0) {
   console.error('Refusing --apply without explicit --approve=productId:quantity:quarantineQuantity entries.');
   process.exit(2);
@@ -72,6 +78,12 @@ for (const [productId, approval] of approved) {
     const product = productSnap.data() || {};
     if ((movementByProduct.get(productId) || []).length > 0) throw new Error('PRODUCT_ALREADY_HAS_LEDGER');
 
+    const operatorSnap = await transaction.get(db.collection('users').doc(operatorUid));
+    const roles = Array.isArray(operatorSnap.data()?.roles) ? operatorSnap.data().roles : [];
+    if (!operatorSnap.exists || !roles.some((role) => ['administrator', 'platform_admin', 'super_admin'].includes(String(role)))) {
+      throw new Error('LEGACY_MIGRATION_OPERATOR_UNAUTHORIZED');
+    }
+
     const currentQuantity = Number(product.quantity ?? 0);
     const currentQuarantine = Number(product.quarantineQuantity ?? 0);
     if (currentQuantity !== approval.quantity || currentQuarantine !== approval.quarantineQuantity) {
@@ -98,6 +110,19 @@ for (const [productId, approval] of approved) {
       sourceId,
       sourceModule: 'store.inventory.legacy_migration',
       actorUid: 'system:legacy-migration',
+      businessId: product.businessId || null,
+      branchId: product.branchId || null,
+      createdAt: now,
+      approvalRef,
+      approvedByUid: operatorUid,
+    });
+    transaction.create(db.collection('audit_logs').doc(), {
+      action: 'store_inventory_legacy_migration',
+      actorUid: operatorUid,
+      approvalRef,
+      productId,
+      quantity: approval.quantity,
+      quarantineQuantity: approval.quarantineQuantity,
       businessId: product.businessId || null,
       branchId: product.branchId || null,
       createdAt: now,
