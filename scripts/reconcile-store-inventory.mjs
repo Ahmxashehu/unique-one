@@ -45,6 +45,7 @@ for (const movementDoc of movementsSnap.docs) {
 
 let checkedProducts = 0;
 let reconciledProducts = 0;
+let legacyProducts = 0;
 
 for (const productDoc of productsSnap.docs) {
   const productId = productDoc.id;
@@ -60,6 +61,22 @@ for (const productDoc of productsSnap.docs) {
   }
 
   checkedProducts += 1;
+
+  // A zero-stock product may legitimately have no movement history. Any product
+  // carrying sellable or quarantined stock without a canonical movement ledger
+  // is legacy/unreconciled and must not be silently treated as healthy.
+  if (movements.length === 0) {
+    if (currentQuantity > 0 || currentQuarantine > 0) {
+      legacyProducts += 1;
+      errors.push({
+        type: 'legacy_inventory_without_ledger',
+        productId,
+        productQuantity: currentQuantity,
+        productQuarantineQuantity: currentQuarantine,
+      });
+    }
+    continue;
+  }
 
   movements.sort((a, b) => {
     const at = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
@@ -138,6 +155,7 @@ console.log(JSON.stringify({
   checkedProducts,
   productsWithLedger: movementsByProduct.size,
   reconciledProducts,
+  legacyProducts,
   errors,
 }, null, 2));
 
