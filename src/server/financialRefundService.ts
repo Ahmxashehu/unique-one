@@ -217,6 +217,20 @@ export async function executeFinancialRefund(
             status: product.status === 'out_of_stock' ? 'published' : product.status,
             updatedAt: now,
           });
+          recordStoreInventoryMovement(transaction, db, {
+            productId,
+            movementType: 'refund_release',
+            quantity,
+            previousQuantity: currentQuantity,
+            resultingQuantity: currentQuantity + quantity,
+            direction: 'in',
+            sourceId: input.originalTransactionId + ':early-refund',
+            sourceModule: 'unique_store.refund',
+            actorUid: input.actorUid,
+            orderId: input.relatedOrderId,
+            transactionId: input.originalTransactionId,
+            businessId: typeof product.businessId === 'string' ? product.businessId : null,
+          });
         }
       }
       if (input.finalizeDispute) {
