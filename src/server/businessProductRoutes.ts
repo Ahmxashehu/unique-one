@@ -159,6 +159,8 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
       console.error('Business product creation failed:', error);
       return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to create the product right now.', 503);
     }
+  });
+
   app.patch('/api/business/products/:productId', authenticate, limiter, async (req, res) => {
     const uid = String((req as any).user?.uid || '');
     const membership = ((req as any).businessMembership || {}) as Record<string, unknown>;
@@ -252,7 +254,5 @@ export function registerBusinessProductRoutes(app: Express, authenticate: Reques
       console.error('Business product update failed:', error);
       return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to update the product right now.', 503);
     }
-  });
-
   });
 }
