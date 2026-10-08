@@ -153,7 +153,7 @@ export function registerAdminRbacRoutes(
   registerBusinessDataRoutes(app, authenticate, db);
   registerBusinessInventoryRoutes(app, authenticate, db);
   registerBusinessProductRoutes(app, authenticate, db);
-  registerRestaurantRoutes(app, authenticate, db);
+  registerRestaurantRoutes(app, authenticate, db, requirePermission);
   registerBusinessOperationsRoutes(app, authenticate, db);
   registerStoreOrderLifecycleRoutes(app, authenticate, db);
   registerStoreReturnInspectionRoutes(app, authenticate, db);
