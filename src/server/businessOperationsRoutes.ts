@@ -64,6 +64,53 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
     } catch (e) { console.error('Business staff invite failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to create the staff invitation.', 503); }
   });
 
+  app.post('/api/business/staff/:staffUid/deactivate', async (req, res) => {
+    if (!can(req, 'manage:business_staff')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage business staff.', 403);
+    const { uid, businessId } = ctx(req);
+    const targetUid = String(req.params.staffUid || '').trim();
+    if (!uid || !businessId || !targetUid || targetUid === uid) return fail(res, 'INVALID_REQUEST', 'A valid staff account other than the Business owner is required.');
+    try {
+      const businessSnap = await db.collection('businesses').doc(businessId).get();
+      const business = businessSnap.exists ? businessSnap.data() || {} : {};
+      if (!businessSnap.exists || String(business.ownerUid || '') !== uid || String(business.status || '') !== 'verified') {
+        return fail(res, 'FORBIDDEN', 'Only the verified Business owner can deactivate staff access.', 403);
+      }
+      const membershipRef = db.collection('businessMemberships').doc(`${targetUid}__${businessId}`);
+      const now = Timestamp.now();
+      let changed = false;
+      await db.runTransaction(async (transaction) => {
+        const membershipSnap = await transaction.get(membershipRef);
+        if (!membershipSnap.exists || String(membershipSnap.data()?.status || '') !== 'active') return;
+        const membership = membershipSnap.data() || {};
+        if (String(membership.role || '') === 'business_owner') throw new Error('OWNER_MEMBERSHIP_PROTECTED');
+        transaction.update(membershipRef, { status: 'inactive', inactiveReason: 'staff_deactivated', deactivatedBy: uid, updatedAt: now });
+        const sessions = await transaction.get(
+          db.collection('businessAccessSessions')
+            .where('uid', '==', targetUid)
+            .where('businessId', '==', businessId)
+            .where('status', '==', 'active')
+            .limit(50)
+        );
+        for (const session of sessions.docs) {
+          transaction.update(session.ref, { status: 'revoked', revokedAt: now, revokedBy: uid });
+        }
+        changed = true;
+      });
+      await db.collection('audit_logs').add({
+        action: 'business_staff_deactivated',
+        actorUid: uid,
+        targetUid,
+        businessId,
+        createdAt: now,
+      });
+      return res.json({ ok: true, changed });
+    } catch (error: any) {
+      if (String(error?.message || '') === 'OWNER_MEMBERSHIP_PROTECTED') return fail(res, 'FORBIDDEN', 'The Business owner membership cannot be deactivated.', 403);
+      console.error('Business staff deactivation failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to deactivate Business staff access.', 503);
+    }
+  });
+
   app.get('/api/business/branches', async (req, res) => {
     if (!can(req, 'manage:business_staff') && !can(req, 'create:products') && !can(req, 'edit:products') && !can(req, 'manage:inventory')) return fail(res, 'FORBIDDEN', 'You do not have permission to view branches.', 403);
     const { businessId } = ctx(req);
