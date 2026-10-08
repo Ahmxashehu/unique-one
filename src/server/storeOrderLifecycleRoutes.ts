@@ -59,8 +59,12 @@ export function registerStoreOrderLifecycleRoutes(
         const activeBusinessId = typeof businessMembership?.businessId === 'string' ? businessMembership.businessId : '';
         const orderBusinessId = typeof order.businessId === 'string' ? order.businessId : '';
         const hasBusinessContext = Boolean(activeBusinessId);
-        const privilegedBusinessAccess = hasBusinessContext && orderBusinessId === activeBusinessId;
-        if (!isSeller && (!hasRolePermission(roles, permissions, 'manage:orders') || !privilegedBusinessAccess)) {
+        const assignedBranchId = typeof businessMembership?.branchId === 'string' ? businessMembership.branchId.trim() : '';
+        const orderBranchId = typeof order.branchId === 'string' ? order.branchId.trim() : '';
+        const branchAccess = !assignedBranchId || orderBranchId === assignedBranchId;
+        const privilegedBusinessAccess = hasBusinessContext && orderBusinessId === activeBusinessId && branchAccess;
+        const sellerBusinessAccess = isSeller && (!orderBusinessId || (hasBusinessContext && orderBusinessId === activeBusinessId && branchAccess));
+        if (!sellerBusinessAccess && (!hasRolePermission(roles, permissions, 'manage:orders') || !privilegedBusinessAccess)) {
           throw new Error('FORBIDDEN');
         }
 
