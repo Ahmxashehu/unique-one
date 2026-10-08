@@ -193,7 +193,7 @@ service cloud.firestore {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated()
         && request.resource.data.keys().hasOnly([
-          'id','sellerId','businessId','name','description','category','images','hasVideo',
+          'id','sellerId','businessId','branchId','name','description','category','images','hasVideo',
           'price','currency','discount','condition','quantity','minOrderQuantity',
           'wholesalePrice','bulkPrice','variants','location','deliveryOptions',
           'pickupOptions','status','createdAt','updatedAt'
@@ -208,6 +208,12 @@ service cloud.firestore {
               || (
                 exists(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId))
                 && get(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId)).data.status == 'active'
+                && ('branchId' in request.resource.data)
+                && request.resource.data.branchId is string
+                && request.resource.data.branchId == get(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId)).data.branchId
+                && exists(/databases/$(database)/documents/branches/$(request.resource.data.branchId))
+                && get(/databases/$(database)/documents/branches/$(request.resource.data.branchId)).data.businessId == request.resource.data.businessId
+                && get(/databases/$(database)/documents/branches/$(request.resource.data.branchId)).data.status == 'active'
               )
             )
           ))
@@ -232,12 +238,18 @@ service cloud.firestore {
               || (
                 exists(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId))
                 && get(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId)).data.status == 'active'
+                && ('branchId' in request.resource.data)
+                && request.resource.data.branchId is string
+                && request.resource.data.branchId == get(/databases/$(database)/documents/businessMemberships/$(request.auth.uid + '__' + request.resource.data.businessId)).data.branchId
+                && exists(/databases/$(database)/documents/branches/$(request.resource.data.branchId))
+                && get(/databases/$(database)/documents/branches/$(request.resource.data.branchId)).data.businessId == request.resource.data.businessId
+                && get(/databases/$(database)/documents/branches/$(request.resource.data.branchId)).data.status == 'active'
               )
             )
           )
         )
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'businessId','name','description','category','images','hasVideo','price','currency',
+          'businessId','branchId','name','description','category','images','hasVideo','price','currency',
           'discount','condition','minOrderQuantity','wholesalePrice','bulkPrice',
           'variants','location','deliveryOptions','pickupOptions','status','updatedAt'
         ])
