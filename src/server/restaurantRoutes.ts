@@ -50,4 +50,76 @@ export function registerRestaurantRoutes(app: Express, authenticate: RequestHand
       return fail(res, 'SERVICE_UNAVAILABLE', 'Restaurant onboarding is temporarily unavailable.', 503);
     }
   });
+  app.patch('/api/business/restaurants/:restaurantId', authenticate, limiter, async (req, res) => {
+    const uid = clean((req as any).user?.uid, 128);
+    const membership = ((req as any).businessMembership || {}) as Record<string, unknown>;
+    const session = ((req as any).businessSession || {}) as Record<string, unknown>;
+    const businessId = clean(session.businessId, 128);
+    const restaurantId = clean(req.params.restaurantId, 128);
+    const role = clean(membership.role, 64) as Role;
+    const customPermissions = Array.isArray(membership.permissions)
+      ? membership.permissions.filter((v): v is Permission => typeof v === 'string') as Permission[] : [];
+    if (!uid || !businessId || clean(membership.businessId, 128) !== businessId) {
+      return fail(res, 'BUSINESS_AUTH_REQUIRED', 'An active Business Platform session is required.', 401);
+    }
+    if (!hasRolePermission([role], customPermissions, 'manage:restaurant')) {
+      return fail(res, 'FORBIDDEN', 'Your Business role does not allow Restaurant management.', 403);
+    }
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const allowed = ['name', 'description'];
+    for (const key of Object.keys(body)) {
+      if (!allowed.includes(key)) return fail(res, 'INVALID_REQUEST', 'Only draft Restaurant profile fields can be changed.');
+    }
+    const updates: Record<string, string> = {};
+    if ('name' in body) updates.name = clean(body.name, 200);
+    if ('description' in body) updates.description = clean(body.description, 2000);
+    if (!updates.name && !updates.description) return fail(res, 'INVALID_REQUEST', 'No valid Restaurant changes were supplied.');
+
+    const restaurantRef = db.collection('restaurants').doc(restaurantId);
+    const businessRef = db.collection('businesses').doc(businessId);
+    const now = Timestamp.now();
+    try {
+      await db.runTransaction(async (transaction) => {
+        const [restaurantSnap, businessSnap] = await Promise.all([
+          transaction.get(restaurantRef), transaction.get(businessRef),
+        ]);
+        if (!restaurantSnap.exists || !businessSnap.exists) throw Object.assign(new Error('NOT_FOUND'), { code: 'NOT_FOUND' });
+        const restaurant = restaurantSnap.data() || {};
+        const business = businessSnap.data() || {};
+        if (
+          String(restaurant.businessId || '') !== businessId ||
+          String(restaurant.ownerUid || '') !== uid ||
+          String(business.ownerUid || '') !== uid ||
+          String(business.status || '') !== 'active' ||
+          String(business.verificationStatus || '') !== 'verified'
+        ) throw Object.assign(new Error('FORBIDDEN'), { code: 'FORBIDDEN' });
+        const assignedBranchId = clean(membership.branchId, 128);
+        if (assignedBranchId && String(restaurant.branchId || '') !== assignedBranchId) {
+          throw Object.assign(new Error('BRANCH_FORBIDDEN'), { code: 'BRANCH_FORBIDDEN' });
+        }
+        if (String(restaurant.status || '') !== 'draft' || String(restaurant.verificationStatus || '') !== 'pending') {
+          throw Object.assign(new Error('LOCKED'), { code: 'LOCKED' });
+        }
+        transaction.update(restaurantRef, { ...updates, updatedAt: now });
+        transaction.create(db.collection('audit_logs').doc(), {
+          action: 'restaurant_updated',
+          actorUid: uid,
+          resource: 'restaurant',
+          resourceId: restaurantId,
+          businessId,
+          branchId: String(restaurant.branchId || ''),
+          details: { changedFields: Object.keys(updates) },
+          timestamp: now,
+        });
+      });
+      return res.json({ ok: true, restaurantId, updatedFields: Object.keys(updates) });
+    } catch (error: any) {
+      if (error?.code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'Restaurant not found.', 404);
+      if (error?.code === 'FORBIDDEN') return fail(res, 'FORBIDDEN', 'You are not authorized to modify this Restaurant.', 403);
+      if (error?.code === 'BRANCH_FORBIDDEN') return fail(res, 'FORBIDDEN', 'You cannot modify a Restaurant assigned to another branch.', 403);
+      if (error?.code === 'LOCKED') return fail(res, 'CONFLICT', 'This Restaurant profile is locked after submission.', 409);
+      console.error('Restaurant update failed:', error);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'Restaurant profile update is temporarily unavailable.', 503);
+    }
+  });
 }
