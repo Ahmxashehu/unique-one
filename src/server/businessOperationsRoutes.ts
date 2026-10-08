@@ -188,7 +188,7 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
         if (!snap.exists || !inTenant(branch, businessId)) return fail(res, 'NOT_FOUND', 'Branch not found.', 404);
         const businessSnap = await db.collection('businesses').doc(businessId).get();
         const business = businessSnap.exists ? businessSnap.data() || {} : {};
-        if (!businessSnap.exists || String(business.ownerUid || '') !== String(branch.ownerUid || '') || String(business.status || '') !== 'verified') {
+        if (!businessSnap.exists || String(business.ownerUid || '') !== String(branch.ownerUid || '') || String(business.status || '') !== 'active' || String(business.verificationStatus || '') !== 'verified') {
           return fail(res, 'FORBIDDEN', 'This branch is not owned by the verified Business.', 403);
         }
         if (method === 'patch') {
