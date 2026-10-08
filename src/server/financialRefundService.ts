@@ -226,6 +226,19 @@ export async function executeFinancialRefund(
           const productSnap = await transaction.get(productRef);
           if (!productSnap.exists) return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'A Store product no longer exists; inventory reconciliation is required before refund.' } };
           const product = productSnap.data() ?? {};
+          const productBusinessId = typeof product.businessId === 'string' ? product.businessId.trim() : '';
+          const productBranchId = typeof product.branchId === 'string' ? product.branchId.trim() : '';
+          const orderBusinessId = typeof order.businessId === 'string' ? order.businessId.trim() : '';
+          const orderBranchId = typeof order.branchId === 'string' ? order.branchId.trim() : '';
+          if (orderBusinessId && productBusinessId !== orderBusinessId) {
+            return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'A Store product does not belong to the related order business.' } };
+          }
+          if (orderBranchId && productBranchId !== orderBranchId) {
+            return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'A Store product does not belong to the related order branch.' } };
+          }
+          if (product.sellerId !== sellerUid) {
+            return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'A Store product does not belong to the order seller.' } };
+          }
           const currentQuantity = Number(product.quantity);
           if (!Number.isSafeInteger(currentQuantity) || currentQuantity < 0 || !Number.isSafeInteger(currentQuantity + quantity)) {
             return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'Store inventory data is invalid; the refund was not applied.' } };
