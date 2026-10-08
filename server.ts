@@ -3446,6 +3446,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       };
       const orderRef = adminDb.collection('restaurantOrders').doc(orderId);
       const now = Timestamp.now();
+      let refundRequired = false;
       await adminDb.runTransaction(async (transaction) => {
         const orderSnap = await transaction.get(orderRef);
         if (!orderSnap.exists) throw new RequestValidationError('NOT_FOUND', 'Restaurant order not found.');
