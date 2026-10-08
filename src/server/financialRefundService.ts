@@ -182,8 +182,15 @@ export async function executeFinancialRefund(
       }
       if (input.finalizeOrder === 'partial') {
         const rr = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest as Record<string, unknown> : null;
-        if (!rr || rr.status !== 'received' || Number(rr.requestedRefundAmountMinor) !== input.amountMinor) {
-          return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The partial Store return is not ready for this refund.' } };
+        const disposition = rr?.inventoryDisposition;
+        if (
+          !rr ||
+          rr.status !== 'received' ||
+          Number(rr.requestedRefundAmountMinor) !== input.amountMinor ||
+          !['resalable', 'damaged', 'non_resalable'].includes(String(disposition)) ||
+          rr.quarantined !== false
+        ) {
+          return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The partial Store return must complete inventory inspection before the refund.' } };
         }
       }
       if (input.finalizeOrder === 'full' && originalAmount !== Number(order.amountMinor)) {
