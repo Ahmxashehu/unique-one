@@ -41,6 +41,16 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
     const allowedRoles = new Set(['admin','manager','sales','cashier','accountant','inventory','support','delivery','branch_manager','viewer']);
     if (!uid || !businessId || !email || !allowedRoles.has(role)) return fail(res, 'INVALID_REQUEST', 'Valid invitation details are required.');
     try {
+      const businessSnap = await db.collection('businesses').doc(businessId).get();
+      const business = businessSnap.exists ? businessSnap.data() || {} : {};
+      if (!businessSnap.exists || String(business.status || '') !== 'verified') {
+        return fail(res, 'FORBIDDEN', 'Only a verified Business can issue staff invitations.', 403);
+      }
+      const businessOwnerUid = String(business.ownerUid || '');
+      const privilegedInviteRoles = new Set(['admin', 'manager', 'branch_manager']);
+      if (privilegedInviteRoles.has(role) && businessOwnerUid !== uid) {
+        return fail(res, 'FORBIDDEN', 'Only the Business owner can invite privileged staff roles.', 403);
+      }
       let branchName: string | null = null;
       if (branchId) {
         const snap = await db.collection('branches').doc(branchId).get(), branch = snap.exists ? snap.data() || {} : {};
