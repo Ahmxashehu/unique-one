@@ -449,6 +449,14 @@ export async function executeFinancialRefund(
             refundTransactionId: refundRef.id,
           };
         }
+        if (rr) {
+          orderUpdate.returnRequest = {
+            ...rr,
+            status: 'refunded',
+            refundedAt: now,
+            refundTransactionId: refundRef.id,
+          };
+        }
         transaction.update(relatedOrderRef, orderUpdate);
       }
     }
