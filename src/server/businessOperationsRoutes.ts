@@ -202,6 +202,44 @@ export function registerBusinessOperationsRoutes(app: Express, _authenticate: Re
     } catch (e) { console.error('Store delivery confirmation request failed:', e); return fail(res, 'SERVICE_UNAVAILABLE', 'Unable to start delivery confirmation safely.', 503); }
   });
 
+  app.post('/api/business/orders/:orderId/delivery-confirmation/verify', async (req, res) => {
+    const { uid, businessId } = ctx(req);
+    const role = String((req.businessMembership || {}).role || '').trim();
+    if (role !== 'delivery' && !can(req, 'confirm:delivery')) return fail(res, 'FORBIDDEN', 'You do not have delivery confirmation authority.', 403);
+    const orderId = typeof req.params.orderId === 'string' ? req.params.orderId.trim() : '';
+    const challengeId = typeof req.body?.challengeId === 'string' ? req.body.challengeId.trim() : '';
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    if (!uid || !businessId || !/^[A-Za-z0-9_-]{1,128}$/.test(orderId) || !/^[A-Za-z0-9_-]{1,128}$/.test(challengeId) || !/^\d{6}$/.test(code)) return fail(res, 'INVALID_REQUEST', 'A valid challenge and 6-digit UniqueOTP are required.');
+    try {
+      const challengeRef = db.collection('storeDeliveryChallenges').doc(challengeId);
+      const orderRef = db.collection('orders').doc(orderId);
+      const [cs, os] = await Promise.all([challengeRef.get(), orderRef.get()]);
+      if (!cs.exists || !os.exists) return fail(res, 'NOT_FOUND', 'The delivery confirmation challenge or order was not found.', 404);
+      const c = cs.data() || {}, o = os.data() || {};
+      if (String(c.status || '') !== 'pending' || String(c.orderId || '') !== orderId || String(c.businessId || '') !== businessId || String(c.deliveryActorUid || '') !== uid) return fail(res, 'FORBIDDEN', 'This delivery confirmation challenge is not valid.', 403);
+      if (String(o.businessId || '') !== businessId || String(o.deliveryActorUid || '') !== uid || String(o.customerId || '') !== String(c.customerId || '') || String(o.status || '') !== 'out_for_delivery') return fail(res, 'FORBIDDEN', 'The delivery assignment or order state no longer matches this challenge.', 403);
+      const verified = await getUniqueOtpService('sms').verify({ destination: String(c.destination || ''), purpose: 'store_delivery_confirmation', channel: 'sms', code });
+      if (!verified) return fail(res, 'OTP_INVALID', 'The UniqueOTP is invalid, expired, or already used.', 403);
+      const now = Timestamp.now();
+      await db.runTransaction(async transaction => {
+        const [freshC, freshO] = await Promise.all([transaction.get(challengeRef), transaction.get(orderRef)]);
+        if (!freshC.exists || !freshO.exists) throw new Error('NOT_FOUND');
+        const fc = freshC.data() || {}, fo = freshO.data() || {};
+        if (String(fc.status || '') !== 'pending' || String(fc.deliveryActorUid || '') !== uid || String(fc.orderId || '') !== orderId) throw new Error('CHALLENGE_USED');
+        if (String(fo.businessId || '') !== businessId || String(fo.deliveryActorUid || '') !== uid || String(fo.customerId || '') !== String(fc.customerId || '') || String(fo.status || '') !== 'out_for_delivery') throw new Error('ORDER_CHANGED');
+        transaction.update(orderRef, { status: 'delivered', delivery: { actorUid: uid, businessId, branchId: String(fo.branchId || ''), assignedAt: fo.deliveryAssignedAt || null, confirmedAt: now, confirmationMethod: 'unique_otp', verificationId: challengeId }, deliveryConfirmedAt: now, deliveryConfirmedBy: uid, statusChangedAt: now, statusChangedBy: uid, updatedAt: now, orderTimeline: [...(Array.isArray(fo.orderTimeline) ? fo.orderTimeline.slice(-49) : []), { status: 'delivered', at: now, actorUid: uid, confirmationMethod: 'unique_otp', verificationId: challengeId }] });
+        transaction.update(challengeRef, { status: 'consumed', consumedAt: now, verificationId: challengeId });
+        transaction.create(db.collection('audit_logs').doc(), { action: 'store.order.delivery_confirmed', actorUid: uid, targetUid: String(fo.customerId || ''), resource: 'store_order', resourceId: orderId, orderId, businessId, branchId: String(fo.branchId || ''), verificationId: challengeId, confirmationMethod: 'unique_otp', createdAt: now });
+      });
+      return res.json({ ok: true, orderId, status: 'delivered', verificationId: challengeId });
+    } catch (e) {
+      const codeValue = e instanceof Error ? e.message : '';
+      if (codeValue === 'CHALLENGE_USED' || codeValue === 'ORDER_CHANGED') return fail(res, 'CONFLICT', 'The delivery confirmation is no longer valid for this order.', 409);
+      console.error('Store delivery confirmation failed:', e);
+      return fail(res, 'SERVICE_UNAVAILABLE', 'The Store delivery confirmation could not be completed safely.', 503);
+    }
+  });
+
   app.get('/api/business/branches', async (req, res) => {
     if (!can(req, 'manage:business_staff') && !can(req, 'create:products') && !can(req, 'edit:products') && !can(req, 'manage:inventory')) return fail(res, 'FORBIDDEN', 'You do not have permission to view branches.', 403);
     const { businessId } = ctx(req), membership = req.businessMembership || {};
