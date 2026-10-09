@@ -106,11 +106,10 @@ export default function SendMoneyPage() {
       } catch {
         // Storage may be disabled; the in-memory ref still protects retries in this page.
       }
-      const existingPending = pendingTransferRef.current?.fingerprint === transferFingerprint
-        ? pendingTransferRef.current
-        : persistedPending?.fingerprint === transferFingerprint
-          ? persistedPending
-          : null;
+      const existingPending = pendingTransferRef.current ?? persistedPending;
+      if (existingPending && existingPending.fingerprint !== transferFingerprint) {
+        throw new Error('A previous transfer still has an uncertain outcome. Restore its original recipient, amount and description, then retry it before starting another transfer.');
+      }
       if (existingPending) {
         pendingTransferRef.current = existingPending;
       } else {
