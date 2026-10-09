@@ -118,6 +118,7 @@ for (const forbidden of ["demo rice order", "featured providers"]) {
 
 assert(fs.existsSync(path.join(root, "dist/sw.js")), "production PWA service worker exists");
 assert(fs.existsSync(path.join(root, "dist/server.cjs")), "production server bundle exists");
-assert(paySmallSmallRoutes.includes("!Number.isSafeInteger(holdBalance) || holdBalance !== total"), "Pay Small Small seller settlement requires exact hold-ledger balance");
+assert(paySmallSmallRoutes.includes("if (!Number.isSafeInteger(holdBalance)) throw new Error('HOLD_LEDGER_INVALID')"), "Pay Small Small settlement rejects unsafe intermediate hold-ledger totals");
+assert(paySmallSmallRoutes.includes("if (holdBalance !== total) throw new Error('HOLD_BALANCE_MISMATCH')"), "Pay Small Small seller settlement requires exact hold-ledger balance");
 
 console.log("\nUniquePlatform smoke verification: ALL CHECKS PASSED");
