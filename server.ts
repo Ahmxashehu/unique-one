@@ -3887,7 +3887,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
   });
 
   app.post("/api/restaurant/pay", authenticate, rateLimit({
-    windowMs: 60_000, limit: 15, standardHeaders: true, legacyHeaders: false,
+    windowMs: 60_000, limit: 5, standardHeaders: true, legacyHeaders: false,
     store: createFirestoreRateLimitStore('restaurantPaymentRateLimits', 60_000),
     keyGenerator: (req) => { const uid = (req as any).user?.uid; return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip); },
     handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Restaurant payment attempts. Please try again shortly.'),
