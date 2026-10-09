@@ -53,11 +53,16 @@ try {
   const concurrentState = db.collection(TRANSACTION_PIN_SECURITY_COLLECTION).doc(concurrentUid);
   const concurrentCredential = db.collection('authCredentials').doc(concurrentUid);
   await concurrentCredential.set({ transactionPinHash: 'test-valid' });
-  const outcomes = await Promise.all(Array.from({ length: 20 }, () =>
+  const outcomes = await Promise.all(Array.from({ length: 4 }, () =>
     verifyTransactionPinWithLockout(db, concurrentUid, '0000', matcher)));
   assert.equal(outcomes.filter(Boolean).length, 0, 'all concurrent incorrect PIN attempts must fail');
+  const concurrentIntermediate = (await concurrentState.get()).data()!;
+  assert.equal(concurrentIntermediate.failedAttempts, 4, 'concurrent Firestore transactions must not lose failure increments');
+  assert.equal(concurrentIntermediate.lockedUntil, null, 'four concurrent failures must not prematurely lock');
+  assert.equal(await verifyTransactionPinWithLockout(db, concurrentUid, '0000', matcher), false,
+    'the next incorrect PIN must trigger lockout after concurrent attempts');
   const concurrentFinal = (await concurrentState.get()).data()!;
-  assert.equal(concurrentFinal.failedAttempts, 5, 'Firestore transactions preserve concurrent failure counts');
+  assert.equal(concurrentFinal.failedAttempts, 5, 'fifth total failure must be preserved');
   assert.ok(concurrentFinal.lockedUntil.toMillis() > Date.now(), 'concurrent failures leave account locked');
 
   const missingUid = uid + '-missing-credential';
