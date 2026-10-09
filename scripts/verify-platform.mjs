@@ -57,6 +57,7 @@ for (const required of [
   "Number(menu.priceMinor) !== Number(item.unitPriceMinor)",
   "const inventoryQuantities = new Map",
   "const combinedQuantity = (prior?.quantity || 0) + quantity",
+  "if (amountMinor !== preflightAmountMinor) throw new RequestValidationError",
 ]) {
   assert(restaurantPaymentSource.includes(required), `Restaurant payment integrity includes: ${required}`);
 }
