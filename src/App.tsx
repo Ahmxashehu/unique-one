@@ -36,6 +36,7 @@ const RegisterPage = lazy(() => import("./pages/public/RegisterPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/public/ForgotPasswordPage"));
 
 const PayPage = lazy(() => import("./pages/PayPage"));
+const AirtimeDataPage = lazy(() => import("./pages/pay/AirtimeDataPage"));
 const CheapDataHubBillsPage = lazy(() => import("./pages/pay/CheapDataHubBillsPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
@@ -234,6 +235,7 @@ export default function App() {
                     <Route path="wishlist" element={<WishlistPage />} />
                     <Route path="requests" element={<UserRequestsPage />} />
                     <Route path="pay" element={<RoleGuard dashboard="uniquepay"><PayPage /></RoleGuard>} />
+                    <Route path="pay/airtime-data" element={<RoleGuard dashboard="uniquepay"><AirtimeDataPage /></RoleGuard>} />
                     <Route path="store" element={<StorePage />} />
                     <Route path="ai" element={<RoleGuard dashboard="unique_ai"><UniqueAiPage /></RoleGuard>} />
                     <Route path="ai/premium" element={<UniqueAiSubscriptionPage />} />
