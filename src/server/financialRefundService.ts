@@ -408,6 +408,7 @@ export async function executeFinancialRefund(
       transaction.update(relatedRestaurantOrderRef, {
         status: 'refunded',
         paymentStatus: 'refunded',
+        refundStatus: 'completed',
         refundedAt: now,
         refundTransactionId: refundRef.id,
         cancellationReason: (relatedRestaurantOrderData?.cancellationReason as string) || 'customer_requested',
