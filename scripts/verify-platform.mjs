@@ -136,6 +136,42 @@ for (const required of [
 }
 
 
+const storeSource = read("server.ts");
+const storeCheckoutStart = storeSource.indexOf('app.post("/api/store/checkout", authenticate');
+const storePaymentStart = storeSource.indexOf('app.post("/api/store/pay", authenticate');
+const storeCancelStart = storeSource.indexOf('app.post("/api/store/orders/:orderId/cancel", authenticate');
+const storeDisputeStart = storeSource.indexOf('app.post("/api/store/orders/:orderId/dispute", authenticate');
+const storeCheckoutRoute = storeSource.slice(storeCheckoutStart, storePaymentStart);
+const storePaymentRoute = storeSource.slice(storePaymentStart, storeCancelStart);
+const storeCancelRoute = storeSource.slice(storeCancelStart, storeDisputeStart);
+for (const required of [
+  "const requestedByProduct = new Map<string, number>();",
+  "if (!Number.isSafeInteger(requested) || requested > available)",
+  "movementType: 'checkout_reservation'",
+  "transaction.update(snapshot.ref, {",
+  "carts.forEach((cart) => transaction.delete(cart.ref))",
+  "transaction.create(idempotencyRef, { uid, idempotencyKey, orderIds",
+]) {
+  assert(storeCheckoutRoute.includes(required), `Store checkout inventory and idempotency protection includes: ${required}`);
+}
+for (const required of [
+  "data.requestFingerprint !== fingerprint",
+  "order.status !== 'pending'",
+  "customerWallet.availableBalanceMinor < amountMinor",
+  "transaction.update(customerWalletRef, { availableBalanceMinor: customerBalanceAfter",
+  "paymentStatus: 'paid'",
+  "transaction.create(idempotencyRef, { uid, orderIds, amountMinor, requestFingerprint: fingerprint",
+]) {
+  assert(storePaymentRoute.includes(required), `Store payment atomicity includes: ${required}`);
+}
+for (const required of [
+  "order.status !== 'pending'",
+  "movementType: 'order_cancellation_release'",
+  "transaction.update(orderRef, {",
+  "status: 'cancelled'",
+]) {
+  assert(storeCancelRoute.includes(required), `Store unpaid-order cancellation releases reserved inventory: ${required}`);
+}
 const restaurantRefundKeySource = read("server.ts");
 const financialRefundServiceSource = read("src/server/financialRefundService.ts");
 assert(restaurantRefundKeySource.includes("return 'restaurant_refund_' + createHash('sha256').update(orderId).digest('hex');"), "Restaurant refund operation keys remain bounded for maximum-length order IDs");
