@@ -40,10 +40,11 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
     try {
       const result = await db.runTransaction(async (transaction) => {
         const orderRef = db.collection('orders').doc(orderId);
-        const idemRef = db.collection('paySmallSmallIdempotency').doc(uid + '_' + idempotencyKey);
+        const idemRef = db.collection('paySmallSmallIdempotency').doc(crypto.createHash('sha256').update(uid + '\0' + idempotencyKey).digest('hex'));
         const [orderSnap, idemSnap] = await Promise.all([transaction.get(orderRef), transaction.get(idemRef)]);
         if (idemSnap.exists) {
           const existing = idemSnap.data() || {};
+          if (String(existing.uid || '') !== uid) throw new Error('IDEMPOTENCY_CONFLICT');
           const expectedFingerprint = orderId + '|' + totalAmountMinor + '|' + depositAmountMinor + '|' + installmentCount + '|' + frequency;
           if (String(existing.requestFingerprint || '') !== expectedFingerprint) throw new Error('IDEMPOTENCY_CONFLICT');
           return { ...(existing.result || existing), replayed: true };

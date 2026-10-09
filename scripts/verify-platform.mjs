@@ -36,6 +36,10 @@ for (const phrase of ["Home", "Search", "Log in", "Sign Up", "Checkout", "Wallet
 assert(globalLanguage.includes("MutationObserver"), "dynamic UI text is observed for translation");
 assert(globalLanguage.includes("placeholder"), "form placeholders are included in translation handling");
 
+const paySmallSmallRoutesSource = read("src/server/paySmallSmallRoutes.ts");
+assert(paySmallSmallRoutesSource.includes("doc(crypto.createHash('sha256').update(uid + '\\0' + idempotencyKey).digest('hex'))"), "Pay Small Small plan idempotency key uses unambiguous UID/key encoding");
+assert(paySmallSmallRoutesSource.includes("if (String(existing.uid || '') !== uid) throw new Error('IDEMPOTENCY_CONFLICT');"), "Pay Small Small plan replay verifies the stored owner");
+
 const backendSources = [
   ["server.ts", read("server.ts")],
   ["src/server/ajoRoutes.ts", read("src/server/ajoRoutes.ts")],
