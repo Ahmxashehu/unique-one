@@ -3701,7 +3701,25 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (!orderSnap.exists) return errorResponse(res, 'NOT_FOUND', 'Restaurant order not found.');
       const order = orderSnap.data() as Record<string, any>;
       if (String(order.customerId || '') !== uid) return errorResponse(res, 'FORBIDDEN', 'You cannot refund this Restaurant order.');
-      if (String(order.status || '') !== 'cancelled' || String(order.paymentStatus || '') !== 'paid' || String(order.refundStatus || '') !== 'required') {
+      if (String(order.status || '') !== 'cancelled') {
+        return errorResponse(res, 'INVALID_STATE', 'Only a cancelled Restaurant order can be refunded.');
+      }
+      // A successful refund finalizes the order before the HTTP response reaches the
+      // client. If that response is lost, an exact retry must still return success
+      // instead of failing the mutable refundStatus === 'required' precondition.
+      if (String(order.refundStatus || '') === 'completed') {
+        const completedObligationSnap = await adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).doc(orderId).get();
+        const completedObligation = completedObligationSnap.data() || {};
+        const refundTransactionId = String(completedObligation.refundTransactionId || '');
+        if (completedObligationSnap.exists &&
+            String(completedObligation.customerUid || '') === uid &&
+            String(completedObligation.status || '') === 'completed' &&
+            isSafeId(refundTransactionId)) {
+          return res.json({ ok: true, status: 'refunded', refundTransactionId, replayed: true });
+        }
+        return errorResponse(res, 'INVALID_STATE', 'The Restaurant refund completion record could not be verified.');
+      }
+      if (String(order.paymentStatus || '') !== 'paid' || String(order.refundStatus || '') !== 'required') {
         return errorResponse(res, 'INVALID_STATE', 'Only a cancelled Restaurant order with a required refund can be refunded.');
       }
       const obligation = await claimRestaurantRefundObligation(orderId, uid);
