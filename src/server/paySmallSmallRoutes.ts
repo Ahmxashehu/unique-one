@@ -74,7 +74,6 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         !['weekly', 'monthly'].includes(frequency) || !IDEMPOTENCY.test(idempotencyKey)) {
       return fail(res, 'INVALID_REQUEST', 'Valid Pay Small Small plan details are required.');
     }
-    if (!(await verifyPaySmallSmallTransactionPin(db, uid, transactionPin))) return fail(res, 'FORBIDDEN', 'Incorrect Transaction PIN.', 403);
     try {
       const result = await db.runTransaction(async (transaction) => {
         const orderRef = db.collection('orders').doc(orderId);
@@ -134,8 +133,8 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
     if (!uid || !PLAN_ID.test(planId) || !/^\d{4}$/.test(transactionPin) || !IDEMPOTENCY.test(idempotencyKey)) {
       return fail(res, 'INVALID_REQUEST', 'A valid plan, Transaction PIN and idempotency key are required.');
     }
-    if (!(await verifyPaySmallSmallTransactionPin(db, uid, transactionPin))) return fail(res, 'FORBIDDEN', 'Incorrect Transaction PIN.', 403);
     try {
+      if (!(await verifyPaySmallSmallTransactionPin(db, uid, transactionPin))) return fail(res, 'FORBIDDEN', 'Incorrect Transaction PIN.', 403);
       const result = await db.runTransaction(async (transaction) => {
         const planRef = db.collection('paySmallSmallPlans').doc(planId);
         const walletRef = db.collection('wallets').doc(uid);
@@ -272,8 +271,8 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
     const transactionPin = typeof req.body?.transactionPin === 'string' ? req.body.transactionPin : '';
     const idempotencyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey.trim() : '';
     if (!uid || !PLAN_ID.test(planId) || !Number.isInteger(installmentNumber) || installmentNumber < 1 || installmentNumber > 24 || !/^\d{4}$/.test(transactionPin) || !IDEMPOTENCY.test(idempotencyKey)) return fail(res, 'INVALID_REQUEST', 'A valid plan, installment number, Transaction PIN and idempotency key are required.');
-    if (!(await verifyPaySmallSmallTransactionPin(db, uid, transactionPin))) return fail(res, 'FORBIDDEN', 'Incorrect Transaction PIN.', 403);
     try {
+      if (!(await verifyPaySmallSmallTransactionPin(db, uid, transactionPin))) return fail(res, 'FORBIDDEN', 'Incorrect Transaction PIN.', 403);
       const result = await db.runTransaction(async (transaction) => {
         const planRef = db.collection('paySmallSmallPlans').doc(planId);
         const walletRef = db.collection('wallets').doc(uid);
