@@ -176,6 +176,29 @@ const restaurantRefundKeySource = read("server.ts");
 const financialRefundServiceSource = read("src/server/financialRefundService.ts");
 assert(restaurantRefundKeySource.includes("return 'restaurant_refund_' + createHash('sha256').update(orderId).digest('hex');"), "Restaurant refund operation keys remain bounded for maximum-length order IDs");
 assert(financialRefundServiceSource.includes("!isSafeId(input.idempotencyKey)"), "financial refund service enforces its idempotency key size/character boundary");
+for (const required of [
+  "payment.recordKind !== 'financial'",
+  "payment.schemaVersion !== 2",
+  "payment.amountUnit !== 'minor'",
+  "Number(payment.amount) !== amountMinor",
+  "String(payment.sourceModule || '') !== 'unique_restaurant.checkout'",
+  "String(payment.relatedOrderIds?.[0] || '') !== orderId",
+  "transaction.create(obligationRef, {",
+  "status: 'required', attemptCount: 0",
+  "if (String(obligation.customerUid || '') !== actorUid)",
+  "status === 'processing' && leaseExpiresAt <= Date.now()",
+  "status: 'processing', attemptCount: attemptCount + 1",
+]) {
+  assert(restaurantRefundKeySource.includes(required), `Restaurant refund obligation safeguards include: ${required}`);
+}
+for (const required of [
+  "const refundSnapshots = await transaction.get(refundQuery)",
+  "input.amountMinor > originalAmount - refundedMinor",
+  "transaction.update(customerWalletRef",
+  "transaction.update(sellerWalletRef",
+]) {
+  assert(financialRefundServiceSource.includes(required), `Financial refund engine includes: ${required}`);
+}
 
 for (const required of [
   "src/lib/i18n.ts",
