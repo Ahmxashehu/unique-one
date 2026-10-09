@@ -3895,7 +3895,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     try {
       const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
       if (!isPlainObject(req.body) || !isSafeIdempotencyKey(req.body.idempotencyKey) ||
-          typeof req.body.transactionPin !== 'string' || !/^\\d{4}$/.test(req.body.transactionPin) ||
+          typeof req.body.transactionPin !== 'string' || !/^\d{4}$/.test(req.body.transactionPin) ||
           typeof req.body.orderId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(req.body.orderId)) {
         return errorResponse(res, 'INVALID_REQUEST', 'A valid order ID, payment idempotency key and 4-digit Transaction PIN are required.');
       }
