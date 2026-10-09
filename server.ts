@@ -14,6 +14,7 @@ import { generatePublicUniqueAiResponse, generateUniqueAiResponse, UniqueAiValid
 import { getLiveDiscoveryContext } from "./src/lib/ai/aiTools";
 import { registerIdentityVerificationRoutes } from "./src/server/identityVerificationRoutes";
 import { registerAjoRoutes } from "./src/server/ajoRoutes";
+import { registerMonnifyRoutes } from "./src/server/monnifyRoutes";
 import { registerUniqueShareRoutes } from "./src/server/uniqueShareRoutes";
 import { getTransactionAuthPolicy } from "./src/server/transactionAuthPolicy";
 import { registerAdminRbacRoutes } from "./src/server/adminRbacRoutes";
@@ -552,7 +553,7 @@ const app = express();
     }
     next();
   });
-  app.use(express.json({ limit: "10mb" }));
+  app.use(express.json({ limit: "10mb", verify: (req, _res, buffer) => { (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer); } }));
   app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
   const authenticate = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
@@ -908,6 +909,7 @@ const app = express();
   app.get("/api/health", (req, res) => res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" }));
   registerIdentityVerificationRoutes(app, authenticate);
   registerAjoRoutes(app, authenticate);
+  registerMonnifyRoutes(app, authenticate);
   registerUniqueShareRoutes(app, authenticate);
   registerAdminRbacRoutes(app, authenticate, requirePermission);
   registerAdminAuditRoutes(app, authenticate, requirePermission);
