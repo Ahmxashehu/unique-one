@@ -51,7 +51,7 @@ function config(): MonnifyConfig | null {
   return { apiKey, secretKey, contractCode, baseUrl, redirectUrl };
 }
 
-function uidFrom(req: Request): string | null {
+function liveModeEnabled(): boolean {\n  return process.env.MONNIFY_LIVE_ENABLED === "true";\n}\n\nfunction uidFrom(req: Request): string | null {
   const uid = (req as Request & { user?: { uid?: unknown } }).user?.uid;
   return typeof uid === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(uid) ? uid : null;
 }
@@ -212,7 +212,7 @@ export function registerMonnifyRoutes(app: Express, authenticate: RequestHandler
       provider: "monnify",
       configured: Boolean(cfg),
       environment: cfg?.baseUrl === "https://api.monnify.com" ? "live" : "sandbox",
-      livePaymentsEnabled: Boolean(cfg && cfg.baseUrl === "https://api.monnify.com"),
+      livePaymentsEnabled: Boolean(cfg && cfg.baseUrl === "https://api.monnify.com" && liveModeEnabled()),
     });
   });
 
@@ -220,7 +220,7 @@ export function registerMonnifyRoutes(app: Express, authenticate: RequestHandler
     const uid = uidFrom(req);
     if (!uid) return jsonError(res, 401, "UNAUTHENTICATED", "Authentication is required.");
     const cfg = config();
-    if (!cfg) return jsonError(res, 503, "PAYMENT_PROVIDER_NOT_CONFIGURED", "Monnify is not configured on the server.");
+    if (!cfg) return jsonError(res, 503, "PAYMENT_PROVIDER_NOT_CONFIGURED", "Monnify is not configured on the server.");\n    if (cfg.baseUrl === "https://api.monnify.com" && !liveModeEnabled()) return jsonError(res, 503, "LIVE_PAYMENTS_DISABLED", "Live payments are disabled until Monnify activation and production checks are complete.");\n    if (cfg.baseUrl === "https://api.monnify.com" && !liveModeEnabled()) return jsonError(res, 503, "LIVE_PAYMENTS_DISABLED", "Live payments are disabled until Monnify activation and production checks are complete.");
     if (!isPlainObject(req.body) || Object.keys(req.body).some(key => !["amountMinor", "description"].includes(key))) {
       return jsonError(res, 400, "INVALID_REQUEST", "Only amountMinor and description are accepted.");
     }
@@ -316,7 +316,7 @@ export function registerMonnifyRoutes(app: Express, authenticate: RequestHandler
 
   app.post("/api/webhooks/monnify/collection", async (req, res) => {
     const cfg = config();
-    if (!cfg) return res.status(503).json({ accepted: false });
+    if (!cfg) return res.status(503).json({ accepted: false });\n    if (cfg.baseUrl === "https://api.monnify.com" && !liveModeEnabled()) return res.status(503).json({ accepted: false });
     if (cfg.baseUrl === "https://api.monnify.com" && !verifyWebhookSignature(req, cfg)) {
       return res.status(401).json({ accepted: false });
     }
