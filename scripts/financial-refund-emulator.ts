@@ -73,6 +73,24 @@ try {
   assert.equal((await db.collection('inventory_movements').where('sourceId', '==', failed.originalId + ':early-refund').get()).size, 0,
     'failed refund must not create an inventory movement');
 
+  // A rejected partial return must not alter wallets, order, stock, ledger, or transaction history.
+  const invalidPartial = await seedScenario('invalid-partial', 5000);
+  const invalidPartialResult = await executeFinancialRefund(db, {
+    ...refundInput(invalidPartial, prefix + '-invalid-partial-key', 400),
+    finalizeOrder: 'partial',
+    releaseInventory: true,
+  });
+  assert.ok('error' in invalidPartialResult, 'partial refund without an eligible received return request must fail');
+  if ('error' in invalidPartialResult) assert.equal(invalidPartialResult.error.code, 'ORIGINAL_NOT_REFUNDABLE');
+  assert.equal((await invalidPartial.product.get()).data()?.quantity, 0, 'rejected partial return must not restore stock');
+  assert.equal((await invalidPartial.order.get()).data()?.status, 'confirmed', 'rejected partial return must not change order status');
+  assert.equal((await invalidPartial.sellerWallet.get()).data()?.availableBalanceMinor, 5000, 'rejected partial return must not debit seller');
+  assert.equal((await invalidPartial.customerWallet.get()).data()?.availableBalanceMinor, 200, 'rejected partial return must not credit customer');
+  assert.equal((await db.collection('transactions').where('reversalOfTransactionId', '==', invalidPartial.originalId).get()).size, 0,
+    'rejected partial return must not create a refund transaction');
+  assert.equal((await db.collection('inventory_movements').where('sourceId', '==', invalidPartial.originalId + ':early-refund').get()).size, 0,
+    'rejected partial return must not create an inventory movement');
+
   // A successful replay returns the original result and applies stock/money exactly once.
   const successful = await seedScenario('success', 5000);
   const input = refundInput(successful, prefix + '-success-key');
