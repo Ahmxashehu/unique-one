@@ -1755,7 +1755,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             const saved = existing.data() as Record<string, unknown>;
             if (saved.fingerprint !== fingerprint) throw new RequestValidationError('IDEMPOTENCY_KEY_CONFLICT', 'This retry key was already used for a different payment request.');
             if (typeof saved.requestId !== 'string' || typeof saved.status !== 'string') throw new RequestValidationError('INVALID_STATE', 'The saved payment request retry record is invalid.');
-            return { id: saved.requestId, status: saved.status, replayed: true };
+            if (typeof saved.recipientId !== 'string') throw new RequestValidationError('INVALID_STATE', 'The saved payment request retry record is invalid.');
+            return { id: saved.requestId, recipientId: saved.recipientId, status: saved.status, replayed: true };
           }
         }
         transaction.create(ref, {
@@ -1780,11 +1781,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           timestamp: Timestamp.fromDate(new Date(now)),
         });
         if (idempotencyRef) transaction.create(idempotencyRef, {
-          senderUid: senderId, fingerprint, requestId: ref.id, status, createdAt: now,
+          senderUid: senderId, fingerprint, requestId: ref.id, recipientId: recipientDoc.id, status, createdAt: now,
         });
-        return { id: ref.id, status, replayed: false };
+        return { id: ref.id, recipientId: recipientDoc.id, status, replayed: false };
       });
-      return res.status(result.replayed ? 200 : 201).json({ id: result.id, recipientId: recipientDoc.id, status: result.status, ...(result.replayed ? { idempotentReplay: true } : {}) });
+      return res.status(result.replayed ? 200 : 201).json({ id: result.id, recipientId: result.recipientId, status: result.status, ...(result.replayed ? { idempotentReplay: true } : {}) });
     } catch (error) {
       if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
       console.error('Payment request creation failed:', error);
