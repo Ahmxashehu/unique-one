@@ -1742,9 +1742,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const auditRef = adminDb.collection('audit_logs').doc();
       await adminDb.runTransaction(async transaction => {
         transaction.create(ref, {
-          senderId, recipientId: recipientDoc.id,
+          senderId,
+          ...(status === 'sent' ? {
+            recipientId: recipientDoc.id,
+            recipientName: typeof recipientData.fullName === 'string' ? recipientData.fullName : 'Unique One user',
+          } : {}),
           recipientIdentifier,
-          recipientName: typeof recipientData.fullName === 'string' ? recipientData.fullName : 'Unique One user',
           amount: amountNaira, currency: 'NGN', description,
           ...(dueDate ? { dueDate } : {}), status, createdAt: now, updatedAt: now,
         });
