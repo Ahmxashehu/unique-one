@@ -5,7 +5,6 @@ import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Product } from '../../lib/os/types';
-import { prototypeStock } from './storePrototype';
 
 type StoreProductsCacheEntry = { products: Product[]; expiresAt: number };
 
@@ -237,17 +236,6 @@ export default function StoreSearchPage() {
         </form>
       </div>
 
-      <section className="mb-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 sm:p-4">
-        <div className="flex items-center justify-between gap-2 mb-3"><div><h2 className="text-sm font-black text-slate-900">Prototype stock preview</h2><p className="text-[11px] text-slate-600">Buyer marketplace prototype — all matching category stock is visible for UI testing.</p></div><span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-1 text-[9px] font-black text-amber-800">PROTOTYPE</span></div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {prototypeStock.filter(item => (!filterCat || item.category === filterCat) && (!initialQuery.trim() || scoreSearchMatch(initialQuery, [item.name, item.categoryLabel]) > 0)).map(item => (
-            <Link key={item.category + item.name} to={'/store/search?cat=' + item.category} className="group overflow-hidden rounded-xl border border-amber-100 bg-white">
-              <div className="aspect-[4/3] flex items-center justify-center bg-gradient-to-br from-slate-100 via-white to-emerald-50"><StoreIcon className="w-8 h-8 text-emerald-300 group-hover:scale-110 transition" /></div>
-              <div className="p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">{item.categoryLabel}</p><p className="mt-1 text-sm font-bold text-slate-900 line-clamp-2">{item.name}</p><p className="mt-2 text-sm font-black text-slate-900">₦{item.price.toLocaleString()}</p><p className="mt-1 text-[11px] text-slate-500">{item.quantity} {item.unit ?? 'units'}</p></div>
-            </Link>
-          ))}
-        </div>
-      </section>
       <div className="flex flex-col md:flex-row gap-8">
         {showMobileFilters && (
           <div className="md:hidden bg-white border border-slate-200 rounded-2xl p-4 space-y-4">
