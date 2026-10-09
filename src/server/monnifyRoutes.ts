@@ -238,6 +238,16 @@ export function registerMonnifyRoutes(app: Express, authenticate: RequestHandler
     try {
       const user = await getAuth().getUser(uid);
       if (!user.email || !user.emailVerified) return jsonError(res, 400, "CUSTOMER_EMAIL_REQUIRED", "Verify an email on your account before funding your wallet.");
+
+      // Reject funding before taking the customer to checkout if no eligible wallet exists.
+      // A successful external payment must never be accepted for a wallet we cannot credit.
+      const walletSnap = await getFirestore().collection("wallets").doc(uid).get();
+      const wallet = walletSnap.data() || {};
+      if (!walletSnap.exists || wallet.uid !== uid || wallet.currency !== "NGN" || wallet.status !== "active" ||
+          !Number.isSafeInteger(wallet.availableBalanceMinor) || Number(wallet.availableBalanceMinor) < 0) {
+        return jsonError(res, 409, "WALLET_UNAVAILABLE", "An active NGN wallet is required before funding.");
+      }
+
       const paymentReference = "UPMONNIFY_" + randomUUID().replace(/-/g, "");
       const now = Timestamp.now();
       const intentRef = getFirestore().collection("monnifyPaymentIntents").doc(paymentReference);
@@ -338,7 +348,10 @@ export function registerMonnifyRoutes(app: Express, authenticate: RequestHandler
       const intentSnap = await getFirestore().collection("monnifyPaymentIntents").doc(paymentReference).get();
       if (!intentSnap.exists || intentSnap.data()?.status === "credited") return res.status(200).json({ accepted: true });
       const intent = intentSnap.data() || {};
-      if (intent.status !== "pending") return res.status(200).json({ accepted: true });
+      // If Monnify notifies us before the initialize request has persisted the checkout,
+      // ask it to retry rather than acknowledging an event we have not processed.
+      if (intent.status === "initializing") return res.status(503).json({ accepted: false });
+      if (intent.status !== "pending") return res.status(200).json({ accepted: true, ignored: true });
       const providerTx = await queryPayment(cfg, paymentReference);
       await creditVerifiedTopUp(paymentReference, providerTx);
       return res.status(200).json({ accepted: true });
