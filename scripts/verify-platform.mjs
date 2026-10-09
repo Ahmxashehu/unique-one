@@ -48,6 +48,15 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
   assert(backendSources.some(([, source]) => source.includes(route)), `backend route surface includes: ${route}`);
 }
 
+const transactionPinSource = read("server.ts");
+assert(transactionPinSource.includes("const TRANSACTION_PIN_SECURITY_COLLECTION = 'transactionPinSecurity'"), "Transaction PIN security uses persistent server-side state");
+assert(transactionPinSource.includes("const TRANSACTION_PIN_MAX_FAILURES = 5"), "Transaction PIN lockout threshold is five failed attempts");
+assert(transactionPinSource.includes("const TRANSACTION_PIN_LOCKOUT_MS = 15 * 60_000"), "Transaction PIN lockout duration is fifteen minutes");
+assert(transactionPinSource.includes("return adminDb.runTransaction(async transaction => {"), "Transaction PIN security updates are atomic");
+assert(transactionPinSource.includes("transaction.set(securityRef, {\n        failedAttempts: 0"), "successful Transaction PIN verification resets failed attempts");
+assert(transactionPinSource.includes("failedAttempts >= TRANSACTION_PIN_MAX_FAILURES"), "repeated incorrect Transaction PIN attempts trigger lockout");
+assert(transactionPinSource.includes("if (initialLockedUntilMs > nowMs) return false"), "an active Transaction PIN lockout blocks verification before credential checks");
+
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
