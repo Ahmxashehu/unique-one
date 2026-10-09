@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Cable, CheckCircle2, FileCheck2, Loader2, LockKeyhole, PlugZap, RefreshCw, ShieldCheck, Tv, Zap } from "lucide-react";
+import { CheckCircle2, FileCheck2, Loader2, LockKeyhole, PlugZap, RefreshCw, ShieldCheck, Tv, Zap } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
 type Service = "electricity" | "cable" | "exam";
