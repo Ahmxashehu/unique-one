@@ -51,6 +51,7 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
+assert(restaurantPayRoute.includes("!/^\\d{4}$/.test(req.body.transactionPin)"), "Restaurant payment accepts a numeric 4-digit Transaction PIN");
 const restaurantBiometricRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 6500);
 for (const required of [
   "transaction.delete(challengeRef)",
