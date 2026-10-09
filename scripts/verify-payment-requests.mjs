@@ -54,4 +54,17 @@ assert.match(routes, /nextStatus === 'sent' && sender && current === 'draft'/,
 assert.ok(page.includes("canSend && <button") && page.includes("changeStatus(r, 'sent')"),
   "the page must expose a send action for saved drafts");
 
+
+const statusRouteStart = routes.indexOf("app.patch('/api/payment-requests/:requestId/status'");
+const statusRouteEnd = routes.indexOf("\\n  app.get('/api/admin/audit-logs'", statusRouteStart);
+assert.ok(statusRouteStart >= 0 && statusRouteEnd > statusRouteStart,
+  "payment request status route boundaries must be identifiable");
+const statusRoute = routes.slice(statusRouteStart, statusRouteEnd);
+assert.match(statusRoute, /!\\['sent', 'viewed', 'rejected', 'cancelled'\\]\\.includes\\(nextStatus\\)/,
+  "the status endpoint must reject unsupported statuses including paid");
+assert.doesNotMatch(statusRoute, /nextStatus\\s*===?\\s*['"]paid['"]|status:\\s*['"]paid['"]/,
+  "a request status update must never mark a request paid without settlement");
+assert.doesNotMatch(statusRoute, /collection\\(['"]wallets['"]\\)|availableBalanceMinor|ledgerEntries|walletIdempotency/,
+  "status-only endpoint must not pretend to settle a wallet transfer");
+
 console.log("Payment request contract checks passed (static checks; not a live Firestore integration test).");
