@@ -56,7 +56,6 @@ export default function JobsPage() {
   const [applications, setApplications] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [requestingService, setRequestingService] = useState<Service | null>(null);
-  const [hireBusy, setHireBusy] = useState(false);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [agreementRequest, setAgreementRequest] = useState<any | null>(null);
   const [agreements, setAgreements] = useState<any[]>([]);
@@ -68,7 +67,6 @@ export default function JobsPage() {
   const [applying, setApplying] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [showRequest, setShowRequest] = useState(false);
-  const [requestBusy, setRequestBusy] = useState(false);
   const [requestForm, setRequestForm] = useState({
     title: '', category: 'Skilled & Handwork', location: '', requiredDate: '', budget: '', description: ''
   });
@@ -458,28 +456,11 @@ export default function JobsPage() {
 
       {agreementRequest && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/60 p-0 sm:items-center sm:p-4">
-          <form onSubmit={async (event) => {
+          <form onSubmit={(event) => {
             event.preventDefault();
             setAgreementRequest(null);
             setError('Agreement creation is unavailable until a secure server-side agreement endpoint and authorization rules are implemented. No agreement was created.');
-            return;
-            if (!currentUser || !agreementRequest) return;
-            const form = new FormData(event.currentTarget);
-            const title = String(form.get('title') || '').trim();
-            const scope = String(form.get('scope') || '').trim();
-            const price = String(form.get('price') || '').trim();
-            if (!title || !scope || !price) { setError('Add the agreement title, scope and agreed price.'); return; }
-            try {
-              await addDoc(collection(db, 'workAgreements'), {
-                serviceRequestId: agreementRequest.id, clientUid: agreementRequest.requesterUid, providerUid: agreementRequest.providerUid,
-                serviceId: agreementRequest.serviceId, title, scope, price, currency: String(form.get('currency') || 'NGN'),
-                startDate: String(form.get('startDate') || ''), completionDate: String(form.get('completionDate') || ''),
-                responsibilities: String(form.get('responsibilities') || '').trim(), cancellationTerms: String(form.get('cancellationTerms') || '').trim(),
-                status: 'pending_acceptance', clientAccepted: false, providerAccepted: false, createdByUid: currentUser.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-              });
-              setAgreementRequest(null); setTab('work'); setError('Free agreement created. Both parties should accept it before work or payment begins.');
-            } catch (err: any) { setError(err?.message || 'Could not create the agreement.'); }
-          }} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-5 sm:rounded-3xl">
+          }}} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-5 sm:rounded-3xl">
             <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-600">Free agreement</p><h2 className="mt-1 text-2xl font-black">Agree the work before payment</h2><p className="mt-2 text-sm text-slate-500">No subscription or agreement fee. Set scope, price and responsibilities clearly.</p></div><button type="button" onClick={() => setAgreementRequest(null)}><X className="h-5 w-5" /></button></div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <input name="title" required placeholder="Agreement title" className="rounded-xl border border-slate-200 p-3 sm:col-span-2" />
