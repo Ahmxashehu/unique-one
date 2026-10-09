@@ -36,6 +36,12 @@ for (const phrase of ["Home", "Search", "Log in", "Sign Up", "Checkout", "Wallet
 assert(globalLanguage.includes("MutationObserver"), "dynamic UI text is observed for translation");
 assert(globalLanguage.includes("placeholder"), "form placeholders are included in translation handling");
 
+const sendMoneySource = read("src/pages/pay/SendMoneyPage.tsx");
+assert(sendMoneySource.includes("pendingTransferRef = useRef"), "wallet transfer retries retain an idempotency key across re-renders");
+assert(sendMoneySource.includes("pendingTransferRef.current?.fingerprint !== transferFingerprint"), "wallet transfer idempotency key is scoped to the exact transfer details");
+assert(sendMoneySource.includes("pendingTransferRef.current = null;") && sendMoneySource.includes("payload?.error?.code !== 'TRANSFER_IN_PROGRESS'"), "wallet transfer clears keys only after success or definitive rejection, preserving ambiguous retries");
+assert(sendMoneySource.includes("const idempotencyKey = pendingTransferRef.current.key"), "wallet transfer submits the persistent idempotency key");
+
 const backendSources = [
   ["server.ts", read("server.ts")],
   ["src/server/ajoRoutes.ts", read("src/server/ajoRoutes.ts")],
