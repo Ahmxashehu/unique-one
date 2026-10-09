@@ -136,18 +136,6 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const wallet = walletSnap.data() || {};
         const balance = Number(wallet.availableBalanceMinor);
         if (!Number.isSafeInteger(balance) || balance < deposit || String(wallet.status || '') !== 'active') throw new Error('INSUFFICIENT_FUNDS');
-        const orderRef = db.collection('orders').doc(String(plan.orderId));
-        const orderSnap = await transaction.get(orderRef);
-        if (!orderSnap.exists) throw new Error('ORDER_NOT_FOUND');
-        const order = orderSnap.data() || {};
-        const total = Number(plan.totalAmountMinor);
-        if (String(order.paySmallSmallPlanId || '') !== planId ||
-            String(order.paySmallSmallStatus || '') !== 'active' ||
-            String(order.paymentStatus || '') !== 'partial' ||
-            String(order.status || '') !== 'reserved' ||
-            !Number.isSafeInteger(total) || Number(order.totalMinor) !== total) {
-          throw new Error('ORDER_STATE_MISMATCH');
-        }
         const now = Timestamp.now();
         const txRef = db.collection('transactions').doc();
         const reference = 'UP-PSS-' + txRef.id;
@@ -281,6 +269,18 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const wallet = walletSnap.data() || {};
         const balance = Number(wallet.availableBalanceMinor);
         if (String(wallet.status || '') !== 'active' || !Number.isSafeInteger(balance) || balance < amount) throw new Error('INSUFFICIENT_FUNDS');
+        const orderRef = db.collection('orders').doc(String(plan.orderId));
+        const orderSnap = await transaction.get(orderRef);
+        if (!orderSnap.exists) throw new Error('ORDER_NOT_FOUND');
+        const order = orderSnap.data() || {};
+        const total = Number(plan.totalAmountMinor);
+        if (String(order.paySmallSmallPlanId || '') !== planId ||
+            String(order.paySmallSmallStatus || '') !== 'active' ||
+            String(order.paymentStatus || '') !== 'partial' ||
+            String(order.status || '') !== 'reserved' ||
+            !Number.isSafeInteger(total) || Number(order.totalMinor) !== total) {
+          throw new Error('ORDER_STATE_MISMATCH');
+        }
         const now = Timestamp.now();
         const txRef = db.collection('transactions').doc();
         const reference = 'UP-PSS-' + txRef.id;
