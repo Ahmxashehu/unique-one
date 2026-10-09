@@ -48,6 +48,18 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
   assert(backendSources.some(([, source]) => source.includes(route)), `backend route surface includes: ${route}`);
 }
 
+const storeReturnRequestSource = read("server.ts");
+const storeReturnRequestStart = storeReturnRequestSource.indexOf('app.post("/api/store/orders/:orderId/return-request", authenticate');
+const storeReturnRequestRoute = storeReturnRequestSource.slice(storeReturnRequestStart, storeReturnRequestStart + 9000);
+for (const required of [
+  "requestFingerprint",
+  "stored.orderId !== orderId",
+  "stored.requestFingerprint !== requestFingerprint",
+  "IDEMPOTENCY_CONFLICT",
+]) {
+  assert(storeReturnRequestRoute.includes(required), `Store return request idempotency protects: ${required}`);
+}
+
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
