@@ -273,7 +273,9 @@ export function registerMonnifyRoutes(app: Express, authenticate: RequestHandler
             paymentDescription: description,
             currencyCode: "NGN",
             contractCode: cfg.contractCode,
-            redirectUrl: cfg.redirectUrl,
+            // Bind the browser return to this server-generated reference. The client must
+            // still call the authenticated verification endpoint; redirect parameters are not proof of payment.
+            redirectUrl: cfg.redirectUrl + (cfg.redirectUrl.includes("?") ? "&" : "?") + "paymentReference=" + encodeURIComponent(paymentReference),
             paymentMethods: ["CARD", "ACCOUNT_TRANSFER", "USSD"],
             metadata: { platform: "UniquePlatform", purpose: "wallet_funding", uid },
           }),
