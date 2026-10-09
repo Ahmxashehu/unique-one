@@ -88,6 +88,9 @@ for (const required of [
 ]) {
   assert(restaurantBiometricRoute.includes(required), `Restaurant biometric payment protection includes: ${required}`);
 }
+const paymentBindingCheckIndex = restaurantBiometricRoute.indexOf("if (challengeData.transactionBinding !== expectedBinding)");
+const passkeyCounterUpdateIndex = restaurantBiometricRoute.indexOf("const counterAccepted = await adminDb.runTransaction(async transaction => {");
+assert(paymentBindingCheckIndex >= 0 && paymentBindingCheckIndex < passkeyCounterUpdateIndex, "Restaurant biometric payment binding is validated before advancing the passkey counter");
 const restaurantMenuSource = read("src/server/restaurantRoutes.ts");
 for (const required of [
   "stockTracked === true",
