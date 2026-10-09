@@ -38,7 +38,7 @@ export default function CycleAjoPage() {
   const amountNaira = Number(amount);
   const memberCount = Number(members);
   const amountMinor = Math.round(amountNaira * 100);
-  const amountHasValidPrecision = /^\\d+(?:\\.\\d{1,2})?$/.test(amount.trim());
+  const amountHasValidPrecision = /^\d+(?:\.\d{1,2})?$/.test(amount.trim());
   const valid = cycleName.trim().length >= 1 && cycleName.trim().length <= 100 &&
     amountHasValidPrecision && Number.isFinite(amountNaira) && amountNaira > 0 && Number.isSafeInteger(amountMinor) &&
     Number.isInteger(memberCount) && memberCount >= 2 && memberCount <= 1000;
