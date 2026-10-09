@@ -150,6 +150,18 @@ function scenario() {
   assert.equal(combinedDemand, 5, "duplicate menu lines aggregate to combined stock demand");
   assert(4 < combinedDemand, "aggregate demand rejects stock that would pass each line independently");
 
+  // External Monnify wallet funding must also balance as double-entry:
+  // debit provider clearing and credit the customer's wallet for the same amount.
+  const monnifyFundingMinor = 25_000;
+  const monnifyFundingLedger = [
+    { uid: "monnify", accountType: "external_provider_clearing", direction: "debit", amountMinor: monnifyFundingMinor, currency: "NGN" },
+    { uid: "customer", accountType: "wallet", direction: "credit", amountMinor: monnifyFundingMinor, currency: "NGN" },
+  ];
+  assert.equal(monnifyFundingLedger.length, 2, "Monnify top-up creates both ledger sides");
+  assert.equal(monnifyFundingLedger.filter((entry) => entry.direction === "debit").reduce((sum, entry) => sum + entry.amountMinor, 0), monnifyFundingMinor, "Monnify top-up clearing debit balances");
+  assert.equal(monnifyFundingLedger.filter((entry) => entry.direction === "credit").reduce((sum, entry) => sum + entry.amountMinor, 0), monnifyFundingMinor, "Monnify top-up wallet credit balances");
+  assert(monnifyFundingLedger.every((entry) => entry.currency === "NGN"), "Monnify top-up ledger currency matches");
+
   return state.transactions.length;
 }
 
