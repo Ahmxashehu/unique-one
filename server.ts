@@ -14,6 +14,7 @@ import { generatePublicUniqueAiResponse, generateUniqueAiResponse, UniqueAiValid
 import { getLiveDiscoveryContext } from "./src/lib/ai/aiTools";
 import { registerIdentityVerificationRoutes } from "./src/server/identityVerificationRoutes";
 import { registerAjoRoutes } from "./src/server/ajoRoutes";
+import { registerCheapDataHubRoutes } from "./src/server/cheapDataHubRoutes";
 import { registerUniqueShareRoutes } from "./src/server/uniqueShareRoutes";
 import { getTransactionAuthPolicy } from "./src/server/transactionAuthPolicy";
 import { registerAdminRbacRoutes } from "./src/server/adminRbacRoutes";
@@ -908,6 +909,7 @@ const app = express();
   app.get("/api/health", (req, res) => res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" }));
   registerIdentityVerificationRoutes(app, authenticate);
   registerAjoRoutes(app, authenticate);
+  registerCheapDataHubRoutes(app, authenticate);
   registerUniqueShareRoutes(app, authenticate);
   registerAdminRbacRoutes(app, authenticate, requirePermission);
   registerAdminAuditRoutes(app, authenticate, requirePermission);
