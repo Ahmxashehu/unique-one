@@ -305,7 +305,7 @@ async function ensureWalletForUser(uid: string): Promise<WalletDocument> {
 function validateTransferRequest(body: unknown, senderUid: string): TransferRequestInput {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('INVALID_REQUEST');
   const payload = body as Record<string, unknown>;
-  const allowedKeys = new Set(['recipientId', 'amountMinor', 'currency', 'idempotencyKey', 'description', 'senderUid', 'transactionPin']);
+  const allowedKeys = new Set(['recipientId', 'amountMinor', 'currency', 'idempotencyKey', 'description', 'senderUid', 'transactionPin', 'biometricAssertion']);
   for (const key of Object.keys(payload)) if (!allowedKeys.has(key)) throw new Error('INVALID_REQUEST');
   if ('senderUid' in payload) throw new Error('INVALID_REQUEST');
   const transactionPin = validateTransactionPin(payload.transactionPin);
