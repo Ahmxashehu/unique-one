@@ -3972,6 +3972,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         if (order.status !== 'pending_payment') throw new RequestValidationError('INVALID_REQUEST', 'This restaurant order is no longer awaiting payment.');
         const amountMinor = Number(order.totalMinor);
         if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) throw new RequestValidationError('INVALID_AMOUNT', 'The restaurant payment amount is invalid.');
+         if (amountMinor !== preflightAmountMinor) throw new RequestValidationError('INVALID_REQUEST', 'The restaurant order total changed during payment authorization. Please retry payment.');
         const restaurantRef = adminDb.collection('restaurants').doc(String(order.restaurantId));
         const restaurantSnap = await transaction.get(restaurantRef);
         if (!restaurantSnap.exists) throw new RequestValidationError('UNAVAILABLE', 'This restaurant is not yet connected to a verified UniquePay merchant wallet.');
