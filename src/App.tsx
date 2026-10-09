@@ -266,8 +266,9 @@ export default function App() {
                     <Route path="services" element={<RoleGuard dashboard="operations"><ServicesPage /></RoleGuard>} />
                     <Route path="customers" element={<RoleGuard dashboard="business"><CustomersPage /></RoleGuard>} />
                     <Route path="invoices" element={<RoleGuard dashboard="business"><InvoicesPage /></RoleGuard>} />
-                    <Route path="payment-requests" element={<RoleGuard dashboard="business"><PaymentRequestsPage /></RoleGuard>} />
-                    <Route path="payment-requests/new" element={<RoleGuard dashboard="business"><CreatePaymentRequestPage /></RoleGuard>} />
+                    {/* Payment requests are available to authenticated personal and business users; the API enforces ownership and recipient validation. */}
+                    <Route path="payment-requests" element={<PaymentRequestsPage />} />
+                    <Route path="payment-requests/new" element={<CreatePaymentRequestPage />} />
                     <Route path="invoices/new" element={<RoleGuard dashboard="business"><CreateInvoicePage /></RoleGuard>} />
                     <Route path="pay/receipts/:id" element={<RoleGuard dashboard="uniquepay"><ReceiptPage /></RoleGuard>} />
                     <Route path="pay/school-payments" element={<RoleGuard dashboard="uniquepay"><SchoolPaymentDashboard /></RoleGuard>} />
