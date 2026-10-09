@@ -288,7 +288,7 @@ export default function RestaurantPage() {
         <div className="mt-5 flex items-center justify-between">
           <div>
             <h2 className="text-sm font-black text-slate-900">Available restaurants</h2>
-            <p className="text-xs text-slate-500">{filtered.length} prototype options · availability will become live when providers are connected</p>
+            <p className="text-xs text-slate-500">{filtered.length} verified restaurant listing{filtered.length === 1 ? '' : 's'} from UniquePlatform businesses</p>
           </div>
           <span className="hidden rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 sm:block">Guest browsing</span>
         </div>
