@@ -44,6 +44,12 @@ const refundInventoryMutation = financialRefundSource.indexOf("transaction.updat
 assert(refundInventoryQueue >= 0 && refundInventoryQueue < refundSellerFundsGuard, "refund inventory changes are queued before wallet funding validation rather than written");
 assert(refundOrderFinalValidation >= 0 && refundInventoryMutation > refundOrderFinalValidation, "refund inventory mutations happen only after all error-return order validations");
 assert(financialRefundSource.indexOf("recordStoreInventoryMovement(transaction, db, {", refundInventoryMutation) > refundInventoryMutation, "refund stock movement ledger is written with the deferred inventory mutation");
+const refundFirstFinancialWrite = financialRefundSource.indexOf("transaction.set(refundRef");
+const refundLastErrorReturn = financialRefundSource.lastIndexOf("return { error:");
+assert(refundFirstFinancialWrite > 0 && refundLastErrorReturn < refundFirstFinancialWrite, "refund validation failures are returned before any Firestore transaction writes are queued");
+assert(financialRefundSource.indexOf("input.finalizeOrder === 'partial' && (") < refundFirstFinancialWrite, "partial return eligibility is checked before wallet and ledger mutations");
+assert(financialRefundSource.indexOf("if (input.finalizeDispute) {", financialRefundSource.indexOf("const relatedOrderRef")) < refundFirstFinancialWrite, "dispute state is prevalidated before financial writes");
+
 
 const backendSources = [
   ["server.ts", read("server.ts")],
