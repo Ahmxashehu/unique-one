@@ -16,6 +16,7 @@ import { registerIdentityVerificationRoutes } from "./src/server/identityVerific
 import { registerAjoRoutes } from "./src/server/ajoRoutes";
 import { registerCheapDataHubRoutes } from "./src/server/cheapDataHubRoutes";
 import { registerCheapDataHubUtilityRoutes } from "./src/server/cheapDataHubUtilityRoutes";
+import { registerCheapDataHubVtuCatalogRoutes } from "./src/server/cheapDataHubVtuCatalogRoutes";
 import { registerUniqueShareRoutes } from "./src/server/uniqueShareRoutes";
 import { getTransactionAuthPolicy } from "./src/server/transactionAuthPolicy";
 import { registerAdminRbacRoutes } from "./src/server/adminRbacRoutes";
@@ -912,6 +913,7 @@ const app = express();
   registerAjoRoutes(app, authenticate);
   registerCheapDataHubRoutes(app, authenticate);
   registerCheapDataHubUtilityRoutes(app, authenticate);
+  registerCheapDataHubVtuCatalogRoutes(app, authenticate);
   registerUniqueShareRoutes(app, authenticate);
   registerAdminRbacRoutes(app, authenticate, requirePermission);
   registerAdminAuditRoutes(app, authenticate, requirePermission);
