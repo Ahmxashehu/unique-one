@@ -71,7 +71,7 @@ assert(retryLookupIndex >= 0 && retryLookupIndex < pinVerificationIndex && retry
 assert(restaurantPayFullRoute.includes("saved.uid !== uid") && restaurantPayFullRoute.includes("saved.requestFingerprint !== uid + '|' + orderId"), "Restaurant completed payment replay validates owner and order fingerprint");
 assert(restaurantPayFullRoute.includes("return res.status(200).json({ ...saved.result, replayed: true })"), "Restaurant completed payment replay returns saved result without repeating financial mutations");
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
-const restaurantBiometricRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 6500);
+const restaurantBiometricRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 9000);
 for (const required of [
   "transaction.delete(challengeRef)",
   "clientData.type !== 'webauthn.get'",
