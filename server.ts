@@ -4474,6 +4474,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const savedResult = saved.result;
         const savedFingerprint = [uid, orderIds.join(','), String(savedAmountMinor), 'NGN'].join('|');
         if (saved.uid !== uid ||
+            saved.status !== 'completed' ||
+            saved.result?.status !== 'completed' ||
             saved.result?.idempotencyKey !== idempotencyKey ||
             !Number.isSafeInteger(savedAmountMinor) || savedAmountMinor <= 0 ||
             savedOrderIds.length !== orderIds.length ||
@@ -4482,6 +4484,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             !isPlainObject(savedResult) ||
             savedResult.amountMinor !== savedAmountMinor ||
             !Array.isArray(savedResult.orderIds) ||
+            savedResult.orderIds.length !== orderIds.length ||
             !savedResult.orderIds.every((id: unknown, index: number) => id === orderIds[index])) {
           return errorResponse(res, 'INVALID_REQUEST', 'This payment idempotency key was already used with different payment data.');
         }
