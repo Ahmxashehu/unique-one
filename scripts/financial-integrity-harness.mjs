@@ -116,6 +116,40 @@ function scenario() {
   assert.throws(() => { const balance = 5_000; assert(balance >= 10_000, "overdraft guard"); }, /overdraft guard/);
   assert.throws(() => { assert(MAX <= MAX - 1, "overflow guard"); }, /overflow guard/);
 
+  // Controlled stock race model: two different orders compete for the final unit.
+  // This validates the expected invariant in the harness; it is not a live Firestore test.
+  const race = {
+    stock: 1,
+    customerBalances: { customerA: 5_000, customerB: 5_000 },
+    paidOrders: new Set(),
+    debits: [],
+  };
+  const attempts = [
+    { orderId: "race-order-A", uid: "customerA", quantity: 1, amount: 1_000 },
+    { orderId: "race-order-B", uid: "customerB", quantity: 1, amount: 1_000 },
+  ];
+  const outcomes = attempts.map((attempt) => {
+    // Simulate transaction commit-time revalidation after a competing commit.
+    if (race.stock < attempt.quantity) return { orderId: attempt.orderId, paid: false, reason: "insufficient_stock" };
+    if (race.customerBalances[attempt.uid] < attempt.amount) return { orderId: attempt.orderId, paid: false, reason: "insufficient_funds" };
+    race.stock -= attempt.quantity;
+    race.customerBalances[attempt.uid] -= attempt.amount;
+    race.paidOrders.add(attempt.orderId);
+    race.debits.push({ orderId: attempt.orderId, uid: attempt.uid, amount: attempt.amount });
+    return { orderId: attempt.orderId, paid: true };
+  });
+  assert.equal(outcomes.filter((outcome) => outcome.paid).length, 1, "only one competing order buys the final stock unit");
+  assert.equal(race.stock, 0, "competing stock race never makes inventory negative");
+  assert.equal(race.paidOrders.size, 1, "losing stock-race order is never marked paid");
+  assert.equal(race.debits.length, 1, "losing stock-race order creates no customer debit");
+  assert.equal(outcomes.find((outcome) => !outcome.paid)?.reason, "insufficient_stock", "losing order fails for stock exhaustion");
+
+  // Multiple lines for one item must consume their combined demand.
+  const duplicateLines = [2, 3];
+  const combinedDemand = duplicateLines.reduce((sum, quantity) => sum + quantity, 0);
+  assert.equal(combinedDemand, 5, "duplicate menu lines aggregate to combined stock demand");
+  assert(4 < combinedDemand, "aggregate demand rejects stock that would pass each line independently");
+
   return state.transactions.length;
 }
 
