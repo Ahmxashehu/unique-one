@@ -3756,6 +3756,68 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.get("/api/business/restaurants/orders", authenticate, rateLimit({
+    windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false,
+    store: createFirestoreRateLimitStore('restaurantMerchantOrderListRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many Restaurant order list requests.'),
+  }), async (req, res) => {
+    try {
+      const uid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      const membership = ((req as any).businessMembership || {}) as Record<string, unknown>;
+      const session = ((req as any).businessSession || {}) as Record<string, unknown>;
+      const businessId = typeof session.businessId === 'string' ? session.businessId.trim() : '';
+      const role = typeof membership.role === 'string' ? membership.role : '';
+      const permissions = Array.isArray(membership.permissions) ? membership.permissions.filter((v): v is string => typeof v === 'string') : [];
+      if (!uid || !businessId || String(membership.businessId || '') !== businessId) {
+        return errorResponse(res, 'FORBIDDEN', 'An active Business session is required.');
+      }
+      if (!hasRolePermission([role as any], permissions as any, 'manage:restaurant_orders')) {
+        return errorResponse(res, 'FORBIDDEN', 'You do not have permission to view Restaurant orders.');
+      }
+      const assignedBranchId = typeof membership.branchId === 'string' ? membership.branchId.trim() : '';
+      const snapshot = await adminDb.collection('restaurantOrders')
+        .where('businessId', '==', businessId)
+        .limit(100)
+        .get();
+      const orders = snapshot.docs.map((doc) => {
+        const order = doc.data() as Record<string, any>;
+        const createdAt = order.createdAt && typeof order.createdAt.toMillis === 'function'
+          ? order.createdAt.toMillis()
+          : (typeof order.createdAt === 'number' ? order.createdAt : 0);
+        return {
+          id: doc.id,
+          restaurantId: String(order.restaurantId || ''),
+          branchId: String(order.branchId || ''),
+          status: String(order.status || 'pending_payment'),
+          paymentStatus: String(order.paymentStatus || 'pending'),
+          currency: String(order.currency || 'NGN'),
+          totalMinor: Number(order.totalMinor || 0),
+          customerName: String(order.customerName || ''),
+          customerPhone: String(order.customerPhone || ''),
+          mode: String(order.mode || ''),
+          deliveryAddress: String(order.deliveryAddress || ''),
+          date: String(order.date || ''),
+          time: String(order.time || ''),
+          items: Array.isArray(order.items) ? order.items.map((item: any) => ({
+            name: String(item?.name || 'Item'),
+            quantity: Number(item?.quantity || 0),
+          })) : [],
+          createdAtMs: createdAt,
+          refundStatus: String(order.refundStatus || ''),
+        };
+      }).filter((order) => !assignedBranchId || order.branchId === assignedBranchId)
+        .sort((a, b) => b.createdAtMs - a.createdAtMs);
+      return res.json({ ok: true, orders });
+    } catch (error) {
+      console.error('Restaurant merchant order list failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Restaurant orders could not be loaded right now.');
+    }
+  });
+
   app.patch("/api/business/restaurants/orders/:orderId/status", authenticate, rateLimit({
     windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false,
     store: createFirestoreRateLimitStore('restaurantMerchantOrderStatusRateLimits', 60_000),
