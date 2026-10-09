@@ -1782,6 +1782,15 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const data = current.data() as Record<string, unknown>;
       if (data.senderId !== senderId) return errorResponse(res, "FORBIDDEN", "You can only send your own payment requests.", 403);
       if (data.status !== "draft") return errorResponse(res, "INVALID_REQUEST", "Only saved drafts can be sent.");
+      const amount = data.amount;
+      const description = typeof data.description === "string" ? data.description.trim() : "";
+      const dueDate = data.dueDate;
+      if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0 || amount > 1000000000000 || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7) return errorResponse(res, "INVALID_AMOUNT", "This draft has an invalid amount and cannot be sent.");
+      if (!description || description.length > 500) return errorResponse(res, "INVALID_REQUEST", "This draft has an invalid description and cannot be sent.");
+      if (dueDate !== undefined && dueDate !== null) {
+        const parsedDueDate = typeof dueDate === "string" ? new Date(dueDate + "T00:00:00.000Z") : new Date(Number.NaN);
+        if (typeof dueDate !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate) || Number.isNaN(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== dueDate) return errorResponse(res, "INVALID_REQUEST", "This draft has an invalid due date and cannot be sent.");
+      }
       const identifier = typeof data.recipientIdentifier === "string" ? data.recipientIdentifier.trim() : "";
       if (!identifier) return errorResponse(res, "INVALID_REQUEST", "This draft has no recipient identifier.");
       const normalizedEmail = identifier.toLowerCase();
@@ -1800,19 +1809,19 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const auditRef = adminDb.collection("audit_logs").doc();
       await adminDb.runTransaction(async transaction => {
         const fresh = await transaction.get(requestRef);
-        if (!fresh.exists) throw new Error("INVALID_REQUEST");
+        if (!fresh.exists) throw new Error("REQUEST_NOT_FOUND");
         const latest = fresh.data() as Record<string, unknown>;
         if (latest.senderId !== senderId) throw new Error("FORBIDDEN");
-        if (latest.status !== "draft") throw new Error("INVALID_REQUEST");
+        if (latest.status !== "draft") throw new Error("INVALID_STATUS");
         transaction.update(requestRef, { recipientId: recipientDoc.id, recipientName: typeof recipientData.fullName === "string" ? recipientData.fullName : "Unique One user", status: "sent", updatedAt: now });
         transaction.create(auditRef, { action: "payment_request.sent", actorUid: senderId, targetUid: recipientDoc.id, resource: "payment_request", resourceId: requestId, amount: typeof latest.amount === "number" ? latest.amount : null, currency: latest.currency === "NGN" ? "NGN" : null, status: "sent", timestamp: Timestamp.fromDate(new Date(now)) });
       });
       return res.status(200).json({ id: requestId, recipientId: recipientDoc.id, status: "sent" });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
-      if (message === "INVALID_REQUEST") return errorResponse(res, "INVALID_REQUEST", "Payment request was not found.", 404);
+      if (message === "REQUEST_NOT_FOUND") return errorResponse(res, "INVALID_REQUEST", "Payment request was not found.", 404);
       if (message === "FORBIDDEN") return errorResponse(res, "FORBIDDEN", "You can only send your own payment requests.", 403);
-      if (message === "INVALID_REQUEST") return errorResponse(res, "INVALID_REQUEST", "This draft has already been sent or changed.");
+      if (message === "INVALID_STATUS") return errorResponse(res, "INVALID_REQUEST", "This draft has already been sent or changed.");
       console.error("Payment request send failed:", error);
       return errorResponse(res, "SERVICE_UNAVAILABLE", "We could not send this payment request right now.");
     }
