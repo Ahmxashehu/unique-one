@@ -3987,12 +3987,13 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         if (!orderItems.length) throw new RequestValidationError('INVALID_STATE', 'This Restaurant order has no valid menu items.');
         const inventoryRefs = orderItems.map((item) => restaurantRef.collection('menuItems').doc(String(item.itemId || '')));
         const inventorySnaps = await Promise.all(inventoryRefs.map((ref) => transaction.get(ref)));
-        const inventoryAdjustments: Array<{ ref: any; nextQuantity: number }> = [];
+        const inventoryQuantities = new Map<string, { ref: any; stockQuantity: number; quantity: number }>();
         for (let index = 0; index < orderItems.length; index++) {
           const item = orderItems[index];
           const menuSnap = inventorySnaps[index];
           const quantity = Number(item.quantity);
-          if (!menuSnap.exists || !Number.isSafeInteger(quantity) || quantity <= 0) {
+          const itemId = String(item.itemId || '');
+          if (!menuSnap.exists || !/^[A-Za-z0-9_-]{1,128}$/.test(itemId) || !Number.isSafeInteger(quantity) || quantity <= 0) {
             throw new RequestValidationError('UNAVAILABLE', 'A Restaurant menu item is no longer available. Cancel this order and check out again.');
           }
           const menu = menuSnap.data() as Record<string, any>;
@@ -4009,11 +4010,24 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             if (!Number.isSafeInteger(stockQuantity) || stockQuantity < 0) {
               throw new RequestValidationError('INVALID_STATE', 'A tracked Restaurant menu item has invalid stock data. Contact the restaurant.');
             }
-            if (stockQuantity < quantity) {
-              throw new RequestValidationError('UNAVAILABLE', 'There is not enough stock for one or more items. Please update your order.');
+            const prior = inventoryQuantities.get(itemId);
+            const combinedQuantity = (prior?.quantity || 0) + quantity;
+            if (!Number.isSafeInteger(combinedQuantity)) {
+              throw new RequestValidationError('INVALID_STATE', 'The requested Restaurant stock quantity is invalid.');
             }
-            inventoryAdjustments.push({ ref: inventoryRefs[index], nextQuantity: stockQuantity - quantity });
+            inventoryQuantities.set(itemId, {
+              ref: inventoryRefs[index],
+              stockQuantity,
+              quantity: combinedQuantity,
+            });
           }
+        }
+        const inventoryAdjustments: Array<{ ref: any; nextQuantity: number }> = [];
+        for (const item of inventoryQuantities.values()) {
+          if (item.stockQuantity < item.quantity) {
+            throw new RequestValidationError('UNAVAILABLE', 'There is not enough stock for one or more items. Please update your order.');
+          }
+          inventoryAdjustments.push({ ref: item.ref, nextQuantity: item.stockQuantity - item.quantity });
         }
         const customerWalletRef = adminDb.collection('wallets').doc(uid), merchantWalletRef = adminDb.collection('wallets').doc(merchantWalletId);
         const [customerSnap, merchantSnap] = await Promise.all([transaction.get(customerWalletRef), transaction.get(merchantWalletRef)]);
