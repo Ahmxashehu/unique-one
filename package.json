@@ -11,6 +11,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test": "node scripts/verify-platform.mjs && node scripts/financial-integrity-harness.mjs",
+    "test:refund-emulator": "tsx scripts/financial-refund-emulator.ts",
     "localization:audit": "node scripts/audit-localization.mjs",
     "localization:strict": "node scripts/audit-localization.mjs --strict",
     "store:expire-reservations": "node scripts/expire-store-reservations.mjs",
