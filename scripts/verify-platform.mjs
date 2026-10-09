@@ -49,6 +49,11 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
 }
 
 const restaurantPaymentSource = read("server.ts");
+const restaurantRefundRouteStart = restaurantPaymentSource.indexOf('app.post("/api/restaurant/orders/:orderId/refund", authenticate');
+const restaurantRefundRoute = restaurantPaymentSource.slice(restaurantRefundRouteStart, restaurantPaymentSource.indexOf('app.post("/api/restaurant/system/refund-sync"', restaurantRefundRouteStart));
+assert(restaurantRefundRouteStart >= 0 && restaurantRefundRoute.includes("existingObligation.status || '') === 'completed'") &&
+  restaurantRefundRoute.indexOf("existingObligation.status || '') === 'completed'") < restaurantRefundRoute.indexOf("Only a cancelled Restaurant order"),
+  "Restaurant refund retry returns completed obligation before rejecting the already-refunded order state");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
 const restaurantBiometricRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 6500);
