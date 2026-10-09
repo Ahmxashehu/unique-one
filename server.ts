@@ -3753,9 +3753,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const customerUid = String(obligation.customerUid || '');
           if (!isSafeId(orderId) || !isSafeId(customerUid)) continue;
           if (String(obligation.status || '') === 'processing' && (obligation.leaseExpiresAt?.toMillis?.() ?? 0) > Date.now()) continue;
+          let claimedLeaseToken = '';
           try {
             const claimed = await claimRestaurantRefundObligation(orderId, customerUid);
             if (claimed.alreadyCompleted) continue;
+            claimedLeaseToken = String(claimed.leaseToken || '');
             const result = await executeFinancialRefund(adminDb, {
               originalTransactionId: String(claimed.originalTransactionId || ''),
               amountMinor: Number(claimed.amountMinor),
@@ -3776,7 +3778,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             }
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown refund processing error.';
-            const finalized = await finalizeRestaurantRefundObligation(orderId, String(claimed?.leaseToken || ''), { status: 'retryable', lastError: message, updatedAt: Timestamp.now(), nextAttemptAt: Timestamp.now(), leaseExpiresAt: null }).catch(() => false);
+            const finalized = await finalizeRestaurantRefundObligation(orderId, claimedLeaseToken, { status: 'retryable', lastError: message, updatedAt: Timestamp.now(), nextAttemptAt: Timestamp.now(), leaseExpiresAt: null }).catch(() => false);
             results.push({ orderId, status: finalized ? 'retryable' : 'superseded', ...(finalized ? { error: 'PROCESSING_FAILED' } : {}) });
           }
         }
