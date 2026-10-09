@@ -51,7 +51,7 @@ export default function TravelPage() {
       setMessage('Enter a destination and check-in date.');
       return;
     }
-    setMessage('Travel search is ready for live provider integration. No availability or price has been invented.');
+    setMessage('Live travel-provider search is not connected yet. No availability was checked, no price was quoted, and no booking or request was submitted.');
   };
 
   return (
@@ -155,7 +155,7 @@ export default function TravelPage() {
                     </div>
                     <label className="block text-xs font-bold text-slate-600">Travellers / guests<input type="number" min="1" value={guests} onChange={e => setGuests(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm font-normal outline-none focus:border-emerald-500" /></label>
                     {(mode === 'plan' || mode === 'activities' || mode === 'destinations') && (
-                      <div className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">This prototype is ready for live providers. Search results will only appear when verified provider data is connected.</div>
+                      <div className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">Live provider data is not connected for this experience. This action cannot return real availability, pricing or a booking.</div>
                     )}
                     <button type="button" onClick={submit} className="w-full rounded-xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 sm:w-auto">
                       <span className="inline-flex items-center justify-center gap-2"><Search className="h-4 w-4" /> Search travel</span>
