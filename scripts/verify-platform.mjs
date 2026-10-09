@@ -83,7 +83,7 @@ for (const required of [
   "const latestCredentialSnap = await transaction.get(credentialRef);",
   "if (latestCount > 0 && signCount > 0 && signCount <= latestCount) return false;",
   "transaction.update(credentialRef, { signCount, lastUsedAt: Timestamp.now() });",
-  "counterAccepted",
+  "if (!counterAccepted)",
   "'restaurant_payment|' + uid + '|' + orderId + '|' + preflightAmountMinor + '|NGN'",
 ]) {
   assert(restaurantBiometricRoute.includes(required), `Restaurant biometric payment protection includes: ${required}`);
