@@ -49,7 +49,15 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
 }
 
 const restaurantPaymentSource = read("server.ts");
-const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
+const restaurantPayStart = restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate');
+const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPayStart, restaurantPayStart + 700);
+const restaurantPayFullRoute = restaurantPaymentSource.slice(restaurantPayStart, restaurantPaymentSource.indexOf('app.post("/api/store/checkout", authenticate', restaurantPayStart));
+const retryLookupIndex = restaurantPayFullRoute.indexOf("const completedRetry = await idempotencyRef.get()");
+const pinVerificationIndex = restaurantPayFullRoute.indexOf("verifyTransactionPin(uid, req.body.transactionPin)");
+const mutableOrderPreflightIndex = restaurantPayFullRoute.indexOf("const preflightOrder = await adminDb.collection('restaurantOrders').doc(orderId).get()");
+assert(retryLookupIndex >= 0 && retryLookupIndex < pinVerificationIndex && retryLookupIndex < mutableOrderPreflightIndex, "Restaurant completed payment retries are checked before PIN re-verification and mutable order preflight");
+assert(restaurantPayFullRoute.includes("saved.uid !== uid") && restaurantPayFullRoute.includes("saved.requestFingerprint !== uid + '|' + orderId"), "Restaurant completed payment replay validates owner and order fingerprint");
+assert(restaurantPayFullRoute.includes("return res.status(200).json({ ...saved.result, replayed: true })"), "Restaurant completed payment replay returns saved result without repeating financial mutations");
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
 const restaurantBiometricRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 6500);
 for (const required of [
