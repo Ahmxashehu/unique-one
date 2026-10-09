@@ -14,6 +14,7 @@ import { generatePublicUniqueAiResponse, generateUniqueAiResponse, UniqueAiValid
 import { getLiveDiscoveryContext } from "./src/lib/ai/aiTools";
 import { registerIdentityVerificationRoutes } from "./src/server/identityVerificationRoutes";
 import { registerAjoRoutes } from "./src/server/ajoRoutes";
+import { registerMonnifyRoutes } from "./src/server/monnifyRoutes";
 import { registerUniqueShareRoutes } from "./src/server/uniqueShareRoutes";
 import { getTransactionAuthPolicy } from "./src/server/transactionAuthPolicy";
 import { registerAdminRbacRoutes } from "./src/server/adminRbacRoutes";
@@ -552,7 +553,7 @@ const app = express();
     }
     next();
   });
-  app.use(express.json({ limit: "10mb" }));
+  app.use(express.json({ limit: "10mb", verify: (req, _res, buffer) => { (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer); } }));
   app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
   const authenticate = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
@@ -908,6 +909,7 @@ const app = express();
   app.get("/api/health", (req, res) => res.json({ status: "ok", ecosystem: "Unique One", version: "1.0.0" }));
   registerIdentityVerificationRoutes(app, authenticate);
   registerAjoRoutes(app, authenticate);
+  registerMonnifyRoutes(app, authenticate);
   registerUniqueShareRoutes(app, authenticate);
   registerAdminRbacRoutes(app, authenticate, requirePermission);
   registerAdminAuditRoutes(app, authenticate, requirePermission);
@@ -1750,6 +1752,51 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     } catch (error) {
       console.error('Payment request creation failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'We could not create the payment request right now.');
+    }
+  });
+
+  app.get("/api/wallet/transactions", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+    const uid = (req as any).user?.uid as string | undefined;
+    if (!uid || !isSafeFirebaseUid(uid)) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+    try {
+      // Read only the authenticated user's own financial records. Bound each query,
+      // merge both sides; each query uses the built-in single-field index.
+      const transactions = adminDb.collection('transactions');
+      const [sent, received] = await Promise.all([
+        transactions.where('senderId', '==', uid).orderBy('createdAt', 'desc').limit(50).get(),
+        transactions.where('recipientId', '==', uid).orderBy('createdAt', 'desc').limit(50).get(),
+      ]);
+      const unique = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+      for (const doc of [...sent.docs, ...received.docs]) unique.set(doc.id, doc);
+      const rows = Array.from(unique.values()).map((doc) => {
+        const data = doc.data() as Record<string, any>;
+        const createdAt = data.createdAt && typeof data.createdAt.toDate === 'function'
+          ? data.createdAt.toDate().toISOString()
+          : typeof data.createdAt === 'string' ? data.createdAt : null;
+        const amountMinor = Number(data.amountMinor ?? data.amount);
+        const senderId = typeof data.senderId === 'string' ? data.senderId : '';
+        const recipientId = typeof data.recipientId === 'string' ? data.recipientId : '';
+        return {
+          id: doc.id,
+          reference: typeof data.reference === 'string' ? data.reference : doc.id,
+          type: typeof data.type === 'string' ? data.type : 'transaction',
+          sourceModule: typeof data.sourceModule === 'string' ? data.sourceModule : '',
+          status: typeof data.status === 'string' ? data.status : 'unknown',
+          currency: typeof data.currency === 'string' ? data.currency : 'NGN',
+          amountMinor: Number.isSafeInteger(amountMinor) && amountMinor > 0 ? amountMinor : null,
+          direction: recipientId === uid ? 'in' : senderId === uid ? 'out' : 'unknown',
+          createdAt,
+        };
+      }).filter((row) =>
+        row.amountMinor !== null &&
+        row.currency === 'NGN' &&
+        (unique.get(row.id)?.data() as Record<string, any> | undefined)?.recordKind === 'financial' &&
+        ['completed', 'pending', 'failed', 'refunded', 'partially_refunded'].includes(row.status)
+      ).sort((a, b) => Date.parse(b.createdAt || '') - Date.parse(a.createdAt || '')).slice(0, 10);
+      return res.status(200).json({ transactions: rows });
+    } catch (error) {
+      console.error('Wallet transaction history read failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Recent wallet activity is temporarily unavailable.');
     }
   });
 

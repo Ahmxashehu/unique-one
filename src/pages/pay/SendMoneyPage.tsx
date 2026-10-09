@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ArrowUpRight, Search, ShieldCheck, User, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,6 +24,7 @@ export default function SendMoneyPage() {
   const [transactionPin, setTransactionPin] = useState('');
   const [biometricBusy, setBiometricBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pendingTransferRef = useRef<{ fingerprint: string; key: string } | null>(null);
 
   const handleResolveRecipient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,9 +84,16 @@ export default function SendMoneyPage() {
     try {
       const token = await currentUser.getIdToken();
       const amountMinor = Math.round(amountValue * 100);
-      const idempotencyKey = typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `transfer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const requestFingerprint = JSON.stringify([recipient.uid, amountMinor, description.trim()]);
+      const previousAttempt = pendingTransferRef.current;
+      const idempotencyKey = previousAttempt?.fingerprint === requestFingerprint
+        ? previousAttempt.key
+        : (typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `transfer-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      // Keep the same key if the network/server outcome is uncertain. This lets a
+      // same-payload retry recover the original result instead of moving funds twice.
+      pendingTransferRef.current = { fingerprint: requestFingerprint, key: idempotencyKey };
 
       let biometricAssertion: BiometricAssertion | undefined;
       if (amountMinor >= 5_000_000) {
@@ -127,11 +135,20 @@ export default function SendMoneyPage() {
         payload = await response.json().catch(() => null);
       }
 
-      if (!response.ok || !payload?.id) {
+      const transactionId = typeof payload?.transaction?.id === 'string'
+        ? payload.transaction.id
+        : typeof payload?.id === 'string' ? payload.id : null;
+      if (!response.ok || !transactionId) {
+        // A definitive client rejection did not complete the transfer. Allow a new
+        // attempt after the user corrects the request; retain keys for uncertain 5xx/network outcomes.
+        if (response.status >= 400 && response.status < 500 && payload?.error?.code !== 'SERVICE_UNAVAILABLE') {
+          pendingTransferRef.current = null;
+        }
         throw new Error(payload?.error?.message || 'The transfer could not be completed.');
       }
 
-      navigate(`/os/pay/receipts/${payload.id}`);
+      pendingTransferRef.current = null;
+      navigate(`/os/pay/receipts/${transactionId}`);
     } catch (sendError) {
       console.error('Wallet transfer failed:', sendError);
       const message = sendError instanceof Error ? sendError.message : 'The transfer could not be completed.';
@@ -157,7 +174,7 @@ export default function SendMoneyPage() {
         <div>
           <h4 className="font-semibold text-emerald-900">Secure transfer</h4>
           <p className="text-sm text-emerald-800 mt-1">
-            Recipient verification and money movement are handled by the authenticated UniquePay wallet service.
+            Recipient verification and wallet updates are handled by the authenticated UniquePay wallet service. This sends between UniquePay wallets only; external bank payouts are not connected yet.
           </p>
         </div>
       </div>
