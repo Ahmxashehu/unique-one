@@ -108,6 +108,12 @@ for (const required of [
   assert(restaurantMenuSource.includes(required), `Restaurant menu stock management includes: ${required}`);
 }
 
+
+const restaurantRefundKeySource = read("server.ts");
+const financialRefundServiceSource = read("src/server/financialRefundService.ts");
+assert(restaurantRefundKeySource.includes("return 'restaurant_refund_' + createHash('sha256').update(orderId).digest('hex');"), "Restaurant refund operation keys remain bounded for maximum-length order IDs");
+assert(financialRefundServiceSource.includes("!isSafeId(input.idempotencyKey)"), "financial refund service enforces its idempotency key size/character boundary");
+
 for (const required of [
   "src/lib/i18n.ts",
   "src/components/GlobalLanguageLayer.tsx",
