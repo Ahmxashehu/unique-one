@@ -9,6 +9,7 @@ const assert = (condition, message) => {
 };
 
 const packageJson = JSON.parse(read("package.json"));
+const paySmallSmallRoutes = read("src/server/paySmallSmallRoutes.ts");
 assert(packageJson.scripts?.lint === "tsc --noEmit", "TypeScript lint script is present");
 assert(packageJson.scripts?.build === "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs", "production build script is present");
 assert(packageJson.scripts?.["store:reconcile-inventory"] === "node scripts/reconcile-store-inventory.mjs", "Store inventory reconciliation command is present");
@@ -117,4 +118,7 @@ for (const forbidden of ["demo rice order", "featured providers"]) {
 
 assert(fs.existsSync(path.join(root, "dist/sw.js")), "production PWA service worker exists");
 assert(fs.existsSync(path.join(root, "dist/server.cjs")), "production server bundle exists");
+assert(paySmallSmallRoutes.includes("if (!Number.isSafeInteger(holdBalance)) throw new Error('HOLD_LEDGER_INVALID')"), "Pay Small Small settlement rejects unsafe intermediate hold-ledger totals");
+assert(paySmallSmallRoutes.includes("if (holdBalance !== total) throw new Error('HOLD_BALANCE_MISMATCH')"), "Pay Small Small seller settlement requires exact hold-ledger balance");
+
 console.log("\nUniquePlatform smoke verification: ALL CHECKS PASSED");
