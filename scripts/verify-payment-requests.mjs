@@ -2,8 +2,16 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const routes = readFileSync("src/server/adminAuditRoutes.ts", "utf8");
+const server = readFileSync("server.ts", "utf8");
 const page = readFileSync("src/pages/PaymentRequestsPage.tsx", "utf8");
 const rules = readFileSync("firestore.rules", "utf8");
+
+assert.match(server, /const amountMinor = Math\.round\(amount \* 100\)/,
+  "payment request amount must be converted to integer minor units");
+assert.match(server, /Math\.abs\(amount \* 100 - amountMinor\) > 1e-7/,
+  "payment request amount must reject more than two decimal places");
+assert.match(server, /amount: normalizedAmount, amountMinor, currency: 'NGN'/,
+  "payment request must persist both normalized NGN amount and integer minor units");
 
 assert.match(routes, /app\.get\(['"]\/api\/payment-requests['"]/,
   "payment requests must be listed through a server route");
