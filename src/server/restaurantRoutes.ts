@@ -305,9 +305,9 @@ export function registerRestaurantRoutes(app: Express, authenticate: RequestHand
     const category = clean(req.body?.category, 100);
     const description = clean(req.body?.description, 1000);
     const priceMinor = Number(req.body?.priceMinor);
-    const available = req.body?.available !== false;
     const stockQuantityProvided = Object.prototype.hasOwnProperty.call(req.body || {}, 'stockQuantity');
     const stockQuantity = Number(req.body?.stockQuantity);
+    const available = req.body?.available !== false && (!stockQuantityProvided || stockQuantity > 0);
     if (!name || !category || !Number.isSafeInteger(priceMinor) || priceMinor <= 0 || priceMinor > 1000000000) {
       return fail(res, 'INVALID_REQUEST', 'Menu item name, category and a valid NGN price are required.');
     }
