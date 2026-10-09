@@ -175,6 +175,13 @@ for (const required of [
 const restaurantRefundKeySource = read("server.ts");
 const financialRefundServiceSource = read("src/server/financialRefundService.ts");
 assert(restaurantRefundKeySource.includes("return 'restaurant_refund_' + createHash('sha256').update(orderId).digest('hex');"), "Restaurant refund operation keys remain bounded for maximum-length order IDs");
+const restaurantRefundRouteStart = restaurantRefundKeySource.indexOf('app.post("/api/restaurant/orders/:orderId/refund"');
+const restaurantRefundRoute = restaurantRefundKeySource.slice(restaurantRefundRouteStart, restaurantRefundRouteStart + 6500);
+assert(restaurantRefundRoute.includes("if (String(order.refundStatus || '') === 'completed')") &&
+  restaurantRefundRoute.includes("completedObligation.status || '') === 'completed'") &&
+  restaurantRefundRoute.includes("replayed: true") &&
+  restaurantRefundRoute.indexOf("if (String(order.refundStatus || '') === 'completed')") < restaurantRefundRoute.indexOf("String(order.refundStatus || '') !== 'required'"),
+  "Restaurant refund retry returns verified completed receipt before enforcing the mutable required-refund state");
 assert(financialRefundServiceSource.includes("!isSafeId(input.idempotencyKey)"), "financial refund service enforces its idempotency key size/character boundary");
 for (const required of [
   "payment.recordKind !== 'financial'",
