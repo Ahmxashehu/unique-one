@@ -36,6 +36,15 @@ for (const phrase of ["Home", "Search", "Log in", "Sign Up", "Checkout", "Wallet
 assert(globalLanguage.includes("MutationObserver"), "dynamic UI text is observed for translation");
 assert(globalLanguage.includes("placeholder"), "form placeholders are included in translation handling");
 
+const financialRefundSource = read("src/server/financialRefundService.ts");
+const refundInventoryQueue = financialRefundSource.indexOf("inventoryRestockOperations.push");
+const refundSellerFundsGuard = financialRefundSource.indexOf("if (sellerBalance < input.amountMinor)");
+const refundOrderFinalValidation = financialRefundSource.indexOf("transaction.update(relatedOrderRef, orderUpdate)");
+const refundInventoryMutation = financialRefundSource.indexOf("transaction.update(operation.productRef");
+assert(refundInventoryQueue >= 0 && refundInventoryQueue < refundSellerFundsGuard, "refund inventory changes are queued before wallet funding validation rather than written");
+assert(refundOrderFinalValidation >= 0 && refundInventoryMutation > refundOrderFinalValidation, "refund inventory mutations happen only after all error-return order validations");
+assert(financialRefundSource.indexOf("recordStoreInventoryMovement(transaction, db, {", refundInventoryMutation) > refundInventoryMutation, "refund stock movement ledger is written with the deferred inventory mutation");
+
 const backendSources = [
   ["server.ts", read("server.ts")],
   ["src/server/ajoRoutes.ts", read("src/server/ajoRoutes.ts")],
