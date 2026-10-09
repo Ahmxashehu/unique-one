@@ -153,6 +153,11 @@ export default function RestaurantPage() {
   };
 
   const confirmBooking = async () => {
+    if (draft.paymentMethod === 'bank-transfer') {
+      setOrderError('Bank transfer is coming soon. This restaurant checkout currently supports UniquePay only; no order or payment was created.');
+      setStage('review');
+      return;
+    }
     if (!currentUser || !selected || submitting) {
       if (!currentUser) navigate('/login', { state: { from: location, message: 'Sign in to confirm your restaurant reservation. Your details will be preserved.' } });
       return;
@@ -398,7 +403,7 @@ export default function RestaurantPage() {
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Payment</p>
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={() => { setTransactionPin(''); saveDraft({...draft, paymentMethod:'uniquepay'}); }} className={`rounded-2xl border p-3 text-left ${draft.paymentMethod === 'uniquepay' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200'}`}><CreditCard className="h-4 w-4 text-emerald-600"/><p className="mt-2 text-xs font-black">UniquePay</p><p className="text-[10px] text-slate-500">Pay directly</p></button>
-                <button onClick={() => saveDraft({...draft, paymentMethod:'bank-transfer'})} className={`rounded-2xl border p-3 text-left ${draft.paymentMethod === 'bank-transfer' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200'}`}><Landmark className="h-4 w-4 text-emerald-600"/><p className="mt-2 text-xs font-black">Bank transfer</p><p className="text-[10px] text-slate-500">Generate account number</p></button>
+                <button type="button" disabled aria-disabled="true" title="Bank transfer will be enabled when a verified payment provider is connected" className="cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left opacity-60"><Landmark className="h-4 w-4 text-slate-400"/><p className="mt-2 text-xs font-black">Bank transfer</p><p className="text-[10px] text-slate-500">Coming soon · provider not connected</p></button>
               </div>
               {draft.paymentMethod === 'uniquepay' && currentUser && (
                 <div>
