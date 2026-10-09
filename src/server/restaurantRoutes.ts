@@ -306,8 +306,13 @@ export function registerRestaurantRoutes(app: Express, authenticate: RequestHand
     const description = clean(req.body?.description, 1000);
     const priceMinor = Number(req.body?.priceMinor);
     const available = req.body?.available !== false;
+    const stockQuantityProvided = Object.prototype.hasOwnProperty.call(req.body || {}, 'stockQuantity');
+    const stockQuantity = Number(req.body?.stockQuantity);
     if (!name || !category || !Number.isSafeInteger(priceMinor) || priceMinor <= 0 || priceMinor > 1000000000) {
       return fail(res, 'INVALID_REQUEST', 'Menu item name, category and a valid NGN price are required.');
+    }
+    if (stockQuantityProvided && (!Number.isSafeInteger(stockQuantity) || stockQuantity < 0 || stockQuantity > 1000000000)) {
+      return fail(res, 'INVALID_REQUEST', 'Stock quantity must be a whole number between 0 and 1,000,000,000.');
     }
     const restaurantRef = db.collection('restaurants').doc(restaurantId);
     const now = Timestamp.now();
@@ -331,6 +336,8 @@ export function registerRestaurantRoutes(app: Express, authenticate: RequestHand
         transaction.create(itemRef, {
           id: itemId, restaurantId, businessId, branchId: String(restaurant.branchId || ''), ownerUid: uid,
           name, category, description, priceMinor, currency: 'NGN', available,
+          stockTracked: stockQuantityProvided,
+          ...(stockQuantityProvided ? { stockQuantity } : {}),
           createdAt: now, updatedAt: now,
         });
         transaction.create(db.collection('audit_logs').doc(), {
@@ -361,7 +368,7 @@ export function registerRestaurantRoutes(app: Express, authenticate: RequestHand
     if (!uid || !businessId || clean(membership.businessId, 128) !== businessId) return fail(res, 'BUSINESS_AUTH_REQUIRED', 'An active Business Platform session is required.', 401);
     if (!hasRolePermission([role], customPermissions, 'manage:restaurant_menu')) return fail(res, 'FORBIDDEN', 'You do not have permission to manage the Restaurant menu.', 403);
     const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const allowed = ['name', 'category', 'description', 'priceMinor', 'available'];
+    const allowed = ['name', 'category', 'description', 'priceMinor', 'available', 'stockQuantity'];
     for (const key of Object.keys(body)) if (!allowed.includes(key)) return fail(res, 'INVALID_REQUEST', 'Only Restaurant menu fields can be changed.');
     const updates: Record<string, unknown> = {};
     if ('name' in body) updates.name = clean(body.name, 200);
@@ -375,6 +382,15 @@ export function registerRestaurantRoutes(app: Express, authenticate: RequestHand
     if ('available' in body) {
       if (typeof body.available !== 'boolean') return fail(res, 'INVALID_REQUEST', 'Menu availability must be boolean.');
       updates.available = body.available;
+    }
+    if ('stockQuantity' in body) {
+      const stockQuantity = Number(body.stockQuantity);
+      if (!Number.isSafeInteger(stockQuantity) || stockQuantity < 0 || stockQuantity > 1000000000) {
+        return fail(res, 'INVALID_REQUEST', 'Stock quantity must be a whole number between 0 and 1,000,000,000.');
+      }
+      updates.stockTracked = true;
+      updates.stockQuantity = stockQuantity;
+      if (stockQuantity === 0) updates.available = false;
     }
     if (typeof updates.name === 'string' && !updates.name) return fail(res, 'INVALID_REQUEST', 'Menu item name cannot be empty.');
     if (typeof updates.category === 'string' && !updates.category) return fail(res, 'INVALID_REQUEST', 'Menu item category cannot be empty.');
