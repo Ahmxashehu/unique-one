@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, Loader2, Plus, Search } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Loader2, Plus, Search, Send } from 'lucide-react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,6 +25,7 @@ export default function PaymentRequestsPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!currentUser) {
@@ -63,6 +64,20 @@ export default function PaymentRequestsPage() {
     return () => { cancelled = true; };
   }, [currentUser]);
 
+  const sendDraft = async (requestId: string) => {
+    if (!currentUser || sendingId) return;
+    setSendingId(requestId);
+    setError(null);
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch("/api/payment-requests/" + encodeURIComponent(requestId) + "/send", { method: "POST", headers: { Authorization: "Bearer " + token } });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error?.message || "We could not send this request.");
+      setRequests(previous => previous.map(item => item.id === requestId ? { ...item, recipientId: payload.recipientId, status: "sent" } : item));
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : "We could not send this request.");
+    } finally { setSendingId(null); }
+  };
   const visibleRequests = useMemo(() => {
     const term = search.trim().toLowerCase();
     return requests.filter((request) => {
@@ -121,7 +136,8 @@ export default function PaymentRequestsPage() {
                 </div>
                 <div className="text-left sm:text-right">
                   <p className="font-semibold text-slate-900">{request.currency === 'NGN' ? '₦' : request.currency || ''}{Number(request.amount || 0).toLocaleString()}</p>
-                  <p className="text-xs text-slate-500">{tab === 'received' ? 'From requester' : `To ${request.recipientIdentifier || 'recipient'}`}</p>
+                  <p className="text-xs text-slate-500">{tab === 'received' ? 'From requester' : `To ${request.recipientIdentifier || 'recipient'}`}
+                  {tab === 'sent' && request.status === 'draft' && <button type="button" onClick={() => void sendDraft(request.id)} disabled={sendingId !== null} className="mt-2 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60">{sendingId === request.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}{sendingId === request.id ? 'Sending…' : 'Send draft'}</button>}</p>
                 </div>
               </div>
             ))}
