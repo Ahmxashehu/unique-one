@@ -49,6 +49,8 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
 }
 
 const transactionPinSource = read("server.ts");
+const firestoreRulesSource = read("firestore.rules");
+assert(firestoreRulesSource.includes("match /transactionPinSecurity/{userId} { allow read, write: if false; }"), "clients cannot read or tamper with server-side Transaction PIN lockout state");
 assert(transactionPinSource.includes("const TRANSACTION_PIN_SECURITY_COLLECTION = 'transactionPinSecurity'"), "Transaction PIN security uses persistent server-side state");
 assert(transactionPinSource.includes("const TRANSACTION_PIN_MAX_FAILURES = 5"), "Transaction PIN lockout threshold is five failed attempts");
 assert(transactionPinSource.includes("const TRANSACTION_PIN_LOCKOUT_MS = 15 * 60_000"), "Transaction PIN lockout duration is fifteen minutes");
