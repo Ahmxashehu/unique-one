@@ -4051,10 +4051,14 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const originalTransactionSnap = await transaction.get(originalTransactionRef);
           const originalTransaction = originalTransactionSnap.data() || {};
           if (!originalTransactionSnap.exists ||
+              originalTransaction.id !== originalTransactionId ||
               originalTransaction.status !== 'completed' ||
               originalTransaction.type !== 'merchant_payment' ||
               originalTransaction.senderId !== uid ||
+              !isSafeFirebaseUid(originalTransaction.recipientId) ||
+              originalTransaction.recipientId === uid ||
               originalTransaction.currency !== 'NGN' ||
+              Number(originalTransaction.amount) !== Number(order.totalMinor) ||
               !Array.isArray(originalTransaction.relatedOrderIds) ||
               !originalTransaction.relatedOrderIds.includes(orderId) ||
               typeof originalTransaction.reference !== 'string') {
