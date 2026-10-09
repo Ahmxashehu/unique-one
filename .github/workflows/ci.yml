@@ -39,6 +39,9 @@ jobs:
       - name: Run whole-platform smoke verification
         run: npm test
 
+      - name: Verify PIN lockout against isolated Firestore Emulator
+        run: npx --yes firebase-tools@14.22.0 emulators:exec --config firebase.emulator.json --only firestore --project demo-uniqueplatform-pin-lockout "npm run test:transaction-pin-emulator"
+
       - name: Audit user-facing localization coverage
         run: npm run localization:audit
 
