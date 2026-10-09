@@ -61,6 +61,18 @@ const finalSettlementRead = installmentPayRoute.indexOf("transaction.get(db.coll
 assert(installmentPayStart >= 0 && installmentPayEnd > installmentPayStart && finalSettlementRead >= 0 && firstInstallmentWrite > finalSettlementRead,
   "Pay Small Small installment transaction completes settlement reads before writing payment and hold ledger records");
 
+const pssInstallmentOrderSource = read("src/server/paySmallSmallRoutes.ts");
+const installmentOrderStart = pssInstallmentOrderSource.indexOf("app.post('/api/pay-small-small/plans/:planId/installments/:installmentNumber/pay'");
+const installmentOrderEnd = pssInstallmentOrderSource.indexOf("app.post('/api/pay-small-small/system/sync'", installmentOrderStart);
+const installmentOrderRoute = pssInstallmentOrderSource.slice(installmentOrderStart, installmentOrderEnd);
+const installmentOrderRead = installmentOrderRoute.indexOf("const orderSnap = await transaction.get(orderRef)");
+const installmentFirstWrite = installmentOrderRoute.indexOf("transaction.create(txRef");
+assert(installmentOrderStart >= 0 && installmentOrderEnd > installmentOrderStart &&
+  installmentOrderRead >= 0 && installmentFirstWrite > installmentOrderRead &&
+  installmentOrderRoute.includes("String(order.status || '') !== 'reserved'") &&
+  installmentOrderRoute.includes("String(order.paymentStatus || '') !== 'partial'"),
+  "Every Pay Small Small installment validates its linked reserved, partially paid order before financial writes");
+
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
