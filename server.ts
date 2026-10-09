@@ -3651,6 +3651,17 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (!orderSnap.exists) return errorResponse(res, 'NOT_FOUND', 'Restaurant order not found.');
       const order = orderSnap.data() as Record<string, any>;
       if (String(order.customerId || '') !== uid) return errorResponse(res, 'FORBIDDEN', 'You cannot refund this Restaurant order.');
+      // Resolve a completed durable obligation before checking the mutable order state:
+      // a lost HTTP response after a successful refund must be safe to retry.
+      const obligationRef = adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).doc(orderId);
+      const existingObligationSnap = await obligationRef.get();
+      if (existingObligationSnap.exists) {
+        const existingObligation = existingObligationSnap.data() as Record<string, any>;
+        if (String(existingObligation.customerUid || '') !== uid) return errorResponse(res, 'FORBIDDEN', 'You cannot refund this Restaurant order.');
+        if (String(existingObligation.status || '') === 'completed' && isSafeId(String(existingObligation.refundTransactionId || ''))) {
+          return res.json({ ok: true, status: 'refunded', refundTransactionId: String(existingObligation.refundTransactionId), replayed: true });
+        }
+      }
       if (String(order.status || '') !== 'cancelled' || String(order.paymentStatus || '') !== 'paid' || String(order.refundStatus || '') !== 'required') {
         return errorResponse(res, 'INVALID_STATE', 'Only a cancelled Restaurant order with a required refund can be refunded.');
       }
