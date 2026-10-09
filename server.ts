@@ -3979,6 +3979,42 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const merchantWalletId = typeof restaurant.merchantWalletId === 'string' && isSafeFirebaseUid(restaurant.merchantWalletId) ? restaurant.merchantWalletId : '';
         if (!merchantWalletId || restaurant.uniquePayStatus !== 'verified') throw new RequestValidationError('UNAVAILABLE', 'This restaurant is not yet connected to a verified UniquePay merchant wallet.');
         if (merchantWalletId === uid) throw new RequestValidationError('INVALID_REQUEST', 'A customer cannot pay their own wallet.');
+
+        // Revalidate the authoritative menu and reserve finite stock in the same
+        // transaction as the wallet debit/credit. Legacy items without stockTracked
+        // remain explicitly untracked for backward compatibility.
+        const orderItems = Array.isArray(order.items) ? order.items as Array<Record<string, any>> : [];
+        if (!orderItems.length) throw new RequestValidationError('INVALID_STATE', 'This Restaurant order has no valid menu items.');
+        const inventoryRefs = orderItems.map((item) => restaurantRef.collection('menuItems').doc(String(item.itemId || '')));
+        const inventorySnaps = await Promise.all(inventoryRefs.map((ref) => transaction.get(ref)));
+        const inventoryAdjustments: Array<{ ref: any; nextQuantity: number }> = [];
+        for (let index = 0; index < orderItems.length; index++) {
+          const item = orderItems[index];
+          const menuSnap = inventorySnaps[index];
+          const quantity = Number(item.quantity);
+          if (!menuSnap.exists || !Number.isSafeInteger(quantity) || quantity <= 0) {
+            throw new RequestValidationError('UNAVAILABLE', 'A Restaurant menu item is no longer available. Cancel this order and check out again.');
+          }
+          const menu = menuSnap.data() as Record<string, any>;
+          if (String(menu.restaurantId || '') !== String(order.restaurantId || '') ||
+              String(menu.businessId || '') !== String(order.businessId || '') ||
+              String(menu.branchId || '') !== String(order.branchId || '') ||
+              menu.available !== true ||
+              !Number.isSafeInteger(Number(menu.priceMinor)) ||
+              Number(menu.priceMinor) !== Number(item.unitPriceMinor)) {
+            throw new RequestValidationError('UNAVAILABLE', 'A Restaurant menu item or price has changed. Cancel this order and check out again.');
+          }
+          if (menu.stockTracked === true) {
+            const stockQuantity = Number(menu.stockQuantity);
+            if (!Number.isSafeInteger(stockQuantity) || stockQuantity < 0) {
+              throw new RequestValidationError('INVALID_STATE', 'A tracked Restaurant menu item has invalid stock data. Contact the restaurant.');
+            }
+            if (stockQuantity < quantity) {
+              throw new RequestValidationError('UNAVAILABLE', 'There is not enough stock for one or more items. Please update your order.');
+            }
+            inventoryAdjustments.push({ ref: inventoryRefs[index], nextQuantity: stockQuantity - quantity });
+          }
+        }
         const customerWalletRef = adminDb.collection('wallets').doc(uid), merchantWalletRef = adminDb.collection('wallets').doc(merchantWalletId);
         const [customerSnap, merchantSnap] = await Promise.all([transaction.get(customerWalletRef), transaction.get(merchantWalletRef)]);
         if (!customerSnap.exists || !merchantSnap.exists) throw new RequestValidationError('UNAVAILABLE', 'The UniquePay wallet connection is not available.');
@@ -3987,6 +4023,13 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         if (customerWallet.availableBalanceMinor < amountMinor) throw new RequestValidationError('INSUFFICIENT_FUNDS', 'Your UniquePay balance is insufficient for this order.');
         if (!Number.isSafeInteger(merchantWallet.availableBalanceMinor + amountMinor)) throw new RequestValidationError('INVALID_AMOUNT', 'The merchant wallet cannot safely receive this payment.');
         const now = Timestamp.now(), transactionId = adminDb.collection('transactions').doc().id, reference = 'UP-RS-' + transactionId;
+        for (const adjustment of inventoryAdjustments) {
+          transaction.update(adjustment.ref, {
+            stockQuantity: adjustment.nextQuantity,
+            ...(adjustment.nextQuantity === 0 ? { available: false } : {}),
+            updatedAt: now,
+          });
+        }
         const transactionRef = adminDb.collection('transactions').doc(transactionId);
         transaction.create(transactionRef, { id: transactionId, reference, senderId: uid, recipientId: merchantWalletId, amount: amountMinor, currency: 'NGN', type: 'merchant_payment', sourceModule: 'unique_restaurant.checkout', provider: 'unique_pay_internal_wallet', status: 'completed', relatedOrderIds: [orderId], createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor' });
         const debitRef = adminDb.collection('ledgerEntries').doc(), creditRef = adminDb.collection('ledgerEntries').doc();
