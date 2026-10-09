@@ -37,6 +37,8 @@ type Draft = {
   customerName: string;
   customerPhone: string;
   cart: Record<string, number>;
+  orderIdempotencyKey?: string;
+  paymentIdempotencyKey?: string;
 };
 
 const emptyDraft: Draft = {
@@ -52,6 +54,8 @@ const emptyDraft: Draft = {
   customerName: '',
   customerPhone: '',
   cart: {},
+  orderIdempotencyKey: '',
+  paymentIdempotencyKey: '',
 };
 
 export default function RestaurantPage() {
@@ -131,7 +135,22 @@ export default function RestaurantPage() {
   const finalTotal = finalTotalMinor / 100;
   const checkoutReady = Boolean(customerName.trim() && customerPhone.trim() && (draft.paymentMethod !== 'uniquepay' || /^\d{4}$/.test(transactionPin)) && (draft.mode !== 'delivery' || draft.deliveryAddress.trim()) && (draft.mode !== 'dine-in' || (draft.date && draft.time)) && (draft.mode !== 'pickup' || (draft.date && draft.time)));
 
-  const openBooking = (restaurant: Restaurant) => { setSelected(restaurant); saveDraft({ ...draft, restaurantId: restaurant.id, cart, customerName, customerPhone }); setBookingOpen(true); setStage('menu'); };
+  const openBooking = (restaurant: Restaurant) => {
+    const sameUnfinishedBooking = draft.restaurantId === restaurant.id && Boolean(draft.orderIdempotencyKey);
+    const nextDraft: Draft = {
+      ...draft,
+      restaurantId: restaurant.id,
+      cart,
+      customerName,
+      customerPhone,
+      orderIdempotencyKey: sameUnfinishedBooking ? draft.orderIdempotencyKey : `restaurant_${crypto.randomUUID().replace(/-/g, '')}`,
+      paymentIdempotencyKey: sameUnfinishedBooking && draft.paymentIdempotencyKey ? draft.paymentIdempotencyKey : `restaurant_pay_${crypto.randomUUID().replace(/-/g, '')}`,
+    };
+    setSelected(restaurant);
+    saveDraft(nextDraft);
+    setBookingOpen(true);
+    setStage('menu');
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -165,7 +184,8 @@ export default function RestaurantPage() {
     setSubmitting(true);
     setOrderError('');
     try {
-      const idempotencyKey = `restaurant_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      const idempotencyKey = draft.orderIdempotencyKey;
+      if (!idempotencyKey) throw new Error('Checkout protection could not be initialized. Please reopen the restaurant booking.');
       const token = await currentUser.getIdToken();
       const response = await fetch('/api/restaurant/orders', {
         method: 'POST',
@@ -186,7 +206,7 @@ export default function RestaurantPage() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
             orderId: data.orderId,
-            idempotencyKey: `restaurant_pay_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+            idempotencyKey: draft.paymentIdempotencyKey,
             transactionPin,
           }),
         });
@@ -199,7 +219,7 @@ export default function RestaurantPage() {
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify({
               orderId: data.orderId,
-              idempotencyKey: `restaurant_pay_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+              idempotencyKey: draft.paymentIdempotencyKey,
               transactionPin,
               biometricAssertion,
             }),
