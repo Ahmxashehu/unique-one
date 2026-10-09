@@ -53,7 +53,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         if (String(order.customerId || '') !== uid) throw new Error('FORBIDDEN');
         if (String(order.currency || '') !== 'NGN') throw new Error('INVALID_CURRENCY');
         if (Number(order.totalMinor) !== totalAmountMinor) throw new Error('AMOUNT_MISMATCH');
-        if (String(order.paymentStatus || '') !== 'pending_payment') throw new Error('ORDER_NOT_ELIGIBLE');
+        if (String(order.paymentStatus || '') !== 'pending_payment' || String(order.status || '') !== 'pending_payment') throw new Error('ORDER_NOT_ELIGIBLE');
         if (order.paySmallSmallPlanId) throw new Error('PLAN_EXISTS');
         const now = Timestamp.now();
         const intervalDays = frequency === 'weekly' ? 7 : 30;
