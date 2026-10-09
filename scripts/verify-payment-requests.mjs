@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const routes = readFileSync("src/server/adminAuditRoutes.ts", "utf8");
 const page = readFileSync("src/pages/PaymentRequestsPage.tsx", "utf8");
+const rules = readFileSync("firestore.rules", "utf8");
 
 assert.match(routes, /app\.get\(['"]\/api\/payment-requests['"]/,
   "payment requests must be listed through a server route");
@@ -29,5 +30,15 @@ assert.ok(page.includes("fetch('/api/payment-requests/' + encodeURIComponent(ite
   "status actions must target the selected request on the API");
 assert.doesNotMatch(page, /from ['"]firebase\/firestore['"]/,
   "the page must not bypass server authorization with direct Firestore reads");
+
+const requestRulesStart = rules.indexOf("match /payment_requests/{reqId}");
+const requestRulesEnd = rules.indexOf("\n    match /", requestRulesStart + 1);
+assert.ok(requestRulesStart >= 0 && requestRulesEnd > requestRulesStart,
+  "payment request Firestore rules block must exist");
+const requestRules = rules.slice(requestRulesStart, requestRulesEnd);
+assert.match(requestRules, /allow update: if isPlatformAdmin\(\);/,
+  "clients must not bypass server-authoritative payment request transitions");
+assert.doesNotMatch(requestRules, /allow update:[\s\S]*?request\.auth\.uid/,
+  "participant client updates must not be allowed directly");
 
 console.log("Payment request contract checks passed (static checks; not a live Firestore integration test).");
