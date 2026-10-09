@@ -138,12 +138,30 @@ async function claimRestaurantRefundObligation(orderId: string, actorUid: string
     }
     const attemptCount = Number(obligation.attemptCount || 0);
     if (!Number.isSafeInteger(attemptCount) || attemptCount < 0) throw new RequestValidationError('INVALID_STATE', 'The Restaurant refund obligation is invalid.');
+    const leaseToken = randomUUID();
     transaction.update(ref, {
-      status: 'processing', attemptCount: attemptCount + 1,
+      status: 'processing', attemptCount: attemptCount + 1, leaseToken,
       leaseExpiresAt: Timestamp.fromMillis(Date.now() + RESTAURANT_REFUND_LEASE_MS),
       updatedAt: now, lastAttemptAt: now,
     });
-    return { ...obligation, status: 'processing', attemptCount: attemptCount + 1 };
+    return { ...obligation, status: 'processing', attemptCount: attemptCount + 1, leaseToken };
+  });
+}
+
+async function finalizeRestaurantRefundObligation(
+  orderId: string,
+  leaseToken: string,
+  patch: Record<string, unknown>,
+): Promise<boolean> {
+  if (!leaseToken) return false;
+  const ref = adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).doc(orderId);
+  return adminDb.runTransaction(async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists) return false;
+    const current = snap.data() as Record<string, any>;
+    if (String(current.status || '') !== 'processing' || String(current.leaseToken || '') !== leaseToken) return false;
+    transaction.update(ref, { ...patch, leaseToken: null });
+    return true;
   });
 }
 
@@ -3684,10 +3702,10 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         finalizeOrder: 'full',
       });
       if ('error' in result) {
-        await adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).doc(orderId).update({ status: 'retryable', lastError: result.error.message, updatedAt: Timestamp.now(), nextAttemptAt: Timestamp.now(), leaseExpiresAt: null });
+        await finalizeRestaurantRefundObligation(orderId, String(obligation.leaseToken || ''), { status: 'retryable', lastError: result.error.message, updatedAt: Timestamp.now(), nextAttemptAt: Timestamp.now(), leaseExpiresAt: null });
         return errorResponse(res, result.error.code, result.error.message);
       }
-      await adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).doc(orderId).update({ status: 'completed', refundTransactionId: result.transactionId, completedAt: Timestamp.now(), updatedAt: Timestamp.now(), leaseExpiresAt: null });
+      await finalizeRestaurantRefundObligation(orderId, String(obligation.leaseToken || ''), { status: 'completed', refundTransactionId: result.transactionId, completedAt: Timestamp.now(), updatedAt: Timestamp.now(), leaseExpiresAt: null });
       return res.json({ ok: true, ...result });
     } catch (error) {
       console.error('Restaurant refund failed:', error);
@@ -3735,9 +3753,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const customerUid = String(obligation.customerUid || '');
           if (!isSafeId(orderId) || !isSafeId(customerUid)) continue;
           if (String(obligation.status || '') === 'processing' && (obligation.leaseExpiresAt?.toMillis?.() ?? 0) > Date.now()) continue;
+          let claimedLeaseToken = '';
           try {
             const claimed = await claimRestaurantRefundObligation(orderId, customerUid);
             if (claimed.alreadyCompleted) continue;
+            claimedLeaseToken = String(claimed.leaseToken || '');
             const result = await executeFinancialRefund(adminDb, {
               originalTransactionId: String(claimed.originalTransactionId || ''),
               amountMinor: Number(claimed.amountMinor),
@@ -3750,16 +3770,16 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
               finalizeOrder: 'full',
             });
             if ('error' in result) {
-              await doc.ref.update({ status: 'retryable', lastError: result.error.message, updatedAt: Timestamp.now(), nextAttemptAt: Timestamp.now(), leaseExpiresAt: null });
-              results.push({ orderId, status: 'retryable', error: result.error.code });
+              const finalized = await finalizeRestaurantRefundObligation(orderId, String(claimed.leaseToken || ''), { status: 'retryable', lastError: result.error.message, updatedAt: Timestamp.now(), nextAttemptAt: Timestamp.now(), leaseExpiresAt: null });
+              results.push({ orderId, status: finalized ? 'retryable' : 'superseded', ...(finalized ? { error: result.error.code } : {}) });
             } else {
-              await doc.ref.update({ status: 'completed', refundTransactionId: result.transactionId, completedAt: Timestamp.now(), updatedAt: Timestamp.now(), leaseExpiresAt: null });
-              results.push({ orderId, status: 'completed', refundTransactionId: result.transactionId });
+              const finalized = await finalizeRestaurantRefundObligation(orderId, String(claimed.leaseToken || ''), { status: 'completed', refundTransactionId: result.transactionId, completedAt: Timestamp.now(), updatedAt: Timestamp.now(), leaseExpiresAt: null });
+              results.push({ orderId, status: finalized ? 'completed' : 'superseded', refundTransactionId: result.transactionId });
             }
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown refund processing error.';
-            await doc.ref.update({ status: 'retryable', lastError: message, updatedAt: Timestamp.now(), nextAttemptAt: Timestamp.now(), leaseExpiresAt: null }).catch(() => undefined);
-            results.push({ orderId, status: 'retryable', error: 'PROCESSING_FAILED' });
+            const finalized = await finalizeRestaurantRefundObligation(orderId, claimedLeaseToken, { status: 'retryable', lastError: message, updatedAt: Timestamp.now(), nextAttemptAt: Timestamp.now(), leaseExpiresAt: null }).catch(() => false);
+            results.push({ orderId, status: finalized ? 'retryable' : 'superseded', ...(finalized ? { error: 'PROCESSING_FAILED' } : {}) });
           }
         }
       }

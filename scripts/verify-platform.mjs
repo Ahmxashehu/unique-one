@@ -69,6 +69,10 @@ for (const required of [
 ]) {
   assert(restaurantBiometricRoute.includes(required), `Restaurant biometric payment protection includes: ${required}`);
 }
+const restaurantRefundLeaseSource = read("server.ts");
+assert(restaurantRefundLeaseSource.includes("const leaseToken = randomUUID();"), "Restaurant refund claims issue a unique lease token");
+assert(restaurantRefundLeaseSource.includes("String(current.leaseToken || '') !== leaseToken"), "Restaurant refund finalization rejects stale workers");
+assert(restaurantRefundLeaseSource.includes("finalizeRestaurantRefundObligation(orderId, String(claimed.leaseToken || '')"), "Restaurant refund recovery fences final status updates by lease token");
 const restaurantMenuSource = read("src/server/restaurantRoutes.ts");
 for (const required of [
   "stockTracked === true",
