@@ -4,7 +4,7 @@ import {
   History, Landmark, Receipt, ShieldCheck, Smartphone, Users, Wallet,
   WalletCards, Zap, Wifi, PhoneCall
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const money = (minor: number) => '₦' + (minor / 100).toLocaleString('en-NG', {
@@ -18,6 +18,116 @@ export default function PayPage() {
   const [walletLoading, setWalletLoading] = useState(true);
   const [walletError, setWalletError] = useState('');
   const [walletRetry, setWalletRetry] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const returnPaymentReference = searchParams.get('paymentReference');
+  const [providerConfig, setProviderConfig] = useState<{ configured: boolean; environment: string; livePaymentsEnabled: boolean } | null>(null);
+  const [fundingOpen, setFundingOpen] = useState(false);
+  const [fundingAmount, setFundingAmount] = useState('500');
+  const [fundingBusy, setFundingBusy] = useState(false);
+  const [fundingError, setFundingError] = useState('');
+  const [paymentStatusMessage, setPaymentStatusMessage] = useState('');
+  const [paymentVerifyBusy, setPaymentVerifyBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/payments/monnify/config')
+      .then(async response => {
+        if (!response.ok) throw new Error('Unable to check payment provider');
+        return response.json() as Promise<{ configured?: boolean; environment?: string; livePaymentsEnabled?: boolean }>;
+      })
+      .then(value => {
+        if (!cancelled) setProviderConfig({
+          configured: value.configured === true,
+          environment: value.environment === 'live' ? 'live' : 'sandbox',
+          livePaymentsEnabled: value.livePaymentsEnabled === true,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setProviderConfig({ configured: false, environment: 'sandbox', livePaymentsEnabled: false });
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const verifyReturnedPayment = async () => {
+    if (!currentUser || !returnPaymentReference) return;
+    setPaymentVerifyBusy(true);
+    setPaymentStatusMessage('');
+    try {
+      let token = await currentUser.getIdToken();
+      let response = await fetch('/api/payments/monnify/verify/' + encodeURIComponent(returnPaymentReference), {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      if (response.status === 401) {
+        token = await currentUser.getIdToken(true);
+        response = await fetch('/api/payments/monnify/verify/' + encodeURIComponent(returnPaymentReference), {
+          headers: { Authorization: 'Bearer ' + token },
+        });
+      }
+      const payload = await response.json().catch(() => ({})) as { status?: string; error?: { message?: string } };
+      if (!response.ok) throw new Error(payload.error?.message || 'Payment status could not be checked.');
+      if (payload.status === 'credited' || payload.status === 'already_credited') {
+        setPaymentStatusMessage('Payment verified. Your wallet balance has been updated.');
+        setWalletRetry(value => value + 1);
+        const next = new URLSearchParams(searchParams);
+        next.delete('paymentReference');
+        setSearchParams(next, { replace: true });
+      } else if (payload.status === 'pending') {
+        setPaymentStatusMessage('Payment is not confirmed yet. Your wallet has not been credited; check again shortly.');
+      } else {
+        setPaymentStatusMessage('Payment status: ' + String(payload.status || 'unconfirmed') + '. Your wallet was not credited.');
+      }
+    } catch (error) {
+      setPaymentStatusMessage(error instanceof Error ? error.message : 'Payment status could not be checked.');
+    } finally {
+      setPaymentVerifyBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authLoading || !currentUser || !returnPaymentReference) return;
+    void verifyReturnedPayment();
+    // The reference is deliberately retained in the URL while status is pending, allowing a safe manual retry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, currentUser, returnPaymentReference]);
+
+  const startWalletFunding = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFundingError('');
+    if (!currentUser) {
+      setFundingError('Sign in to fund your UniquePay wallet.');
+      return;
+    }
+    if (!providerConfig?.configured || (providerConfig.environment === 'live' && !providerConfig.livePaymentsEnabled)) {
+      setFundingError('Monnify funding is not enabled on the server yet.');
+      return;
+    }
+    if (!/^\\d+(?:\\.\\d{1,2})?$/.test(fundingAmount.trim())) {
+      setFundingError('Enter an amount with no more than two decimal places.');
+      return;
+    }
+    const amountMinor = Math.round(Number(fundingAmount) * 100);
+    if (!Number.isSafeInteger(amountMinor) || amountMinor < 2000 || amountMinor > 50_000_000) {
+      setFundingError('Enter an amount between ₦20 and ₦500,000.');
+      return;
+    }
+    setFundingBusy(true);
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/payments/monnify/initialize', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amountMinor, description: 'UniquePay wallet funding' }),
+      });
+      const payload = await response.json().catch(() => ({})) as { checkoutUrl?: string; error?: { message?: string } };
+      if (!response.ok || typeof payload.checkoutUrl !== 'string') {
+        throw new Error(payload.error?.message || 'Secure checkout could not be started. No wallet balance was changed.');
+      }
+      window.location.assign(payload.checkoutUrl);
+    } catch (error) {
+      setFundingError(error instanceof Error ? error.message : 'Secure checkout could not be started.');
+      setFundingBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -114,6 +224,41 @@ export default function PayPage() {
               <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
                 <span>{walletError}</span>
                 <button type="button" onClick={() => setWalletRetry((value) => value + 1)} className="shrink-0 rounded-lg bg-white/10 px-2.5 py-1.5 font-bold text-white hover:bg-white/15">Retry</button>
+              </div>
+            )}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" onClick={() => { setFundingOpen(value => !value); setFundingError(''); }} disabled={walletLoading || balanceMinor === null} className="rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-50">
+                {fundingOpen ? 'Close funding' : 'Fund wallet'}
+              </button>
+              {providerConfig?.configured && (
+                <span className="self-center text-[11px] text-slate-400">
+                  Monnify {providerConfig.environment === 'live' ? 'live' : 'sandbox'} {providerConfig.environment === 'live' && !providerConfig.livePaymentsEnabled ? '— disabled' : ''}
+                </span>
+              )}
+            </div>
+            {fundingOpen && (
+              <form onSubmit={startWalletFunding} className="mt-4 rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+                <label htmlFor="uniquepay-funding-amount" className="block text-xs font-bold text-slate-200">Amount to add (NGN)</label>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <input id="uniquepay-funding-amount" type="number" min="20" max="500000" step="0.01" inputMode="decimal" value={fundingAmount} onChange={event => setFundingAmount(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-sm text-white outline-none focus:border-emerald-300" required />
+                  <button type="submit" disabled={fundingBusy || !providerConfig?.configured || (providerConfig.environment === 'live' && !providerConfig.livePaymentsEnabled)} className="rounded-xl bg-white px-4 py-3 text-sm font-black text-slate-950 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50">
+                    {fundingBusy ? 'Preparing checkout…' : 'Continue to Monnify'}
+                  </button>
+                </div>
+                <p className="mt-2 text-[11px] text-slate-400">Minimum ₦20, maximum ₦500,000 per payment. Your wallet is credited only after server-side confirmation.</p>
+                {!providerConfig?.configured && <p className="mt-2 text-xs text-amber-200">Monnify credentials are not configured on the server yet.</p>}
+                {providerConfig?.environment === 'live' && !providerConfig.livePaymentsEnabled && <p className="mt-2 text-xs text-amber-200">Live collections are deliberately disabled pending activation and production checks.</p>}
+                {fundingError && <p role="alert" className="mt-2 text-xs text-rose-300">{fundingError}</p>}
+              </form>
+            )}
+            {paymentStatusMessage && (
+              <div role="status" className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-slate-200">
+                <p>{paymentStatusMessage}</p>
+                {returnPaymentReference && (
+                  <button type="button" onClick={() => void verifyReturnedPayment()} disabled={paymentVerifyBusy} className="mt-2 rounded-lg bg-white/10 px-3 py-1.5 font-bold text-white disabled:opacity-50">
+                    {paymentVerifyBusy ? 'Checking…' : 'Check payment status'}
+                  </button>
+                )}
               </div>
             )}
           </div>
