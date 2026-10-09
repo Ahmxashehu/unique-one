@@ -1718,8 +1718,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const dueDate = typeof body?.dueDate === 'string' ? body.dueDate : undefined;
       const status = body?.status === 'draft' ? 'draft' : body?.status === 'sent' ? 'sent' : '';
       if (!recipientIdentifier || recipientIdentifier.length > 320 || !description || description.length > 500) return errorResponse(res, 'INVALID_REQUEST', 'Recipient and description are required and must be valid.');
-      if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 1000000000000) return errorResponse(res, 'INVALID_AMOUNT', 'The payment request amount is invalid.');
+      if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 1000000000000 || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7) return errorResponse(res, 'INVALID_AMOUNT', 'The payment request amount must be positive and use no more than two decimal places.');
       if (!status) return errorResponse(res, 'INVALID_REQUEST', 'A valid payment request status is required.');
+      if (dueDate !== undefined) {
+        const parsedDueDate = new Date(dueDate + 'T00:00:00.000Z');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || Number.isNaN(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== dueDate) return errorResponse(res, 'INVALID_REQUEST', 'The payment request due date must be a valid YYYY-MM-DD date.');
+      }
       const normalizedEmail = recipientIdentifier.toLowerCase();
       const [emailSnapshot, phoneSnapshot, uniqueOneIdSnapshot] = await Promise.all([
         adminDb.collection('users').where('email', '==', recipientIdentifier).limit(1).get(),
@@ -1734,23 +1738,27 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const recipientData = recipientDoc.data() as Record<string, unknown>;
       const now = Timestamp.now().toDate().toISOString();
       const ref = adminDb.collection('payment_requests').doc();
-      await ref.create({
-        senderId, recipientId: recipientDoc.id,
-        recipientIdentifier,
-        recipientName: typeof recipientData.fullName === 'string' ? recipientData.fullName : 'Unique One user',
-        amount: Math.round(amount * 100) / 100, currency: 'NGN', description,
-        ...(dueDate ? { dueDate } : {}), status, createdAt: now, updatedAt: now,
-      });
-      await adminDb.collection('audit_logs').add({
-        action: 'payment_request.created',
-        actorUid: senderId,
-        targetUid: recipientDoc.id,
-        resource: 'payment_request',
-        resourceId: ref.id,
-        amount: Math.round(amount * 100) / 100,
-        currency: 'NGN',
-        status,
-        timestamp: Timestamp.fromDate(new Date(now)),
+      const amountNaira = Math.round(amount * 100) / 100;
+      const auditRef = adminDb.collection('audit_logs').doc();
+      await adminDb.runTransaction(async transaction => {
+        transaction.create(ref, {
+          senderId, recipientId: recipientDoc.id,
+          recipientIdentifier,
+          recipientName: typeof recipientData.fullName === 'string' ? recipientData.fullName : 'Unique One user',
+          amount: amountNaira, currency: 'NGN', description,
+          ...(dueDate ? { dueDate } : {}), status, createdAt: now, updatedAt: now,
+        });
+        transaction.create(auditRef, {
+          action: 'payment_request.created',
+          actorUid: senderId,
+          targetUid: recipientDoc.id,
+          resource: 'payment_request',
+          resourceId: ref.id,
+          amount: amountNaira,
+          currency: 'NGN',
+          status,
+          timestamp: Timestamp.fromDate(new Date(now)),
+        });
       });
       return res.status(201).json({ id: ref.id, recipientId: recipientDoc.id, status });
     } catch (error) {
