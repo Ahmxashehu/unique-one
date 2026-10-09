@@ -234,6 +234,13 @@ export async function executeFinancialRefund(
       const rr = order.returnRequest && typeof order.returnRequest === 'object'
         ? order.returnRequest as Record<string, unknown>
         : null;
+      if (input.finalizeOrder === 'partial' && (
+        !rr ||
+        rr.status !== 'received' ||
+        Number(rr.requestedRefundAmountMinor) !== input.amountMinor
+      )) {
+        return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'A partial Store refund requires a received return request for the exact refund amount.' } };
+      }
       if (rr) {
         const expiresAtMs = typeof rr.expiresAt === 'string' ? Date.parse(rr.expiresAt) : NaN;
         if (!Number.isFinite(expiresAtMs) || Date.now() > expiresAtMs) {
@@ -423,13 +430,10 @@ export async function executeFinancialRefund(
         ? order.returnRequest as Record<string, unknown>
         : null;
       if (input.finalizeOrder === 'partial') {
-        if (!order) return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order was not found.' } };
-        if (!rr || rr.status !== 'received' || Number(rr.requestedRefundAmountMinor) !== input.amountMinor) {
-          return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The partial Store return is no longer eligible for this refund.' } };
-        }
+        // These preconditions were validated above, before any transaction writes.
         transaction.update(relatedOrderRef, {
           paymentStatus: 'partially_refunded',
-          returnRequest: { ...rr, status: 'refunded', refundedAt: now, refundTransactionId: refundRef.id },
+          returnRequest: { ...rr!, status: 'refunded', refundedAt: now, refundTransactionId: refundRef.id },
           updatedAt: now,
         });
       } else {
@@ -441,12 +445,9 @@ export async function executeFinancialRefund(
           refundTransactionId: refundRef.id,
         };
         if (input.finalizeDispute) {
-          const current = relatedOrderData;
-          if (!current) return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The related Store order was not found.' } };
+          const current = relatedOrderData!;
           const dispute = current.dispute && typeof current.dispute === 'object' ? current.dispute as Record<string, unknown> : null;
-          if (!dispute || !['opened', 'seller_responded', 'under_review'].includes(String(dispute.status))) {
-            return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'The Store dispute has already been resolved.' } };
-          }
+          // Dispute state and eligibility were validated above, before any transaction writes.
           orderUpdate.dispute = {
             ...dispute,
             status: 'resolved',
