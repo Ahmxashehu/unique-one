@@ -27,6 +27,10 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Validate Firebase configuration and composite indexes
+        run: |
+          node -e "const fs=require('fs'); const cfg=JSON.parse(fs.readFileSync('firebase.json','utf8')); const indexes=cfg.firestore?.indexes; if(indexes!=='firestore.indexes.json') throw new Error('firebase.json must reference firestore.indexes.json'); const data=JSON.parse(fs.readFileSync(indexes,'utf8')); if(!Array.isArray(data.indexes)||!Array.isArray(data.fieldOverrides)) throw new Error('Invalid Firestore index configuration'); for (const index of data.indexes) { if(!index.collectionGroup || !['COLLECTION','COLLECTION_GROUP'].includes(index.queryScope) || !Array.isArray(index.fields) || index.fields.length < 2) throw new Error('Invalid composite index: '+JSON.stringify(index)); } console.log('Firebase config and '+data.indexes.length+' composite indexes validated.');"
+
       - name: Install dependencies
         run: npm install
 
@@ -93,4 +97,3 @@ jobs:
           path: release-assets/Unique-One.apk
           if-no-files-found: error
           retention-days: 14
-
