@@ -1,4 +1,5 @@
 import type { Express, Request, RequestHandler } from "express";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
@@ -59,6 +60,29 @@ function uidFrom(req: Request): string | null {
   const uid = (req as Request & { user?: { uid?: unknown } }).user?.uid;
   return typeof uid === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(uid) ? uid : null;
 }
+
+function paymentRateLimitKey(req: Request): string {
+  const uid = uidFrom(req);
+  return uid ? `uid:${uid}` : `ip:${ipKeyGenerator(req.ip)}`;
+}
+
+const initializePaymentLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: paymentRateLimitKey,
+  message: { error: { code: "RATE_LIMITED", message: "Too many payment attempts. Please try again shortly." } },
+});
+
+const verifyPaymentLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: paymentRateLimitKey,
+  message: { error: { code: "RATE_LIMITED", message: "Too many payment status checks. Please try again shortly." } },
+});
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -238,7 +262,7 @@ export function registerMonnifyRoutes(app: Express, authenticate: RequestHandler
     });
   });
 
-  app.post("/api/payments/monnify/initialize", authenticate, async (req, res) => {
+  app.post("/api/payments/monnify/initialize", authenticate, initializePaymentLimiter, async (req, res) => {
     const uid = uidFrom(req);
     if (!uid) return jsonError(res, 401, "UNAUTHENTICATED", "Authentication is required.");
     const cfg = config();
@@ -325,7 +349,7 @@ export function registerMonnifyRoutes(app: Express, authenticate: RequestHandler
     }
   });
 
-  app.get("/api/payments/monnify/verify/:paymentReference", authenticate, async (req, res) => {
+  app.get("/api/payments/monnify/verify/:paymentReference", authenticate, verifyPaymentLimiter, async (req, res) => {
     const uid = uidFrom(req);
     if (!uid) return jsonError(res, 401, "UNAUTHENTICATED", "Authentication is required.");
     const cfg = config();
