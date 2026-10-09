@@ -274,9 +274,6 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const reference = 'UP-PSS-' + txRef.id;
         const debitRef = db.collection('ledgerEntries').doc();
         const holdRef = db.collection('ledgerEntries').doc();
-        transaction.create(txRef, { id: txRef.id, reference, senderId: uid, recipientId: String(plan.planId), amount, currency: 'NGN', type: 'merchant_payment', sourceModule: 'unique_pay_small_small.installment', provider: 'unique_pay_internal_wallet', status: 'completed', relatedOrderIds: [String(plan.orderId)], createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor', installmentNumber });
-        transaction.create(debitRef, { id: debitRef.id, transactionId: txRef.id, reference, uid, direction: 'debit', amountMinor: amount, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now });
-        transaction.create(holdRef, { id: holdRef.id, transactionId: txRef.id, reference, uid: String(plan.planId), direction: 'credit', amountMinor: amount, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now, accountType: 'pay_small_small_hold' });
         const nextInstallments = installments.map((item: any, i: number) => i === index ? { ...item, status: 'paid', paidAt: now, paymentTransactionId: txRef.id } : item);
         const paidAmount = Number(plan.paidAmountMinor || 0) + amount;
         const total = Number(plan.totalAmountMinor);
@@ -328,6 +325,11 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
           transaction.update(sellerWalletRef, { availableBalanceMinor: sellerBalance + total, updatedAt: now });
           sellerSettlement = { transactionId: settlementTxRef.id, sellerId, amountMinor: total };
         }
+        // Firestore transactions require every read to complete before the first write.
+        // The final order, seller wallet and hold-ledger checks above must all finish first.
+        transaction.create(txRef, { id: txRef.id, reference, senderId: uid, recipientId: String(plan.planId), amount, currency: 'NGN', type: 'merchant_payment', sourceModule: 'unique_pay_small_small.installment', provider: 'unique_pay_internal_wallet', status: 'completed', relatedOrderIds: [String(plan.orderId)], createdAt: now, updatedAt: now, recordKind: 'financial', schemaVersion: 2, amountUnit: 'minor', installmentNumber });
+        transaction.create(debitRef, { id: debitRef.id, transactionId: txRef.id, reference, uid, direction: 'debit', amountMinor: amount, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now });
+        transaction.create(holdRef, { id: holdRef.id, transactionId: txRef.id, reference, uid: String(plan.planId), direction: 'credit', amountMinor: amount, currency: 'NGN', status: 'completed', idempotencyKey, createdAt: now, accountType: 'pay_small_small_hold' });
         transaction.update(walletRef, { availableBalanceMinor: balance - amount, updatedAt: now });
         transaction.update(planRef, { installments: nextInstallments, paidAmountMinor: paidAmount, remainingAmountMinor: remaining, status: completed ? 'completed' : 'active', ...(completed ? { completedAt: now } : {}), updatedAt: now });
         transaction.update(db.collection('orders').doc(String(plan.orderId)), { paySmallSmallStatus: completed ? 'completed' : 'active', paymentStatus: completed ? 'paid' : 'partial', status: completed ? 'confirmed' : 'reserved', updatedAt: now, ...(completed ? { paidAt: now } : {}) });
