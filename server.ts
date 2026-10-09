@@ -80,7 +80,9 @@ function isSafeId(value: unknown): value is string {
 }
 
 function restaurantRefundOperationKey(orderId: string): string {
-  return 'restaurant_refund_' + orderId;
+  // Keep the deterministic key within financialRefundService's 128-character ID limit
+  // even when a valid Restaurant order ID is near its 128-character maximum.
+  return 'restaurant_refund_' + createHash('sha256').update(orderId).digest('hex');
 }
 
 async function createRestaurantRefundObligation(
@@ -246,12 +248,60 @@ function validateTransactionPin(value: unknown): string {
   }
   return value;
 }
+const TRANSACTION_PIN_SECURITY_COLLECTION = 'transactionPinSecurity';
+const TRANSACTION_PIN_MAX_FAILURES = 5;
+const TRANSACTION_PIN_FAILURE_WINDOW_MS = 15 * 60_000;
+const TRANSACTION_PIN_LOCKOUT_MS = 15 * 60_000;
+
 async function verifyTransactionPin(uid: string, pin: unknown): Promise<boolean> {
-  const credential = await adminDb.collection('authCredentials').doc(uid).get();
-  if (!credential.exists) return false;
-  const data = credential.data() as { transactionPinSalt?: unknown; transactionPinHash?: unknown } | undefined;
-  if (typeof data?.transactionPinSalt !== 'string' || typeof data.transactionPinHash !== 'string') return false;
-  return passwordDigestMatches(String(pin), data.transactionPinSalt, data.transactionPinHash);
+  const securityRef = adminDb.collection(TRANSACTION_PIN_SECURITY_COLLECTION).doc(uid);
+  const credentialRef = adminDb.collection('authCredentials').doc(uid);
+
+  // Read credential and lock state in the same transaction. This prevents a PIN
+  // rotation or concurrent failed attempt from racing with a successful verification.
+  return adminDb.runTransaction(async transaction => {
+    const [securitySnap, credentialSnap] = await Promise.all([
+      transaction.get(securityRef),
+      transaction.get(credentialRef),
+    ]);
+    const state = securitySnap.data() || {};
+    const nowMs = Date.now();
+    const lockedUntil = state.lockedUntil;
+    const lockedUntilMs = typeof lockedUntil?.toMillis === 'function' ? lockedUntil.toMillis() : 0;
+    if (lockedUntilMs > nowMs) return false;
+
+    if (!credentialSnap.exists) return false;
+    const credential = credentialSnap.data() as { transactionPinSalt?: unknown; transactionPinHash?: unknown } | undefined;
+    if (typeof credential?.transactionPinSalt !== 'string' || typeof credential.transactionPinHash !== 'string') return false;
+
+    const matches = passwordDigestMatches(String(pin), credential.transactionPinSalt, credential.transactionPinHash);
+    if (matches) {
+      transaction.set(securityRef, {
+        failedAttempts: 0,
+        windowStartedAt: null,
+        lockedUntil: null,
+        lastSuccessAt: Timestamp.fromMillis(nowMs),
+        updatedAt: Timestamp.fromMillis(nowMs),
+      }, { merge: true });
+      return true;
+    }
+
+    const windowStartedAt = state.windowStartedAt;
+    const windowStartedAtMs = typeof windowStartedAt?.toMillis === 'function' ? windowStartedAt.toMillis() : 0;
+    const withinWindow = windowStartedAtMs > 0 && nowMs - windowStartedAtMs < TRANSACTION_PIN_FAILURE_WINDOW_MS;
+    const previousFailures = withinWindow && Number.isSafeInteger(state.failedAttempts) ? state.failedAttempts : 0;
+    const failedAttempts = previousFailures + 1;
+    const nextWindowStartedAt = withinWindow ? windowStartedAt : Timestamp.fromMillis(nowMs);
+    const lockTriggered = failedAttempts >= TRANSACTION_PIN_MAX_FAILURES;
+    transaction.set(securityRef, {
+      failedAttempts,
+      windowStartedAt: nextWindowStartedAt,
+      lockedUntil: lockTriggered ? Timestamp.fromMillis(nowMs + TRANSACTION_PIN_LOCKOUT_MS) : null,
+      lastFailureAt: Timestamp.fromMillis(nowMs),
+      updatedAt: Timestamp.fromMillis(nowMs),
+    }, { merge: true });
+    return false;
+  });
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -3748,7 +3798,25 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (!orderSnap.exists) return errorResponse(res, 'NOT_FOUND', 'Restaurant order not found.');
       const order = orderSnap.data() as Record<string, any>;
       if (String(order.customerId || '') !== uid) return errorResponse(res, 'FORBIDDEN', 'You cannot refund this Restaurant order.');
-      if (String(order.status || '') !== 'cancelled' || String(order.paymentStatus || '') !== 'paid' || String(order.refundStatus || '') !== 'required') {
+      if (String(order.status || '') !== 'cancelled') {
+        return errorResponse(res, 'INVALID_STATE', 'Only a cancelled Restaurant order can be refunded.');
+      }
+      // A successful refund finalizes the order before the HTTP response reaches the
+      // client. If that response is lost, an exact retry must still return success
+      // instead of failing the mutable refundStatus === 'required' precondition.
+      if (String(order.refundStatus || '') === 'completed') {
+        const completedObligationSnap = await adminDb.collection(RESTAURANT_REFUND_OBLIGATIONS).doc(orderId).get();
+        const completedObligation = completedObligationSnap.data() || {};
+        const refundTransactionId = String(completedObligation.refundTransactionId || '');
+        if (completedObligationSnap.exists &&
+            String(completedObligation.customerUid || '') === uid &&
+            String(completedObligation.status || '') === 'completed' &&
+            isSafeId(refundTransactionId)) {
+          return res.json({ ok: true, status: 'refunded', refundTransactionId, replayed: true });
+        }
+        return errorResponse(res, 'INVALID_STATE', 'The Restaurant refund completion record could not be verified.');
+      }
+      if (String(order.paymentStatus || '') !== 'paid' || String(order.refundStatus || '') !== 'required') {
         return errorResponse(res, 'INVALID_STATE', 'Only a cancelled Restaurant order with a required refund can be refunded.');
       }
       const obligation = await claimRestaurantRefundObligation(orderId, uid);
@@ -3996,8 +4064,21 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           typeof req.body.orderId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(req.body.orderId)) {
         return errorResponse(res, 'INVALID_REQUEST', 'A valid order ID, payment idempotency key and 4-digit Transaction PIN are required.');
       }
-      if (!(await verifyTransactionPin(uid, req.body.transactionPin))) return errorResponse(res, 'FORBIDDEN', 'Incorrect Transaction PIN.');
       const orderId = req.body.orderId.trim(), idempotencyKey = req.body.idempotencyKey.trim();
+      // Return an exact completed retry before checking mutable order state or consuming
+      // a one-time biometric challenge. The authenticated UID and full request binding
+      // must match; this path never mutates wallets, stock, ledger, or order state.
+      const idempotencyRef = adminDb.collection('restaurantPaymentIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
+      const completedRetry = await idempotencyRef.get();
+      if (completedRetry.exists) {
+        const saved = completedRetry.data() || {};
+        if (saved.uid !== uid || saved.idempotencyKey !== idempotencyKey ||
+            saved.requestFingerprint !== uid + '|' + orderId || !isPlainObject(saved.result)) {
+          return errorResponse(res, 'INVALID_REQUEST', 'This payment idempotency key was already used with different payment data.');
+        }
+        return res.status(200).json({ ...saved.result, replayed: true });
+      }
+      if (!(await verifyTransactionPin(uid, req.body.transactionPin))) return errorResponse(res, 'FORBIDDEN', 'Incorrect Transaction PIN.');
       const preflightOrder = await adminDb.collection('restaurantOrders').doc(orderId).get();
       if (!preflightOrder.exists) return errorResponse(res, 'NOT_FOUND', 'Restaurant order could not be found.');
       const preflightData = preflightOrder.data() as Record<string, any>;
@@ -4040,17 +4121,25 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const publicKey = crypto.createPublicKey({ key: Buffer.from(String(credential.publicKey), 'base64'), format: 'der', type: 'spki' });
           const signedData = Buffer.concat([authenticatorData, crypto.createHash('sha256').update(clientDataJSON).digest()]);
           if (!crypto.verify('sha256', signedData, publicKey, signature)) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification failed.');
-          const signCount = authenticatorData.readUInt32BE(33);
-          const previousCount = Number(credential.signCount || 0);
-          if (previousCount > 0 && signCount > 0 && signCount <= previousCount) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'The biometric credential counter is invalid.');
-          await credentialRef.update({ signCount, lastUsedAt: Timestamp.now() });
           const expectedBinding = 'restaurant_payment|' + uid + '|' + orderId + '|' + preflightAmountMinor + '|NGN';
           if (challengeData.transactionBinding !== expectedBinding) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'This biometric approval is not bound to this restaurant payment.');
+          const signCount = authenticatorData.readUInt32BE(33);
+          // Re-read and advance the authenticator counter atomically only after the
+          // signed assertion is verified and bound to this exact payment request.
+          const counterAccepted = await adminDb.runTransaction(async transaction => {
+            const latestCredentialSnap = await transaction.get(credentialRef);
+            if (!latestCredentialSnap.exists) return false;
+            const latestCredential = latestCredentialSnap.data() || {};
+            const latestCount = Number(latestCredential.signCount || 0);
+            if (latestCount > 0 && signCount > 0 && signCount <= latestCount) return false;
+            transaction.update(credentialRef, { signCount, lastUsedAt: Timestamp.now() });
+            return true;
+          });
+          if (!counterAccepted) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'The biometric credential counter is invalid.');
         } catch {
           return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification could not be verified.');
         }
       }
-      const idempotencyRef = adminDb.collection('restaurantPaymentIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
       const result = await adminDb.runTransaction(async (transaction) => {
         const existing = await transaction.get(idempotencyRef);
         if (existing.exists) {
@@ -4065,7 +4154,50 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         if (order.customerId !== uid) throw new RequestValidationError('FORBIDDEN', 'You can only pay for your own restaurant order.');
         if (order.currency !== 'NGN' || order.paymentMethod !== 'uniquepay') throw new RequestValidationError('INVALID_REQUEST', 'This order is not configured for UniquePay.');
         if (order.pricingStatus !== 'server_verified') throw new RequestValidationError('UNAVAILABLE', 'Restaurant UniquePay payment is temporarily unavailable until the order total is verified by the restaurant catalog.');
-        if (order.paymentStatus === 'paid') return { orderId, paymentStatus: 'paid', status: order.status, replayed: true };
+        if (order.paymentStatus === 'paid') {
+          // A concurrent request may have completed the same order under another
+          // idempotency key after this request's preflight read. Return the verified
+          // original receipt and persist this key as an alias so retries remain stable.
+          const originalTransactionId = typeof order.paymentTransactionId === 'string' ? order.paymentTransactionId : '';
+          if (!/^[A-Za-z0-9_-]{1,128}$/.test(originalTransactionId)) {
+            throw new RequestValidationError('INVALID_STATE', 'The completed Restaurant payment could not be verified.');
+          }
+          const originalTransactionRef = adminDb.collection('transactions').doc(originalTransactionId);
+          const originalTransactionSnap = await transaction.get(originalTransactionRef);
+          const originalTransaction = originalTransactionSnap.data() || {};
+          if (!originalTransactionSnap.exists ||
+              originalTransaction.id !== originalTransactionId ||
+              originalTransaction.status !== 'completed' ||
+              originalTransaction.type !== 'merchant_payment' ||
+              originalTransaction.senderId !== uid ||
+              !isSafeFirebaseUid(originalTransaction.recipientId) ||
+              originalTransaction.recipientId === uid ||
+              originalTransaction.currency !== 'NGN' ||
+              Number(originalTransaction.amount) !== Number(order.totalMinor) ||
+              !Array.isArray(originalTransaction.relatedOrderIds) ||
+              !originalTransaction.relatedOrderIds.includes(orderId) ||
+              typeof originalTransaction.reference !== 'string') {
+            throw new RequestValidationError('INVALID_STATE', 'The completed Restaurant payment could not be verified.');
+          }
+          const replayResult = {
+            orderId,
+            paymentStatus: 'paid',
+            status: order.status,
+            transactionId: originalTransactionId,
+            reference: originalTransaction.reference,
+            replayed: true,
+          };
+          const now = Timestamp.now();
+          transaction.create(idempotencyRef, {
+            uid,
+            idempotencyKey,
+            requestFingerprint: uid + '|' + orderId,
+            result: replayResult,
+            createdAt: now,
+            updatedAt: now,
+          });
+          return replayResult;
+        }
         if (order.status !== 'pending_payment') throw new RequestValidationError('INVALID_REQUEST', 'This restaurant order is no longer awaiting payment.');
         const amountMinor = Number(order.totalMinor);
         if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) throw new RequestValidationError('INVALID_AMOUNT', 'The restaurant payment amount is invalid.');
@@ -4120,12 +4252,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             });
           }
         }
-        const inventoryAdjustments: Array<{ ref: any; nextQuantity: number }> = [];
-        for (const item of inventoryQuantities.values()) {
+        const inventoryAdjustments: Array<{ ref: any; itemId: string; quantity: number; stockQuantity: number; nextQuantity: number }> = [];
+        for (const [itemId, item] of inventoryQuantities.entries()) {
           if (item.stockQuantity < item.quantity) {
             throw new RequestValidationError('UNAVAILABLE', 'There is not enough stock for one or more items. Please update your order.');
           }
-          inventoryAdjustments.push({ ref: item.ref, nextQuantity: item.stockQuantity - item.quantity });
+          inventoryAdjustments.push({ ref: item.ref, itemId, quantity: item.quantity, stockQuantity: item.stockQuantity, nextQuantity: item.stockQuantity - item.quantity });
         }
         const customerWalletRef = adminDb.collection('wallets').doc(uid), merchantWalletRef = adminDb.collection('wallets').doc(merchantWalletId);
         const [customerSnap, merchantSnap] = await Promise.all([transaction.get(customerWalletRef), transaction.get(merchantWalletRef)]);
@@ -4140,6 +4272,32 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             stockQuantity: adjustment.nextQuantity,
             ...(adjustment.nextQuantity === 0 ? { available: false } : {}),
             updatedAt: now,
+          });
+          // Keep Restaurant stock history in the same atomic commit as payment.
+          // Use a separate collection so Store reconciliation does not mistake
+          // Restaurant menu item IDs for Store product IDs.
+          const movementId = createHash('sha256')
+            .update('unique_restaurant.checkout|' + orderId + '|' + adjustment.itemId)
+            .digest('hex');
+          const movementRef = adminDb.collection('restaurant_inventory_movements').doc(movementId);
+          transaction.create(movementRef, {
+            schemaVersion: 1,
+            id: movementId,
+            restaurantId: String(order.restaurantId || ''),
+            businessId: String(order.businessId || ''),
+            branchId: String(order.branchId || ''),
+            menuItemId: adjustment.itemId,
+            orderId,
+            transactionId,
+            sourceModule: 'unique_restaurant.checkout',
+            movementType: 'checkout_sale',
+            direction: 'out',
+            quantity: adjustment.quantity,
+            quantityDelta: -adjustment.quantity,
+            previousQuantity: adjustment.stockQuantity,
+            resultingQuantity: adjustment.nextQuantity,
+            actorUid: uid,
+            createdAt: now,
           });
         }
         const transactionRef = adminDb.collection('transactions').doc(transactionId);
@@ -4395,16 +4553,45 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         return errorResponse(res, 'INVALID_REQUEST', 'A valid payment idempotency key and 4-digit Transaction PIN are required.');
       }
       const idempotencyKey = req.body.idempotencyKey.trim();
-      if (!(await verifyTransactionPin(uid, req.body.transactionPin))) {
-        return errorResponse(res, 'FORBIDDEN', 'Incorrect Transaction PIN.');
-      }
-
       const orders = Array.isArray(req.body.orderIds) ? req.body.orderIds : [];
       if (orders.length < 1 || orders.length > 50 || !orders.every((id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id))) {
         return errorResponse(res, 'INVALID_REQUEST', 'One or more order IDs are invalid.');
       }
-
       const orderIds = Array.from(new Set(orders as string[]));
+      const idempotencyRef = adminDb.collection('storePaymentIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
+
+      // Return an authenticated, exact completed retry before checking mutable order
+      // status or consuming a one-time biometric challenge. Bind the saved receipt to
+      // this UID, key, ordered order-ID list, amount and NGN currency.
+      const completedRetry = await idempotencyRef.get();
+      if (completedRetry.exists) {
+        const saved = completedRetry.data() || {};
+        const savedAmountMinor = Number(saved.amountMinor);
+        const savedOrderIds = Array.isArray(saved.orderIds) ? saved.orderIds : [];
+        const savedResult = saved.result;
+        const savedFingerprint = [uid, orderIds.join(','), String(savedAmountMinor), 'NGN'].join('|');
+        if (saved.uid !== uid ||
+            saved.status !== 'completed' ||
+            saved.result?.status !== 'completed' ||
+            saved.result?.idempotencyKey !== idempotencyKey ||
+            !Number.isSafeInteger(savedAmountMinor) || savedAmountMinor <= 0 ||
+            savedOrderIds.length !== orderIds.length ||
+            !savedOrderIds.every((id: unknown, index: number) => id === orderIds[index]) ||
+            saved.requestFingerprint !== savedFingerprint ||
+            !isPlainObject(savedResult) ||
+            savedResult.amountMinor !== savedAmountMinor ||
+            !Array.isArray(savedResult.orderIds) ||
+            savedResult.orderIds.length !== orderIds.length ||
+            !savedResult.orderIds.every((id: unknown, index: number) => id === orderIds[index])) {
+          return errorResponse(res, 'INVALID_REQUEST', 'This payment idempotency key was already used with different payment data.');
+        }
+        return res.status(200).json({ ...savedResult, replayed: true });
+      }
+
+      if (!(await verifyTransactionPin(uid, req.body.transactionPin))) {
+        return errorResponse(res, 'FORBIDDEN', 'Incorrect Transaction PIN.');
+      }
+
       const orderSnapshots = await Promise.all(orderIds.map((id) => adminDb.collection('orders').doc(id).get()));
       const sellerTotalsMinor = new Map<string, number>();
       let amountMinor = 0;
@@ -4472,14 +4659,22 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const signedData = Buffer.concat([authenticatorData, crypto.createHash('sha256').update(clientDataJSON).digest()]);
         if (!crypto.verify('sha256', signedData, publicKey, signature)) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification failed.');
         const signCount = authenticatorData.readUInt32BE(33);
-        const previousCount = Number(credential.signCount || 0);
-        if (previousCount > 0 && signCount > 0 && signCount <= previousCount) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'The biometric credential counter is invalid.');
-        await credentialRef.update({ signCount, lastUsedAt: Timestamp.now() });
         const expectedBinding = 'store_payment|' + uid + '|' + orderIds.join(',') + '|' + amountMinor + '|NGN';
         if (challengeData.transactionBinding !== expectedBinding) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'This biometric approval is not bound to this Store payment.');
+        // Advance the authenticator counter atomically to prevent concurrent assertions
+        // from both passing a stale read of the same previous sign count.
+        const counterAccepted = await adminDb.runTransaction(async transaction => {
+          const latestCredentialSnap = await transaction.get(credentialRef);
+          if (!latestCredentialSnap.exists) return false;
+          const latestCredential = latestCredentialSnap.data() || {};
+          const latestCount = Number(latestCredential.signCount || 0);
+          if (latestCount > 0 && signCount > 0 && signCount <= latestCount) return false;
+          transaction.update(credentialRef, { signCount, lastUsedAt: Timestamp.now() });
+          return true;
+        });
+        if (!counterAccepted) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'The biometric credential counter is invalid.');
       }
 
-      const idempotencyRef = adminDb.collection('storePaymentIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
       const fingerprint = [uid, orderIds.join(','), String(amountMinor), 'NGN'].join('|');
       const result = await adminDb.runTransaction(async (transaction) => {
         const existing = await transaction.get(idempotencyRef);

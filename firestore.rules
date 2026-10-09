@@ -1,6 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /transactionPinSecurity/{userId} { allow read, write: if false; }
     function isAuthenticated() { return request.auth != null; }
     function isOwner(uid) { return isAuthenticated() && request.auth.uid == uid; }
     function conversationMemberId(conversationId, uid) { return conversationId + '_' + uid; }
