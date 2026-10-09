@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { AlertCircle, Loader2, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,6 +12,7 @@ export default function CreatePaymentRequestPage() {
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const idempotencyRef = useRef<{ fingerprint: string; key: string } | null>(null);
 
   const handleSubmit = async (isDraft: boolean) => {
     if (!currentUser) return setError('You must be signed in to create a payment request.');
@@ -25,16 +26,26 @@ export default function CreatePaymentRequestPage() {
     setError(null);
     try {
       const token = await currentUser.getIdToken();
+      const requestBody = {
+        recipientIdentifier,
+        amount: amountValue,
+        description: requestDescription,
+        ...(dueDate ? { dueDate } : {}),
+        status: isDraft ? 'draft' : 'sent',
+      };
+      const fingerprint = JSON.stringify(requestBody);
+      if (!idempotencyRef.current || idempotencyRef.current.fingerprint !== fingerprint) {
+        const key = globalThis.crypto?.randomUUID?.() || 'pr-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+        idempotencyRef.current = { fingerprint, key };
+      }
       const response = await fetch('/api/payment-requests', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({
-          recipientIdentifier,
-          amount: amountValue,
-          description: requestDescription,
-          ...(dueDate ? { dueDate } : {}),
-          status: isDraft ? 'draft' : 'sent',
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token,
+          'Idempotency-Key': idempotencyRef.current.key,
+        },
+        body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.id) throw new Error(payload?.error?.message || 'We could not create the payment request.');
