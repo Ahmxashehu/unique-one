@@ -79,7 +79,7 @@ for (const required of [
 ]) {
   assert(paySmallSmallPinSource.includes(required), `Pay Small Small persistent PIN lockout includes: ${required}`);
 }
-assert((paySmallSmallPinSource.match(/verifyPaySmallSmallTransactionPin\\(db, uid, transactionPin\\)/g) || []).length === 2,
+assert((paySmallSmallPinSource.match(/verifyPaySmallSmallTransactionPin\(db, uid, transactionPin\)/g) || []).length === 2,
   "Pay Small Small deposit and installment payments enforce persistent Transaction PIN lockout");
 
 const restaurantPaymentSource = read("server.ts");
