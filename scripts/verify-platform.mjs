@@ -161,9 +161,18 @@ for (const required of [
   "transaction.update(customerWalletRef, { availableBalanceMinor: customerBalanceAfter",
   "paymentStatus: 'paid'",
   "transaction.create(idempotencyRef, { uid, orderIds, amountMinor, requestFingerprint: fingerprint",
+  "const completedRetry = await idempotencyRef.get()",
+  "saved.uid !== uid",
+  "saved.result?.idempotencyKey !== idempotencyKey",
+  "return res.status(200).json({ ...savedResult, replayed: true })",
 ]) {
   assert(storePaymentRoute.includes(required), `Store payment atomicity includes: ${required}`);
 }
+const storeRetryLookupIndex = storePaymentRoute.indexOf("const completedRetry = await idempotencyRef.get()");
+const storePinCheckIndex = storePaymentRoute.indexOf("verifyTransactionPin(uid, req.body.transactionPin)");
+const storeOrderPreflightIndex = storePaymentRoute.indexOf("const orderSnapshots = await Promise.all(orderIds.map");
+assert(storeRetryLookupIndex >= 0 && storeRetryLookupIndex < storePinCheckIndex && storeRetryLookupIndex < storeOrderPreflightIndex,
+  "Store completed payment retries are checked before PIN re-verification and mutable order preflight");
 for (const required of [
   "order.status !== 'pending'",
   "movementType: 'order_cancellation_release'",
