@@ -55,7 +55,8 @@ assert(transactionPinSource.includes("const TRANSACTION_PIN_LOCKOUT_MS = 15 * 60
 assert(transactionPinSource.includes("return adminDb.runTransaction(async transaction => {"), "Transaction PIN security updates are atomic");
 assert(transactionPinSource.includes("transaction.set(securityRef, {\n        failedAttempts: 0"), "successful Transaction PIN verification resets failed attempts");
 assert(transactionPinSource.includes("failedAttempts >= TRANSACTION_PIN_MAX_FAILURES"), "repeated incorrect Transaction PIN attempts trigger lockout");
-assert(transactionPinSource.includes("if (initialLockedUntilMs > nowMs) return false"), "an active Transaction PIN lockout blocks verification before credential checks");
+assert(transactionPinSource.includes("if (lockedUntilMs > nowMs) return false"), "an active Transaction PIN lockout blocks verification inside the atomic check");
+assert(transactionPinSource.includes("transaction.get(credentialRef)"), "PIN credential reads participate in the atomic lockout transaction");
 
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
