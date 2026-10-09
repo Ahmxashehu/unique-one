@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plane, Hotel, MapPinned, CalendarDays, ShieldCheck, Car, BusFront, UserRound, Map, Ticket, UtensilsCrossed, UsersRound, Bookmark, BriefcaseBusiness, X, ArrowLeft, Navigation, CircleAlert } from 'lucide-react';
+import { Plane, Hotel, MapPinned, CalendarDays, ShieldCheck, Car, BusFront, UserRound, Map, Ticket, UsersRound, Bookmark, X, ArrowLeft, Navigation, CircleAlert } from 'lucide-react';
 
 type TravelMode = 'flights' | 'car' | 'bus' | 'hire' | 'stays' | 'activities' | 'destinations' | 'plan' | 'trips' | 'saved' | 'group' | 'nearby';
 const options: Array<{id:TravelMode;icon:typeof Plane;label:string;description:string}> = [
