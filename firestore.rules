@@ -68,6 +68,7 @@ service cloud.firestore {
       allow delete: if isPlatformAdmin();
     }
     match /authCredentials/{userId} { allow read, write: if false; }
+    match /transactionPinSecurity/{userId} { allow read, write: if false; }
     match /users/{userId} {
       allow read: if isOwner(userId) || isPlatformAdmin();
       allow create: if isOwner(userId) && (!('roles' in request.resource.data) || !('administrator' in request.resource.data.roles));
