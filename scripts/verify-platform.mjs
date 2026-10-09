@@ -36,6 +36,9 @@ for (const phrase of ["Home", "Search", "Log in", "Sign Up", "Checkout", "Wallet
 assert(globalLanguage.includes("MutationObserver"), "dynamic UI text is observed for translation");
 assert(globalLanguage.includes("placeholder"), "form placeholders are included in translation handling");
 
+const serverSource = read("server.ts");
+assert(serverSource.includes("if (uid === customerId && !privilegedRefundAccess && !customerMayUseDirectRefund && !customerMayUseReturnRefund)"),
+  "Store refund customer eligibility must not be bypassed by a general manage:disputes permission");
 const backendSources = [
   ["server.ts", read("server.ts")],
   ["src/server/ajoRoutes.ts", read("src/server/ajoRoutes.ts")],
