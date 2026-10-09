@@ -146,7 +146,8 @@ async function creditVerifiedTopUp(paymentReference: string, providerTx: Monnify
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(uid)) return "not_eligible";
     const walletRef = db.collection("wallets").doc(uid);
     const txRef = db.collection("transactions").doc();
-    const ledgerRef = db.collection("ledgerEntries").doc();
+    const clearingLedgerRef = db.collection("ledgerEntries").doc();
+    const walletLedgerRef = db.collection("ledgerEntries").doc();
     const walletSnap = await transaction.get(walletRef);
     if (!walletSnap.exists) return "not_eligible";
     const wallet = walletSnap.data() || {};
@@ -184,11 +185,28 @@ async function creditVerifiedTopUp(paymentReference: string, providerTx: Monnify
       updatedAt: now,
     });
     transaction.create(txRef, transactionRecord);
-    transaction.create(ledgerRef, {
-      id: ledgerRef.id,
+    // Keep external wallet funding double-entry: debit the Monnify clearing
+    // account and credit the customer's wallet in the same atomic transaction.
+    transaction.create(clearingLedgerRef, {
+      id: clearingLedgerRef.id,
+      transactionId,
+      reference: paymentReference,
+      uid: "monnify",
+      accountType: "external_provider_clearing",
+      direction: "debit",
+      amountMinor,
+      currency: "NGN",
+      status: "completed",
+      idempotencyKey: "monnify:" + paymentReference,
+      providerReference: String(providerTx.transactionReference || ""),
+      createdAt: now,
+    });
+    transaction.create(walletLedgerRef, {
+      id: walletLedgerRef.id,
       transactionId,
       reference: paymentReference,
       uid,
+      accountType: "wallet",
       direction: "credit",
       amountMinor,
       currency: "NGN",
