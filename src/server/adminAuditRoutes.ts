@@ -1,17 +1,18 @@
 import type { Express, RequestHandler } from 'express';
+import rateLimit from 'express-rate-limit';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import type { Permission } from '../lib/os/types';
 
 export function registerAdminAuditRoutes(app: Express, authenticate: RequestHandler, requirePermission: (permission: Permission) => RequestHandler) {
   const db = getFirestore();
 
-  app.get('/api/payment-requests', authenticate, async (req, res) => {
+  app.get('/api/payment-requests', rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = (req as any).user?.uid as string | undefined;
     if (!uid) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication is required.' } });
     try {
       const [sent, received] = await Promise.all([
-        db.collection('payment_requests').where('senderId', '==', uid).orderBy('createdAt', 'desc').limit(100).get(),
-        db.collection('payment_requests').where('recipientId', '==', uid).orderBy('createdAt', 'desc').limit(100).get(),
+        db.collection('payment_requests').where('senderId', '==', uid).limit(100).get(),
+        db.collection('payment_requests').where('recipientId', '==', uid).limit(100).get(),
       ]);
       const requests = new Map<string, Record<string, unknown>>();
       for (const doc of [...sent.docs, ...received.docs]) {
@@ -31,7 +32,7 @@ export function registerAdminAuditRoutes(app: Express, authenticate: RequestHand
     }
   });
 
-  app.patch('/api/payment-requests/:requestId/status', authenticate, async (req, res) => {
+  app.patch('/api/payment-requests/:requestId/status', rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = (req as any).user?.uid as string | undefined;
     if (!uid) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication is required.' } });
     const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : '';
