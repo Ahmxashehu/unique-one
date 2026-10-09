@@ -1,30 +1,29 @@
-import React from 'react';
-import { MapPin, Navigation } from 'lucide-react';
+import { MapPin, ShieldCheck } from 'lucide-react';
 
 export default function NearMePage() {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-6 flex flex-col h-[calc(100vh-4rem)]">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Near Me</h1>
-          <p className="text-slate-500 mt-1">Discover businesses and services in your local area.</p>
+    <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-3xl items-center px-4 py-10 sm:px-6">
+      <section className="w-full rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+          <MapPin className="h-6 w-6" />
         </div>
-        <button className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm">
-          <Navigation className="w-4 h-4" />
-          Use Current Location
-        </button>
-      </div>
-
-      <div className="flex-1 bg-slate-100 rounded-3xl border border-slate-200 relative overflow-hidden flex flex-col items-center justify-center">
-        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-        <div className="relative z-10 text-center p-8 bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-sm max-w-sm">
-          <MapPin className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-          <h3 className="font-semibold text-slate-900 text-lg">Map integration unavailable</h3>
-          <p className="text-slate-500 mt-2 text-sm">
-            Live map and location-based business discovery are not connected yet. No businesses or locations are being invented or shown as sample data.
-          </p>
+        <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-950">Near Me</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Discover nearby businesses and services after live location and verified business discovery are connected.
+        </p>
+        <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+          <div>
+            <h2 className="text-sm font-black text-amber-950">Location discovery is not enabled</h2>
+            <p className="mt-2 text-sm leading-6 text-amber-900">
+              The live map, device-location permission flow, and verified nearby-business search are not connected. Location actions are disabled so this page does not imply that your location was read or that any business was found.
+            </p>
+          </div>
         </div>
-      </div>
-    </div>
+        <p className="mt-4 text-xs leading-5 text-slate-500">
+          To activate this section, connect a real mapping/location provider, request permission explicitly, and verify business listings and distance results end to end.
+        </p>
+      </section>
+    </main>
   );
 }
