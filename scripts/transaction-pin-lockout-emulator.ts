@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { initializeApp } from 'firebase-admin/app';
+import { deleteApp, initializeApp } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import {
   TRANSACTION_PIN_LOCKOUT_MS,
@@ -75,5 +75,5 @@ try {
     db.collection('authCredentials').doc(uid + '-concurrent').delete(),
     db.collection(TRANSACTION_PIN_SECURITY_COLLECTION).doc(uid + '-missing-credential').delete(),
   ]);
-  await app.delete();
+  await deleteApp(app);
 }
