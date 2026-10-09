@@ -38,8 +38,9 @@ export default function CycleAjoPage() {
   const amountNaira = Number(amount);
   const memberCount = Number(members);
   const amountMinor = Math.round(amountNaira * 100);
+  const amountHasValidPrecision = /^\\d+(?:\\.\\d{1,2})?$/.test(amount.trim());
   const valid = cycleName.trim().length >= 1 && cycleName.trim().length <= 100 &&
-    Number.isFinite(amountNaira) && amountNaira > 0 && Number.isSafeInteger(amountMinor) &&
+    amountHasValidPrecision && Number.isFinite(amountNaira) && amountNaira > 0 && Number.isSafeInteger(amountMinor) &&
     Number.isInteger(memberCount) && memberCount >= 2 && memberCount <= 1000;
   const totalCycle = useMemo(() => amountNaira * memberCount, [amountNaira, memberCount]);
 
@@ -131,7 +132,7 @@ export default function CycleAjoPage() {
         <div><p className="text-[10px] font-black uppercase tracking-[0.15em] text-emerald-600">Draft setup</p><h2 className="mt-1 text-lg font-black text-slate-900">Define your cycle</h2><p className="mt-1 text-xs leading-5 text-slate-500">Only the fields supported by the saved-draft API are accepted here.</p></div>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <label className="text-xs font-bold text-slate-700">Cycle name<input value={cycleName} onChange={e => setCycleName(e.target.value)} maxLength={100} placeholder="e.g. Family Aju" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-normal outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" /></label>
-          <label className="text-xs font-bold text-slate-700">Contribution per member (₦)<input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="10000" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-normal outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" /></label>
+          <label className="text-xs font-bold text-slate-700">Contribution per member (₦)<input inputMode="decimal" type="number" min="0.01" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="10000" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-normal outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" /></label>
           <label className="text-xs font-bold text-slate-700">Number of members<input inputMode="numeric" value={members} onChange={e => setMembers(e.target.value)} min="2" max="1000" type="number" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-normal outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" /></label>
           <label className="text-xs font-bold text-slate-700">Contribution frequency<select value={frequency} onChange={e => setFrequency(e.target.value as "weekly" | "monthly" | "custom")} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-normal"><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="custom">Custom schedule</option></select></label>
         </div>
