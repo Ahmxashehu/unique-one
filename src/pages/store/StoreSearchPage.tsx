@@ -154,8 +154,10 @@ export default function StoreSearchPage() {
               .filter(b => {
                 const publicStatus = String(b.status || '').toLowerCase();
                 const verification = String(b.verificationStatus || '').toLowerCase();
+                // Fail closed: a business with missing publication metadata may be a
+                // draft or an unreviewed registration. Only explicit publication or
+                // verification can make it discoverable in the public Store.
                 const publiclyDiscoverable =
-                  !b.status && !b.verificationStatus ||
                   ['published', 'active', 'approved', 'verified'].includes(publicStatus) ||
                   verification === 'verified';
                 if (!publiclyDiscoverable) return false;
