@@ -237,7 +237,7 @@ export function registerMonnifyRoutes(app: Express, authenticate: RequestHandler
     }
     try {
       const user = await getAuth().getUser(uid);
-      if (!user.email) return jsonError(res, 400, "CUSTOMER_EMAIL_REQUIRED", "Add a verified email to your account before funding your wallet.");
+      if (!user.email || !user.emailVerified) return jsonError(res, 400, "CUSTOMER_EMAIL_REQUIRED", "Verify an email on your account before funding your wallet.");
       const paymentReference = "UPMONNIFY_" + randomUUID().replace(/-/g, "");
       const now = Timestamp.now();
       const intentRef = getFirestore().collection("monnifyPaymentIntents").doc(paymentReference);
