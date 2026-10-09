@@ -84,6 +84,27 @@ const verifyPaymentLimiter = rateLimit({
   message: { error: { code: "RATE_LIMITED", message: "Too many payment status checks. Please try again shortly." } },
 });
 
+// Apply a second, independent IP budget as well as the per-user budget above.
+// Otherwise, an attacker could spread requests across many authenticated accounts
+// from one address and avoid the intended network-level throttle.
+const initializePaymentIpLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  message: { error: { code: "RATE_LIMITED", message: "Too many payment attempts from this network. Please try again shortly." } },
+});
+
+const verifyPaymentIpLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  message: { error: { code: "RATE_LIMITED", message: "Too many payment checks from this network. Please try again shortly." } },
+});
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -262,7 +283,7 @@ export function registerMonnifyRoutes(app: Express, authenticate: RequestHandler
     });
   });
 
-  app.post("/api/payments/monnify/initialize", authenticate, initializePaymentLimiter, async (req, res) => {
+  app.post("/api/payments/monnify/initialize", authenticate, initializePaymentLimiter, initializePaymentIpLimiter, async (req, res) => {
     const uid = uidFrom(req);
     if (!uid) return jsonError(res, 401, "UNAUTHENTICATED", "Authentication is required.");
     const cfg = config();
@@ -349,7 +370,7 @@ export function registerMonnifyRoutes(app: Express, authenticate: RequestHandler
     }
   });
 
-  app.get("/api/payments/monnify/verify/:paymentReference", authenticate, verifyPaymentLimiter, async (req, res) => {
+  app.get("/api/payments/monnify/verify/:paymentReference", authenticate, verifyPaymentLimiter, verifyPaymentIpLimiter, async (req, res) => {
     const uid = uidFrom(req);
     if (!uid) return jsonError(res, 401, "UNAUTHENTICATED", "Authentication is required.");
     const cfg = config();
