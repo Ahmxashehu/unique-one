@@ -117,6 +117,17 @@ export async function executeFinancialRefund(
     const now = Timestamp.now();
     const idemSnap = await transaction.get(idempotencyRef);
     const requestFingerprint = fingerprint(input);
+    // Queue inventory mutations until every refund validation has passed. A Firestore
+    // transaction that returns an error object still commits queued writes.
+    const inventoryRestockOperations: Array<{
+      productRef: FirebaseFirestore.DocumentReference;
+      productId: string;
+      quantity: number;
+      previousQuantity: number;
+      resultingQuantity: number;
+      previousStatus: unknown;
+      businessId: string | null;
+    }> = [];
 
     if (idemSnap.exists) {
       const existing = idemSnap.data() ?? {};
@@ -278,23 +289,13 @@ export async function executeFinancialRefund(
           if (!Number.isSafeInteger(currentQuantity) || currentQuantity < 0 || !Number.isSafeInteger(currentQuantity + quantity)) {
             return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'Store inventory data is invalid; the refund was not applied.' } };
           }
-          transaction.update(productRef, {
-            quantity: currentQuantity + quantity,
-            status: product.status === 'out_of_stock' ? 'published' : product.status,
-            updatedAt: now,
-          });
-          recordStoreInventoryMovement(transaction, db, {
+          inventoryRestockOperations.push({
+            productRef,
             productId,
-            movementType: 'refund_release',
             quantity,
             previousQuantity: currentQuantity,
             resultingQuantity: currentQuantity + quantity,
-            direction: 'in',
-            sourceId: input.originalTransactionId + ':early-refund',
-            sourceModule: 'unique_store.refund',
-            actorUid: input.actorUid,
-            orderId: input.relatedOrderId,
-            transactionId: input.originalTransactionId,
+            previousStatus: product.status,
             businessId: typeof product.businessId === 'string' ? product.businessId : null,
           });
         }
@@ -466,6 +467,31 @@ export async function executeFinancialRefund(
         }
         transaction.update(relatedOrderRef, orderUpdate);
       }
+    }
+
+    // All failure-return validations are complete. Apply the validated stock updates
+    // only now, so failed refunds cannot accidentally restock inventory without crediting
+    // the customer and debiting the seller.
+    for (const operation of inventoryRestockOperations) {
+      transaction.update(operation.productRef, {
+        quantity: operation.resultingQuantity,
+        status: operation.previousStatus === 'out_of_stock' ? 'published' : operation.previousStatus,
+        updatedAt: now,
+      });
+      recordStoreInventoryMovement(transaction, db, {
+        productId: operation.productId,
+        movementType: 'refund_release',
+        quantity: operation.quantity,
+        previousQuantity: operation.previousQuantity,
+        resultingQuantity: operation.resultingQuantity,
+        direction: 'in',
+        sourceId: input.originalTransactionId + ':early-refund',
+        sourceModule: 'unique_store.refund',
+        actorUid: input.actorUid,
+        orderId: input.relatedOrderId,
+        transactionId: input.originalTransactionId,
+        businessId: operation.businessId,
+      });
     }
 
     transaction.set(idempotencyRef, {
