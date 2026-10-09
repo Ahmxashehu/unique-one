@@ -48,6 +48,24 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
   assert(backendSources.some(([, source]) => source.includes(route)), `backend route surface includes: ${route}`);
 }
 
+const restaurantPaymentSource = read("server.ts");
+const restaurantMenuSource = read("src/server/restaurantRoutes.ts");
+for (const required of [
+  "stockTracked === true",
+  "There is not enough stock for one or more items",
+  "transaction.update(adjustment.ref",
+  "Number(menu.priceMinor) !== Number(item.unitPriceMinor)",
+]) {
+  assert(restaurantPaymentSource.includes(required), `Restaurant payment integrity includes: ${required}`);
+}
+for (const required of [
+  "stockQuantityProvided",
+  "updates.stockTracked = true",
+  "stockQuantity === 0",
+]) {
+  assert(restaurantMenuSource.includes(required), `Restaurant menu stock management includes: ${required}`);
+}
+
 for (const required of [
   "src/lib/i18n.ts",
   "src/components/GlobalLanguageLayer.tsx",
