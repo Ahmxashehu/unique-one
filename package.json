@@ -16,7 +16,8 @@
     "store:expire-reservations": "node scripts/expire-store-reservations.mjs",
     "pay-small-small:sync": "node scripts/pay-small-small-sync.mjs",
     "store:reconcile-inventory": "node scripts/reconcile-store-inventory.mjs",
-    "store:migrate-legacy-inventory": "node scripts/migrate-legacy-store-inventory.mjs"
+    "store:migrate-legacy-inventory": "node scripts/migrate-legacy-store-inventory.mjs",
+    "test:transaction-pin-emulator": "tsx scripts/transaction-pin-lockout-emulator.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
