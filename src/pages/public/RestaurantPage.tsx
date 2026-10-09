@@ -379,7 +379,7 @@ export default function RestaurantPage() {
               )}
               <label className="block rounded-2xl border border-slate-200 p-3"><span className="text-[10px] font-bold text-slate-500">Special request</span><textarea value={draft.notes} onChange={(e) => saveDraft({ ...draft, notes: e.target.value })} rows={3} placeholder="Birthday, accessibility, children, dietary needs…" className="mt-2 w-full resize-none text-sm outline-none" /></label>
               <button disabled={(draft.mode === 'dine-in' && (!draft.date || !draft.time)) || (draft.mode === 'delivery' && !draft.deliveryAddress.trim()) || (draft.mode === 'pickup' && (!draft.date || !draft.time))} onClick={continueBooking} className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">Review reservation</button>
-              <p className="text-center text-[10px] text-slate-500">Prototype reservations do not claim live table availability.</p>
+              <p className="text-center text-[10px] text-slate-500">Submitting creates a request only; the restaurant must confirm availability before a table or order is treated as accepted.</p>
             </div>
           </section>
         </div>
@@ -424,8 +424,8 @@ export default function RestaurantPage() {
         <div className="fixed inset-0 z-[85] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]">
           <section className="w-full max-w-md rounded-3xl bg-white p-6 text-center shadow-2xl">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><Navigation className="h-5 w-5" /></div>
-            <h2 className="mt-4 text-xl font-black text-slate-950">Reservation prepared</h2>
-            <p className="mt-2 text-sm text-slate-500">Your request for {selected.name} has been securely recorded. Live restaurant confirmation and payment settlement activate when the provider is connected.</p>{orderError && <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-xs text-amber-800">{orderError}</p>}
+            <h2 className="mt-4 text-xl font-black text-slate-950">Restaurant request recorded</h2>
+            <p className="mt-2 text-sm text-slate-500">Your request for {selected.name} has been recorded by UniquePlatform. This does not confirm restaurant acceptance or guarantee a table. The payment outcome is shown separately below.</p>{orderError && <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-xs text-amber-800">{orderError}</p>}
             {activeOrderId && currentUser && <button onClick={cancelActiveOrder} disabled={cancellingOrder} className="mt-4 w-full rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-black text-red-700 disabled:opacity-60">{cancellingOrder ? 'Cancelling…' : 'Cancel this order'}</button>}
             <button onClick={() => { setStage('browse'); setActiveOrderId(''); }} className="mt-3 w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white">Back to restaurants</button>
           </section>
