@@ -78,7 +78,7 @@ try {
   const invalidPartialResult = await executeFinancialRefund(db, {
     ...refundInput(invalidPartial, prefix + '-invalid-partial-key', 400),
     finalizeOrder: 'partial',
-    releaseInventory: true,
+    releaseInventory: false,
   });
   assert.ok('error' in invalidPartialResult, 'partial refund without an eligible received return request must fail');
   if ('error' in invalidPartialResult) assert.equal(invalidPartialResult.error.code, 'ORIGINAL_NOT_REFUNDABLE');
