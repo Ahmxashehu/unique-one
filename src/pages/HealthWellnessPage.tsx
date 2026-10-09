@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, ArrowLeft, CalendarClock, ChevronRight, Clock3, FileText, HeartPulse, Hospital, MapPin, Pill, Search, ShieldCheck, Stethoscope, Upload, UserRound, Video, X } from 'lucide-react';
+import { Activity, ArrowLeft, CalendarClock, ChevronRight, Clock3, FileText, HeartPulse, Hospital, MapPin, Pill, Search, ShieldCheck, Stethoscope, UserRound, Video, X } from 'lucide-react';
 
 type HealthMode = 'nearby' | 'consult' | 'pharmacies' | 'prescription' | 'labs' | 'dental' | 'eye' | 'wellness' | 'emergency' | 'requests';
 const options: Array<[HealthMode, typeof Hospital, string, string]> = [
@@ -15,7 +15,6 @@ const options: Array<[HealthMode, typeof Hospital, string, string]> = [
   ['emergency', ShieldCheck, 'Emergency Care', 'Access emergency providers'],
   ['requests', CalendarClock, 'My Health Requests', 'Track health requests'],
 ];
-const pharmacyServices = ['Prescription fulfilment', 'OTC products', 'Wellness products', 'Delivery & pickup'];
 
 export default function HealthWellnessPage() {
   const navigate = useNavigate();
@@ -23,13 +22,11 @@ export default function HealthWellnessPage() {
   const [area, setArea] = useState('');
   const [consultType, setConsultType] = useState('General consultation');
   const [consultMode, setConsultMode] = useState('Video');
-  const [prescriptionFile, setPrescriptionFile] = useState('');
   const [message, setMessage] = useState('');
   const open = (next: HealthMode) => { setMode(next); setMessage(''); };
   const back = () => { setMode(null); setMessage(''); };
   const action = () => {
     if (mode === 'nearby' && !area.trim()) { setMessage('Enter your city or area so verified providers can be searched.'); return; }
-    if (mode === 'prescription' && !prescriptionFile) { setMessage('Upload or photograph your valid prescription first.'); return; }
     setMessage('Live healthcare-provider search is not connected yet. No provider was contacted, prescription was sent, appointment was booked, or price/availability checked.');
   };
 
@@ -72,7 +69,8 @@ export default function HealthWellnessPage() {
                 {mode === 'pharmacies' ? (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div><h2 className="font-black text-amber-950">Verified pharmacy listings unavailable</h2><p className="mt-2 text-sm leading-6 text-amber-900">No live pharmacy directory is connected. We have removed fictional provider cards and cannot accept or route prescriptions until a verified pharmacy integration is available.</p></div></div></div>
                 ) : mode === 'prescription' ? (
-                  <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5"><div className="flex items-start gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm"><FileText className="h-5 w-5" /></span><div><h2 className="font-black">Send a valid prescription</h2><p className="mt-1 text-xs leading-5 text-slate-500">Upload a prescription for pharmacy review. A pharmacist/provider must verify it before fulfilment.</p></div></div><label className="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-200 bg-white p-7 text-xs font-bold text-emerald-700"><Upload className="h-5 w-5" /> {prescriptionFile || 'Upload prescription image or PDF'}<input type="file" accept="image/*,.pdf" className="hidden" onChange={e => setPrescriptionFile(e.target.files?.[0]?.name || '')} /></label><button type="button" onClick={action} className="mt-3 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white">Send for pharmacy review</button></section>
+                  <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5"><div className="flex items-start gap-3"><FileText className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div><h2 className="font-black text-amber-950">Prescription submission unavailable</h2><p className="mt-2 text-sm leading-6 text-amber-900">No verified pharmacy endpoint is connected. Prescription upload and routing are disabled here; do not submit prescription documents until the secure provider workflow is available.</p></div></div></section>
+                
                 ) : mode === 'consult' ? (
                   <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold text-slate-600">Consultation type<select value={consultType} onChange={e => setConsultType(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm font-normal"><option>General consultation</option><option>Specialist</option><option>Child health</option><option>Women's health</option><option>Dental</option><option>Eye care</option><option>Mental wellness</option></select></label><label className="text-xs font-bold text-slate-600">Consultation mode<select value={consultMode} onChange={e => setConsultMode(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm font-normal"><option>Video</option><option>Voice</option><option>In-person</option></select></label></div><button type="button" onClick={action} className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-black text-white">Find verified providers</button></section>
                 ) : mode === 'nearby' ? (
@@ -85,7 +83,7 @@ export default function HealthWellnessPage() {
                 {message && <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">{message}</div>}
               </>
             )}
-            <div className="mt-4 grid gap-2 sm:grid-cols-3"><div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><ShieldCheck className="h-4 w-4 text-emerald-600" /><span className="text-[10px] font-bold text-slate-600">Verified provider ready</span></div><div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><Pill className="h-4 w-4 text-emerald-600" /><span className="text-[10px] font-bold text-slate-600">Pharmacy fulfilment ready</span></div><div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><Clock3 className="h-4 w-4 text-amber-600" /><span className="text-[10px] font-bold text-slate-600">Requests can be tracked</span></div></div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3"><div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><ShieldCheck className="h-4 w-4 text-emerald-600" /><span className="text-[10px] font-bold text-slate-600">Provider directory unavailable</span></div><div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><Pill className="h-4 w-4 text-emerald-600" /><span className="text-[10px] font-bold text-slate-600">Pharmacy fulfilment unavailable</span></div><div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><Clock3 className="h-4 w-4 text-amber-600" /><span className="text-[10px] font-bold text-slate-600">Request tracking not connected</span></div></div>
           </div>
         </section>
       </div>
