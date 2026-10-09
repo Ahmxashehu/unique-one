@@ -316,8 +316,9 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
             if (String(holdEntry.status || '') !== 'completed') continue;
             if (String(holdEntry.direction || '') === 'credit') holdBalance += holdAmount;
             else if (String(holdEntry.direction || '') === 'debit') holdBalance -= holdAmount;
+            if (!Number.isSafeInteger(holdBalance)) throw new Error('HOLD_LEDGER_INVALID');
           }
-          if (!Number.isSafeInteger(holdBalance) || holdBalance !== total) throw new Error('HOLD_BALANCE_MISMATCH');
+          if (holdBalance !== total) throw new Error('HOLD_BALANCE_MISMATCH');
           const settlementTxRef = db.collection('transactions').doc();
           const settlementReference = 'UP-PSS-SET-' + settlementTxRef.id;
           const holdDebitRef = db.collection('ledgerEntries').doc();
