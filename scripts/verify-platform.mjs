@@ -79,7 +79,11 @@ for (const required of [
   "authenticatorData.subarray(0, 32).equals(crypto.createHash('sha256').update(rpId).digest())",
   "(authenticatorData[32] & 0x05) !== 0x05",
   "crypto.verify('sha256', signedData, publicKey, signature)",
-  "previousCount > 0 && signCount > 0 && signCount <= previousCount",
+  "const counterAccepted = await adminDb.runTransaction(async transaction => {",
+  "const latestCredentialSnap = await transaction.get(credentialRef);",
+  "if (latestCount > 0 && signCount > 0 && signCount <= latestCount) return false;",
+  "transaction.update(credentialRef, { signCount, lastUsedAt: Timestamp.now() });",
+  "counterAccepted",
   "'restaurant_payment|' + uid + '|' + orderId + '|' + preflightAmountMinor + '|NGN'",
 ]) {
   assert(restaurantBiometricRoute.includes(required), `Restaurant biometric payment protection includes: ${required}`);
