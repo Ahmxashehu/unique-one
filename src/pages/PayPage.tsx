@@ -63,8 +63,8 @@ export default function PayPage() {
   const actions = [
     { to: '/os/pay/send', icon: ArrowUpRight, title: 'Send money', text: 'UniquePay, bank or supported recipient' },
     { to: '/os/pay/receive', icon: ArrowDownLeft, title: 'Receive money', text: 'Your ID, phone or temporary receiving ID' },
-    { to: '/os/pay', icon: Wifi, title: 'Buy Data', text: 'Mobile data bundles and top-ups' },
-    { to: '/os/pay', icon: PhoneCall, title: 'Buy Airtime', text: 'Recharge any supported mobile line' },
+    { to: '/os/pay/airtime-data?service=data', icon: Wifi, title: 'Buy Data', text: 'Mobile data bundles and top-ups' },
+    { to: '/os/pay/airtime-data?service=airtime', icon: PhoneCall, title: 'Buy Airtime', text: 'Recharge any supported mobile line' },
   ];
 
   const tools = [
