@@ -38,3 +38,31 @@ Wallet funding minimum is ₦20 and maximum is ₦500,000 per transaction in thi
 3. Test successful, failed, pending, mismatched-amount, duplicate webhook, and repeat-verification cases with Monnify sandbox.
 4. Confirm CI and deployed smoke tests pass.
 5. Only after Monnify approves the account and the production webhook is verified should the live base URL and `MONNIFY_LIVE_ENABLED=true` be configured.
+
+
+## Sandbox acceptance matrix
+
+Run these cases with Monnify sandbox credentials and test instruments only. Record the provider reference, expected amount, provider status, wallet balance before/after, transaction document, both ledger entries, and intent status for each case. Do not record API keys, secret keys, access tokens, or full payment credentials.
+
+| Case | Action | Required result |
+| --- | --- | --- |
+| Successful funding | Complete hosted checkout for an eligible amount | Server-side query confirms `PAID`, exact reference, NGN and exact amount; wallet and both ledger entries update once; intent becomes `credited`. |
+| Customer cancels / failed payment | Cancel checkout or use a sandbox failure scenario | Wallet remains unchanged; no completed funding transaction or credit ledger entry is created. |
+| Pending payment | Return before provider confirms payment | UI says unconfirmed/pending; wallet remains unchanged; payment reference stays available for retry. |
+| Amount mismatch | Use a controlled test response/event that does not match the intent amount | No wallet credit; intent remains uncredited; investigation evidence is retained without trusting webhook payload values. |
+| Currency mismatch | Use a controlled test response/event with a non-NGN currency | No wallet credit. |
+| Duplicate webhook | Deliver the same successful event more than once | At most one wallet increment, one funding transaction and one pair of ledger entries for the payment reference. |
+| Concurrent verification | Trigger verification and webhook processing close together | Firestore transaction/idempotency allows at most one credit. |
+| Repeat verification | Verify after the intent is credited | Returns the credited state without changing the balance or adding financial records. |
+| Unauthenticated verification | Call the verification endpoint without a valid Firebase token | Request is rejected; no payment data is exposed and no wallet changes. |
+| Wrong customer | Verify another customer's payment reference | Not found / rejected; no payment data leak and no wallet changes. |
+| Initialization failure | Force provider initialization to fail | No wallet balance change; intent is marked `initialization_failed`; UI displays a safe error. |
+
+### Evidence required to close the gate
+
+- CI run is green for the exact PR head.
+- Each case above has a recorded result from the sandbox; source-level assertions alone do not count.
+- For every successful and duplicate case, compare wallet balance deltas with the transaction record and exactly two ledger entries sharing the same payment reference and idempotency key.
+- Confirm the Monnify webhook reaches the deployed sandbox endpoint and provider-query failures return a retryable response rather than crediting from webhook payload alone.
+- Keep `MONNIFY_BASE_URL=https://sandbox.monnify.com` and `MONNIFY_LIVE_ENABLED=false` throughout acceptance testing.
+- Do not enable production collection until business activation, production webhook signature handling, operational monitoring, and explicit release approval are complete.
