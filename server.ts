@@ -1778,10 +1778,10 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     try {
       const requestRef = adminDb.collection("payment_requests").doc(requestId);
       const current = await requestRef.get();
-      if (!current.exists) return errorResponse(res, "REQUEST_NOT_FOUND", "Payment request was not found.", 404);
+      if (!current.exists) return errorResponse(res, "INVALID_REQUEST", "Payment request was not found.", 404);
       const data = current.data() as Record<string, unknown>;
       if (data.senderId !== senderId) return errorResponse(res, "FORBIDDEN", "You can only send your own payment requests.", 403);
-      if (data.status !== "draft") return errorResponse(res, "INVALID_STATUS", "Only saved drafts can be sent.");
+      if (data.status !== "draft") return errorResponse(res, "INVALID_REQUEST", "Only saved drafts can be sent.");
       const identifier = typeof data.recipientIdentifier === "string" ? data.recipientIdentifier.trim() : "";
       if (!identifier) return errorResponse(res, "INVALID_REQUEST", "This draft has no recipient identifier.");
       const normalizedEmail = identifier.toLowerCase();
@@ -1800,19 +1800,19 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const auditRef = adminDb.collection("audit_logs").doc();
       await adminDb.runTransaction(async transaction => {
         const fresh = await transaction.get(requestRef);
-        if (!fresh.exists) throw new Error("REQUEST_NOT_FOUND");
+        if (!fresh.exists) throw new Error("INVALID_REQUEST");
         const latest = fresh.data() as Record<string, unknown>;
         if (latest.senderId !== senderId) throw new Error("FORBIDDEN");
-        if (latest.status !== "draft") throw new Error("INVALID_STATUS");
+        if (latest.status !== "draft") throw new Error("INVALID_REQUEST");
         transaction.update(requestRef, { recipientId: recipientDoc.id, recipientName: typeof recipientData.fullName === "string" ? recipientData.fullName : "Unique One user", status: "sent", updatedAt: now });
         transaction.create(auditRef, { action: "payment_request.sent", actorUid: senderId, targetUid: recipientDoc.id, resource: "payment_request", resourceId: requestId, amount: typeof latest.amount === "number" ? latest.amount : null, currency: latest.currency === "NGN" ? "NGN" : null, status: "sent", timestamp: Timestamp.fromDate(new Date(now)) });
       });
       return res.status(200).json({ id: requestId, recipientId: recipientDoc.id, status: "sent" });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
-      if (message === "REQUEST_NOT_FOUND") return errorResponse(res, "REQUEST_NOT_FOUND", "Payment request was not found.", 404);
+      if (message === "INVALID_REQUEST") return errorResponse(res, "INVALID_REQUEST", "Payment request was not found.", 404);
       if (message === "FORBIDDEN") return errorResponse(res, "FORBIDDEN", "You can only send your own payment requests.", 403);
-      if (message === "INVALID_STATUS") return errorResponse(res, "INVALID_STATUS", "This draft has already been sent or changed.");
+      if (message === "INVALID_REQUEST") return errorResponse(res, "INVALID_REQUEST", "This draft has already been sent or changed.");
       console.error("Payment request send failed:", error);
       return errorResponse(res, "SERVICE_UNAVAILABLE", "We could not send this payment request right now.");
     }
