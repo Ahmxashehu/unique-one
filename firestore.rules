@@ -336,7 +336,8 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
           && (
             (resource.data.senderId == request.auth.uid
-              && request.resource.data.status in ['draft', 'sent', 'cancelled'])
+              && request.resource.data.status == 'cancelled'
+              && resource.data.status in ['draft', 'sent'])
             || (resource.data.recipientId == request.auth.uid
               && request.resource.data.status in ['viewed', 'pending_approval', 'approved', 'rejected'])
           ));
