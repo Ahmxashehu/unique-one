@@ -77,7 +77,9 @@ function isSafeId(value: unknown): value is string {
 }
 
 function restaurantRefundOperationKey(orderId: string): string {
-  return 'restaurant_refund_' + orderId;
+  // Keep the deterministic key within financialRefundService's 128-character ID limit
+  // even when a valid Restaurant order ID is near its 128-character maximum.
+  return 'restaurant_refund_' + createHash('sha256').update(orderId).digest('hex');
 }
 
 async function createRestaurantRefundObligation(
