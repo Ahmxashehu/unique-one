@@ -11,7 +11,7 @@ function fail(res: any, code: string, message: string, status = 400) {
 
 const PLAN_ID = /^[A-Za-z0-9_-]{1,128}$/;
 function pinCredentialMatches(data: any, pin: string): boolean {
-  if (!/^\\d{4}$/.test(pin)) return false;
+  if (!/^\d{4}$/.test(pin)) return false;
   const salt = typeof data?.transactionPinSalt === 'string' ? Buffer.from(data.transactionPinSalt, 'utf8') : null;
   const digest = typeof data?.transactionPinHash === 'string' ? Buffer.from(data.transactionPinHash, 'hex') : null;
   if (!salt || !digest || salt.length < 16 || digest.length !== 64) return false;
