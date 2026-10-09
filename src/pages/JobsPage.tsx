@@ -201,47 +201,14 @@ export default function JobsPage() {
   };
 
   const hireService = async () => {
-    if (!currentUser || !requestingService) { window.location.href = '/login'; return; }
-    setHireBusy(true); setError('');
-    try {
-      await addDoc(collection(db, 'serviceRequests'), { requesterUid: currentUser.uid, requesterName: userData?.fullName || '', providerUid: requestingService.ownerUid || '', serviceId: requestingService.id, serviceTitle: requestingService.title || 'Service request', providerName: requestingService.providerName || '', status: 'requested', paymentStatus: 'unpaid', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-      setRequestingService(null); setTab('work'); setError('Hire request sent. The provider can respond before work begins.'); await loadMyWork();
-    } catch (err: any) { setError(err?.message || 'Could not send the hire request.'); } finally { setHireBusy(false); }
+    setRequestingService(null);
+    setError('Hiring is temporarily unavailable while secure server-side service-request permissions and provider response endpoints are being completed. No request or payment was submitted.');
   };
 
   const submitRequest = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!currentUser) { window.location.href = '/login'; return; }
-    if (!requestForm.title.trim() || !requestForm.description.trim()) {
-      setError('Add what you need and describe the work.');
-      return;
-    }
-    setRequestBusy(true);
-    setError('');
-    try {
-      await addDoc(collection(db, 'professionalRequests'), {
-        requesterUid: currentUser.uid,
-        requesterName: userData?.fullName || '',
-        title: requestForm.title.trim().slice(0, 160),
-        category: requestForm.category,
-        location: requestForm.location.trim().slice(0, 160),
-        requiredDate: requestForm.requiredDate,
-        budget: requestForm.budget.trim().slice(0, 80),
-        description: requestForm.description.trim().slice(0, 3000),
-        status: 'published',
-        visibility: 'public',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      setShowRequest(false);
-      setRequestForm({ title: '', category: 'Skilled & Handwork', location: '', requiredDate: '', budget: '', description: '' });
-      setTab('work');
-      setError('Request posted. Suitable professionals can respond when this request is connected to the provider workflow.');
-    } catch (err: any) {
-      setError(err?.message || 'Could not submit the professional request.');
-    } finally {
-      setRequestBusy(false);
-    }
+    setShowRequest(false);
+    setError('Professional requests are not yet connected to a secure, tested provider-matching endpoint. No request was saved or sent.');
   };
 
   const tabs: Array<{ id: WorkTab; label: string; icon: React.ElementType }> = [
@@ -423,8 +390,7 @@ export default function JobsPage() {
               <div className="mt-4 space-y-3">{incomingRequests.map(item =>
                 <div key={item.id} className="rounded-xl border border-slate-200 p-4">
                   <div className="flex items-start justify-between gap-3"><div><p className="font-bold">{item.serviceTitle || 'Service request'}</p><p className="mt-1 text-xs text-slate-500">Client: {item.requesterName || 'Client'}</p></div><span className="text-xs font-bold">{item.status || 'requested'}</span></div>
-                  {item.status === 'requested' && <div className="mt-3 flex gap-2"><button onClick={async () => { await setDoc(doc(db, 'serviceRequests', item.id), { status: 'accepted', respondedAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true }); await loadMyWork(); setAgreementRequest(item); }} className="flex-1 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Accept</button><button onClick={async () => { await setDoc(doc(db, 'serviceRequests', item.id), { status: 'declined', respondedAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true }); await loadMyWork(); }} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold">Decline</button></div>}
-                  {item.status === 'accepted' && <button onClick={() => setAgreementRequest(item)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white"><FileText className="h-4 w-4" /> Create free agreement</button>}
+                  {(item.status === 'requested' || item.status === 'accepted') && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">Provider responses and agreement creation are temporarily disabled until secure server-side request and agreement endpoints are available. No status has been changed.</p>}
                 </div>)}</div>}
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -437,8 +403,8 @@ export default function JobsPage() {
                 return <div key={item.id} className="rounded-xl border border-slate-200 p-4">
                   <div className="flex items-start justify-between gap-3"><div><p className="font-bold">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.currency || 'NGN'} {item.price}</p></div><span className="text-xs font-bold">{item.status || 'pending_acceptance'}</span></div>
                   <p className="mt-2 text-xs text-slate-500">{myAccepted ? 'You accepted' : 'Your acceptance pending'} · {otherAccepted ? 'Other party accepted' : 'Other party pending'}</p>
-                  {!myAccepted && <button onClick={async () => { await setDoc(doc(db, 'workAgreements', item.id), { [isProvider ? 'providerAccepted' : 'clientAccepted']: true, updatedAt: serverTimestamp(), status: otherAccepted ? 'active' : 'pending_acceptance' }, { merge: true }); await loadMyWork(); }} className="mt-3 w-full rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Accept agreement</button>}
-                  {myAccepted && otherAccepted && <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-800">Agreement active — work can begin. Payment can be arranged through UniquePay after the agreed terms are confirmed.</div>}
+                  {!myAccepted && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">Agreement acceptance is unavailable until the secure server-side agreement workflow is implemented. No acceptance was recorded.</p>}
+                  {myAccepted && otherAccepted && <div className="mt-3 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-900">This record shows both parties accepted, but agreement status and payment readiness have not been verified by a secure server workflow.</div>}
                 </div>;
               })}</div>}
           </div>
@@ -473,7 +439,8 @@ export default function JobsPage() {
                 <input value={requestForm.budget} onChange={e => setRequestForm({...requestForm, budget: e.target.value})} placeholder="Budget (optional)" className="rounded-xl border border-slate-200 p-3" />
               </div>
               <textarea required rows={5} value={requestForm.description} onChange={e => setRequestForm({...requestForm, description: e.target.value})} placeholder="Describe the work, skills needed, timing, materials, or other requirements..." className="w-full rounded-xl border border-slate-200 p-3 outline-none" />
-              <button disabled={requestBusy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 font-bold text-white disabled:opacity-50">{requestBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Submit request</button>
+              <p className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">Submitting requests is disabled until a secure provider-matching endpoint and Firestore permissions are implemented and tested. Nothing will be sent from this form.</p>
+              <button disabled={true} className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 font-bold text-white opacity-50">{requestBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Submit request</button>
             </form>
           </div>
         </div>
@@ -484,7 +451,7 @@ export default function JobsPage() {
           <div className="w-full max-w-lg rounded-t-3xl bg-white p-5 sm:rounded-3xl">
             <div className="flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-wider text-emerald-600">Hire request</p><h2 className="mt-1 text-xl font-black">{requestingService.title || 'Service'}</h2><p className="mt-1 text-sm text-slate-500">{requestingService.providerName || 'Provider'}</p></div><button onClick={() => setRequestingService(null)}><X /></button></div>
             <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm"><p>Request this provider first. They can accept, decline or respond before any work or payment starts.</p><p className="mt-2 font-bold">Payment is not taken at this stage.</p></div>
-            <button disabled={hireBusy} onClick={() => void hireService()} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 font-bold text-white">{hireBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Send hire request</button>
+            <button disabled={true} onClick={() => void hireService()} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 font-bold text-white opacity-50">{hireBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Send hire request</button>
           </div>
         </div>
       )}
@@ -493,6 +460,9 @@ export default function JobsPage() {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/60 p-0 sm:items-center sm:p-4">
           <form onSubmit={async (event) => {
             event.preventDefault();
+            setAgreementRequest(null);
+            setError('Agreement creation is unavailable until a secure server-side agreement endpoint and authorization rules are implemented. No agreement was created.');
+            return;
             if (!currentUser || !agreementRequest) return;
             const form = new FormData(event.currentTarget);
             const title = String(form.get('title') || '').trim();
@@ -522,7 +492,8 @@ export default function JobsPage() {
               <textarea name="cancellationTerms" rows={3} placeholder="Cancellation or change terms" className="rounded-xl border border-slate-200 p-3 sm:col-span-2" />
             </div>
             <div className="mt-4 rounded-xl bg-emerald-50 p-3 text-xs text-emerald-800">Free to create. Payment should only proceed after the agreement is accepted.</div>
-            <button className="mt-4 w-full rounded-xl bg-slate-950 px-4 py-3 font-bold text-white">Create free agreement</button>
+            <p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">Agreement creation is disabled pending secure server-side authorization and status-transition tests.</p>
+            <button disabled className="mt-4 w-full rounded-xl bg-slate-950 px-4 py-3 font-bold text-white opacity-50">Agreement creation unavailable</button>
           </form>
         </div>
       )}
