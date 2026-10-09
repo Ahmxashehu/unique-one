@@ -4456,16 +4456,42 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         return errorResponse(res, 'INVALID_REQUEST', 'A valid payment idempotency key and 4-digit Transaction PIN are required.');
       }
       const idempotencyKey = req.body.idempotencyKey.trim();
-      if (!(await verifyTransactionPin(uid, req.body.transactionPin))) {
-        return errorResponse(res, 'FORBIDDEN', 'Incorrect Transaction PIN.');
-      }
-
       const orders = Array.isArray(req.body.orderIds) ? req.body.orderIds : [];
       if (orders.length < 1 || orders.length > 50 || !orders.every((id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id))) {
         return errorResponse(res, 'INVALID_REQUEST', 'One or more order IDs are invalid.');
       }
-
       const orderIds = Array.from(new Set(orders as string[]));
+      const idempotencyRef = adminDb.collection('storePaymentIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
+
+      // Return an authenticated, exact completed retry before checking mutable order
+      // status or consuming a one-time biometric challenge. Bind the saved receipt to
+      // this UID, key, ordered order-ID list, amount and NGN currency.
+      const completedRetry = await idempotencyRef.get();
+      if (completedRetry.exists) {
+        const saved = completedRetry.data() || {};
+        const savedAmountMinor = Number(saved.amountMinor);
+        const savedOrderIds = Array.isArray(saved.orderIds) ? saved.orderIds : [];
+        const savedResult = saved.result;
+        const savedFingerprint = [uid, orderIds.join(','), String(savedAmountMinor), 'NGN'].join('|');
+        if (saved.uid !== uid ||
+            saved.result?.idempotencyKey !== idempotencyKey ||
+            !Number.isSafeInteger(savedAmountMinor) || savedAmountMinor <= 0 ||
+            savedOrderIds.length !== orderIds.length ||
+            !savedOrderIds.every((id: unknown, index: number) => id === orderIds[index]) ||
+            saved.requestFingerprint !== savedFingerprint ||
+            !isPlainObject(savedResult) ||
+            savedResult.amountMinor !== savedAmountMinor ||
+            !Array.isArray(savedResult.orderIds) ||
+            !savedResult.orderIds.every((id: unknown, index: number) => id === orderIds[index])) {
+          return errorResponse(res, 'INVALID_REQUEST', 'This payment idempotency key was already used with different payment data.');
+        }
+        return res.status(200).json({ ...savedResult, replayed: true });
+      }
+
+      if (!(await verifyTransactionPin(uid, req.body.transactionPin))) {
+        return errorResponse(res, 'FORBIDDEN', 'Incorrect Transaction PIN.');
+      }
+
       const orderSnapshots = await Promise.all(orderIds.map((id) => adminDb.collection('orders').doc(id).get()));
       const sellerTotalsMinor = new Map<string, number>();
       let amountMinor = 0;
@@ -4549,7 +4575,6 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         if (!counterAccepted) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'The biometric credential counter is invalid.');
       }
 
-      const idempotencyRef = adminDb.collection('storePaymentIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
       const fingerprint = [uid, orderIds.join(','), String(amountMinor), 'NGN'].join('|');
       const result = await adminDb.runTransaction(async (transaction) => {
         const existing = await transaction.get(idempotencyRef);
