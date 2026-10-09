@@ -1755,6 +1755,52 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.get("/api/wallet/transactions", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
+    const uid = (req as any).user?.uid as string | undefined;
+    if (!uid || !isSafeFirebaseUid(uid)) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+    try {
+      // Read only the authenticated user's own financial records. Bound each query,
+      // merge both sides, and sort in memory to avoid requiring a composite index.
+      const transactions = adminDb.collection('transactions');
+      const [sent, received] = await Promise.all([
+        transactions.where('senderId', '==', uid).limit(50).get(),
+        transactions.where('recipientId', '==', uid).limit(50).get(),
+      ]);
+      const unique = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+      for (const doc of [...sent.docs, ...received.docs]) unique.set(doc.id, doc);
+      const rows = Array.from(unique.values()).map((doc) => {
+        const data = doc.data() as Record<string, any>;
+        const createdAt = data.createdAt && typeof data.createdAt.toDate === 'function'
+          ? data.createdAt.toDate().toISOString()
+          : typeof data.createdAt === 'string' ? data.createdAt : null;
+        const amountMinor = Number(data.amountMinor ?? data.amount);
+        const senderId = typeof data.senderId === 'string' ? data.senderId : '';
+        const recipientId = typeof data.recipientId === 'string' ? data.recipientId : '';
+        return {
+          id: doc.id,
+          reference: typeof data.reference === 'string' ? data.reference : doc.id,
+          type: typeof data.type === 'string' ? data.type : 'transaction',
+          sourceModule: typeof data.sourceModule === 'string' ? data.sourceModule : '',
+          status: typeof data.status === 'string' ? data.status : 'unknown',
+          currency: typeof data.currency === 'string' ? data.currency : 'NGN',
+          amountMinor: Number.isSafeInteger(amountMinor) && amountMinor > 0 ? amountMinor : null,
+          direction: recipientId === uid ? 'in' : senderId === uid ? 'out' : 'unknown',
+          counterpartyUid: senderId === uid ? recipientId : senderId,
+          createdAt,
+        };
+      }).filter((row) =>
+        row.amountMinor !== null &&
+        row.currency === 'NGN' &&
+        ['financial', undefined].includes((unique.get(row.id)?.data() as Record<string, any> | undefined)?.recordKind) &&
+        ['completed', 'pending', 'failed', 'refunded', 'partially_refunded'].includes(row.status)
+      ).sort((a, b) => Date.parse(b.createdAt || '') - Date.parse(a.createdAt || '')).slice(0, 10);
+      return res.status(200).json({ transactions: rows });
+    } catch (error) {
+      console.error('Wallet transaction history read failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Recent wallet activity is temporarily unavailable.');
+    }
+  });
+
   app.get("/api/wallet", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = (req as any).user?.uid as string | undefined;
     if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Missing authenticated user.');
