@@ -1770,6 +1770,54 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  app.post("/api/payment-requests/:requestId/send", authenticate, rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), async (req, res) => {
+    const senderId = (req as any).user?.uid as string | undefined;
+    const requestId = typeof req.params.requestId === "string" ? req.params.requestId.trim() : "";
+    if (!senderId) return errorResponse(res, "UNAUTHENTICATED", "Missing authenticated user.");
+    if (!requestId || requestId.length > 150 || requestId.includes("/")) return errorResponse(res, "INVALID_REQUEST", "A valid payment request ID is required.");
+    try {
+      const requestRef = adminDb.collection("payment_requests").doc(requestId);
+      const current = await requestRef.get();
+      if (!current.exists) return errorResponse(res, "REQUEST_NOT_FOUND", "Payment request was not found.", 404);
+      const data = current.data() as Record<string, unknown>;
+      if (data.senderId !== senderId) return errorResponse(res, "FORBIDDEN", "You can only send your own payment requests.", 403);
+      if (data.status !== "draft") return errorResponse(res, "INVALID_STATUS", "Only saved drafts can be sent.");
+      const identifier = typeof data.recipientIdentifier === "string" ? data.recipientIdentifier.trim() : "";
+      if (!identifier) return errorResponse(res, "INVALID_REQUEST", "This draft has no recipient identifier.");
+      const normalizedEmail = identifier.toLowerCase();
+      const [emailSnapshot, phoneSnapshot, uniqueOneIdSnapshot] = await Promise.all([
+        adminDb.collection("users").where("email", "==", identifier).limit(1).get(),
+        adminDb.collection("users").where("phone", "==", identifier).limit(1).get(),
+        adminDb.collection("users").where("uniqueOneId", "==", identifier).limit(1).get(),
+      ]);
+      const normalizedEmailSnapshot = normalizedEmail !== identifier ? await adminDb.collection("users").where("email", "==", normalizedEmail).limit(1).get() : null;
+      const match = [emailSnapshot, normalizedEmailSnapshot, phoneSnapshot, uniqueOneIdSnapshot].find(snapshot => snapshot && !snapshot.empty);
+      if (!match || match.empty) return errorResponse(res, "RECIPIENT_NOT_FOUND", "No Unique One user matches that recipient identifier.");
+      const recipientDoc = match.docs[0];
+      if (recipientDoc.id === senderId) return errorResponse(res, "SELF_TRANSFER_NOT_ALLOWED", "You cannot send a payment request to yourself.");
+      const recipientData = recipientDoc.data() as Record<string, unknown>;
+      const now = Timestamp.now().toDate().toISOString();
+      const auditRef = adminDb.collection("audit_logs").doc();
+      await adminDb.runTransaction(async transaction => {
+        const fresh = await transaction.get(requestRef);
+        if (!fresh.exists) throw new Error("REQUEST_NOT_FOUND");
+        const latest = fresh.data() as Record<string, unknown>;
+        if (latest.senderId !== senderId) throw new Error("FORBIDDEN");
+        if (latest.status !== "draft") throw new Error("INVALID_STATUS");
+        transaction.update(requestRef, { recipientId: recipientDoc.id, recipientName: typeof recipientData.fullName === "string" ? recipientData.fullName : "Unique One user", status: "sent", updatedAt: now });
+        transaction.create(auditRef, { action: "payment_request.sent", actorUid: senderId, targetUid: recipientDoc.id, resource: "payment_request", resourceId: requestId, amount: typeof latest.amount === "number" ? latest.amount : null, currency: latest.currency === "NGN" ? "NGN" : null, status: "sent", timestamp: Timestamp.fromDate(new Date(now)) });
+      });
+      return res.status(200).json({ id: requestId, recipientId: recipientDoc.id, status: "sent" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message === "REQUEST_NOT_FOUND") return errorResponse(res, "REQUEST_NOT_FOUND", "Payment request was not found.", 404);
+      if (message === "FORBIDDEN") return errorResponse(res, "FORBIDDEN", "You can only send your own payment requests.", 403);
+      if (message === "INVALID_STATUS") return errorResponse(res, "INVALID_STATUS", "This draft has already been sent or changed.");
+      console.error("Payment request send failed:", error);
+      return errorResponse(res, "SERVICE_UNAVAILABLE", "We could not send this payment request right now.");
+    }
+  });
+
   app.get("/api/wallet", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = (req as any).user?.uid as string | undefined;
     if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Missing authenticated user.');
