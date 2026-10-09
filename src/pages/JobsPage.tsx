@@ -438,7 +438,7 @@ export default function JobsPage() {
               </div>
               <textarea required rows={5} value={requestForm.description} onChange={e => setRequestForm({...requestForm, description: e.target.value})} placeholder="Describe the work, skills needed, timing, materials, or other requirements..." className="w-full rounded-xl border border-slate-200 p-3 outline-none" />
               <p className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">Submitting requests is disabled until a secure provider-matching endpoint and Firestore permissions are implemented and tested. Nothing will be sent from this form.</p>
-              <button disabled={true} className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 font-bold text-white opacity-50">{requestBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Submit request</button>
+              <button disabled={true} className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 font-bold text-white opacity-50"><ArrowRight className="h-4 w-4" /> Submit request</button>
             </form>
           </div>
         </div>
@@ -449,7 +449,7 @@ export default function JobsPage() {
           <div className="w-full max-w-lg rounded-t-3xl bg-white p-5 sm:rounded-3xl">
             <div className="flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-wider text-emerald-600">Hire request</p><h2 className="mt-1 text-xl font-black">{requestingService.title || 'Service'}</h2><p className="mt-1 text-sm text-slate-500">{requestingService.providerName || 'Provider'}</p></div><button onClick={() => setRequestingService(null)}><X /></button></div>
             <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm"><p>Request this provider first. They can accept, decline or respond before any work or payment starts.</p><p className="mt-2 font-bold">Payment is not taken at this stage.</p></div>
-            <button disabled={true} onClick={() => void hireService()} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 font-bold text-white opacity-50">{hireBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Send hire request</button>
+            <button disabled={true} onClick={() => void hireService()} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 font-bold text-white opacity-50"><ArrowRight className="h-4 w-4" /> Send hire request</button>
           </div>
         </div>
       )}
@@ -460,7 +460,7 @@ export default function JobsPage() {
             event.preventDefault();
             setAgreementRequest(null);
             setError('Agreement creation is unavailable until a secure server-side agreement endpoint and authorization rules are implemented. No agreement was created.');
-          }}} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-5 sm:rounded-3xl">
+          }} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-5 sm:rounded-3xl">
             <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-600">Free agreement</p><h2 className="mt-1 text-2xl font-black">Agree the work before payment</h2><p className="mt-2 text-sm text-slate-500">No subscription or agreement fee. Set scope, price and responsibilities clearly.</p></div><button type="button" onClick={() => setAgreementRequest(null)}><X className="h-5 w-5" /></button></div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <input name="title" required placeholder="Agreement title" className="rounded-xl border border-slate-200 p-3 sm:col-span-2" />
