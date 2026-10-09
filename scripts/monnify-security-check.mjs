@@ -8,6 +8,7 @@ const payPage = await readFile(new URL("../src/pages/PayPage.tsx", import.meta.u
 const checks = [
   ["only approved Monnify API base URLs are accepted", routes.includes('["https://sandbox.monnify.com", "https://api.monnify.com"]')],
   ["redirect must be HTTPS and reject embedded credentials", routes.includes('redirect.protocol !== "https:" || redirect.username || redirect.password')],
+  ["return payment reference is added safely while preserving existing redirect query parameters", routes.includes('new URL(cfg.redirectUrl)') && routes.includes('redirectUrl.searchParams.set("paymentReference", paymentReference)') && routes.includes('redirectUrl: redirectUrl.toString()')],
   ["live collections require explicit enablement", routes.includes('process.env.MONNIFY_LIVE_ENABLED === "true"')],
   ["initialization is authenticated and has per-user plus IP limits", routes.includes('authenticate, initializePaymentLimiter, initializePaymentIpLimiter')],
   ["verification is authenticated and has per-user plus IP limits", routes.includes('authenticate, verifyPaymentLimiter, verifyPaymentIpLimiter')],
