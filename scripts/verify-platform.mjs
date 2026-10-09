@@ -41,6 +41,9 @@ assert(sendMoneySource.includes("pendingTransferRef = useRef"), "wallet transfer
 assert(sendMoneySource.includes("pendingTransferRef.current?.fingerprint !== transferFingerprint"), "wallet transfer idempotency key is scoped to the exact transfer details");
 assert(sendMoneySource.includes("pendingTransferRef.current = null;") && sendMoneySource.includes("payload?.error?.code !== 'TRANSFER_IN_PROGRESS'"), "wallet transfer clears keys only after success or definitive rejection, preserving ambiguous retries");
 assert(sendMoneySource.includes("const idempotencyKey = pendingTransferRef.current.key"), "wallet transfer submits the persistent idempotency key");
+assert(sendMoneySource.includes("uniqueplatform:pending-wallet-transfer:"), "wallet transfer idempotency key is persisted across page reloads");
+assert(sendMoneySource.includes("window.localStorage.setItem(pendingStorageKey"), "pending wallet transfer key is durably stored when browser storage is available");
+assert(sendMoneySource.includes("window.localStorage.removeItem(pendingStorageKey)"), "pending wallet transfer key is cleared after success or definitive rejection");
 
 const backendSources = [
   ["server.ts", read("server.ts")],
