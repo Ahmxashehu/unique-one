@@ -4006,9 +4006,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const publicKey = crypto.createPublicKey({ key: Buffer.from(String(credential.publicKey), 'base64'), format: 'der', type: 'spki' });
           const signedData = Buffer.concat([authenticatorData, crypto.createHash('sha256').update(clientDataJSON).digest()]);
           if (!crypto.verify('sha256', signedData, publicKey, signature)) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification failed.');
+          const expectedBinding = 'restaurant_payment|' + uid + '|' + orderId + '|' + preflightAmountMinor + '|NGN';
+          if (challengeData.transactionBinding !== expectedBinding) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'This biometric approval is not bound to this restaurant payment.');
           const signCount = authenticatorData.readUInt32BE(33);
-          // Re-read and advance the authenticator counter atomically. A plain read/update
-          // lets two concurrent assertions both compare against the same stale counter.
+          // Re-read and advance the authenticator counter atomically only after the
+          // signed assertion is verified and bound to this exact payment request.
           const counterAccepted = await adminDb.runTransaction(async transaction => {
             const latestCredentialSnap = await transaction.get(credentialRef);
             if (!latestCredentialSnap.exists) return false;
@@ -4019,8 +4021,6 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             return true;
           });
           if (!counterAccepted) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'The biometric credential counter is invalid.');
-          const expectedBinding = 'restaurant_payment|' + uid + '|' + orderId + '|' + preflightAmountMinor + '|NGN';
-          if (challengeData.transactionBinding !== expectedBinding) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'This biometric approval is not bound to this restaurant payment.');
         } catch {
           return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification could not be verified.');
         }
