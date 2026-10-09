@@ -48,6 +48,37 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
   assert(backendSources.some(([, source]) => source.includes(route)), `backend route surface includes: ${route}`);
 }
 
+const transactionPinSource = read("server.ts");
+const transactionPinServiceSource = read("src/server/transactionPinSecurity.ts");
+const firestoreRulesSource = read("firestore.rules");
+for (const required of [
+  "export const TRANSACTION_PIN_SECURITY_COLLECTION = 'transactionPinSecurity'",
+  "export const TRANSACTION_PIN_MAX_FAILURES = 5",
+  "export const TRANSACTION_PIN_FAILURE_WINDOW_MS = 15 * 60_000",
+  "export const TRANSACTION_PIN_LOCKOUT_MS = 15 * 60_000",
+  "return db.runTransaction(async transaction => {",
+  "if (lockedUntilMs > nowMs) return false",
+  "failedAttempts >= TRANSACTION_PIN_MAX_FAILURES",
+  "lastSuccessAt: Timestamp.fromMillis(nowMs)",
+  "transaction.set(securityRef, {",
+]) {
+  assert(transactionPinServiceSource.includes(required), `shared persistent Transaction PIN lockout includes: ${required}`);
+}
+assert(transactionPinSource.includes("verifyTransactionPinWithLockout("),
+  "wallet transfers delegate Transaction PIN lockout to the shared service");
+assert(firestoreRulesSource.includes("match /transactionPinSecurity/{userId} { allow read, write: if false; }"),
+  "clients cannot read or alter server-side Transaction PIN lockout state");
+const walletTransferStart = transactionPinSource.indexOf('app.post("/api/wallet/transfer"');
+const walletTransferEnd = transactionPinSource.indexOf('app.post("/api/wallet/', walletTransferStart + 10);
+const walletTransferRoute = transactionPinSource.slice(walletTransferStart, walletTransferEnd > walletTransferStart ? walletTransferEnd : walletTransferStart + 18000);
+assert(walletTransferRoute.includes("verifyTransactionPin(senderUid, transactionPin)"),
+  "wallet transfers use the shared persistent Transaction PIN lockout verifier");
+const paySmallSmallPinSource = read("src/server/paySmallSmallRoutes.ts");
+assert(paySmallSmallPinSource.includes("verifyTransactionPinWithLockout("),
+  "Pay Small Small delegates lockout to the same shared verifier");
+assert((paySmallSmallPinSource.match(/verifyPaySmallSmallTransactionPin\(db, uid, transactionPin\)/g) || []).length === 2,
+  "Pay Small Small deposit and installment payments enforce persistent Transaction PIN lockout");
+
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");

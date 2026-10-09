@@ -10,13 +10,14 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "node scripts/verify-platform.mjs && node scripts/financial-integrity-harness.mjs",
+    "test": "node scripts/verify-platform.mjs && node scripts/financial-integrity-harness.mjs && tsx scripts/transaction-pin-lockout-harness.ts",
     "localization:audit": "node scripts/audit-localization.mjs",
     "localization:strict": "node scripts/audit-localization.mjs --strict",
     "store:expire-reservations": "node scripts/expire-store-reservations.mjs",
     "pay-small-small:sync": "node scripts/pay-small-small-sync.mjs",
     "store:reconcile-inventory": "node scripts/reconcile-store-inventory.mjs",
-    "store:migrate-legacy-inventory": "node scripts/migrate-legacy-store-inventory.mjs"
+    "store:migrate-legacy-inventory": "node scripts/migrate-legacy-store-inventory.mjs",
+    "test:transaction-pin-emulator": "tsx scripts/transaction-pin-lockout-emulator.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

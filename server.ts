@@ -21,6 +21,7 @@ import { registerAdminAuditRoutes } from "./src/server/adminAuditRoutes";
 import { hasRolePermission } from "./src/lib/auth/rbac";
 import { executeFinancialRefund } from "./src/server/financialRefundService";
 import { recordStoreInventoryMovement } from "./src/server/storeInventoryLedger";
+import { verifyTransactionPinWithLockout } from './src/server/transactionPinSecurity';
 
 interface WalletDocument {
   uid: string;
@@ -244,11 +245,16 @@ function validateTransactionPin(value: unknown): string {
   return value;
 }
 async function verifyTransactionPin(uid: string, pin: unknown): Promise<boolean> {
-  const credential = await adminDb.collection('authCredentials').doc(uid).get();
-  if (!credential.exists) return false;
-  const data = credential.data() as { transactionPinSalt?: unknown; transactionPinHash?: unknown } | undefined;
-  if (typeof data?.transactionPinSalt !== 'string' || typeof data.transactionPinHash !== 'string') return false;
-  return passwordDigestMatches(String(pin), data.transactionPinSalt, data.transactionPinHash);
+  return verifyTransactionPinWithLockout(
+    adminDb,
+    uid,
+    pin,
+    (credential, candidatePin) =>
+      typeof candidatePin === 'string' &&
+      typeof credential.transactionPinSalt === 'string' &&
+      typeof credential.transactionPinHash === 'string' &&
+      passwordDigestMatches(candidatePin, credential.transactionPinSalt, credential.transactionPinHash),
+  );
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

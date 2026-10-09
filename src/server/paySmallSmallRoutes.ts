@@ -3,19 +3,25 @@ import rateLimit from 'express-rate-limit';
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import crypto from 'node:crypto';
 import { scryptSync, timingSafeEqual } from 'node:crypto';
+import { verifyTransactionPinWithLockout } from './transactionPinSecurity';
 
 function fail(res: any, code: string, message: string, status = 400) {
   return res.status(status).json({ error: { code, message } });
 }
 
 const PLAN_ID = /^[A-Za-z0-9_-]{1,128}$/;
-function verifyPinCredential(data: any, pin: string): boolean {
+function pinCredentialMatches(data: any, pin: string): boolean {
   if (!/^\d{4}$/.test(pin)) return false;
   const salt = typeof data?.transactionPinSalt === 'string' ? Buffer.from(data.transactionPinSalt, 'utf8') : null;
   const digest = typeof data?.transactionPinHash === 'string' ? Buffer.from(data.transactionPinHash, 'hex') : null;
   if (!salt || !digest || salt.length < 16 || digest.length !== 64) return false;
   const candidate = scryptSync(pin, salt, 64);
   return timingSafeEqual(candidate, digest);
+}
+
+async function verifyPaySmallSmallTransactionPin(db: Firestore, uid: string, pin: string): Promise<boolean> {
+  return verifyTransactionPinWithLockout(db, uid, pin, (credential, candidatePin) =>
+    typeof candidatePin === 'string' && pinCredentialMatches(credential, candidatePin));
 }
 
 const IDEMPOTENCY = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -97,13 +103,13 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
       return fail(res, 'INVALID_REQUEST', 'A valid plan, Transaction PIN and idempotency key are required.');
     }
     try {
+      if (!(await verifyPaySmallSmallTransactionPin(db, uid, transactionPin))) return fail(res, 'FORBIDDEN', 'Incorrect Transaction PIN.', 403);
       const result = await db.runTransaction(async (transaction) => {
         const planRef = db.collection('paySmallSmallPlans').doc(planId);
         const walletRef = db.collection('wallets').doc(uid);
         const idemRef = db.collection('paySmallSmallPaymentIdempotency').doc(crypto.createHash('sha256').update(uid + '\0' + idempotencyKey).digest('hex'));
-        const credentialRef = db.collection('authCredentials').doc(uid);
-        const [planSnap, credentialSnap, walletSnap, idemSnap] = await Promise.all([
-          transaction.get(planRef), transaction.get(credentialRef), transaction.get(walletRef), transaction.get(idemRef)
+        const [planSnap, walletSnap, idemSnap] = await Promise.all([
+          transaction.get(planRef), transaction.get(walletRef), transaction.get(idemRef)
         ]);
         if (idemSnap.exists) {
           const existing = idemSnap.data() || {};
@@ -112,7 +118,6 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
           return { ...(existing.result || {}), replayed: true };
         }
         if (!planSnap.exists) throw new Error('PLAN_NOT_FOUND');
-        if (!credentialSnap.exists) throw new Error('USER_NOT_FOUND');
         if (!walletSnap.exists) throw new Error('WALLET_NOT_FOUND');
         const plan = planSnap.data() || {};
         if (String(plan.customerId || '') !== uid) throw new Error('FORBIDDEN');
@@ -129,8 +134,6 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
             Number(order.totalMinor) !== Number(plan.totalAmountMinor)) {
           throw new Error('ORDER_STATE_MISMATCH');
         }
-        const credential = credentialSnap.data() || {};
-        if (!verifyPinCredential(credential, transactionPin)) throw new Error('BAD_PIN');
         const deposit = Number(plan.depositAmountMinor);
         if (!Number.isSafeInteger(deposit) || deposit <= 0) throw new Error('INVALID_AMOUNT');
         const wallet = walletSnap.data() || {};
@@ -238,12 +241,12 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
     const idempotencyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey.trim() : '';
     if (!uid || !PLAN_ID.test(planId) || !Number.isInteger(installmentNumber) || installmentNumber < 1 || installmentNumber > 24 || !/^\d{4}$/.test(transactionPin) || !IDEMPOTENCY.test(idempotencyKey)) return fail(res, 'INVALID_REQUEST', 'A valid plan, installment number, Transaction PIN and idempotency key are required.');
     try {
+      if (!(await verifyPaySmallSmallTransactionPin(db, uid, transactionPin))) return fail(res, 'FORBIDDEN', 'Incorrect Transaction PIN.', 403);
       const result = await db.runTransaction(async (transaction) => {
         const planRef = db.collection('paySmallSmallPlans').doc(planId);
         const walletRef = db.collection('wallets').doc(uid);
-        const credentialRef = db.collection('authCredentials').doc(uid);
         const idemRef = db.collection('paySmallSmallPaymentIdempotency').doc(crypto.createHash('sha256').update(uid + '\0' + idempotencyKey).digest('hex'));
-        const [planSnap, walletSnap, credentialSnap, idemSnap] = await Promise.all([transaction.get(planRef), transaction.get(walletRef), transaction.get(credentialRef), transaction.get(idemRef)]);
+        const [planSnap, walletSnap, idemSnap] = await Promise.all([transaction.get(planRef), transaction.get(walletRef), transaction.get(idemRef)]);
         const fingerprint = planId + '|' + installmentNumber + '|' + String((Array.isArray(planSnap.data()?.installments) ? (planSnap.data()?.installments[installmentNumber - 1] as any)?.amountMinor : '') || '');
         if (idemSnap.exists) {
           const existing = idemSnap.data() || {};
@@ -252,11 +255,9 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         }
         if (!planSnap.exists) throw new Error('PLAN_NOT_FOUND');
         if (!walletSnap.exists) throw new Error('WALLET_NOT_FOUND');
-        if (!credentialSnap.exists) throw new Error('USER_NOT_FOUND');
         const plan = planSnap.data() || {};
         if (String(plan.customerId || '') !== uid) throw new Error('FORBIDDEN');
         if (String(plan.currency || '') !== 'NGN' || String(plan.status || '') !== 'active') throw new Error('PLAN_NOT_ELIGIBLE');
-        if (!verifyPinCredential(credentialSnap.data() || {}, transactionPin)) throw new Error('BAD_PIN');
         const installments = Array.isArray(plan.installments) ? plan.installments : [];
         const index = installmentNumber - 1;
         if (index < 0 || index >= installments.length) throw new Error('INSTALLMENT_NOT_FOUND');
