@@ -1,83 +1,26 @@
-import { Link } from 'react-router-dom';
-import {
-  ArrowLeft, Building2, CalendarDays, Car, CircleAlert, Coffee, ShieldCheck,
-  Sparkles, Utensils, Users, Waves,
-} from 'lucide-react';
-
-const experiences = [
-  { label: 'Stay', description: 'Hotels, rooms and resorts', icon: Building2 },
-  { label: 'Meet', description: 'Conference and meeting venues', icon: Users },
-  { label: 'Celebrate', description: 'Event spaces and venues', icon: Sparkles },
-  { label: 'Dine', description: 'Dining and catering', icon: Utensils },
-  { label: 'Experience', description: 'Spa, pool and activities', icon: Waves },
-  { label: 'Move', description: 'Airport transfers and drivers', icon: Car },
+import { useState } from 'react';
+import { ArrowLeft, Building2, CalendarDays, Car, CircleAlert, MapPin, Search, ShieldCheck, Sparkles, Utensils, Users, Waves } from 'lucide-react';
+type Mode = 'stay' | 'meet' | 'celebrate' | 'dine' | 'experience' | 'move';
+const modes: Array<{id:Mode;label:string;description:string;icon:typeof Building2}> = [
+{id:'stay',label:'Hotels & rooms',description:'Hotels, rooms and accommodation',icon:Building2},
+{id:'meet',label:'Meetings',description:'Conference halls and meeting rooms',icon:Users},
+{id:'celebrate',label:'Events & venues',description:'Weddings, parties and venues',icon:Sparkles},
+{id:'dine',label:'Dining & catering',description:'Restaurants and catering',icon:Utensils},
+{id:'experience',label:'Experiences',description:'Spa, pools and activities',icon:Waves},
+{id:'move',label:'Hospitality transport',description:'Airport pickup, cars and drivers',icon:Car},
 ];
-
-export default function HotelsEventsPage() {
-  return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-4xl space-y-5">
-        <header className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-slate-950 via-emerald-950 to-emerald-800 p-5 text-white shadow-lg sm:p-7">
-          <Link to="/" className="mb-5 inline-flex items-center gap-1 text-xs font-bold text-emerald-100 hover:text-white">
-            <ArrowLeft className="h-3.5 w-3.5" /> Home
-          </Link>
-          <div className="flex items-center gap-2 text-emerald-200">
-            <Building2 className="h-5 w-5" />
-            <span className="text-sm font-black">Unique Hotels & Events</span>
-          </div>
-          <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">Hotels, venues and hospitality</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/85">
-            Explore the types of hospitality services planned for UniquePlatform. We only list properties,
-            availability and prices after verified providers supply real inventory.
-          </p>
-        </header>
-
-        <section className="rounded-3xl border border-amber-200 bg-white p-5 shadow-sm sm:p-7">
-          <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
-              <CircleAlert className="h-5 w-5" />
-            </span>
-            <div>
-              <h2 className="text-lg font-black">Live hotel and event booking is unavailable</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                No verified accommodation or venue inventory integration has been confirmed. Fictional
-                hotel names, ratings, room options, capacities and prices have been removed. No search,
-                reservation or booking request can be submitted from this page yet.
-              </p>
-            </div>
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {experiences.map(({ label, description, icon: Icon }) => (
-              <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                  <Icon className="h-5 w-5" />
-                </span>
-                <h3 className="mt-3 text-sm font-black">{label}</h3>
-                <p className="mt-1 text-xs leading-5 text-slate-600">{description}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-5 flex items-start gap-2 rounded-2xl bg-slate-100 p-4 text-xs leading-5 text-slate-600">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>Booking will be enabled after verified partners provide live inventory, date availability, final pricing, cancellation rules and a tested confirmation flow.</p>
-          </div>
-          <Link to="/" className="mt-5 inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-3 text-sm font-black text-white hover:bg-slate-800">
-            Return to UniquePlatform
-          </Link>
-        </section>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <CalendarDays className="h-5 w-5 text-slate-500" />
-            <h3 className="mt-2 text-sm font-black">Dates and reservations</h3>
-            <p className="mt-1 text-xs leading-5 text-slate-600">Date selection will be available when live provider calendars can confirm inventory.</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <Coffee className="h-5 w-5 text-slate-500" />
-            <h3 className="mt-2 text-sm font-black">Catering and transport</h3>
-            <p className="mt-1 text-xs leading-5 text-slate-600">Hospitality add-ons will be offered only when a verified provider supports them.</p>
-          </div>
-        </div>
-      </div>
-    </main>
-  );
+export default function HotelsEventsPage(){
+ const [mode,setMode]=useState<Mode>('stay'); const [destination,setDestination]=useState(''); const [date,setDate]=useState(''); const [guests,setGuests]=useState('1'); const [message,setMessage]=useState('');
+ const selected=modes.find(item=>item.id===mode)??modes[0]; const Icon=selected.icon;
+ return <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-950 sm:px-6"><div className="mx-auto max-w-5xl space-y-5 pb-10">
+ <header className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-slate-950 via-emerald-950 to-emerald-800 p-5 text-white shadow-xl sm:p-7"><button type="button" onClick={()=>setMessage('')} className="mb-4 inline-flex items-center gap-1 text-xs font-bold text-emerald-100"><ArrowLeft className="h-3.5 w-3.5"/> Clear notice</button><div className="flex items-center gap-2 text-emerald-200 text-sm font-bold"><Building2 className="h-4 w-4"/> Unique Hotels & Events</div><h1 className="mt-2 text-2xl font-black sm:text-3xl">Find a place. Plan an experience.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/80">Explore hospitality categories. Only verified provider listings, live availability and confirmed prices can be used for real bookings.</p></header>
+ <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Hospitality categories">{modes.map(item=>{const ItemIcon=item.icon;return <button key={item.id} type="button" onClick={()=>{setMode(item.id);setMessage('')}} aria-pressed={mode===item.id} className={`rounded-2xl border p-4 text-left transition ${mode===item.id?'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-200':'border-slate-200 bg-white hover:border-emerald-300'}`}><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800"><ItemIcon className="h-5 w-5"/></span><span className="mt-3 block text-sm font-black">{item.label}</span><span className="mt-1 block text-xs leading-5 text-slate-500">{item.description}</span></button>})}</section>
+ <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><div className="flex items-start gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700"><CircleAlert className="h-5 w-5"/></span><div><h2 className="text-lg font-black">Live booking is not available yet</h2><p className="mt-1 text-sm leading-6 text-slate-600">Fictional hotels, venues, prices and inventory have been removed. Bookable options will appear only after verified providers connect actual inventory.</p></div></div>
+ <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center gap-2 text-sm font-black"><Icon className="h-4 w-4 text-emerald-700"/> Search {selected.label.toLowerCase()}</div><div className="mt-4 grid gap-3 sm:grid-cols-2">
+ <label className="text-xs font-bold text-slate-600">Destination or area<span className="relative mt-1 block"><MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={destination} onChange={e=>setDestination(e.target.value)} placeholder="City, area or venue location" className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-9 pr-3 text-sm font-normal outline-none focus:border-emerald-500"/></span></label>
+ <label className="text-xs font-bold text-slate-600">Date<span className="relative mt-1 block"><CalendarDays className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-9 pr-3 text-sm font-normal outline-none focus:border-emerald-500"/></span></label>
+ <label className="text-xs font-bold text-slate-600">Guests or attendees<input type="number" min="1" value={guests} onChange={e=>setGuests(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm font-normal outline-none focus:border-emerald-500"/></label></div>
+ <button type="button" onClick={()=>setMessage('Live verified provider availability is not connected yet. No booking, reservation, or service request has been submitted.')} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-black text-white"><Search className="h-4 w-4"/> Check live availability</button>{message&&<p role="status" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">{message}</p>}</div>
+ <div className="mt-4 flex items-start gap-3 rounded-2xl bg-slate-50 p-4"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700"/><p className="text-xs leading-5 text-slate-600">No hotel, venue, room, event, transport provider, price or availability is currently being advertised as real. Search inputs are not sent to a booking service.</p></div></section>
+ </div></main>
 }
