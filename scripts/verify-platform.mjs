@@ -44,6 +44,7 @@ assert(sendMoneySource.includes("const idempotencyKey = pendingTransferRef.curre
 assert(sendMoneySource.includes("uniqueplatform:pending-wallet-transfer:"), "wallet transfer idempotency key is persisted across page reloads");
 assert(sendMoneySource.includes("window.localStorage.setItem(pendingStorageKey"), "pending wallet transfer key is durably stored when browser storage is available");
 assert(sendMoneySource.includes("window.localStorage.removeItem(pendingStorageKey)"), "pending wallet transfer key is cleared after success or definitive rejection");
+assert(sendMoneySource.includes("A previous transfer still has an uncertain outcome"), "wallet transfer blocks changed requests until an ambiguous transfer is resolved");
 
 const backendSources = [
   ["server.ts", read("server.ts")],
