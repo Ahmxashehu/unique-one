@@ -21,6 +21,7 @@ import { registerAdminAuditRoutes } from "./src/server/adminAuditRoutes";
 import { hasRolePermission } from "./src/lib/auth/rbac";
 import { executeFinancialRefund } from "./src/server/financialRefundService";
 import { recordStoreInventoryMovement } from "./src/server/storeInventoryLedger";
+import { verifyTransactionPinWithLockout } from './src/server/transactionPinSecurity';
 
 interface WalletDocument {
   uid: string;
@@ -243,60 +244,17 @@ function validateTransactionPin(value: unknown): string {
   }
   return value;
 }
-const TRANSACTION_PIN_SECURITY_COLLECTION = 'transactionPinSecurity';
-const TRANSACTION_PIN_MAX_FAILURES = 5;
-const TRANSACTION_PIN_FAILURE_WINDOW_MS = 15 * 60_000;
-const TRANSACTION_PIN_LOCKOUT_MS = 15 * 60_000;
-
 async function verifyTransactionPin(uid: string, pin: unknown): Promise<boolean> {
-  const securityRef = adminDb.collection(TRANSACTION_PIN_SECURITY_COLLECTION).doc(uid);
-  const credentialRef = adminDb.collection('authCredentials').doc(uid);
-
-  // Atomically read the credential and lock state and update failed attempts.
-  // This shared verifier protects wallet transfers as well as merchant payments.
-  return adminDb.runTransaction(async transaction => {
-    const [securitySnap, credentialSnap] = await Promise.all([
-      transaction.get(securityRef),
-      transaction.get(credentialRef),
-    ]);
-    const state = securitySnap.data() || {};
-    const nowMs = Date.now();
-    const lockedUntil = state.lockedUntil;
-    const lockedUntilMs = typeof lockedUntil?.toMillis === 'function' ? lockedUntil.toMillis() : 0;
-    if (lockedUntilMs > nowMs) return false;
-
-    if (!credentialSnap.exists) return false;
-    const credential = credentialSnap.data() as { transactionPinSalt?: unknown; transactionPinHash?: unknown } | undefined;
-    if (typeof credential?.transactionPinSalt !== 'string' || typeof credential.transactionPinHash !== 'string') return false;
-
-    const matches = passwordDigestMatches(String(pin), credential.transactionPinSalt, credential.transactionPinHash);
-    if (matches) {
-      transaction.set(securityRef, {
-        failedAttempts: 0,
-        windowStartedAt: null,
-        lockedUntil: null,
-        lastSuccessAt: Timestamp.fromMillis(nowMs),
-        updatedAt: Timestamp.fromMillis(nowMs),
-      }, { merge: true });
-      return true;
-    }
-
-    const windowStartedAt = state.windowStartedAt;
-    const windowStartedAtMs = typeof windowStartedAt?.toMillis === 'function' ? windowStartedAt.toMillis() : 0;
-    const withinWindow = windowStartedAtMs > 0 && nowMs - windowStartedAtMs < TRANSACTION_PIN_FAILURE_WINDOW_MS;
-    const previousFailures = withinWindow && Number.isSafeInteger(state.failedAttempts) ? state.failedAttempts : 0;
-    const failedAttempts = previousFailures + 1;
-    const nextWindowStartedAt = withinWindow ? windowStartedAt : Timestamp.fromMillis(nowMs);
-    const lockTriggered = failedAttempts >= TRANSACTION_PIN_MAX_FAILURES;
-    transaction.set(securityRef, {
-      failedAttempts,
-      windowStartedAt: nextWindowStartedAt,
-      lockedUntil: lockTriggered ? Timestamp.fromMillis(nowMs + TRANSACTION_PIN_LOCKOUT_MS) : null,
-      lastFailureAt: Timestamp.fromMillis(nowMs),
-      updatedAt: Timestamp.fromMillis(nowMs),
-    }, { merge: true });
-    return false;
-  });
+  return verifyTransactionPinWithLockout(
+    adminDb,
+    uid,
+    pin,
+    (credential, candidatePin) =>
+      typeof candidatePin === 'string' &&
+      typeof credential.transactionPinSalt === 'string' &&
+      typeof credential.transactionPinHash === 'string' &&
+      passwordDigestMatches(candidatePin, credential.transactionPinSalt, credential.transactionPinHash),
+  );
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
