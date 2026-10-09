@@ -56,7 +56,7 @@ assert.ok(page.includes("canSend && <button") && page.includes("changeStatus(r, 
 
 
 const statusRouteStart = routes.indexOf("app.patch('/api/payment-requests/:requestId/status'");
-const statusRouteEnd = routes.indexOf("\\n  app.get('/api/admin/audit-logs'", statusRouteStart);
+const statusRouteEnd = routes.indexOf("app.get('/api/admin/audit-logs'", statusRouteStart);
 assert.ok(statusRouteStart >= 0 && statusRouteEnd > statusRouteStart,
   "payment request status route boundaries must be identifiable");
 const statusRoute = routes.slice(statusRouteStart, statusRouteEnd);
