@@ -44,7 +44,7 @@ function config(): MonnifyConfig | null {
   if (!["https://sandbox.monnify.com", "https://api.monnify.com"].includes(baseUrl)) return null;
   try {
     const redirect = new URL(redirectUrl);
-    if (redirect.protocol !== "https:" && redirect.hostname !== "localhost") return null;
+    if (redirect.protocol !== "https:" || redirect.username || redirect.password) return null;
   } catch {
     return null;
   }
