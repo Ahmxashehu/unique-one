@@ -431,7 +431,9 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
                 if (String(holdEntry.direction || '') === 'credit') holdBalance += holdAmount;
                 else if (String(holdEntry.direction || '') === 'debit') holdBalance -= holdAmount;
               }
-              if (!Number.isSafeInteger(holdBalance) || holdBalance < refundAmount) throw new Error('HOLD_BALANCE_MISMATCH');
+              // Cancellation must return exactly the amount still held for this plan.
+              // A surplus or deficit signals ledger corruption and must fail closed.
+              if (!Number.isSafeInteger(holdBalance) || holdBalance !== refundAmount) throw new Error('HOLD_BALANCE_MISMATCH');
               if (refundAmount > 0) {
                 const refundTx = db.collection('transactions').doc();
                 const refundRef = 'UP-PSS-REF-' + refundTx.id;
