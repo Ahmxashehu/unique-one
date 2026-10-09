@@ -48,6 +48,18 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
   assert(backendSources.some(([, source]) => source.includes(route)), `backend route surface includes: ${route}`);
 }
 
+const transactionPinSource = read("server.ts");
+const firestoreRulesSource = read("firestore.rules");
+assert(firestoreRulesSource.includes("match /transactionPinSecurity/{userId} { allow read, write: if false; }"), "clients cannot read or tamper with server-side Transaction PIN lockout state");
+assert(transactionPinSource.includes("const TRANSACTION_PIN_SECURITY_COLLECTION = 'transactionPinSecurity'"), "Transaction PIN security uses persistent server-side state");
+assert(transactionPinSource.includes("const TRANSACTION_PIN_MAX_FAILURES = 5"), "Transaction PIN lockout threshold is five failed attempts");
+assert(transactionPinSource.includes("const TRANSACTION_PIN_LOCKOUT_MS = 15 * 60_000"), "Transaction PIN lockout duration is fifteen minutes");
+assert(transactionPinSource.includes("return adminDb.runTransaction(async transaction => {"), "Transaction PIN security updates are atomic");
+assert(transactionPinSource.includes("transaction.set(securityRef, {\n        failedAttempts: 0"), "successful Transaction PIN verification resets failed attempts");
+assert(transactionPinSource.includes("failedAttempts >= TRANSACTION_PIN_MAX_FAILURES"), "repeated incorrect Transaction PIN attempts trigger lockout");
+assert(transactionPinSource.includes("if (lockedUntilMs > nowMs) return false"), "an active Transaction PIN lockout blocks verification inside the atomic check");
+assert(transactionPinSource.includes("transaction.get(credentialRef)"), "PIN credential reads participate in the atomic lockout transaction");
+
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayStart = restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate');
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPayStart, restaurantPayStart + 700);
@@ -59,7 +71,7 @@ assert(retryLookupIndex >= 0 && retryLookupIndex < pinVerificationIndex && retry
 assert(restaurantPayFullRoute.includes("saved.uid !== uid") && restaurantPayFullRoute.includes("saved.requestFingerprint !== uid + '|' + orderId"), "Restaurant completed payment replay validates owner and order fingerprint");
 assert(restaurantPayFullRoute.includes("return res.status(200).json({ ...saved.result, replayed: true })"), "Restaurant completed payment replay returns saved result without repeating financial mutations");
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
-const restaurantBiometricRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 9000);
+const restaurantBiometricRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 6500);
 for (const required of [
   "transaction.delete(challengeRef)",
   "clientData.type !== 'webauthn.get'",
