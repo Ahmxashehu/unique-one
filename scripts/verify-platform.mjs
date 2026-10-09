@@ -69,6 +69,18 @@ const walletTransferEnd = transactionPinSource.indexOf('app.post("/api/wallet/',
 const walletTransferRoute = transactionPinSource.slice(walletTransferStart, walletTransferEnd > walletTransferStart ? walletTransferEnd : walletTransferStart + 18000);
 assert(walletTransferRoute.includes("verifyTransactionPin(senderUid, transactionPin)"),
   "wallet transfers use the shared persistent Transaction PIN lockout verifier");
+const paySmallSmallPinSource = read("src/server/paySmallSmallRoutes.ts");
+for (const required of [
+  "const PIN_SECURITY_COLLECTION = 'transactionPinSecurity'",
+  "const PIN_MAX_FAILURES = 5",
+  "const PIN_FAILURE_WINDOW_MS = 15 * 60_000",
+  "const PIN_LOCKOUT_MS = 15 * 60_000",
+  "async function verifyPaySmallSmallTransactionPin(db: Firestore, uid: string, pin: string)",
+]) {
+  assert(paySmallSmallPinSource.includes(required), `Pay Small Small persistent PIN lockout includes: ${required}`);
+}
+assert((paySmallSmallPinSource.match(/verifyPaySmallSmallTransactionPin\\(db, uid, transactionPin\\)/g) || []).length === 2,
+  "Pay Small Small deposit and installment payments enforce persistent Transaction PIN lockout");
 
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
