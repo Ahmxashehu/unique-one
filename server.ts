@@ -4833,6 +4833,10 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
       const orderId = req.params.orderId;
       const idempotencyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey.trim() : '';
       const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : '';
+      const requestedItemsFingerprintInput = Array.isArray(req.body?.items) ? req.body.items : null;
+      const requestFingerprint = createHash('sha256')
+        .update(JSON.stringify({ orderId, reason, items: requestedItemsFingerprintInput }))
+        .digest('hex');
       if (!/^[A-Za-z0-9_-]{1,128}$/.test(orderId) || !/^[A-Za-z0-9_-]{1,200}$/.test(idempotencyKey) || !reason) {
         return errorResponse(res, 'INVALID_REQUEST', 'A valid order, idempotency key, and return reason are required.');
       }
@@ -4840,7 +4844,14 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
         const orderRef = adminDb.collection('orders').doc(orderId);
         const idempotencyRef = adminDb.collection('storeReturnRequestIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
         const existing = await transaction.get(idempotencyRef);
-        if (existing.exists) return existing.data();
+        if (existing.exists) {
+          const stored = existing.data() as Record<string, unknown>;
+          if (stored.uid !== uid || stored.orderId !== orderId ||
+              (typeof stored.requestFingerprint === 'string' && stored.requestFingerprint !== requestFingerprint)) {
+            throw new RequestValidationError('IDEMPOTENCY_CONFLICT', 'This idempotency key was already used for a different Store return request.');
+          }
+          return stored;
+        }
         const orderSnap = await transaction.get(orderRef);
         if (!orderSnap.exists) throw new RequestValidationError('NOT_FOUND', 'The Store order was not found.');
         const order = orderSnap.data() as Record<string, unknown>;
@@ -4900,7 +4911,7 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
         const expiresAt = new Date(deliveredAtMs + STORE_RETURN_WINDOW_MS).toISOString();
         const returnRequest = { status: 'requested', reason, items, requestedRefundAmountMinor, requestedBy: uid, requestedAt: now, expiresAt, restocked: false };
         transaction.update(orderRef, { returnRequest, updatedAt: now });
-        transaction.create(idempotencyRef, { uid, orderId, idempotencyKey, status: 'requested', createdAt: now, updatedAt: now });
+        transaction.create(idempotencyRef, { uid, orderId, idempotencyKey, requestFingerprint, status: 'requested', createdAt: now, updatedAt: now });
         transaction.create(adminDb.collection('audit_logs').doc(), {
           action: 'store.return.requested', actorUid: uid, targetUid: uid, resource: 'store_order',
           resourceId: orderId, reason, items, timestamp: Timestamp.now(), createdAt: now,
