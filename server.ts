@@ -3603,7 +3603,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         if (!snap.exists) throw new RequestValidationError('NOT_FOUND', 'Restaurant order not found.');
         const order = snap.data() as Record<string, any>;
         if (String(order.customerId || '') !== uid) throw new RequestValidationError('FORBIDDEN', 'You cannot cancel this Restaurant order.');
-        if (!['pending', 'paid', 'accepted'].includes(String(order.status || ''))) {
+        if (!['pending', 'pending_payment', 'paid', 'accepted'].includes(String(order.status || ''))) {
           throw new RequestValidationError('INVALID_STATE', 'This Restaurant order can no longer be cancelled.');
         }
         const nextStatus = 'cancelled';
