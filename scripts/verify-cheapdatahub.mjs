@@ -15,3 +15,21 @@ assert.ok(!route.includes("console.log(apiKey"), "API key must never be logged")
 assert.ok(server.includes("registerCheapDataHubRoutes(app, authenticate);"), "route must be registered");
 
 console.log("CheapDataHub read-only connection-check assertions passed.");
+
+const catalogRoute = readFileSync("src/server/cheapDataHubVtuCatalogRoutes.ts", "utf8");
+const airtimeDataPage = readFileSync("src/pages/pay/AirtimeDataPage.tsx", "utf8");
+
+assert.ok(server.includes("registerCheapDataHubVtuCatalogRoutes(app, authenticate);"), "provider catalogue route must be registered");
+assert.ok(catalogRoute.includes('"/api/cheapdatahub/vtu/catalog"'), "catalogue endpoint must exist");
+assert.ok(catalogRoute.includes("authenticate"), "catalogue endpoint must require authentication");
+assert.ok(catalogRoute.includes("limit: 20"), "catalogue endpoint must be rate limited");
+assert.ok(catalogRoute.includes("AbortSignal.timeout(8_000)"), "provider catalogue fetch must have a timeout");
+assert.ok(catalogRoute.includes("CACHE_MS = 5 * 60_000"), "provider catalogue must be cached");
+assert.ok(catalogRoute.includes("/unavailable/i.test(name)"), "unavailable data plans must be excluded");
+assert.ok(catalogRoute.includes("dataPlans.length === 0 || airtimeNetworks.size < 4"), "incomplete provider catalogue must fail closed");
+assert.ok(!catalogRoute.includes("/airtime/purchase/") && !catalogRoute.includes("/data/purchase/"), "catalogue endpoint must never submit purchases");
+assert.ok(airtimeDataPage.includes("Purchase submission remains locked"), "UI must communicate that purchases are locked");
+assert.ok(airtimeDataPage.includes("No money was taken and no provider purchase was submitted"), "UI must not imply a purchase occurred");
+assert.ok(!airtimeDataPage.includes("/api/v1/resellers/airtime/purchase/") && !airtimeDataPage.includes("/api/v1/resellers/data/purchase/"), "client must never call provider purchase endpoints directly");
+
+console.log("CheapDataHub catalogue and purchase-lock regression assertions passed.");
