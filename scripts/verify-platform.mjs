@@ -48,6 +48,28 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
   assert(backendSources.some(([, source]) => source.includes(route)), `backend route surface includes: ${route}`);
 }
 
+const transactionPinSource = read("server.ts");
+const firestoreRulesSource = read("firestore.rules");
+for (const required of [
+  "const TRANSACTION_PIN_SECURITY_COLLECTION = 'transactionPinSecurity'",
+  "const TRANSACTION_PIN_MAX_FAILURES = 5",
+  "const TRANSACTION_PIN_FAILURE_WINDOW_MS = 15 * 60_000",
+  "const TRANSACTION_PIN_LOCKOUT_MS = 15 * 60_000",
+  "return adminDb.runTransaction(async transaction => {",
+  "if (lockedUntilMs > nowMs) return false",
+  "const lockTriggered = failedAttempts >= TRANSACTION_PIN_MAX_FAILURES",
+  "lastSuccessAt: Timestamp.fromMillis(nowMs)",
+]) {
+  assert(transactionPinSource.includes(required), `persistent Transaction PIN lockout includes: ${required}`);
+}
+assert(firestoreRulesSource.includes("match /transactionPinSecurity/{userId} { allow read, write: if false; }"),
+  "clients cannot read or alter server-side Transaction PIN lockout state");
+const walletTransferStart = transactionPinSource.indexOf('app.post("/api/wallet/transfer"');
+const walletTransferEnd = transactionPinSource.indexOf('app.post("/api/wallet/', walletTransferStart + 10);
+const walletTransferRoute = transactionPinSource.slice(walletTransferStart, walletTransferEnd > walletTransferStart ? walletTransferEnd : walletTransferStart + 18000);
+assert(walletTransferRoute.includes("verifyTransactionPin(senderUid, transactionPin)"),
+  "wallet transfers use the shared persistent Transaction PIN lockout verifier");
+
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
