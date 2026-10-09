@@ -3996,8 +3996,21 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           typeof req.body.orderId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(req.body.orderId)) {
         return errorResponse(res, 'INVALID_REQUEST', 'A valid order ID, payment idempotency key and 4-digit Transaction PIN are required.');
       }
-      if (!(await verifyTransactionPin(uid, req.body.transactionPin))) return errorResponse(res, 'FORBIDDEN', 'Incorrect Transaction PIN.');
       const orderId = req.body.orderId.trim(), idempotencyKey = req.body.idempotencyKey.trim();
+      // Return an exact completed retry before checking mutable order state or consuming
+      // a one-time biometric challenge. The authenticated UID and full request binding
+      // must match; this path never mutates wallets, stock, ledger, or order state.
+      const idempotencyRef = adminDb.collection('restaurantPaymentIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
+      const completedRetry = await idempotencyRef.get();
+      if (completedRetry.exists) {
+        const saved = completedRetry.data() || {};
+        if (saved.uid !== uid || saved.idempotencyKey !== idempotencyKey ||
+            saved.requestFingerprint !== uid + '|' + orderId || !isPlainObject(saved.result)) {
+          return errorResponse(res, 'INVALID_REQUEST', 'This payment idempotency key was already used with different payment data.');
+        }
+        return res.status(200).json({ ...saved.result, replayed: true });
+      }
+      if (!(await verifyTransactionPin(uid, req.body.transactionPin))) return errorResponse(res, 'FORBIDDEN', 'Incorrect Transaction PIN.');
       const preflightOrder = await adminDb.collection('restaurantOrders').doc(orderId).get();
       if (!preflightOrder.exists) return errorResponse(res, 'NOT_FOUND', 'Restaurant order could not be found.');
       const preflightData = preflightOrder.data() as Record<string, any>;
@@ -4050,7 +4063,6 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification could not be verified.');
         }
       }
-      const idempotencyRef = adminDb.collection('restaurantPaymentIdempotency').doc(idempotencyDocumentId(uid, idempotencyKey));
       const result = await adminDb.runTransaction(async (transaction) => {
         const existing = await transaction.get(idempotencyRef);
         if (existing.exists) {
