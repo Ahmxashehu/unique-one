@@ -150,6 +150,29 @@ function scenario() {
   assert.equal(combinedDemand, 5, "duplicate menu lines aggregate to combined stock demand");
   assert(4 < combinedDemand, "aggregate demand rejects stock that would pass each line independently");
 
+  // Refund-cap model: partial refunds may consume the original payment only once.
+  // This is a deterministic invariant check, not an integration test of Firestore.
+  const refundable = { originalMinor: 10_000, refundedMinor: 0, completedRefunds: [] };
+  function applyRefund(amountMinor, key) {
+    assert(Number.isSafeInteger(amountMinor) && amountMinor > 0, "refund amount must be positive minor units");
+    const prior = refundable.completedRefunds.find((refund) => refund.key === key);
+    if (prior) {
+      assert.equal(prior.amountMinor, amountMinor, "same refund key cannot be replayed with a different amount");
+      return "replayed";
+    }
+    assert(amountMinor <= refundable.originalMinor - refundable.refundedMinor, "refund cannot exceed remaining original payment");
+    refundable.refundedMinor += amountMinor;
+    refundable.completedRefunds.push({ key, amountMinor });
+    return "completed";
+  }
+  assert.equal(applyRefund(3_000, "partial-1"), "completed", "first partial refund completes");
+  assert.equal(applyRefund(3_000, "partial-1"), "replayed", "same-key refund retry does not mutate twice");
+  assert.equal(refundable.refundedMinor, 3_000, "same-key retry preserves refunded total");
+  assert.throws(() => applyRefund(2_000, "partial-1"), /different amount/, "reusing a refund key with a different amount is rejected");
+  assert.equal(applyRefund(7_000, "final-1"), "completed", "remaining balance can be refunded exactly");
+  assert.equal(refundable.refundedMinor, refundable.originalMinor, "partial plus final refunds equal original amount");
+  assert.throws(() => applyRefund(1, "over-refund"), /exceed remaining/, "any additional refund is rejected");
+
   return state.transactions.length;
 }
 
