@@ -4094,12 +4094,12 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             });
           }
         }
-        const inventoryAdjustments: Array<{ ref: any; nextQuantity: number }> = [];
-        for (const item of inventoryQuantities.values()) {
+        const inventoryAdjustments: Array<{ ref: any; itemId: string; quantity: number; stockQuantity: number; nextQuantity: number }> = [];
+        for (const [itemId, item] of inventoryQuantities.entries()) {
           if (item.stockQuantity < item.quantity) {
             throw new RequestValidationError('UNAVAILABLE', 'There is not enough stock for one or more items. Please update your order.');
           }
-          inventoryAdjustments.push({ ref: item.ref, nextQuantity: item.stockQuantity - item.quantity });
+          inventoryAdjustments.push({ ref: item.ref, itemId, quantity: item.quantity, stockQuantity: item.stockQuantity, nextQuantity: item.stockQuantity - item.quantity });
         }
         const customerWalletRef = adminDb.collection('wallets').doc(uid), merchantWalletRef = adminDb.collection('wallets').doc(merchantWalletId);
         const [customerSnap, merchantSnap] = await Promise.all([transaction.get(customerWalletRef), transaction.get(merchantWalletRef)]);
@@ -4114,6 +4114,32 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
             stockQuantity: adjustment.nextQuantity,
             ...(adjustment.nextQuantity === 0 ? { available: false } : {}),
             updatedAt: now,
+          });
+          // Keep Restaurant stock history in the same atomic commit as payment.
+          // Use a separate collection so Store reconciliation does not mistake
+          // Restaurant menu item IDs for Store product IDs.
+          const movementId = createHash('sha256')
+            .update('unique_restaurant.checkout|' + orderId + '|' + adjustment.itemId)
+            .digest('hex');
+          const movementRef = adminDb.collection('restaurant_inventory_movements').doc(movementId);
+          transaction.create(movementRef, {
+            schemaVersion: 1,
+            id: movementId,
+            restaurantId: String(order.restaurantId || ''),
+            businessId: String(order.businessId || ''),
+            branchId: String(order.branchId || ''),
+            menuItemId: adjustment.itemId,
+            orderId,
+            transactionId,
+            sourceModule: 'unique_restaurant.checkout',
+            movementType: 'checkout_sale',
+            direction: 'out',
+            quantity: adjustment.quantity,
+            quantityDelta: -adjustment.quantity,
+            previousQuantity: adjustment.stockQuantity,
+            resultingQuantity: adjustment.nextQuantity,
+            actorUid: uid,
+            createdAt: now,
           });
         }
         const transactionRef = adminDb.collection('transactions').doc(transactionId);
