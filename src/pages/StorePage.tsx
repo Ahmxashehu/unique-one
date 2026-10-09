@@ -8,7 +8,6 @@ import { collection, getDocs, limit, orderBy, query, where } from 'firebase/fire
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Product, ProductCategory } from '../lib/os/types';
-import { prototypeStock } from './store/storePrototype';
 
 const storeProductsCache = new Map<string, { products: Product[]; expiresAt: number }>();
 const storeProductsRequests = new Map<string, Promise<Product[]>>();
@@ -283,34 +282,6 @@ export default function StorePage() {
           </div>
           <div className="mt-3 flex justify-end"><Link to="/store/command-centre" className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-800 hover:bg-emerald-100">Store ecosystem <ArrowRight className="h-3.5 w-3.5"/></Link></div>
         </div>
-      </section>
-
-      <section className="rounded-2xl border border-emerald-200 bg-white px-3 py-4 shadow-sm sm:px-4 sm:py-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-black text-slate-900">All category stock preview</h2>
-            <p className="mt-0.5 text-xs leading-4 text-slate-500">UI prototype only — this shows how the general Store catalogue will look across every category.</p>
-          </div>
-          <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-700">PROTOTYPE</span>
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-          {prototypeStock.map((item) => (
-            <Link key={item.category + item.name} to={`/store/search?cat=${item.category}`} className="group overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
-              <div className="flex aspect-[4/3] items-center justify-center bg-gradient-to-br from-slate-100 via-white to-emerald-50">
-                <ShoppingBag className="h-9 w-9 text-emerald-300 transition group-hover:scale-110" />
-              </div>
-              <div className="p-3">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">{item.categoryLabel}</p>
-                <p className="mt-1 min-h-9 text-sm font-bold leading-4 text-slate-900">{item.name}</p>
-                <p className="mt-2 text-sm font-black text-slate-900">₦{item.price.toLocaleString()}</p>
-                <p className="mt-1 text-[11px] text-slate-500">{item.quantity} {item.unit ?? 'units'} available</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-        <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-800">
-          Prototype only: visual/test stock, not real seller inventory and not purchasable. Real seller listings will replace it as sellers publish products.
-        </p>
       </section>
 
       <section className="rounded-2xl border border-emerald-200 bg-white px-3 py-3 shadow-sm sm:px-4 sm:py-3.5">
