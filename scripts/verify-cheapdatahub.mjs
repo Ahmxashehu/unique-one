@@ -28,7 +28,7 @@ assert.ok(catalogRoute.includes("CACHE_MS = 5 * 60_000"), "provider catalogue mu
 assert.ok(catalogRoute.includes("/unavailable/i.test(name)"), "unavailable data plans must be excluded");
 assert.ok(catalogRoute.includes("dataPlans.length === 0 || airtimeNetworks.size < 4"), "incomplete provider catalogue must fail closed");
 assert.ok(!catalogRoute.includes("/airtime/purchase/") && !catalogRoute.includes("/data/purchase/"), "catalogue endpoint must never submit purchases");
-assert.ok(airtimeDataPage.includes("purchase submission remains locked"), "UI must communicate that purchases are locked");
+assert.ok(airtimeDataPage.includes("Purchase submission remains locked"), "UI must communicate that purchases are locked");
 assert.ok(airtimeDataPage.includes("No money was taken and no provider purchase was submitted"), "UI must not imply a purchase occurred");
 assert.ok(!airtimeDataPage.includes("/api/v1/resellers/airtime/purchase/") && !airtimeDataPage.includes("/api/v1/resellers/data/purchase/"), "client must never call provider purchase endpoints directly");
 
