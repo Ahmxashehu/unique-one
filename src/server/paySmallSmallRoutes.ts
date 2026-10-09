@@ -124,7 +124,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         if (String(order.customerId || '') !== uid ||
             String(order.paySmallSmallPlanId || '') !== planId ||
             String(order.currency || '') !== 'NGN' ||
-            String(order.paymentStatus || '') !== 'pending' ||
+            String(order.paymentStatus || '') !== 'pending_payment' ||
             String(order.status || '') !== 'pending_payment' ||
             Number(order.totalMinor) !== Number(plan.totalAmountMinor)) {
           throw new Error('ORDER_STATE_MISMATCH');
