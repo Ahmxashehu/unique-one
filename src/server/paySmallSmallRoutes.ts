@@ -140,7 +140,7 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const planRef = db.collection('paySmallSmallPlans').doc(planId);
         const walletRef = db.collection('wallets').doc(uid);
         const idemRef = db.collection('paySmallSmallPaymentIdempotency').doc(crypto.createHash('sha256').update(uid + '\0' + idempotencyKey).digest('hex'));
-        const [planSnap, credentialSnap, walletSnap, idemSnap] = await Promise.all([
+        const [planSnap, walletSnap, idemSnap] = await Promise.all([
           transaction.get(planRef), transaction.get(walletRef), transaction.get(idemRef)
         ]);
         if (idemSnap.exists) {
@@ -272,13 +272,13 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
     const transactionPin = typeof req.body?.transactionPin === 'string' ? req.body.transactionPin : '';
     const idempotencyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey.trim() : '';
     if (!uid || !PLAN_ID.test(planId) || !Number.isInteger(installmentNumber) || installmentNumber < 1 || installmentNumber > 24 || !/^\d{4}$/.test(transactionPin) || !IDEMPOTENCY.test(idempotencyKey)) return fail(res, 'INVALID_REQUEST', 'A valid plan, installment number, Transaction PIN and idempotency key are required.');
+    if (!(await verifyPaySmallSmallTransactionPin(db, uid, transactionPin))) return fail(res, 'FORBIDDEN', 'Incorrect Transaction PIN.', 403);
     try {
       const result = await db.runTransaction(async (transaction) => {
         const planRef = db.collection('paySmallSmallPlans').doc(planId);
         const walletRef = db.collection('wallets').doc(uid);
-        const credentialRef = db.collection('authCredentials').doc(uid);
         const idemRef = db.collection('paySmallSmallPaymentIdempotency').doc(crypto.createHash('sha256').update(uid + '\0' + idempotencyKey).digest('hex'));
-        const [planSnap, walletSnap, credentialSnap, idemSnap] = await Promise.all([transaction.get(planRef), transaction.get(walletRef), transaction.get(idemRef)]);
+        const [planSnap, walletSnap, idemSnap] = await Promise.all([transaction.get(planRef), transaction.get(walletRef), transaction.get(idemRef)]);
         const fingerprint = planId + '|' + installmentNumber + '|' + String((Array.isArray(planSnap.data()?.installments) ? (planSnap.data()?.installments[installmentNumber - 1] as any)?.amountMinor : '') || '');
         if (idemSnap.exists) {
           const existing = idemSnap.data() || {};
@@ -287,7 +287,6 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         }
         if (!planSnap.exists) throw new Error('PLAN_NOT_FOUND');
         if (!walletSnap.exists) throw new Error('WALLET_NOT_FOUND');
-        if (!credentialSnap.exists) throw new Error('USER_NOT_FOUND');
         const plan = planSnap.data() || {};
         if (String(plan.customerId || '') !== uid) throw new Error('FORBIDDEN');
         if (String(plan.currency || '') !== 'NGN' || String(plan.status || '') !== 'active') throw new Error('PLAN_NOT_ELIGIBLE');
