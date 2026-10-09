@@ -4005,9 +4005,18 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           const signedData = Buffer.concat([authenticatorData, crypto.createHash('sha256').update(clientDataJSON).digest()]);
           if (!crypto.verify('sha256', signedData, publicKey, signature)) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'Biometric verification failed.');
           const signCount = authenticatorData.readUInt32BE(33);
-          const previousCount = Number(credential.signCount || 0);
-          if (previousCount > 0 && signCount > 0 && signCount <= previousCount) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'The biometric credential counter is invalid.');
-          await credentialRef.update({ signCount, lastUsedAt: Timestamp.now() });
+          // Re-read and advance the authenticator counter atomically. A plain read/update
+          // lets two concurrent assertions both compare against the same stale counter.
+          const counterAccepted = await adminDb.runTransaction(async transaction => {
+            const latestCredentialSnap = await transaction.get(credentialRef);
+            if (!latestCredentialSnap.exists) return false;
+            const latestCredential = latestCredentialSnap.data() || {};
+            const latestCount = Number(latestCredential.signCount || 0);
+            if (latestCount > 0 && signCount > 0 && signCount <= latestCount) return false;
+            transaction.update(credentialRef, { signCount, lastUsedAt: Timestamp.now() });
+            return true;
+          });
+          if (!counterAccepted) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'The biometric credential counter is invalid.');
           const expectedBinding = 'restaurant_payment|' + uid + '|' + orderId + '|' + preflightAmountMinor + '|NGN';
           if (challengeData.transactionBinding !== expectedBinding) return errorResponse(res, 'BIOMETRIC_REQUIRED', 'This biometric approval is not bound to this restaurant payment.');
         } catch {
