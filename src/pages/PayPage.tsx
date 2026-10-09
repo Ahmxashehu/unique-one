@@ -18,6 +18,12 @@ export default function PayPage() {
   const [walletLoading, setWalletLoading] = useState(true);
   const [walletError, setWalletError] = useState('');
   const [walletRetry, setWalletRetry] = useState(0);
+  const [recentTransactions, setRecentTransactions] = useState<Array<{
+    id: string; reference: string; type: string; sourceModule: string; status: string;
+    amountMinor: number; direction: 'in' | 'out' | 'unknown'; createdAt: string | null;
+  }>>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const returnPaymentReference = searchParams.get('paymentReference');
   const [providerConfig, setProviderConfig] = useState<{ configured: boolean; environment: string; livePaymentsEnabled: boolean } | null>(null);
@@ -165,6 +171,65 @@ export default function PayPage() {
       }
     };
     void loadWallet();
+    return () => { cancelled = true; };
+  }, [authLoading, currentUser, walletRetry]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    let cancelled = false;
+    const loadRecentActivity = async () => {
+      if (!currentUser) {
+        setRecentTransactions([]);
+        setActivityLoading(false);
+        return;
+      }
+      setActivityLoading(true);
+      setActivityError('');
+      try {
+        let token = await currentUser.getIdToken();
+        let response = await fetch('/api/wallet/transactions', {
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        if (response.status === 401) {
+          token = await currentUser.getIdToken(true);
+          response = await fetch('/api/wallet/transactions', {
+            headers: { Authorization: 'Bearer ' + token },
+          });
+        }
+        const payload = await response.json().catch(() => ({})) as {
+          transactions?: Array<{
+            id?: unknown; reference?: unknown; type?: unknown; sourceModule?: unknown;
+            status?: unknown; amountMinor?: unknown; direction?: unknown; createdAt?: unknown;
+          }>;
+          error?: { message?: string };
+        };
+        if (!response.ok) throw new Error(payload.error?.message || 'Recent wallet activity could not be loaded.');
+        const rows = Array.isArray(payload.transactions) ? payload.transactions : [];
+        const safeRows = rows.filter((item) =>
+          typeof item.id === 'string' &&
+          typeof item.reference === 'string' &&
+          typeof item.type === 'string' &&
+          typeof item.status === 'string' &&
+          Number.isSafeInteger(item.amountMinor) && Number(item.amountMinor) > 0 &&
+          ['in', 'out', 'unknown'].includes(String(item.direction))
+        ).map((item) => ({
+          id: String(item.id),
+          reference: String(item.reference),
+          type: String(item.type),
+          sourceModule: typeof item.sourceModule === 'string' ? item.sourceModule : '',
+          status: String(item.status),
+          amountMinor: Number(item.amountMinor),
+          direction: String(item.direction) as 'in' | 'out' | 'unknown',
+          createdAt: typeof item.createdAt === 'string' ? item.createdAt : null,
+        }));
+        if (!cancelled) setRecentTransactions(safeRows);
+      } catch (error) {
+        if (!cancelled) setActivityError(error instanceof Error ? error.message : 'Recent wallet activity could not be loaded.');
+      } finally {
+        if (!cancelled) setActivityLoading(false);
+      }
+    };
+    void loadRecentActivity();
     return () => { cancelled = true; };
   }, [authLoading, currentUser, walletRetry]);
 
@@ -329,10 +394,45 @@ export default function PayPage() {
             </div>
             <Link to="/os/pay/history" className="text-xs font-bold text-emerald-700">View all</Link>
           </div>
-          <div className="mt-4 rounded-2xl bg-slate-50 p-6 text-center">
-            <Clock3 className="mx-auto h-7 w-7 text-slate-300" />
-            <p className="mt-2 text-sm font-bold text-slate-900">No recent transactions</p>
-            <p className="mt-1 text-xs text-slate-500">Verified wallet activity will appear here.</p>
+          <div className="mt-4 space-y-2">
+            {activityLoading ? (
+              <div className="rounded-2xl bg-slate-50 p-6 text-center">
+                <Clock3 className="mx-auto h-7 w-7 animate-pulse text-slate-300" />
+                <p className="mt-2 text-sm font-semibold text-slate-600">Loading wallet activity…</p>
+              </div>
+            ) : activityError ? (
+              <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">
+                <p>{activityError}</p>
+                <button type="button" onClick={() => setWalletRetry(value => value + 1)} className="mt-2 rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-amber-900 shadow-sm">Retry</button>
+              </div>
+            ) : recentTransactions.length === 0 ? (
+              <div className="rounded-2xl bg-slate-50 p-6 text-center">
+                <Clock3 className="mx-auto h-7 w-7 text-slate-300" />
+                <p className="mt-2 text-sm font-bold text-slate-900">No recorded wallet activity yet</p>
+                <p className="mt-1 text-xs text-slate-500">Completed wallet transactions will appear here.</p>
+              </div>
+            ) : recentTransactions.map((item) => {
+              const label = item.sourceModule.includes('monnify') ? 'Wallet funding' :
+                item.type.replace(/[_-]+/g, ' ').replace(/^./, value => value.toUpperCase());
+              const dateLabel = item.createdAt && Number.isFinite(Date.parse(item.createdAt))
+                ? new Date(item.createdAt).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })
+                : 'Date unavailable';
+              return (
+                <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${item.direction === 'in' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                    {item.direction === 'in' ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold text-slate-900">{label}</p>
+                    <p className="mt-0.5 text-[11px] text-slate-500">{dateLabel} · {item.status.replace(/[_-]+/g, ' ')}</p>
+                    <p className="mt-0.5 truncate text-[10px] text-slate-400">Ref: {item.reference}</p>
+                  </div>
+                  <p className={`shrink-0 text-sm font-black tabular-nums ${item.direction === 'in' ? 'text-emerald-700' : 'text-slate-900'}`}>
+                    {item.direction === 'in' ? '+' : item.direction === 'out' ? '−' : ''}{money(item.amountMinor)}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
 
