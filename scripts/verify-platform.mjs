@@ -51,6 +51,19 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
+const restaurantBiometricRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 6500);
+for (const required of [
+  "transaction.delete(challengeRef)",
+  "clientData.type !== 'webauthn.get'",
+  "clientData.challenge !== challengeData.challenge",
+  "authenticatorData.subarray(0, 32).equals(crypto.createHash('sha256').update(rpId).digest())",
+  "(authenticatorData[32] & 0x05) !== 0x05",
+  "crypto.verify('sha256', signedData, publicKey, signature)",
+  "previousCount > 0 && signCount > 0 && signCount <= previousCount",
+  "'restaurant_payment|' + uid + '|' + orderId + '|' + preflightAmountMinor + '|NGN'",
+]) {
+  assert(restaurantBiometricRoute.includes(required), `Restaurant biometric payment protection includes: ${required}`);
+}
 const restaurantMenuSource = read("src/server/restaurantRoutes.ts");
 for (const required of [
   "stockTracked === true",
