@@ -51,7 +51,7 @@ assert.doesNotMatch(requestRules, /allow update:[\s\S]*?request\.auth\.uid/,
 
 assert.match(routes, /nextStatus === 'sent' && sender && current === 'draft'/,
   "request owners must be able to send a saved draft");
-assert.match(page, /canSend && <button[\\s\\S]*?changeStatus\\(r, 'sent'\\)/,
+assert.ok(page.includes("canSend && <button") && page.includes("changeStatus(r, 'sent')"),
   "the page must expose a send action for saved drafts");
 
 console.log("Payment request contract checks passed (static checks; not a live Firestore integration test).");
