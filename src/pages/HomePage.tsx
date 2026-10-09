@@ -991,7 +991,7 @@ export default function HomePage() {
                 </div>
                 <details className="group mt-3">
                   <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700 sm:rounded-2xl sm:px-4 sm:text-sm">
-                    <span className="min-w-0 break-words">Open Business Hub categories</span>
+                    <span className="min-w-0 break-words">START &amp; VERIFY · Open Business Hub</span>
                     <ArrowRight className="h-4 w-4 shrink-0 rotate-90 transition-transform group-open:-rotate-90" />
                   </summary>
                   <div className="mt-3 space-y-3">
@@ -1003,6 +1003,9 @@ export default function HomePage() {
                           ['NIN / BVN Validation', '/os/pay/verification', 'Identity and account verification.'],
                           ['NIN Modification', '/os/pay/verification', 'Open the verification centre for available guidance.'],
                           ['CAC Registration', '/os/business/register', 'Start business registration and provide CAC details.'],
+                          ['Electricity Bills', '/bills?service=electricity', 'Validate prepaid or postpaid electricity meters.'],
+                          ['Cable TV', '/bills?service=cable', 'Validate decoder smartcards before subscription.'],
+                          ['Exam PIN', '/bills?service=exam', 'Load the live CheapDataHub exam PIN catalogue.'],
                         ].map(([label, href, description]) => (
                           <Link key={label} to={href} className="flex min-w-0 items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 transition hover:border-emerald-300 hover:bg-emerald-50 sm:rounded-2xl sm:p-3">
                             <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-700"><Building2 className="h-4 w-4" /></span>
