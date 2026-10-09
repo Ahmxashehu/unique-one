@@ -1719,6 +1719,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const status = body?.status === 'draft' ? 'draft' : body?.status === 'sent' ? 'sent' : '';
       if (!recipientIdentifier || recipientIdentifier.length > 320 || !description || description.length > 500) return errorResponse(res, 'INVALID_REQUEST', 'Recipient and description are required and must be valid.');
       if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 1000000000000) return errorResponse(res, 'INVALID_AMOUNT', 'The payment request amount is invalid.');
+      const amountMinor = Math.round(amount * 100);
+      if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0 || Math.abs(amount * 100 - amountMinor) > 1e-7) {
+        return errorResponse(res, 'INVALID_AMOUNT', 'Payment request amounts must be positive NGN amounts with no more than two decimal places.');
+      }
+      const normalizedAmount = amountMinor / 100;
       if (!status) return errorResponse(res, 'INVALID_REQUEST', 'A valid payment request status is required.');
       const normalizedEmail = recipientIdentifier.toLowerCase();
       const [emailSnapshot, phoneSnapshot, uniqueOneIdSnapshot] = await Promise.all([
@@ -1738,7 +1743,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         senderId, recipientId: recipientDoc.id,
         recipientIdentifier,
         recipientName: typeof recipientData.fullName === 'string' ? recipientData.fullName : 'Unique One user',
-        amount: Math.round(amount * 100) / 100, currency: 'NGN', description,
+        amount: normalizedAmount, amountMinor, currency: 'NGN', description,
         ...(dueDate ? { dueDate } : {}), status, createdAt: now, updatedAt: now,
       });
       await adminDb.collection('audit_logs').add({
@@ -1747,7 +1752,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         targetUid: recipientDoc.id,
         resource: 'payment_request',
         resourceId: ref.id,
-        amount: Math.round(amount * 100) / 100,
+        amount: normalizedAmount,
+        amountMinor,
         currency: 'NGN',
         status,
         timestamp: Timestamp.fromDate(new Date(now)),
