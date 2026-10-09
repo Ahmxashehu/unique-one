@@ -49,4 +49,9 @@ assert.match(requestRules, /allow update: if isPlatformAdmin\(\);/,
 assert.doesNotMatch(requestRules, /allow update:[\s\S]*?request\.auth\.uid/,
   "participant client updates must not be allowed directly");
 
+assert.match(routes, /nextStatus === 'sent' && sender && current === 'draft'/,
+  "request owners must be able to send a saved draft");
+assert.match(page, /canSend && <button[\\s\\S]*?changeStatus\\(r, 'sent'\\)/,
+  "the page must expose a send action for saved drafts");
+
 console.log("Payment request contract checks passed (static checks; not a live Firestore integration test).");
