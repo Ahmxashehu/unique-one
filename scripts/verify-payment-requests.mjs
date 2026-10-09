@@ -5,7 +5,11 @@ const routes = readFileSync("src/server/adminAuditRoutes.ts", "utf8");
 const page = readFileSync("src/pages/PaymentRequestsPage.tsx", "utf8");
 
 assert.match(routes, /app\.get\(['"]\/api\/payment-requests['"]/,
-  "payment requests must be listed through an authenticated server route");
+  "payment requests must be listed through a server route");
+assert.match(routes, /rateLimit\(\{ windowMs: 60_000, limit: 60/,
+  "request listing must be rate limited");
+assert.match(routes, /rateLimit\(\{ windowMs: 60_000, limit: 30/,
+  "request status updates must be rate limited");
 assert.match(routes, /where\(['"]senderId['"],\s*['"]==['"],\s*uid\)/,
   "sent requests must be scoped to the authenticated sender");
 assert.match(routes, /where\(['"]recipientId['"],\s*['"]==['"],\s*uid\)/,
@@ -20,8 +24,8 @@ assert.match(routes, /payment_request\.status_changed/,
   "status transitions must emit an audit record");
 
 assert.match(page, /fetch\(['"]\/api\/payment-requests['"]/,
-  "the page must load requests through the authenticated API");
-assert.match(page, /\/api\/payment-requests\/['"]? \+ encodeURIComponent\(item\.id\)/,
+  "the page must load requests through the API");
+assert.ok(page.includes("fetch('/api/payment-requests/' + encodeURIComponent(item.id) + '/status'"),
   "status actions must target the selected request on the API");
 assert.doesNotMatch(page, /from ['"]firebase\/firestore['"]/,
   "the page must not bypass server authorization with direct Firestore reads");
