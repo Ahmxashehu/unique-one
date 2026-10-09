@@ -48,6 +48,18 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
   assert(backendSources.some(([, source]) => source.includes(route)), `backend route surface includes: ${route}`);
 }
 
+const paySmallSmallSource = read("src/server/paySmallSmallRoutes.ts");
+const paySmallSmallPlanCreation = paySmallSmallSource.slice(
+  paySmallSmallSource.indexOf("app.post('/api/pay-small-small/plans'"),
+  paySmallSmallSource.indexOf("app.post('/api/pay-small-small/plans/:planId/deposit'")
+);
+const paySmallSmallDeposit = paySmallSmallSource.slice(
+  paySmallSmallSource.indexOf("app.post('/api/pay-small-small/plans/:planId/deposit'"),
+  paySmallSmallSource.indexOf("app.post('/api/pay-small-small/plans/:planId/sync-due-status'")
+);
+assert(paySmallSmallPlanCreation.includes("String(order.paymentStatus || '') !== 'pending_payment'"), "Pay Small Small plan creation requires pending_payment order state");
+assert(paySmallSmallDeposit.includes("String(order.paymentStatus || '') !== 'pending_payment'"), "Pay Small Small deposit accepts the same pending_payment order state as plan creation");
+
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
