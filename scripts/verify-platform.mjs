@@ -48,6 +48,19 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
   assert(backendSources.some(([, source]) => source.includes(route)), `backend route surface includes: ${route}`);
 }
 
+const paySmallSmallSource = read("src/server/paySmallSmallRoutes.ts");
+const installmentPayStart = paySmallSmallSource.indexOf("app.post('/api/pay-small-small/plans/:planId/installments/:installmentNumber/pay'");
+const installmentPayEnd = paySmallSmallSource.indexOf("app.post('/api/pay-small-small/system/sync'", installmentPayStart);
+const installmentPayRoute = paySmallSmallSource.slice(installmentPayStart, installmentPayEnd);
+const firstInstallmentWrite = Math.min(...[
+  installmentPayRoute.indexOf("transaction.create(txRef"),
+  installmentPayRoute.indexOf("transaction.create(debitRef"),
+  installmentPayRoute.indexOf("transaction.create(holdRef"),
+].filter((index) => index >= 0));
+const finalSettlementRead = installmentPayRoute.indexOf("transaction.get(db.collection('ledgerEntries')");
+assert(installmentPayStart >= 0 && installmentPayEnd > installmentPayStart && finalSettlementRead >= 0 && firstInstallmentWrite > finalSettlementRead,
+  "Pay Small Small installment transaction completes settlement reads before writing payment and hold ledger records");
+
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
