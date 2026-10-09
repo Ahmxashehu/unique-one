@@ -4039,7 +4039,46 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         if (order.customerId !== uid) throw new RequestValidationError('FORBIDDEN', 'You can only pay for your own restaurant order.');
         if (order.currency !== 'NGN' || order.paymentMethod !== 'uniquepay') throw new RequestValidationError('INVALID_REQUEST', 'This order is not configured for UniquePay.');
         if (order.pricingStatus !== 'server_verified') throw new RequestValidationError('UNAVAILABLE', 'Restaurant UniquePay payment is temporarily unavailable until the order total is verified by the restaurant catalog.');
-        if (order.paymentStatus === 'paid') return { orderId, paymentStatus: 'paid', status: order.status, replayed: true };
+        if (order.paymentStatus === 'paid') {
+          // A concurrent request may have completed the same order under another
+          // idempotency key after this request's preflight read. Return the verified
+          // original receipt and persist this key as an alias so retries remain stable.
+          const originalTransactionId = typeof order.paymentTransactionId === 'string' ? order.paymentTransactionId : '';
+          if (!/^[A-Za-z0-9_-]{1,128}$/.test(originalTransactionId)) {
+            throw new RequestValidationError('INVALID_STATE', 'The completed Restaurant payment could not be verified.');
+          }
+          const originalTransactionRef = adminDb.collection('transactions').doc(originalTransactionId);
+          const originalTransactionSnap = await transaction.get(originalTransactionRef);
+          const originalTransaction = originalTransactionSnap.data() || {};
+          if (!originalTransactionSnap.exists ||
+              originalTransaction.status !== 'completed' ||
+              originalTransaction.type !== 'merchant_payment' ||
+              originalTransaction.senderId !== uid ||
+              originalTransaction.currency !== 'NGN' ||
+              !Array.isArray(originalTransaction.relatedOrderIds) ||
+              !originalTransaction.relatedOrderIds.includes(orderId) ||
+              typeof originalTransaction.reference !== 'string') {
+            throw new RequestValidationError('INVALID_STATE', 'The completed Restaurant payment could not be verified.');
+          }
+          const replayResult = {
+            orderId,
+            paymentStatus: 'paid',
+            status: order.status,
+            transactionId: originalTransactionId,
+            reference: originalTransaction.reference,
+            replayed: true,
+          };
+          const now = Timestamp.now();
+          transaction.create(idempotencyRef, {
+            uid,
+            idempotencyKey,
+            requestFingerprint: uid + '|' + orderId,
+            result: replayResult,
+            createdAt: now,
+            updatedAt: now,
+          });
+          return replayResult;
+        }
         if (order.status !== 'pending_payment') throw new RequestValidationError('INVALID_REQUEST', 'This restaurant order is no longer awaiting payment.');
         const amountMinor = Number(order.totalMinor);
         if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) throw new RequestValidationError('INVALID_AMOUNT', 'The restaurant payment amount is invalid.');
