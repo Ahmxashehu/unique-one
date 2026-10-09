@@ -1763,8 +1763,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       // merge both sides, and sort in memory to avoid requiring a composite index.
       const transactions = adminDb.collection('transactions');
       const [sent, received] = await Promise.all([
-        transactions.where('senderId', '==', uid).limit(50).get(),
-        transactions.where('recipientId', '==', uid).limit(50).get(),
+        transactions.where('senderId', '==', uid).orderBy('createdAt', 'desc').limit(50).get(),
+        transactions.where('recipientId', '==', uid).orderBy('createdAt', 'desc').limit(50).get(),
       ]);
       const unique = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
       for (const doc of [...sent.docs, ...received.docs]) unique.set(doc.id, doc);
@@ -1791,7 +1791,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       }).filter((row) =>
         row.amountMinor !== null &&
         row.currency === 'NGN' &&
-        ['financial', undefined].includes((unique.get(row.id)?.data() as Record<string, any> | undefined)?.recordKind) &&
+        (unique.get(row.id)?.data() as Record<string, any> | undefined)?.recordKind === 'financial' &&
         ['completed', 'pending', 'failed', 'refunded', 'partially_refunded'].includes(row.status)
       ).sort((a, b) => Date.parse(b.createdAt || '') - Date.parse(a.createdAt || '')).slice(0, 10);
       return res.status(200).json({ transactions: rows });
