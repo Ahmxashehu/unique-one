@@ -1717,6 +1717,8 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const amount = body?.amount;
       const dueDate = typeof body?.dueDate === 'string' ? body.dueDate : undefined;
       const status = body?.status === 'draft' ? 'draft' : body?.status === 'sent' ? 'sent' : '';
+      const idempotencyKey = req.get('Idempotency-Key')?.trim() || '';
+      if (idempotencyKey && !isSafeIdempotencyKey(idempotencyKey)) return errorResponse(res, 'INVALID_IDEMPOTENCY_KEY', 'The request retry key is invalid.');
       if (!recipientIdentifier || recipientIdentifier.length > 320 || !description || description.length > 500) return errorResponse(res, 'INVALID_REQUEST', 'Recipient and description are required and must be valid.');
       if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 1000000000000 || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7) return errorResponse(res, 'INVALID_AMOUNT', 'The payment request amount must be positive and use no more than two decimal places.');
       if (!status) return errorResponse(res, 'INVALID_REQUEST', 'A valid payment request status is required.');
@@ -1740,7 +1742,22 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const ref = adminDb.collection('payment_requests').doc();
       const amountNaira = Math.round(amount * 100) / 100;
       const auditRef = adminDb.collection('audit_logs').doc();
-      await adminDb.runTransaction(async transaction => {
+      const idempotencyRef = idempotencyKey
+        ? adminDb.collection('payment_request_idempotency').doc(createHash('sha256').update(senderId + '\0' + idempotencyKey).digest('hex'))
+        : null;
+      const fingerprint = createHash('sha256').update(JSON.stringify({
+        senderId, recipientIdentifier, amountNaira, currency: 'NGN', description, dueDate: dueDate ?? null, status,
+      })).digest('hex');
+      const result = await adminDb.runTransaction(async transaction => {
+        if (idempotencyRef) {
+          const existing = await transaction.get(idempotencyRef);
+          if (existing.exists) {
+            const saved = existing.data() as Record<string, unknown>;
+            if (saved.fingerprint !== fingerprint) throw new RequestValidationError('IDEMPOTENCY_KEY_CONFLICT', 'This retry key was already used for a different payment request.');
+            if (typeof saved.requestId !== 'string' || typeof saved.status !== 'string') throw new RequestValidationError('INVALID_STATE', 'The saved payment request retry record is invalid.');
+            return { id: saved.requestId, status: saved.status, replayed: true };
+          }
+        }
         transaction.create(ref, {
           senderId,
           ...(status === 'sent' ? {
@@ -1762,9 +1779,14 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           status,
           timestamp: Timestamp.fromDate(new Date(now)),
         });
+        if (idempotencyRef) transaction.create(idempotencyRef, {
+          senderUid: senderId, fingerprint, requestId: ref.id, status, createdAt: now,
+        });
+        return { id: ref.id, status, replayed: false };
       });
-      return res.status(201).json({ id: ref.id, recipientId: recipientDoc.id, status });
+      return res.status(result.replayed ? 200 : 201).json({ id: result.id, recipientId: recipientDoc.id, status: result.status, ...(result.replayed ? { idempotentReplay: true } : {}) });
     } catch (error) {
+      if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
       console.error('Payment request creation failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'We could not create the payment request right now.');
     }
