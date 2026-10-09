@@ -48,6 +48,16 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
   assert(backendSources.some(([, source]) => source.includes(route)), `backend route surface includes: ${route}`);
 }
 
+const pssCancellationSource = read("src/server/paySmallSmallRoutes.ts");
+const cancellationAccountingStart = pssCancellationSource.indexOf("update.cancellationRefundTransactionId = refundTx.id;");
+const cancellationAccountingEnd = pssCancellationSource.indexOf("transaction.update(orderRef", cancellationAccountingStart);
+const cancellationAccounting = pssCancellationSource.slice(cancellationAccountingStart, cancellationAccountingEnd);
+assert(cancellationAccountingStart >= 0 && cancellationAccountingEnd > cancellationAccountingStart &&
+  !cancellationAccounting.includes("update.paidAmountMinor = 0") &&
+  cancellationAccounting.includes("update.refundedAmountMinor = refundAmount") &&
+  cancellationAccounting.includes("update.netPaidAmountMinor = 0"),
+  "Pay Small Small cancellation preserves historical gross paid amount and records refunds separately");
+
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");

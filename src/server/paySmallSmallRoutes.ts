@@ -448,7 +448,10 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
               update.missedPaymentState = 'cancelled';
               update.cancelledAt = now;
               update.cancelReason = 'missed_payment';
-              update.paidAmountMinor = 0;
+              // Keep paidAmountMinor as historical gross collections. Record the
+              // refund separately so reports and audit history do not erase prior payments.
+              update.refundedAmountMinor = refundAmount;
+              update.netPaidAmountMinor = 0;
               update.remainingAmountMinor = Number(plan.totalAmountMinor || 0);
               transaction.update(orderRef, { paySmallSmallStatus: 'cancelled', paymentStatus: 'refunded', status: 'cancelled', updatedAt: now });
               transaction.create(db.collection('audit_logs').doc(), { action: 'pay_small_small.cancelled_for_missed_payment', actorUid: 'system', targetUid: customerId, resource: 'pay_small_pay_small_plan', resourceId: String(plan.planId), orderId: String(plan.orderId), refundAmountMinor: refundAmount, createdAt: now, timestamp: now });
