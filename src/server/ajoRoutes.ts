@@ -27,20 +27,25 @@ export function registerAjoRoutes(app: Express, authenticate: RequestHandler) {
     const uid = uidFrom(req);
     if (!uid) return res.status(401).json({ error: { code: "UNAUTHENTICATED", message: "Authentication is required." } });
 
-    const snapshot = await getFirestore().collection("ajoCycles")
-      .where("ownerUid", "==", uid)
-      .limit(50)
-      .get();
+    try {
+      const snapshot = await getFirestore().collection("ajoCycles")
+        .where("ownerUid", "==", uid)
+        .limit(50)
+        .get();
 
-    const cycles = snapshot.docs
-      .map(doc => doc.data())
-      .sort((a, b) => {
-        const aTime = a.updatedAt instanceof Timestamp ? a.updatedAt.toMillis() : 0;
-        const bTime = b.updatedAt instanceof Timestamp ? b.updatedAt.toMillis() : 0;
-        return bTime - aTime;
-      });
+      const cycles = snapshot.docs
+        .map(doc => doc.data())
+        .sort((a, b) => {
+          const aTime = a.updatedAt instanceof Timestamp ? a.updatedAt.toMillis() : 0;
+          const bTime = b.updatedAt instanceof Timestamp ? b.updatedAt.toMillis() : 0;
+          return bTime - aTime;
+        });
 
-    return res.json({ cycles });
+      return res.json({ cycles });
+    } catch (error) {
+      console.error("Cycle Ajo cycle listing failed:", error);
+      return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Cycle Ajo cycles are temporarily unavailable." } });
+    }
   });
 
   app.post("/api/ajo/cycles", authenticate, async (req, res) => {
@@ -52,7 +57,7 @@ export function registerAjoRoutes(app: Express, authenticate: RequestHandler) {
     }
     const body = req.body;
     const allowed = new Set(["name", "contributionAmountMinor", "memberCount", "frequency"]);
-    if (!body || Object.keys(body).some(key => !allowed.has(key))) {
+    if (Object.keys(body).some(key => !allowed.has(key))) {
       return res.status(400).json({ error: { code: "INVALID_REQUEST", message: "Invalid Cycle Ajo fields." } });
     }
 
@@ -84,12 +89,16 @@ export function registerAjoRoutes(app: Express, authenticate: RequestHandler) {
       updatedAt: now,
     };
 
-    await db.collection("ajoCycles").doc(id).create(cycle);
-
-    return res.status(201).json({
-      cycle: { ...cycle, createdAt: now.toDate().toISOString(), updatedAt: now.toDate().toISOString() },
-      moneyMoved: false,
-      activated: false,
-    });
+    try {
+      await db.collection("ajoCycles").doc(id).create(cycle);
+      return res.status(201).json({
+        cycle: { ...cycle, createdAt: now.toDate().toISOString(), updatedAt: now.toDate().toISOString() },
+        moneyMoved: false,
+        activated: false,
+      });
+    } catch (error) {
+      console.error("Cycle Ajo draft creation failed:", error);
+      return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "The Cycle Ajo draft could not be saved. No money was moved." } });
+    }
   });
 }
