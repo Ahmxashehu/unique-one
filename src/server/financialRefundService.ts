@@ -155,10 +155,14 @@ export async function executeFinancialRefund(
       .where('type', '==', 'refund')
       .where('status', '==', 'completed');
     const refundSnapshots = await transaction.get(refundQuery);
-    const refundedMinor = refundSnapshots.docs.reduce((sum, doc) => {
-      const amount = doc.data().amount;
-      return Number.isSafeInteger(amount) && amount > 0 && Number.isSafeInteger(sum + amount) ? sum + amount : sum;
-    }, 0);
+    let refundedMinor = 0;
+    for (const refundDoc of refundSnapshots.docs) {
+      const amount = refundDoc.data().amount;
+      if (!Number.isSafeInteger(amount) || amount <= 0 || !Number.isSafeInteger(refundedMinor + amount)) {
+        return { error: { code: 'TRANSACTION_FAILED', message: 'Refund history is inconsistent; reconciliation is required before another refund.' } };
+      }
+      refundedMinor += amount;
+    }
 
     if (!Number.isSafeInteger(refundedMinor) || refundedMinor >= originalAmount || input.amountMinor > originalAmount - refundedMinor) {
       return { error: { code: 'REFUND_EXCEEDS_REMAINING', message: 'The requested refund exceeds the remaining refundable amount.' } };

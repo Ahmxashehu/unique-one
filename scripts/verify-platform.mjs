@@ -51,6 +51,11 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
+const restaurantPayRouteValidation = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 3500);
+assert(restaurantPayRouteValidation.includes(String.raw`!/^\d{4}$/.test(req.body.transactionPin)`), "Restaurant payment accepts a numeric 4-digit Transaction PIN");
+const refundServiceSource = read("src/server/financialRefundService.ts");
+assert(refundServiceSource.includes("Refund history is inconsistent; reconciliation is required before another refund."), "refund service fails closed when completed refund history is invalid");
+assert(refundServiceSource.includes("!Number.isSafeInteger(amount) || amount <= 0 || !Number.isSafeInteger(refundedMinor + amount)"), "refund history amounts and cumulative totals are validated before calculating remaining refundable value");
 const restaurantBiometricRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 6500);
 for (const required of [
   "transaction.delete(challengeRef)",
