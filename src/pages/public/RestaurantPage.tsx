@@ -78,6 +78,8 @@ export default function RestaurantPage() {
   const [customerName, setCustomerName] = useState(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').customerName || ''; } catch { return ''; } });
   const [submitting, setSubmitting] = useState(false);
   const [orderError, setOrderError] = useState('');
+  const [activeOrderId, setActiveOrderId] = useState('');
+  const [cancellingOrder, setCancellingOrder] = useState(false);
   const [transactionPin, setTransactionPin] = useState('');
   const [customerPhone, setCustomerPhone] = useState(() => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}').customerPhone || ''; } catch { return ''; } });
 
@@ -172,6 +174,7 @@ export default function RestaurantPage() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error?.message || 'We could not create your restaurant order.');
+      if (typeof data.orderId === 'string' && data.orderId) setActiveOrderId(data.orderId);
       if (draft.paymentMethod === 'uniquepay') {
         let paymentResponse = await fetch('/api/restaurant/pay', {
           method: 'POST',
@@ -221,6 +224,28 @@ export default function RestaurantPage() {
       setOrderError(error instanceof Error ? error.message : 'We could not create your restaurant order.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const cancelActiveOrder = async () => {
+    if (!currentUser || !activeOrderId || cancellingOrder) return;
+    setCancellingOrder(true);
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch(`/api/restaurant/orders/${encodeURIComponent(activeOrderId)}/cancel`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error?.message || 'This order could not be cancelled.');
+      setOrderError(data.refundRequired
+        ? 'Order cancelled. Your refund has been queued for processing; cancellation does not mean the refund is already complete.'
+        : 'Order cancelled. No refund was required for this unpaid order.');
+      setActiveOrderId('');
+    } catch (error) {
+      setOrderError(error instanceof Error ? error.message : 'This order could not be cancelled.');
+    } finally {
+      setCancellingOrder(false);
     }
   };
 
@@ -396,7 +421,8 @@ export default function RestaurantPage() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><Navigation className="h-5 w-5" /></div>
             <h2 className="mt-4 text-xl font-black text-slate-950">Reservation prepared</h2>
             <p className="mt-2 text-sm text-slate-500">Your request for {selected.name} has been securely recorded. Live restaurant confirmation and payment settlement activate when the provider is connected.</p>{orderError && <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-xs text-amber-800">{orderError}</p>}
-            <button onClick={() => setStage('browse')} className="mt-5 w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white">Back to restaurants</button>
+            {activeOrderId && currentUser && <button onClick={cancelActiveOrder} disabled={cancellingOrder} className="mt-4 w-full rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-black text-red-700 disabled:opacity-60">{cancellingOrder ? 'Cancelling…' : 'Cancel this order'}</button>}
+            <button onClick={() => { setStage('browse'); setActiveOrderId(''); }} className="mt-3 w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white">Back to restaurants</button>
           </section>
         </div>
       )}
