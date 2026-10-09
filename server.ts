@@ -3447,8 +3447,11 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const seating = typeof body.seating === 'string' ? body.seating.trim().slice(0, 80) : '';
       const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 500) : '';
       const cart = body.cart;
+      if (paymentMethod === 'bank-transfer') {
+        return errorResponse(res, 'UNAVAILABLE', 'Restaurant bank transfer is not available yet because a verified payment provider and settlement confirmation are not connected.');
+      }
       if (!restaurantId || !['dine-in', 'delivery', 'pickup'].includes(String(mode)) ||
-          !['uniquepay', 'bank-transfer'].includes(String(paymentMethod)) ||
+          paymentMethod !== 'uniquepay' ||
           !customerName || !customerPhone || !isPlainObject(cart)) {
         return errorResponse(res, 'INVALID_REQUEST', 'Restaurant order details are incomplete or invalid.');
       }
