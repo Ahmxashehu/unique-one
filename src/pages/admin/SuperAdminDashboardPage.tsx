@@ -30,6 +30,15 @@ export default function SuperAdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [cheapDataHubLoading, setCheapDataHubLoading] = useState(false);
+  const [cheapDataHubResult, setCheapDataHubResult] = useState<{
+    ok: boolean;
+    connection?: string;
+    providerBalanceNaira?: number;
+    currency?: string;
+    checkedAt?: string;
+    message?: string;
+  } | null>(null);
 
   const load = async () => {
     if (!currentUser) return;
@@ -60,6 +69,36 @@ export default function SuperAdminDashboardPage() {
   useEffect(() => {
     void load();
   }, [currentUser]);
+
+  const checkCheapDataHub = async () => {
+    if (!currentUser || cheapDataHubLoading) return;
+    setCheapDataHubLoading(true);
+    setCheapDataHubResult(null);
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/cheapdatahub/connection-check', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
+      });
+      const payload = await response.json();
+      setCheapDataHubResult({
+        ok: Boolean(response.ok && payload?.ok),
+        connection: typeof payload?.connection === 'string' ? payload.connection : undefined,
+        providerBalanceNaira: Number.isFinite(Number(payload?.providerBalanceNaira)) ? Number(payload.providerBalanceNaira) : undefined,
+        currency: typeof payload?.currency === 'string' ? payload.currency : undefined,
+        checkedAt: typeof payload?.checkedAt === 'string' ? payload.checkedAt : undefined,
+        message: typeof payload?.message === 'string' ? payload.message : 'Connection check returned an unexpected response.',
+      });
+    } catch {
+      setCheapDataHubResult({
+        ok: false,
+        connection: 'request_failed',
+        message: 'Could not complete the connection check. Please retry when the service is available.',
+      });
+    } finally {
+      setCheapDataHubLoading(false);
+    }
+  };
 
   const cards = useMemo(() => [
     { label: 'Platform users', value: stats?.users ?? 0, icon: Users, to: '/admin/users' },
@@ -167,6 +206,43 @@ export default function SuperAdminDashboardPage() {
             ))}
           </div>
         </div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-2xl">
+            <h2 className="text-lg font-black text-slate-900">CheapDataHub connection</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              Run a read-only reseller wallet check using the server-side credential. This does not buy airtime or data and does not debit a UniquePay wallet.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void checkCheapDataHub()}
+            disabled={cheapDataHubLoading || !currentUser}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw className={cheapDataHubLoading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+            {cheapDataHubLoading ? 'Checking provider…' : 'Test CheapDataHub Connection'}
+          </button>
+        </div>
+        {cheapDataHubResult && (
+          <div className={`mt-4 rounded-2xl border p-4 ${cheapDataHubResult.ok ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`} role="status" aria-live="polite">
+            <div className="flex items-center gap-2">
+              {cheapDataHubResult.ok ? <CheckCircle2 className="h-5 w-5 text-emerald-700" /> : <AlertTriangle className="h-5 w-5 text-amber-700" />}
+              <p className="font-black text-slate-900">{cheapDataHubResult.ok ? 'Connection verified' : 'Connection not verified'}</p>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{cheapDataHubResult.message}</p>
+            {cheapDataHubResult.ok && cheapDataHubResult.providerBalanceNaira !== undefined && (
+              <p className="mt-2 text-sm font-bold text-slate-900">
+                Provider reseller balance: {new Intl.NumberFormat('en-NG', { style: 'currency', currency: cheapDataHubResult.currency || 'NGN' }).format(cheapDataHubResult.providerBalanceNaira)}
+              </p>
+            )}
+            {cheapDataHubResult.connection && <p className="mt-1 text-xs text-slate-500">Status: {cheapDataHubResult.connection}</p>}
+            {cheapDataHubResult.checkedAt && <p className="mt-1 text-xs text-slate-500">Checked: {new Date(cheapDataHubResult.checkedAt).toLocaleString()}</p>}
+            <p className="mt-2 text-xs font-semibold text-slate-500">Purchase mode remains disabled.</p>
+          </div>
+        )}
       </section>
 
       <section>
