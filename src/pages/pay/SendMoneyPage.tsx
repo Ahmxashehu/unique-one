@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ArrowUpRight, Search, ShieldCheck, User, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,6 +24,9 @@ export default function SendMoneyPage() {
   const [transactionPin, setTransactionPin] = useState('');
   const [biometricBusy, setBiometricBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Preserve the same server idempotency key across ambiguous network/5xx retries.
+  // A changed transfer fingerprint gets a new key; successful transfers clear it.
+  const pendingTransferRef = useRef<{ fingerprint: string; key: string } | null>(null);
 
   const handleResolveRecipient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,9 +86,44 @@ export default function SendMoneyPage() {
     try {
       const token = await currentUser.getIdToken();
       const amountMinor = Math.round(amountValue * 100);
-      const idempotencyKey = typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `transfer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const transferFingerprint = [
+        currentUser.uid,
+        recipient.uid,
+        amountMinor,
+        'NGN',
+        description.trim(),
+      ].join('|');
+      const pendingStorageKey = `uniqueplatform:pending-wallet-transfer:${currentUser.uid}`;
+      let persistedPending: { fingerprint: string; key: string } | null = null;
+      try {
+        const raw = window.localStorage.getItem(pendingStorageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (typeof parsed?.fingerprint === 'string' && typeof parsed?.key === 'string') {
+            persistedPending = { fingerprint: parsed.fingerprint, key: parsed.key };
+          }
+        }
+      } catch {
+        // Storage may be disabled; the in-memory ref still protects retries in this page.
+      }
+      const existingPending = pendingTransferRef.current ?? persistedPending;
+      if (existingPending && existingPending.fingerprint !== transferFingerprint) {
+        throw new Error('A previous transfer still has an uncertain outcome. Restore its original recipient, amount and description, then retry it before starting another transfer.');
+      }
+      if (existingPending) {
+        pendingTransferRef.current = existingPending;
+      } else {
+        const key = typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `transfer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        pendingTransferRef.current = { fingerprint: transferFingerprint, key };
+        try {
+          window.localStorage.setItem(pendingStorageKey, JSON.stringify(pendingTransferRef.current));
+        } catch {
+          // Do not block a transfer if storage is unavailable; same-page retries still reuse the ref.
+        }
+      }
+      const idempotencyKey = pendingTransferRef.current.key;
 
       let biometricAssertion: BiometricAssertion | undefined;
       if (amountMinor >= 5_000_000) {
@@ -128,9 +166,30 @@ export default function SendMoneyPage() {
       }
 
       if (!response.ok || !payload?.id) {
+        // A 4xx response (except in-progress) is a definitive rejection; allow a
+        // fresh key on the next attempt. Keep the key for 5xx/network ambiguity
+        // and in-progress responses so retries cannot double-debit a completed transfer.
+        if (response.status >= 400 && response.status < 500 && payload?.error?.code !== 'TRANSFER_IN_PROGRESS') {
+          pendingTransferRef.current = null;
+          try {
+            const raw = window.localStorage.getItem(pendingStorageKey);
+            const parsed = raw ? JSON.parse(raw) : null;
+            if (parsed?.key === idempotencyKey) window.localStorage.removeItem(pendingStorageKey);
+          } catch {
+            // Ignore storage cleanup errors; the server remains the source of truth.
+          }
+        }
         throw new Error(payload?.error?.message || 'The transfer could not be completed.');
       }
 
+      pendingTransferRef.current = null;
+      try {
+        const raw = window.localStorage.getItem(pendingStorageKey);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed?.key === idempotencyKey) window.localStorage.removeItem(pendingStorageKey);
+      } catch {
+        // A stale key is harmless server-side; do not fail a completed transfer on cleanup.
+      }
       navigate(`/os/pay/receipts/${payload.id}`);
     } catch (sendError) {
       console.error('Wallet transfer failed:', sendError);
