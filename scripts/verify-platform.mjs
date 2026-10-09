@@ -58,6 +58,7 @@ const paySmallSmallDeposit = paySmallSmallSource.slice(
   paySmallSmallSource.indexOf("app.post('/api/pay-small-small/plans/:planId/sync-due-status'")
 );
 assert(paySmallSmallPlanCreation.includes("String(order.paymentStatus || '') !== 'pending_payment'"), "Pay Small Small plan creation requires pending_payment order state");
+assert(paySmallSmallPlanCreation.includes("String(order.status || '') !== 'pending_payment'"), "Pay Small Small plan creation requires pending_payment order status");
 assert(paySmallSmallDeposit.includes("String(order.paymentStatus || '') !== 'pending_payment'"), "Pay Small Small deposit accepts the same pending_payment order state as plan creation");
 
 const restaurantPaymentSource = read("server.ts");
