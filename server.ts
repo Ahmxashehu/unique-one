@@ -5130,7 +5130,7 @@ function isGlobalStoreAdmin(roles: unknown[]): boolean {
       const hasReturnRequest = Boolean(order.returnRequest && typeof order.returnRequest === 'object');
       const customerMayUseDirectRefund = new Set(['confirmed', 'processing']).has(orderStatus) && !hasReturnRequest;
       const customerMayUseReturnRefund = uid === customerId && hasReturnRequest;
-      if (uid === customerId && !canManageDisputes && !customerMayUseDirectRefund && !customerMayUseReturnRefund) {
+      if (uid === customerId && !privilegedRefundAccess && !customerMayUseDirectRefund && !customerMayUseReturnRefund) {
         return errorResponse(res, 'INVALID_REQUEST', 'A customer refund requires an eligible early-order cancellation or a completed return workflow.');
       }
       if (order.currency !== 'NGN' || order.paymentStatus !== 'paid') {
