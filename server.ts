@@ -1760,7 +1760,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     if (!uid || !isSafeFirebaseUid(uid)) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
     try {
       // Read only the authenticated user's own financial records. Bound each query,
-      // merge both sides, and sort in memory to avoid requiring a composite index.
+      // merge both sides; each query uses the built-in single-field index.
       const transactions = adminDb.collection('transactions');
       const [sent, received] = await Promise.all([
         transactions.where('senderId', '==', uid).orderBy('createdAt', 'desc').limit(50).get(),
@@ -1785,7 +1785,6 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           currency: typeof data.currency === 'string' ? data.currency : 'NGN',
           amountMinor: Number.isSafeInteger(amountMinor) && amountMinor > 0 ? amountMinor : null,
           direction: recipientId === uid ? 'in' : senderId === uid ? 'out' : 'unknown',
-          counterpartyUid: senderId === uid ? recipientId : senderId,
           createdAt,
         };
       }).filter((row) =>
