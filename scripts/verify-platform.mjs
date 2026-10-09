@@ -92,6 +92,26 @@ for (const required of [
 const paymentBindingCheckIndex = restaurantBiometricRoute.indexOf("if (challengeData.transactionBinding !== expectedBinding)");
 const passkeyCounterUpdateIndex = restaurantBiometricRoute.indexOf("const counterAccepted = await adminDb.runTransaction(async transaction => {");
 assert(paymentBindingCheckIndex >= 0 && paymentBindingCheckIndex < passkeyCounterUpdateIndex, "Restaurant biometric payment binding is validated before advancing the passkey counter");
+
+const storePaymentSource = read("server.ts");
+const storePayStart = storePaymentSource.indexOf('app.post("/api/store/pay", authenticate');
+const storePayEnd = storePaymentSource.indexOf('app.post("/api/store/orders/:orderId/cancel", authenticate', storePayStart);
+const storeBiometricRoute = storePaymentSource.slice(storePayStart, storePayEnd);
+for (const required of [
+  "const expectedBinding = 'store_payment|' + uid + '|' + orderIds.join(',') + '|' + amountMinor + '|NGN';",
+  "if (challengeData.transactionBinding !== expectedBinding)",
+  "const counterAccepted = await adminDb.runTransaction(async transaction => {",
+  "const latestCredentialSnap = await transaction.get(credentialRef);",
+  "if (latestCount > 0 && signCount > 0 && signCount <= latestCount) return false;",
+  "transaction.update(credentialRef, { signCount, lastUsedAt: Timestamp.now() });",
+  "if (!counterAccepted)",
+]) {
+  assert(storeBiometricRoute.includes(required), `Store biometric payment protection includes: ${required}`);
+}
+const storeBindingIndex = storeBiometricRoute.indexOf("if (challengeData.transactionBinding !== expectedBinding)");
+const storeCounterIndex = storeBiometricRoute.indexOf("const counterAccepted = await adminDb.runTransaction(async transaction => {");
+assert(storeBindingIndex >= 0 && storeBindingIndex < storeCounterIndex, "Store biometric payment binding is validated before advancing the passkey counter");
+
 const restaurantMenuSource = read("src/server/restaurantRoutes.ts");
 for (const required of [
   "stockTracked === true",
