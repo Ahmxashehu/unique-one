@@ -269,6 +269,18 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const wallet = walletSnap.data() || {};
         const balance = Number(wallet.availableBalanceMinor);
         if (String(wallet.status || '') !== 'active' || !Number.isSafeInteger(balance) || balance < amount) throw new Error('INSUFFICIENT_FUNDS');
+        const orderRef = db.collection('orders').doc(String(plan.orderId));
+        const orderSnap = await transaction.get(orderRef);
+        if (!orderSnap.exists) throw new Error('ORDER_NOT_FOUND');
+        const order = orderSnap.data() || {};
+        const total = Number(plan.totalAmountMinor);
+        if (String(order.paySmallSmallPlanId || '') !== planId ||
+            String(order.paySmallSmallStatus || '') !== 'active' ||
+            String(order.paymentStatus || '') !== 'partial' ||
+            String(order.status || '') !== 'reserved' ||
+            !Number.isSafeInteger(total) || Number(order.totalMinor) !== total) {
+          throw new Error('ORDER_STATE_MISMATCH');
+        }
         const now = Timestamp.now();
         const txRef = db.collection('transactions').doc();
         const reference = 'UP-PSS-' + txRef.id;
@@ -276,22 +288,11 @@ export function registerPaySmallSmallRoutes(app: Express, authenticate: RequestH
         const holdRef = db.collection('ledgerEntries').doc();
         const nextInstallments = installments.map((item: any, i: number) => i === index ? { ...item, status: 'paid', paidAt: now, paymentTransactionId: txRef.id } : item);
         const paidAmount = Number(plan.paidAmountMinor || 0) + amount;
-        const total = Number(plan.totalAmountMinor);
         const remaining = total - paidAmount;
         if (!Number.isSafeInteger(paidAmount) || paidAmount > total || remaining < 0) throw new Error('INVALID_AMOUNT');
         const completed = remaining === 0 && nextInstallments.every((item: any) => String(item.status || '') === 'paid');
         let sellerSettlement: any = null;
         if (completed) {
-          const orderRef = db.collection('orders').doc(String(plan.orderId));
-          const orderSnap = await transaction.get(orderRef);
-          if (!orderSnap.exists) throw new Error('ORDER_NOT_FOUND');
-          const order = orderSnap.data() || {};
-          if (String(order.paySmallSmallPlanId || '') !== planId ||
-              String(order.paySmallSmallStatus || '') !== 'active' ||
-              String(order.paymentStatus || '') !== 'partial' ||
-              String(order.status || '') !== 'reserved') {
-            throw new Error('ORDER_STATE_MISMATCH');
-          }
           const sellerId = typeof order.sellerId === 'string' ? order.sellerId : '';
           if (!sellerId || sellerId === uid) throw new Error('INVALID_SELLER');
           if (Number(order.totalMinor) !== total) throw new Error('SETTLEMENT_AMOUNT_MISMATCH');
