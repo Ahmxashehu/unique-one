@@ -55,6 +55,8 @@ for (const required of [
   "There is not enough stock for one or more items",
   "transaction.update(adjustment.ref",
   "Number(menu.priceMinor) !== Number(item.unitPriceMinor)",
+  "const inventoryQuantities = new Map",
+  "const combinedQuantity = (prior?.quantity || 0) + quantity",
 ]) {
   assert(restaurantPaymentSource.includes(required), `Restaurant payment integrity includes: ${required}`);
 }
