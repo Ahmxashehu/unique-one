@@ -288,7 +288,7 @@ export default function RestaurantPage() {
         <div className="mt-5 flex items-center justify-between">
           <div>
             <h2 className="text-sm font-black text-slate-900">Available restaurants</h2>
-            <p className="text-xs text-slate-500">{filtered.length} prototype options · availability will become live when providers are connected</p>
+            <p className="text-xs text-slate-500">{filtered.length} verified restaurant listing{filtered.length === 1 ? '' : 's'} · live availability must be confirmed by each restaurant</p>
           </div>
           <span className="hidden rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 sm:block">Guest browsing</span>
         </div>
@@ -379,7 +379,7 @@ export default function RestaurantPage() {
               )}
               <label className="block rounded-2xl border border-slate-200 p-3"><span className="text-[10px] font-bold text-slate-500">Special request</span><textarea value={draft.notes} onChange={(e) => saveDraft({ ...draft, notes: e.target.value })} rows={3} placeholder="Birthday, accessibility, children, dietary needs…" className="mt-2 w-full resize-none text-sm outline-none" /></label>
               <button disabled={(draft.mode === 'dine-in' && (!draft.date || !draft.time)) || (draft.mode === 'delivery' && !draft.deliveryAddress.trim()) || (draft.mode === 'pickup' && (!draft.date || !draft.time))} onClick={continueBooking} className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">Review reservation</button>
-              <p className="text-center text-[10px] text-slate-500">Prototype reservations do not claim live table availability.</p>
+              <p className="text-center text-[10px] text-slate-500">Submitting creates a request only; it does not guarantee a table, delivery slot, or restaurant confirmation.</p>
             </div>
           </section>
         </div>
