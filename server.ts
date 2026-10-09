@@ -243,12 +243,71 @@ function validateTransactionPin(value: unknown): string {
   }
   return value;
 }
+const TRANSACTION_PIN_SECURITY_COLLECTION = 'transactionPinSecurity';
+const TRANSACTION_PIN_MAX_FAILURES = 5;
+const TRANSACTION_PIN_FAILURE_WINDOW_MS = 15 * 60_000;
+const TRANSACTION_PIN_LOCKOUT_MS = 15 * 60_000;
+
 async function verifyTransactionPin(uid: string, pin: unknown): Promise<boolean> {
+  const securityRef = adminDb.collection(TRANSACTION_PIN_SECURITY_COLLECTION).doc(uid);
+  const nowMs = Date.now();
+  const securitySnap = await securityRef.get();
+  const initialSecurity = securitySnap.data() || {};
+  const initialLockedUntil = initialSecurity.lockedUntil;
+  const initialLockedUntilMs = typeof initialLockedUntil?.toMillis === 'function' ? initialLockedUntil.toMillis() : 0;
+  if (initialLockedUntilMs > nowMs) return false;
+
   const credential = await adminDb.collection('authCredentials').doc(uid).get();
   if (!credential.exists) return false;
   const data = credential.data() as { transactionPinSalt?: unknown; transactionPinHash?: unknown } | undefined;
   if (typeof data?.transactionPinSalt !== 'string' || typeof data.transactionPinHash !== 'string') return false;
-  return passwordDigestMatches(String(pin), data.transactionPinSalt, data.transactionPinHash);
+
+  const matches = passwordDigestMatches(String(pin), data.transactionPinSalt, data.transactionPinHash);
+  if (matches) {
+    // Re-check lock state atomically: another concurrent attempt may have triggered lockout
+    // after the initial read. A valid PIN must not bypass an active lock.
+    return adminDb.runTransaction(async transaction => {
+      const snap = await transaction.get(securityRef);
+      const state = snap.data() || {};
+      const lockedUntil = state.lockedUntil;
+      const lockedUntilMs = typeof lockedUntil?.toMillis === 'function' ? lockedUntil.toMillis() : 0;
+      if (lockedUntilMs > Date.now()) return false;
+      transaction.set(securityRef, {
+        failedAttempts: 0,
+        windowStartedAt: null,
+        lockedUntil: null,
+        lastSuccessAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      }, { merge: true });
+      return true;
+    });
+  }
+
+  // Count failures in a Firestore transaction so parallel incorrect attempts cannot
+  // overwrite one another's counters or avoid the temporary lock.
+  return adminDb.runTransaction(async transaction => {
+    const snap = await transaction.get(securityRef);
+    const state = snap.data() || {};
+    const transactionNow = Date.now();
+    const lockedUntil = state.lockedUntil;
+    const lockedUntilMs = typeof lockedUntil?.toMillis === 'function' ? lockedUntil.toMillis() : 0;
+    if (lockedUntilMs > transactionNow) return false;
+    const windowStartedAt = state.windowStartedAt;
+    const windowStartedAtMs = typeof windowStartedAt?.toMillis === 'function' ? windowStartedAt.toMillis() : 0;
+    const withinWindow = windowStartedAtMs > 0 && transactionNow - windowStartedAtMs < TRANSACTION_PIN_FAILURE_WINDOW_MS;
+    const previousFailures = withinWindow && Number.isSafeInteger(state.failedAttempts) ? state.failedAttempts : 0;
+    const failedAttempts = previousFailures + 1;
+    const nextWindowStartedAt = withinWindow ? windowStartedAt : Timestamp.fromMillis(transactionNow);
+    const lockTriggered = failedAttempts >= TRANSACTION_PIN_MAX_FAILURES;
+    transaction.set(securityRef, {
+      failedAttempts,
+      windowStartedAt: nextWindowStartedAt,
+      lockedUntil: lockTriggered ? Timestamp.fromMillis(transactionNow + TRANSACTION_PIN_LOCKOUT_MS) : null,
+      lastFailureAt: Timestamp.fromMillis(transactionNow),
+      updatedAt: Timestamp.fromMillis(transactionNow),
+    }, { merge: true });
+    return false;
+  });
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
