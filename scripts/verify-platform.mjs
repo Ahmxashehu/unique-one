@@ -48,6 +48,14 @@ for (const route of ["/api/health", "/api/communication", "/api/unique-share", "
   assert(backendSources.some(([, source]) => source.includes(route)), `backend route surface includes: ${route}`);
 }
 
+const pssSource = read("src/server/paySmallSmallRoutes.ts");
+const cancellationRefundStart = pssSource.indexOf("const refundAmount = Number(plan.paidAmountMinor || 0);");
+const cancellationRefundEnd = pssSource.indexOf("update.status = 'cancelled';", cancellationRefundStart);
+const cancellationRefundRoute = pssSource.slice(cancellationRefundStart, cancellationRefundEnd);
+assert(cancellationRefundStart >= 0 && cancellationRefundEnd > cancellationRefundStart &&
+  cancellationRefundRoute.includes("holdBalance !== refundAmount"),
+  "Pay Small Small cancellation refunds require exact hold-ledger balance equality");
+
 const restaurantPaymentSource = read("server.ts");
 const restaurantPayRoute = restaurantPaymentSource.slice(restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate'), restaurantPaymentSource.indexOf('app.post("/api/restaurant/pay", authenticate') + 700);
 assert(restaurantPayRoute.includes("windowMs: 60_000, limit: 5"), "Restaurant payment attempts are limited to five per UID per minute");
