@@ -101,7 +101,7 @@ export default function PayPage() {
       setFundingError('Monnify funding is not enabled on the server yet.');
       return;
     }
-    if (!/^\\d+(?:\\.\\d{1,2})?$/.test(fundingAmount.trim())) {
+    if (!/^\d+(?:\.\d{1,2})?$/.test(fundingAmount.trim())) {
       setFundingError('Enter an amount with no more than two decimal places.');
       return;
     }
