@@ -36,6 +36,7 @@ const RegisterPage = lazy(() => import("./pages/public/RegisterPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/public/ForgotPasswordPage"));
 
 const PayPage = lazy(() => import("./pages/PayPage"));
+const CheapDataHubBillsPage = lazy(() => import("./pages/pay/CheapDataHubBillsPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 const BookingsPage = lazy(() => import("./pages/BookingsPage"));
@@ -187,6 +188,7 @@ export default function App() {
                     <Route path="/near-me" element={<NearMePage />} />
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/support" element={<SupportPage />} />
+                    <Route path="/bills" element={<CheapDataHubBillsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/education-hub" element={<EducationHubPage />} />
       <Route path="/flights" element={<FlightsPage />} />
