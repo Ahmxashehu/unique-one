@@ -326,6 +326,8 @@ export function registerMonnifyRoutes(app: Express, authenticate: RequestHandler
         updatedAt: now,
       });
       try {
+        const redirectUrl = new URL(cfg.redirectUrl);
+        redirectUrl.searchParams.set("paymentReference", paymentReference);
         const checkout = await monnifyRequest<MonnifyCheckout>(cfg, "/api/v1/merchant/transactions/init-transaction", {
           method: "POST",
           body: JSON.stringify({
@@ -338,7 +340,7 @@ export function registerMonnifyRoutes(app: Express, authenticate: RequestHandler
             contractCode: cfg.contractCode,
             // Bind the browser return to this server-generated reference. The client must
             // still call the authenticated verification endpoint; redirect parameters are not proof of payment.
-            redirectUrl: cfg.redirectUrl + (cfg.redirectUrl.includes("?") ? "&" : "?") + "paymentReference=" + encodeURIComponent(paymentReference),
+            redirectUrl: redirectUrl.toString(),
             paymentMethods: ["CARD", "ACCOUNT_TRANSFER", "USSD"],
             metadata: { platform: "UniquePlatform", purpose: "wallet_funding", uid },
           }),
