@@ -1,4 +1,4 @@
-name: Deploy Firebase Rules
+name: Deploy Firebase Rules and Indexes
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - firestore.rules
+      - firestore.indexes.json
       - storage.rules
       - firebase.json
       - .firebaserc
@@ -38,5 +39,5 @@ jobs:
         with:
           credentials_json: ${{ env.FIREBASE_SERVICE_ACCOUNT }}
 
-      - name: Deploy Firebase Firestore and Storage rules
+      - name: Deploy Firebase Firestore rules, indexes, and Storage rules
         run: npx --yes firebase-tools@latest deploy --only firestore,storage --project unique-one-9731b
