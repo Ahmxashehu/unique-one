@@ -3,19 +3,15 @@ import rateLimit from 'express-rate-limit';
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import crypto from 'node:crypto';
 import { scryptSync, timingSafeEqual } from 'node:crypto';
+import { verifyTransactionPinWithLockout } from './transactionPinSecurity';
 
 function fail(res: any, code: string, message: string, status = 400) {
   return res.status(status).json({ error: { code, message } });
 }
 
 const PLAN_ID = /^[A-Za-z0-9_-]{1,128}$/;
-const PIN_SECURITY_COLLECTION = 'transactionPinSecurity';
-const PIN_MAX_FAILURES = 5;
-const PIN_FAILURE_WINDOW_MS = 15 * 60_000;
-const PIN_LOCKOUT_MS = 15 * 60_000;
-
 function pinCredentialMatches(data: any, pin: string): boolean {
-  if (!/^\d{4}$/.test(pin)) return false;
+  if (!/^\\d{4}$/.test(pin)) return false;
   const salt = typeof data?.transactionPinSalt === 'string' ? Buffer.from(data.transactionPinSalt, 'utf8') : null;
   const digest = typeof data?.transactionPinHash === 'string' ? Buffer.from(data.transactionPinHash, 'hex') : null;
   if (!salt || !digest || salt.length < 16 || digest.length !== 64) return false;
@@ -24,35 +20,8 @@ function pinCredentialMatches(data: any, pin: string): boolean {
 }
 
 async function verifyPaySmallSmallTransactionPin(db: Firestore, uid: string, pin: string): Promise<boolean> {
-  const securityRef = db.collection(PIN_SECURITY_COLLECTION).doc(uid);
-  const credentialRef = db.collection('authCredentials').doc(uid);
-  return db.runTransaction(async (transaction) => {
-    const [securitySnap, credentialSnap] = await Promise.all([transaction.get(securityRef), transaction.get(credentialRef)]);
-    const state = securitySnap.data() || {};
-    const nowMs = Date.now();
-    const lockedUntil = state.lockedUntil;
-    const lockedUntilMs = typeof lockedUntil?.toMillis === 'function' ? lockedUntil.toMillis() : 0;
-    if (lockedUntilMs > nowMs || !credentialSnap.exists) return false;
-    if (pinCredentialMatches(credentialSnap.data() || {}, pin)) {
-      transaction.set(securityRef, {
-        failedAttempts: 0, windowStartedAt: null, lockedUntil: null,
-        lastSuccessAt: Timestamp.fromMillis(nowMs), updatedAt: Timestamp.fromMillis(nowMs),
-      }, { merge: true });
-      return true;
-    }
-    const windowStartedAt = state.windowStartedAt;
-    const windowStartedAtMs = typeof windowStartedAt?.toMillis === 'function' ? windowStartedAt.toMillis() : 0;
-    const withinWindow = windowStartedAtMs > 0 && nowMs - windowStartedAtMs < PIN_FAILURE_WINDOW_MS;
-    const previousFailures = withinWindow && Number.isSafeInteger(state.failedAttempts) ? state.failedAttempts : 0;
-    const failedAttempts = previousFailures + 1;
-    transaction.set(securityRef, {
-      failedAttempts,
-      windowStartedAt: withinWindow ? windowStartedAt : Timestamp.fromMillis(nowMs),
-      lockedUntil: failedAttempts >= PIN_MAX_FAILURES ? Timestamp.fromMillis(nowMs + PIN_LOCKOUT_MS) : null,
-      lastFailureAt: Timestamp.fromMillis(nowMs), updatedAt: Timestamp.fromMillis(nowMs),
-    }, { merge: true });
-    return false;
-  });
+  return verifyTransactionPinWithLockout(db, uid, pin, (credential, candidatePin) =>
+    typeof candidatePin === 'string' && pinCredentialMatches(credential, candidatePin));
 }
 
 const IDEMPOTENCY = /^[A-Za-z0-9._:-]{1,128}$/;
