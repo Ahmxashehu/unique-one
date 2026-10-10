@@ -15,6 +15,7 @@ import { getLiveDiscoveryContext } from "./src/lib/ai/aiTools";
 import { registerIdentityVerificationRoutes } from "./src/server/identityVerificationRoutes";
 import { registerAjoRoutes } from "./src/server/ajoRoutes";
 import { registerPaystackRoutes } from "./src/server/paystackRoutes";
+import { registerPaystackBankTransferRoutes } from "./src/server/paystackBankTransferRoutes";
 import { registerCheapDataHubRoutes } from "./src/server/cheapDataHubRoutes";
 import { registerCheapDataHubUtilityRoutes } from "./src/server/cheapDataHubUtilityRoutes";
 import { registerCheapDataHubVtuCatalogRoutes } from "./src/server/cheapDataHubVtuCatalogRoutes";
@@ -556,7 +557,7 @@ const app = express();
     }
     next();
   });
-  app.use(express.json({ limit: "10mb", verify: (req, _res, buf) => { if ((req as Request).path === "/api/paystack/webhook") (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf); } }));
+  app.use(express.json({ limit: "10mb", verify: (req, _res, buf) => { if (["/api/paystack/webhook", "/api/paystack/transfers/webhook"].includes((req as Request).path)) (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf); } }));
   app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
   const authenticate = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
@@ -913,6 +914,7 @@ const app = express();
   registerIdentityVerificationRoutes(app, authenticate);
   registerAjoRoutes(app, authenticate);
   registerPaystackRoutes(app, authenticate, adminDb);
+  registerPaystackBankTransferRoutes(app, authenticate, adminDb);
   registerCheapDataHubRoutes(app, authenticate);
   registerCheapDataHubUtilityRoutes(app, authenticate);
   registerCheapDataHubVtuCatalogRoutes(app, authenticate);
