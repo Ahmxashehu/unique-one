@@ -169,6 +169,7 @@ export async function executeFinancialRefund(
     if (customerUid === sellerUid) {
       return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'A refund requires distinct customer and seller accounts.' } };
     }
+    const inventoryReleaseItems: Array<{ productRef: FirebaseFirestore.DocumentReference; product: FirebaseFirestore.DocumentData; productId: string; quantity: number; currentQuantity: number }> = [];
     const relatedRestaurantOrderRef = input.relatedRestaurantOrderId ? db.collection('restaurantOrders').doc(input.relatedRestaurantOrderId) : null;
     let relatedRestaurantOrderData: Record<string, unknown> | null = null;
     if (relatedRestaurantOrderRef) {
@@ -278,25 +279,10 @@ export async function executeFinancialRefund(
           if (!Number.isSafeInteger(currentQuantity) || currentQuantity < 0 || !Number.isSafeInteger(currentQuantity + quantity)) {
             return { error: { code: 'ORIGINAL_NOT_REFUNDABLE', message: 'Store inventory data is invalid; the refund was not applied.' } };
           }
-          transaction.update(productRef, {
-            quantity: currentQuantity + quantity,
-            status: product.status === 'out_of_stock' ? 'published' : product.status,
-            updatedAt: now,
-          });
-          recordStoreInventoryMovement(transaction, db, {
-            productId,
-            movementType: 'refund_release',
-            quantity,
-            previousQuantity: currentQuantity,
-            resultingQuantity: currentQuantity + quantity,
-            direction: 'in',
-            sourceId: input.originalTransactionId + ':early-refund',
-            sourceModule: 'unique_store.refund',
-            actorUid: input.actorUid,
-            orderId: input.relatedOrderId,
-            transactionId: input.originalTransactionId,
-            businessId: typeof product.businessId === 'string' ? product.businessId : null,
-          });
+          // Defer every write until all refund/order/product/wallet reads and
+          // all validations have completed. Firestore transactions must read
+          // before writing, and a returned failure must never restore stock.
+          inventoryReleaseItems.push({ productRef, product, productId, quantity, currentQuantity });
         }
       }
       if (input.finalizeDispute) {
@@ -337,6 +323,28 @@ export async function executeFinancialRefund(
     const newCustomerBalance = customerBalance + input.amountMinor;
     if (!Number.isSafeInteger(newSellerBalance) || !Number.isSafeInteger(newCustomerBalance)) {
       return { error: { code: 'TRANSACTION_FAILED', message: 'The refund would exceed the safe wallet accounting range.' } };
+    }
+
+    for (const item of inventoryReleaseItems) {
+      transaction.update(item.productRef, {
+        quantity: item.currentQuantity + item.quantity,
+        status: item.product.status === 'out_of_stock' ? 'published' : item.product.status,
+        updatedAt: now,
+      });
+      recordStoreInventoryMovement(transaction, db, {
+        productId: item.productId,
+        movementType: 'refund_release',
+        quantity: item.quantity,
+        previousQuantity: item.currentQuantity,
+        resultingQuantity: item.currentQuantity + item.quantity,
+        direction: 'in',
+        sourceId: input.originalTransactionId + ':early-refund',
+        sourceModule: 'unique_store.refund',
+        actorUid: input.actorUid,
+        orderId: input.relatedOrderId,
+        transactionId: input.originalTransactionId,
+        businessId: typeof item.product.businessId === 'string' ? item.product.businessId : null,
+      });
     }
 
     const refundRef = db.collection('transactions').doc();
