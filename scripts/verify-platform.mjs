@@ -115,6 +115,28 @@ for (const forbidden of ["demo rice order", "featured providers"]) {
   assert(matches.length === 0, `obsolete placeholder phrase removed: ${forbidden}`);
 }
 
+
+const walletTransferSource = read("server.ts");
+const velocityStart = walletTransferSource.indexOf("const velocityWindowStart = new Date(Date.now() - 10 * 60 * 1000).toISOString();");
+assert(velocityStart >= 0, "wallet transfer velocity window uses an ISO timestamp compatible with transaction records");
+const velocityBlock = walletTransferSource.slice(velocityStart, velocityStart + 900);
+for (const required of [
+  ".where('senderId', '==', senderUid)",
+  ".where('createdAt', '>=', velocityWindowStart)",
+  ".orderBy('createdAt', 'desc')",
+  "const recentTransactionCount = recentTransactionsSnapshot.size;",
+]) {
+  assert(velocityBlock.includes(required), `wallet transfer velocity check includes: ${required}`);
+}
+assert(!velocityBlock.includes(".limit(20)"), "wallet transfer velocity check does not count an unordered capped sample");
+const firestoreIndexes = JSON.parse(read("firestore.indexes.json"));
+assert(firestoreIndexes.indexes.some((index) =>
+  index.collectionGroup === "transactions" &&
+  index.fields.some((field) => field.fieldPath === "senderId" && field.order === "ASCENDING") &&
+  index.fields.some((field) => field.fieldPath === "createdAt" && field.order === "DESCENDING")
+), "Firestore has a composite index for wallet transfer velocity query");
+assert(JSON.parse(read("firebase.json")).firestore?.indexes === "firestore.indexes.json", "Firebase config registers the composite index file");
+
 assert(fs.existsSync(path.join(root, "dist/sw.js")), "production PWA service worker exists");
 assert(fs.existsSync(path.join(root, "dist/server.cjs")), "production server bundle exists");
 console.log("\nUniquePlatform smoke verification: ALL CHECKS PASSED");
