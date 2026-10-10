@@ -1,5 +1,6 @@
 import type { Express, RequestHandler } from 'express';
-import { getFirestore } from 'firebase-admin/firestore';
+import rateLimit from 'express-rate-limit';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import type { Permission } from '../lib/os/types';
 
 export function registerAdminAuditRoutes(app: Express, authenticate: RequestHandler, requirePermission: (permission: Permission) => RequestHandler) {
