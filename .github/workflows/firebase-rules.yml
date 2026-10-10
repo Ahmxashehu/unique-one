@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - firestore.rules
+      - firestore.indexes.json
       - storage.rules
       - firebase.json
       - .firebaserc

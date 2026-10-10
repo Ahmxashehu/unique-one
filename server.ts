@@ -1804,7 +1804,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (!current.exists) return errorResponse(res, "INVALID_REQUEST", "Payment request was not found.", 404);
       const data = current.data() as Record<string, unknown>;
       if (data.senderId !== senderId) return errorResponse(res, "FORBIDDEN", "You can only send your own payment requests.", 403);
-      if (data.status !== "draft") return errorResponse(res, "INVALID_REQUEST", "Only saved drafts can be sent.");
+      if (data.status !== "draft" && data.status !== "sent") return errorResponse(res, "INVALID_REQUEST", "Only saved drafts can be sent.");
       const amount = data.amount;
       const description = typeof data.description === "string" ? data.description.trim() : "";
       const dueDate = data.dueDate;
@@ -1812,7 +1812,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (!description || description.length > 500) return errorResponse(res, "INVALID_REQUEST", "This draft has an invalid description and cannot be sent.");
       if (dueDate !== undefined && dueDate !== null) {
         const parsedDueDate = typeof dueDate === "string" ? new Date(dueDate + "T00:00:00.000Z") : new Date(Number.NaN);
-        if (typeof dueDate !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate) || Number.isNaN(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== dueDate) return errorResponse(res, "INVALID_REQUEST", "This draft has an invalid due date and cannot be sent.");
+        if (typeof dueDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || Number.isNaN(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== dueDate) return errorResponse(res, "INVALID_REQUEST", "This draft has an invalid due date and cannot be sent.");
       }
       const identifier = typeof data.recipientIdentifier === "string" ? data.recipientIdentifier.trim() : "";
       if (!identifier) return errorResponse(res, "INVALID_REQUEST", "This draft has no recipient identifier.");
@@ -1830,16 +1830,24 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const recipientData = recipientDoc.data() as Record<string, unknown>;
       const now = Timestamp.now().toDate().toISOString();
       const auditRef = adminDb.collection("audit_logs").doc();
-      await adminDb.runTransaction(async transaction => {
+      const sendResult = await adminDb.runTransaction(async transaction => {
         const fresh = await transaction.get(requestRef);
         if (!fresh.exists) throw new Error("REQUEST_NOT_FOUND");
         const latest = fresh.data() as Record<string, unknown>;
         if (latest.senderId !== senderId) throw new Error("FORBIDDEN");
+        if (latest.status === "sent" && latest.recipientId === recipientDoc.id) return { replayed: true };
         if (latest.status !== "draft") throw new Error("INVALID_STATUS");
+        const idempotencySnapshot = await transaction.get(
+          adminDb.collection("payment_request_idempotency").where("requestId", "==", requestId)
+        );
         transaction.update(requestRef, { recipientId: recipientDoc.id, recipientName: typeof recipientData.fullName === "string" ? recipientData.fullName : "Unique One user", status: "sent", updatedAt: now });
+        for (const idempotencyDoc of idempotencySnapshot.docs) {
+          transaction.update(idempotencyDoc.ref, { recipientId: recipientDoc.id, status: "sent", updatedAt: now });
+        }
         transaction.create(auditRef, { action: "payment_request.sent", actorUid: senderId, targetUid: recipientDoc.id, resource: "payment_request", resourceId: requestId, amount: typeof latest.amount === "number" ? latest.amount : null, currency: latest.currency === "NGN" ? "NGN" : null, status: "sent", timestamp: Timestamp.fromDate(new Date(now)) });
+        return { replayed: false };
       });
-      return res.status(200).json({ id: requestId, recipientId: recipientDoc.id, status: "sent" });
+      return res.status(200).json({ id: requestId, recipientId: recipientDoc.id, status: "sent", ...(sendResult.replayed ? { idempotentReplay: true } : {}) });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (message === "REQUEST_NOT_FOUND") return errorResponse(res, "INVALID_REQUEST", "Payment request was not found.", 404);
