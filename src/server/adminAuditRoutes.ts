@@ -36,7 +36,7 @@ export function registerAdminAuditRoutes(app: Express, authenticate: RequestHand
     if (!uid) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication is required.' } });
     const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : '';
     const nextStatus = typeof req.body?.status === 'string' ? req.body.status : '';
-    if (!/^[A-Za-z0-9_-]{1,128}$/.test(requestId) || !['sent', 'viewed', 'approved', 'rejected', 'cancelled'].includes(nextStatus)) {
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(requestId) || !['viewed', 'approved', 'rejected', 'cancelled'].includes(nextStatus)) {
       return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'A valid request ID and supported status are required.' } });
     }
     const ref = db.collection('payment_requests').doc(requestId);
@@ -49,8 +49,7 @@ export function registerAdminAuditRoutes(app: Express, authenticate: RequestHand
         const recipient = d.recipientId === uid;
         if (!sender && !recipient) return { status: 403, body: { error: { code: 'FORBIDDEN', message: 'You are not a participant in this payment request.' } } };
         const current = String(d.status ?? '');
-        const allowed = (nextStatus === 'sent' && sender && current === 'draft')
-          || (nextStatus === 'viewed' && recipient && current === 'sent')
+        const allowed = (nextStatus === 'viewed' && recipient && current === 'sent')
           || (nextStatus === 'approved' && recipient && ['sent', 'viewed'].includes(current))
           || (nextStatus === 'rejected' && recipient && ['sent', 'viewed'].includes(current))
           || (nextStatus === 'cancelled' && sender && ['draft', 'sent'].includes(current));
