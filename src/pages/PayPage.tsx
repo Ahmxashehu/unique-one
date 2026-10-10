@@ -19,9 +19,14 @@ export default function PayPage() {
   const [walletError, setWalletError] = useState('');
   const [walletRetry, setWalletRetry] = useState(0);
   const [fundAmount, setFundAmount] = useState('1000');
+  const [billingEmail, setBillingEmail] = useState('');
   const [funding, setFunding] = useState(false);
   const [fundingMessage, setFundingMessage] = useState('');
   const [fundingError, setFundingError] = useState('');
+
+  useEffect(() => {
+    if (currentUser?.email && !billingEmail) setBillingEmail(currentUser.email);
+  }, [currentUser, billingEmail]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -102,6 +107,11 @@ export default function PayPage() {
   const startWalletFunding = async () => {
     if (!currentUser || funding) return;
     const amount = Number(fundAmount);
+    const email = billingEmail.trim();
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      setFundingError('Enter a valid email for the Paystack payment receipt.');
+      return;
+    }
     if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1_000_000) {
       setFundingError('Enter an amount from ₦1 to ₦1,000,000.');
       return;
@@ -114,7 +124,7 @@ export default function PayPage() {
       const response = await fetch('/api/paystack/initialize', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amountMinor: amount * 100 }),
+        body: JSON.stringify({ amountMinor: amount * 100, email }),
       });
       const data = await response.json().catch(() => ({})) as { authorizationUrl?: string; error?: { message?: string } };
       if (!response.ok || !data.authorizationUrl || !/^https:\/\/checkout\.paystack\.com\//.test(data.authorizationUrl)) {
@@ -197,6 +207,10 @@ export default function PayPage() {
             </div>
             <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); void startWalletFunding(); }}>
               <label className="sr-only" htmlFor="unique-pay-fund-amount">Amount in naira</label>
+              <label className="flex flex-1 items-center rounded-xl border border-white/10 bg-white/5 px-3">
+                <span className="sr-only">Email for payment receipt</span>
+                <input type="email" autoComplete="email" required value={billingEmail} onChange={(event) => setBillingEmail(event.target.value)} className="w-full bg-transparent py-3 text-sm text-white outline-none placeholder:text-slate-400" placeholder="Email for receipt" />
+              </label>
               <div className="flex flex-1 items-center rounded-xl border border-white/10 bg-white/5 px-3">
                 <span className="mr-2 text-sm text-slate-300">₦</span>
                 <input id="unique-pay-fund-amount" inputMode="numeric" type="number" min="1" max="1000000" step="1" value={fundAmount} onChange={(event) => setFundAmount(event.target.value)} className="w-full bg-transparent py-3 text-sm font-bold text-white outline-none" placeholder="Amount in naira" />
