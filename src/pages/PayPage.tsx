@@ -108,7 +108,7 @@ export default function PayPage() {
     if (!currentUser || funding) return;
     const amount = Number(fundAmount);
     const email = billingEmail.trim();
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setFundingError('Enter a valid email for the Paystack payment receipt.');
       return;
     }
