@@ -121,7 +121,8 @@ export function registerPaystackRoutes(app: Express, authenticate: RequestHandle
     if (!uid) return res.status(401).json({ error: { code: "UNAUTHENTICATED", message: "Sign in to start a payment." } });
     const body = req.body;
     if (!body || typeof body !== "object" || Array.isArray(body) ||
-        Object.keys(body).some(key => key !== "amountMinor") ||
+        Object.keys(body).some(key => key !== "amountMinor" && key !== "email") ||
+        (body.email !== undefined && (typeof body.email !== "string" || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(body.email.trim()) || body.email.trim().length > 254)) ||
         !Number.isSafeInteger(body.amountMinor) || body.amountMinor < 100 ||
         body.amountMinor > MAX_DEPOSIT_MINOR) {
       return res.status(400).json({ error: { code: "INVALID_AMOUNT", message: "Enter an amount between ₦1 and ₦1,000,000." } });
@@ -129,7 +130,8 @@ export function registerPaystackRoutes(app: Express, authenticate: RequestHandle
     if (!apiSecret()) return res.status(503).json({ error: { code: "PAYSTACK_NOT_CONFIGURED", message: "Payment service is not configured." } });
     try {
       const userSnap = await db.collection("users").doc(uid).get();
-      const email = typeof userSnap.data()?.email === "string" ? String(userSnap.data()?.email).trim() : "";
+      const profileEmail = typeof userSnap.data()?.email === "string" ? String(userSnap.data()?.email).trim() : "";
+      const email = typeof body.email === "string" && body.email.trim() ? body.email.trim() : profileEmail;
       if (!userSnap.exists || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({ error: { code: "EMAIL_REQUIRED", message: "Add a valid email to your account before starting this payment." } });
       }
