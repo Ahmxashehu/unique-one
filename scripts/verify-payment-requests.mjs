@@ -35,6 +35,7 @@ assert.ok(start >= 0 && end > start, 'payment request rules must exist');
 assert.ok(rules.slice(start, end).includes('allow update: if false;'), 'client status writes must be blocked completely');
 assert.ok(server.includes('Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7'), 'request amounts must reject values with more than two decimal places');
 assert.ok(server.includes('const amountNaira = Math.round(amount * 100) / 100'), 'request amounts must be rounded to two decimal places before persistence');
+assert.ok((server.match(/!\/\^\\d\{4\}-\\d\{2\}-\\d\{2\}\$\/\.test\(dueDate\)/g) ?? []).length === 2, 'create and draft-send endpoints must validate YYYY-MM-DD dates with digit regexes');
 assert.ok(server.includes('adminDb.collection("payment_request_idempotency").where("requestId", "==", requestId)'), 'sending a draft must find its idempotency record');
 assert.ok(server.includes('transaction.update(idempotencyDoc.ref, { recipientId: recipientDoc.id, status: "sent", updatedAt: now })'), 'sending a draft must synchronize its retry record to sent');
 assert.ok(server.includes('if (latest.status === "sent" && latest.recipientId === recipientDoc.id) return { replayed: true };'), 'repeated sends to the same recipient must replay safely');
