@@ -1836,7 +1836,13 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
         const latest = fresh.data() as Record<string, unknown>;
         if (latest.senderId !== senderId) throw new Error("FORBIDDEN");
         if (latest.status !== "draft") throw new Error("INVALID_STATUS");
+        const idempotencySnapshot = await transaction.get(
+          adminDb.collection("payment_request_idempotency").where("requestId", "==", requestId)
+        );
         transaction.update(requestRef, { recipientId: recipientDoc.id, recipientName: typeof recipientData.fullName === "string" ? recipientData.fullName : "Unique One user", status: "sent", updatedAt: now });
+        for (const idempotencyDoc of idempotencySnapshot.docs) {
+          transaction.update(idempotencyDoc.ref, { recipientId: recipientDoc.id, status: "sent", updatedAt: now });
+        }
         transaction.create(auditRef, { action: "payment_request.sent", actorUid: senderId, targetUid: recipientDoc.id, resource: "payment_request", resourceId: requestId, amount: typeof latest.amount === "number" ? latest.amount : null, currency: latest.currency === "NGN" ? "NGN" : null, status: "sent", timestamp: Timestamp.fromDate(new Date(now)) });
       });
       return res.status(200).json({ id: requestId, recipientId: recipientDoc.id, status: "sent" });
