@@ -85,6 +85,17 @@ export default function SendMoneyPage() {
       return;
     }
     const attemptFingerprint = JSON.stringify({ recipientId: recipient.uid, amountMinor, currency: 'NGN', description: description.trim() });
+    const attemptStorageKey = `uniqueplatform.walletTransferAttempt:${currentUser.uid}`;
+    if (!transferAttemptRef.current) {
+      try {
+        const storedAttempt = sessionStorage.getItem(attemptStorageKey);
+        if (storedAttempt) {
+          const parsed = JSON.parse(storedAttempt);
+          if (typeof parsed?.key === 'string' && typeof parsed?.fingerprint === 'string') transferAttemptRef.current = parsed;
+          else sessionStorage.removeItem(attemptStorageKey);
+        }
+      } catch { /* Session storage may be unavailable; in-memory idempotency still applies. */ }
+    }
     if (transferAttemptRef.current && transferAttemptRef.current.fingerprint !== attemptFingerprint) {
       setError('A previous transfer attempt may still be processing. Restore its original recipient, amount and description, then retry it; check your transaction history before starting a different transfer.');
       return;
@@ -100,6 +111,7 @@ export default function SendMoneyPage() {
         ? crypto.randomUUID()
         : `transfer-${Date.now()}-${Math.random().toString(36).slice(2)}`);
       transferAttemptRef.current = { key: idempotencyKey, fingerprint: attemptFingerprint };
+      try { sessionStorage.setItem(attemptStorageKey, JSON.stringify(transferAttemptRef.current)); } catch { /* Keep the attempt in memory if storage is unavailable. */ }
 
       let biometricAssertion: BiometricAssertion | undefined;
       if (amountMinor >= 5_000_000) {
@@ -150,6 +162,7 @@ export default function SendMoneyPage() {
       }
 
       transferAttemptRef.current = null;
+      try { sessionStorage.removeItem(attemptStorageKey); } catch { /* Best-effort cleanup. */ }
       navigate(`/os/pay/receipts/${payload.id}`);
     } catch (sendError) {
       // Keep the key after network/5xx ambiguity so a retry cannot create a second debit.
@@ -157,6 +170,7 @@ export default function SendMoneyPage() {
       // reports that the original idempotent operation is still in progress.
       if (finalResponseStatus !== null && finalResponseStatus >= 400 && finalResponseStatus < 500 && finalResponseCode !== 'TRANSFER_IN_PROGRESS') {
         transferAttemptRef.current = null;
+        try { sessionStorage.removeItem(attemptStorageKey); } catch { /* Best-effort cleanup. */ }
       }
       console.error('Wallet transfer failed:', sendError);
       const message = sendError instanceof Error ? sendError.message : 'The transfer could not be completed.';
