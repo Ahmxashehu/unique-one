@@ -16,6 +16,7 @@ assert.ok((routes.match(/where\('senderId', '==', uid\)\.orderBy\('createdAt', '
 assert.ok((routes.match(/where\('recipientId', '==', uid\)\.orderBy\('createdAt', 'desc'\)\.limit\(100\)\.get\(\)/g) ?? []).length === 1, 'recipient history must sort newest-first before limiting');
 assert.ok(routes.includes("app.patch('/api/payment-requests/:requestId/status'"), 'status changes must use the server API');
 assert.ok(routes.includes('await db.runTransaction('), 'status changes must be transaction-protected');
+assert.ok(routes.includes('if (alreadyApplied) return { status: 200, body: { id: requestId, status: nextStatus, idempotentReplay: true } };'), 'repeating an already-applied participant status must replay without a duplicate audit event');
 assert.ok(routes.includes("nextStatus === 'approved' && recipient && ['sent', 'viewed'].includes(current)"), 'only recipients may approve sent/viewed requests');
 assert.ok(routes.includes("nextStatus === 'rejected' && recipient && ['sent', 'viewed'].includes(current)"), 'only recipients may reject sent/viewed requests');
 assert.ok(!routes.includes("nextStatus === 'sent'"), 'sending a draft must use the recipient-resolving send endpoint');
