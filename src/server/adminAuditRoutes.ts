@@ -62,6 +62,12 @@ export function registerAdminAuditRoutes(app: Express, authenticate: RequestHand
         const recipient = d.recipientId === uid;
         if (!sender && !recipient) return { status: 403, body: { error: { code: 'FORBIDDEN', message: 'You are not a participant in this payment request.' } } };
         const current = String(d.status ?? '');
+        const alreadyApplied = current === nextStatus
+          && ((nextStatus === 'viewed' && recipient)
+            || (nextStatus === 'approved' && recipient)
+            || (nextStatus === 'rejected' && recipient)
+            || (nextStatus === 'cancelled' && sender));
+        if (alreadyApplied) return { status: 200, body: { id: requestId, status: nextStatus, idempotentReplay: true } };
         const allowed = (nextStatus === 'viewed' && recipient && current === 'sent')
           || (nextStatus === 'approved' && recipient && ['sent', 'viewed'].includes(current))
           || (nextStatus === 'rejected' && recipient && ['sent', 'viewed'].includes(current))
