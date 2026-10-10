@@ -15,7 +15,7 @@ export default function SendMoneyPage() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
 
-  const [transferType, setTransferType] = useState<'unique' | 'other'>('unique');
+  const [transferType, setTransferType] = useState<'unique' | 'other'>(() => new URLSearchParams(window.location.search).get('destination') === 'bank' ? 'other' : 'unique');
   const [step, setStep] = useState<1 | 2>(1);
   const [identifier, setIdentifier] = useState('');
   const [recipient, setRecipient] = useState<Recipient | null>(null);
