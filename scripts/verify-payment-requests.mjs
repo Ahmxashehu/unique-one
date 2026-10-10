@@ -4,9 +4,14 @@ import { readFileSync } from 'node:fs';
 const routes = readFileSync('src/server/adminAuditRoutes.ts', 'utf8');
 const page = readFileSync('src/pages/PaymentRequestsPage.tsx', 'utf8');
 const rules = readFileSync('firestore.rules', 'utf8');
+const indexes = JSON.parse(readFileSync('firestore.indexes.json', 'utf8'));
+const firebaseConfig = JSON.parse(readFileSync('firebase.json', 'utf8'));
 const server = readFileSync('server.ts', 'utf8');
 
 assert.ok(routes.includes("app.get('/api/payment-requests'"), 'requests must be listed through the server API');
+assert.equal(firebaseConfig.firestore?.indexes, 'firestore.indexes.json', 'Firebase config must deploy the index manifest');
+assert.ok(indexes.indexes.some((i) => i.collectionGroup === 'payment_requests' && i.fields.some((f) => f.fieldPath === 'senderId' && f.order === 'ASCENDING') && i.fields.some((f) => f.fieldPath === 'createdAt' && f.order === 'DESCENDING')), 'sender history composite index must be declared');
+assert.ok(indexes.indexes.some((i) => i.collectionGroup === 'payment_requests' && i.fields.some((f) => f.fieldPath === 'recipientId' && f.order === 'ASCENDING') && i.fields.some((f) => f.fieldPath === 'createdAt' && f.order === 'DESCENDING')), 'recipient history composite index must be declared');
 assert.ok((routes.match(/where\('senderId', '==', uid\)\.orderBy\('createdAt', 'desc'\)\.limit\(100\)\.get\(\)/g) ?? []).length === 1, 'sender history must sort newest-first before limiting');
 assert.ok((routes.match(/where\('recipientId', '==', uid\)\.orderBy\('createdAt', 'desc'\)\.limit\(100\)\.get\(\)/g) ?? []).length === 1, 'recipient history must sort newest-first before limiting');
 assert.ok(routes.includes("app.patch('/api/payment-requests/:requestId/status'"), 'status changes must use the server API');
