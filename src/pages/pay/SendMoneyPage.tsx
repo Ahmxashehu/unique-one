@@ -15,6 +15,7 @@ export default function SendMoneyPage() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
 
+  const [transferType, setTransferType] = useState<'unique' | 'other'>('unique');
   const [step, setStep] = useState<1 | 2>(1);
   const [identifier, setIdentifier] = useState('');
   const [recipient, setRecipient] = useState<Recipient | null>(null);
@@ -188,9 +189,31 @@ export default function SendMoneyPage() {
     <div className="max-w-2xl mx-auto space-y-6 pb-12">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Send Money</h1>
-        <p className="text-sm text-slate-500 mt-1">Securely transfer funds to any verified Unique One user.</p>
+        <p className="text-sm text-slate-500 mt-1">Choose where your money is going.</p>
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="group" aria-label="Transfer destination">
+        <button
+          type="button"
+          aria-pressed={transferType === 'unique'}
+          onClick={() => { setTransferType('unique'); setError(null); }}
+          className={`rounded-2xl border p-4 text-left transition-colors ${transferType === 'unique' ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-100' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+        >
+          <span className="block font-semibold text-slate-900">UniquePay to UniquePay</span>
+          <span className="block text-sm text-slate-600 mt-1">Send to another UniquePlatform user using their phone number or UniquePay ID.</span>
+        </button>
+        <button
+          type="button"
+          aria-pressed={transferType === 'other'}
+          onClick={() => { setTransferType('other'); setError(null); }}
+          className={`rounded-2xl border p-4 text-left transition-colors ${transferType === 'other' ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-100' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+        >
+          <span className="block font-semibold text-slate-900">UniquePay to Other</span>
+          <span className="block text-sm text-slate-600 mt-1">For a Nigerian bank account or a recipient outside UniquePay.</span>
+        </button>
+      </div>
+
+      {transferType === 'unique' ? <>
       <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-emerald-600 mt-0.5" />
         <div>
@@ -314,6 +337,22 @@ export default function SendMoneyPage() {
           </form>
         )}
       </div>
+      </> : (
+        <div className="bg-white border border-amber-200 rounded-3xl p-6 md:p-8 space-y-3">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="w-6 h-6 text-amber-600 mt-0.5" />
+            <div>
+              <h2 className="font-semibold text-slate-900">Bank transfer setup is not enabled yet</h2>
+              <p className="text-sm text-slate-600 mt-2">
+                This option is reserved for transfers to Nigerian bank accounts and other external recipients. External payouts are still being connected to wallet debit, ledger reconciliation, and reversal handling, so no bank details or payment will be submitted from this screen yet.
+              </p>
+              <p className="text-sm text-slate-600 mt-2">
+                You can use <strong>UniquePay to UniquePay</strong> for verified in-platform transfers now. The external-bank option will be enabled only after the payout safeguards and live checks pass.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
