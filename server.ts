@@ -2060,16 +2060,14 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       .get();
     const isNewRecipient = previousRecipientTransaction.empty;
 
+    const velocityWindowStart = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const recentTransactionsSnapshot = await adminDb.collection('transactions')
       .where('senderId', '==', senderUid)
-      .limit(20)
+      .where('createdAt', '>=', velocityWindowStart)
+      .orderBy('createdAt', 'desc')
       .get();
-    const velocityWindowStart = Date.now() - 10 * 60 * 1000;
-    const recentTransactionCount = recentTransactionsSnapshot.docs.reduce((count, doc) => {
-      const createdAt = doc.data().createdAt;
-      const createdAtMs = typeof createdAt?.toMillis === 'function' ? createdAt.toMillis() : 0;
-      return count + (createdAtMs >= velocityWindowStart ? 1 : 0);
-    }, 0);
+    // Count every transaction in the ten-minute window, not an unordered 20-document sample.
+    const recentTransactionCount = recentTransactionsSnapshot.size;
 
     const authPolicy = getTransactionAuthPolicy({
       amountMinor,
