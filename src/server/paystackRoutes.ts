@@ -16,14 +16,14 @@ function safeReference(value: unknown): value is string {
 }
 function apiSecret(): string | null {
   const value = process.env.PAYSTACK_SECRET_KEY?.trim();
-  return value && /^(sk_test_|sk_live_)/.test(value) ? value : null;
+  return value && value.startsWith("sk_test_") ? value : null;
 }
 async function paystackRequest(path: string, init: RequestInit = {}) {
   const secret = apiSecret();
   if (!secret) throw new Error("PAYSTACK_NOT_CONFIGURED");
   const response = await fetch(PAYSTACK_API + path, {
     ...init,
-    headers: { Authorization: "Bearer " + secret, "Content-Type": "application/json", ...(init.headers || {}) },
+    headers: { Authorization: "Bearer " + secret, "Content-Type": "application/json", ...(init.headers as Record<string, string> || {}) },
     signal: AbortSignal.timeout(12_000),
   });
   const body = await response.json().catch(() => null) as any;
