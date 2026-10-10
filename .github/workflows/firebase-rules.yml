@@ -39,5 +39,15 @@ jobs:
         with:
           credentials_json: ${{ env.FIREBASE_SERVICE_ACCOUNT }}
 
-      - name: Deploy Firebase Firestore and Storage rules
-        run: npx --yes firebase-tools@latest deploy --only firestore,storage --project unique-one-9731b
+      # Deploy access-control rules independently so an index IAM failure cannot
+      # prevent security-rule updates from being applied.
+      - name: Deploy Firestore and Storage security rules
+        run: npx --yes firebase-tools@latest deploy --only firestore:rules,storage --project unique-one-9731b
+
+      - name: Deploy Firestore indexes
+        shell: bash
+        run: |
+          if ! npx --yes firebase-tools@latest deploy --only firestore:indexes --project unique-one-9731b; then
+            echo "::error::Firestore index deployment failed. Grant the workflow service account roles/datastore.indexAdmin on project unique-one-9731b, then rerun this workflow."
+            exit 1
+          fi
