@@ -8,6 +8,7 @@ on:
       - firestore.rules
       - storage.rules
       - firebase.json
+      - firestore.indexes.json
       - .firebaserc
       - .github/workflows/firebase-rules.yml
   workflow_dispatch:

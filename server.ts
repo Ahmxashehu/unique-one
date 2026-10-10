@@ -2060,16 +2060,29 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       .get();
     const isNewRecipient = previousRecipientTransaction.empty;
 
-    const recentTransactionsSnapshot = await adminDb.collection('transactions')
-      .where('senderId', '==', senderUid)
-      .limit(20)
-      .get();
-    const velocityWindowStart = Date.now() - 10 * 60 * 1000;
-    const recentTransactionCount = recentTransactionsSnapshot.docs.reduce((count, doc) => {
-      const createdAt = doc.data().createdAt;
-      const createdAtMs = typeof createdAt?.toMillis === 'function' ? createdAt.toMillis() : 0;
-      return count + (createdAtMs >= velocityWindowStart ? 1 : 0);
-    }, 0);
+    const velocityWindowEndMs = Date.now();
+    const velocityWindowStartMs = velocityWindowEndMs - 10 * 60 * 1000;
+    const velocityWindowStart = new Date(velocityWindowStartMs).toISOString();
+    const velocityWindowEnd = new Date(velocityWindowEndMs).toISOString();
+    // Historical records may use ISO strings while the authoritative wallet-transfer
+    // transaction writes Firestore Timestamps. Bound each query to its own value type:
+    // mixed-type Firestore comparisons alone can otherwise count records outside the window.
+    const [recentTimestampTransactionsSnapshot, recentIsoTransactionsSnapshot] = await Promise.all([
+      adminDb.collection('transactions')
+        .where('senderId', '==', senderUid)
+        .where('createdAt', '>=', Timestamp.fromMillis(velocityWindowStartMs))
+        .where('createdAt', '<=', Timestamp.fromMillis(velocityWindowEndMs))
+        .orderBy('createdAt', 'desc')
+        .get(),
+      adminDb.collection('transactions')
+        .where('senderId', '==', senderUid)
+        .where('createdAt', '>=', velocityWindowStart)
+        .where('createdAt', '<=', velocityWindowEnd)
+        .orderBy('createdAt', 'desc')
+        .get(),
+    ]);
+    // Count all recent records across both supported timestamp representations.
+    const recentTransactionCount = recentTimestampTransactionsSnapshot.size + recentIsoTransactionsSnapshot.size;
 
     const authPolicy = getTransactionAuthPolicy({
       amountMinor,
