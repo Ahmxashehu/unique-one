@@ -34,6 +34,18 @@ jobs:
           fi
           echo "Firebase credential secret is available."
 
+      - name: Identify Firebase IAM principal
+        shell: bash
+        run: |
+          node <<'NODE'
+          const credential = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          if (!credential.client_email) {
+            console.error("::error::Firebase service account JSON has no client_email.");
+            process.exit(1);
+          }
+          console.log("::notice title=Firebase IAM principal::Grant roles/datastore.indexAdmin to " + credential.client_email + " on project unique-one-9731b.");
+          NODE
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
