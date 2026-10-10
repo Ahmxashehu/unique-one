@@ -1812,7 +1812,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (!description || description.length > 500) return errorResponse(res, "INVALID_REQUEST", "This draft has an invalid description and cannot be sent.");
       if (dueDate !== undefined && dueDate !== null) {
         const parsedDueDate = typeof dueDate === "string" ? new Date(dueDate + "T00:00:00.000Z") : new Date(Number.NaN);
-        if (typeof dueDate !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate) || Number.isNaN(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== dueDate) return errorResponse(res, "INVALID_REQUEST", "This draft has an invalid due date and cannot be sent.");
+        if (typeof dueDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || Number.isNaN(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== dueDate) return errorResponse(res, "INVALID_REQUEST", "This draft has an invalid due date and cannot be sent.");
       }
       const identifier = typeof data.recipientIdentifier === "string" ? data.recipientIdentifier.trim() : "";
       if (!identifier) return errorResponse(res, "INVALID_REQUEST", "This draft has no recipient identifier.");
