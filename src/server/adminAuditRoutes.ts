@@ -10,8 +10,8 @@ export function registerAdminAuditRoutes(app: Express, authenticate: RequestHand
     if (!uid) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication is required.' } });
     try {
       const [sent, received] = await Promise.all([
-        db.collection('payment_requests').where('senderId', '==', uid).limit(100).get(),
-        db.collection('payment_requests').where('recipientId', '==', uid).limit(100).get(),
+        db.collection('payment_requests').where('senderId', '==', uid).orderBy('createdAt', 'desc').limit(100).get(),
+        db.collection('payment_requests').where('recipientId', '==', uid).orderBy('createdAt', 'desc').limit(100).get(),
       ]);
       const requests = new Map<string, Record<string, unknown>>();
       for (const doc of [...sent.docs, ...received.docs]) {
