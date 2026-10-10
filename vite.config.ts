@@ -24,14 +24,14 @@ export default defineConfig(() => ({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       workbox: {
-        cacheId: 'unique-platform-v2026-10-06-header-cleanup',
+        cacheId: 'unique-platform-v2026-10-10-add-money-checkout-refresh',
         globPatterns: ['**/*.{css,html,ico,png,svg,webmanifest,js}'],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === 'document',
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'unique-platform-app-documents-v7',
+              cacheName: 'unique-platform-app-documents-v8',
               networkTimeoutSeconds: 10,
               expiration: { maxEntries: 20, maxAgeSeconds: 86400 },
             },
@@ -40,7 +40,7 @@ export default defineConfig(() => ({
             urlPattern: ({ request }) => request.destination === 'script' || request.destination === 'style',
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'unique-platform-app-assets-v18',
+              cacheName: 'unique-platform-app-assets-v19',
               networkTimeoutSeconds: 10,
               expiration: { maxEntries: 100, maxAgeSeconds: 604800 },
             },
