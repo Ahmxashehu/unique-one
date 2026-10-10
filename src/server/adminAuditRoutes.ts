@@ -24,7 +24,20 @@ export function registerAdminAuditRoutes(app: Express, authenticate: RequestHand
           createdAt: d.createdAt ?? null, updatedAt: d.updatedAt ?? null,
         });
       }
-      return res.json({ requests: [...requests.values()].sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? ''))) });
+      const toMillis = (value: unknown): number => {
+        if (value instanceof Timestamp) return value.toMillis();
+        if (typeof value === 'string') {
+          const parsed = Date.parse(value);
+          return Number.isFinite(parsed) ? parsed : 0;
+        }
+        if (value && typeof value === 'object') {
+          const stamp = value as { _seconds?: unknown; seconds?: unknown };
+          const seconds = stamp._seconds ?? stamp.seconds;
+          return typeof seconds === 'number' && Number.isFinite(seconds) ? seconds * 1000 : 0;
+        }
+        return 0;
+      };
+      return res.json({ requests: [...requests.values()].sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt)) });
     } catch (error) {
       console.error('Payment request list failed:', error);
       return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Payment requests are temporarily unavailable.' } });
