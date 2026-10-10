@@ -117,17 +117,19 @@ for (const forbidden of ["demo rice order", "featured providers"]) {
 
 
 const walletTransferSource = read("server.ts");
-const velocityStart = walletTransferSource.indexOf("const velocityWindowStart = new Date(Date.now() - 10 * 60 * 1000).toISOString();");
-assert(velocityStart >= 0, "wallet transfer velocity window uses an ISO timestamp compatible with transaction records");
-const velocityBlock = walletTransferSource.slice(velocityStart, velocityStart + 900);
+const velocityStart = walletTransferSource.indexOf("const velocityWindowStartMs = velocityWindowEndMs - 10 * 60 * 1000;");
+assert(velocityStart >= 0, "wallet transfer velocity window has explicit start and end bounds");
+const velocityBlock = walletTransferSource.slice(velocityStart, velocityStart + 1800);
 for (const required of [
-  ".where('senderId', '==', senderUid)",
+  "Timestamp.fromMillis(velocityWindowStartMs)",
+  "Timestamp.fromMillis(velocityWindowEndMs)",
   ".where('createdAt', '>=', velocityWindowStart)",
-  ".orderBy('createdAt', 'desc')",
-  "const recentTransactionCount = recentTransactionsSnapshot.size;",
+  ".where('createdAt', '<=', velocityWindowEnd)",
+  "recentTimestampTransactionsSnapshot.size + recentIsoTransactionsSnapshot.size",
 ]) {
   assert(velocityBlock.includes(required), `wallet transfer velocity check includes: ${required}`);
 }
+assert((velocityBlock.match(/\.where\('senderId', '==', senderUid\)/g) ?? []).length >= 2, "wallet velocity checks both supported createdAt representations");
 assert(!velocityBlock.includes(".limit(20)"), "wallet transfer velocity check does not count an unordered capped sample");
 const firestoreIndexes = JSON.parse(read("firestore.indexes.json"));
 assert(firestoreIndexes.indexes.some((index) =>
