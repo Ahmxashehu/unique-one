@@ -6,6 +6,9 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { collection, getDocs, orderBy, query, where } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { FinancialTransactionViewModel, formatFinancialTransactionAmount, mapFinancialTransaction } from '../lib/os/pay/financialTransaction';
 
 const money = (minor: number) => '₦' + (minor / 100).toLocaleString('en-NG', {
   minimumFractionDigits: 2,
@@ -23,6 +26,9 @@ export default function PayPage() {
   const [funding, setFunding] = useState(false);
   const [fundingMessage, setFundingMessage] = useState('');
   const [fundingError, setFundingError] = useState('');
+  const [recentTransactions, setRecentTransactions] = useState<FinancialTransactionViewModel[]>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState('');
 
   useEffect(() => {
     if (currentUser?.email && !billingEmail) setBillingEmail(currentUser.email);
@@ -66,6 +72,50 @@ export default function PayPage() {
     void loadWallet();
     return () => { cancelled = true; };
   }, [authLoading, currentUser, walletRetry]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    let cancelled = false;
+    const loadRecentActivity = async () => {
+      if (!currentUser) {
+        if (!cancelled) {
+          setRecentTransactions([]);
+          setActivityLoading(false);
+        }
+        return;
+      }
+      setActivityLoading(true);
+      setActivityError('');
+      try {
+        const transactionsRef = collection(db, 'transactions');
+        const [sentSnapshot, receivedSnapshot] = await Promise.all([
+          getDocs(query(transactionsRef, where('senderId', '==', currentUser.uid), orderBy('createdAt', 'desc'))),
+          getDocs(query(transactionsRef, where('recipientId', '==', currentUser.uid), orderBy('createdAt', 'desc'))),
+        ]);
+        if (cancelled) return;
+        const byId = new Map<string, FinancialTransactionViewModel>();
+        sentSnapshot.forEach((document) => {
+          const transaction = mapFinancialTransaction(document.id, document.data(), currentUser.uid);
+          if (transaction) byId.set(document.id, transaction);
+        });
+        receivedSnapshot.forEach((document) => {
+          const transaction = mapFinancialTransaction(document.id, document.data(), currentUser.uid);
+          if (transaction) byId.set(document.id, transaction);
+        });
+        setRecentTransactions([...byId.values()]
+          .filter((transaction) => transaction.status === 'completed')
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, 3));
+      } catch (error) {
+        console.error('Unable to load recent UniquePay activity:', error);
+        if (!cancelled) setActivityError('Recent wallet activity could not be loaded. Open Transaction History to retry.');
+      } finally {
+        if (!cancelled) setActivityLoading(false);
+      }
+    };
+    void loadRecentActivity();
+    return () => { cancelled = true; };
+  }, [authLoading, currentUser]);
 
   useEffect(() => {
     if (authLoading || !currentUser) return;
@@ -290,10 +340,38 @@ export default function PayPage() {
             </div>
             <Link to="/os/pay/history" className="text-xs font-bold text-emerald-700">View all</Link>
           </div>
-          <div className="mt-4 rounded-2xl bg-slate-50 p-6 text-center">
-            <Clock3 className="mx-auto h-7 w-7 text-slate-300" />
-            <p className="mt-2 text-sm font-bold text-slate-900">No recent transactions</p>
-            <p className="mt-1 text-xs text-slate-500">Verified wallet activity will appear here.</p>
+          <div className="mt-4 rounded-2xl bg-slate-50">
+            {activityLoading ? (
+              <p className="p-6 text-center text-sm text-slate-500">Loading verified wallet activity…</p>
+            ) : activityError ? (
+              <div className="p-6 text-center">
+                <p className="text-sm font-bold text-slate-900">Activity unavailable</p>
+                <p className="mt-1 text-xs text-slate-500">{activityError}</p>
+              </div>
+            ) : recentTransactions.length === 0 ? (
+              <div className="p-6 text-center">
+                <Clock3 className="mx-auto h-7 w-7 text-slate-300" />
+                <p className="mt-2 text-sm font-bold text-slate-900">No verified transactions yet</p>
+                <p className="mt-1 text-xs text-slate-500">Completed wallet transactions will appear here.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-200">
+                {recentTransactions.map((transaction) => (
+                  <div key={transaction.id} className="flex items-center gap-3 p-3">
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${transaction.direction === 'outgoing' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {transaction.direction === 'outgoing' ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold capitalize text-slate-900">{transaction.type.replaceAll('_', ' ')}</p>
+                      <p className="truncate text-xs text-slate-500">{new Date(transaction.createdAt).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                    </div>
+                    <p className={`shrink-0 text-sm font-bold ${transaction.direction === 'outgoing' ? 'text-slate-900' : 'text-emerald-700'}`}>
+                      {transaction.direction === 'outgoing' ? '-' : '+'}{formatFinancialTransactionAmount(transaction)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
