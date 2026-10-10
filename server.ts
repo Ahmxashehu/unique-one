@@ -556,7 +556,7 @@ const app = express();
     }
     next();
   });
-  app.use(express.json({ limit: "10mb", verify: (req, _res, buf) => { if (req.path === "/api/paystack/webhook") (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf); } }));
+  app.use(express.json({ limit: "10mb", verify: (req, _res, buf) => { if ((req as Request).path === "/api/paystack/webhook") (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf); } }));
   app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
   const authenticate = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
