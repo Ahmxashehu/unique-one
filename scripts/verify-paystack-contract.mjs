@@ -16,7 +16,7 @@ const checks = [
   ["idempotency protects settlement", /currentDeposit\.status === "completed"/.test(routes) && /existingTxSnap\.exists/.test(routes)],
   ["webhook uses HMAC SHA-512 and timing-safe comparison", /createHmac\("sha512"/.test(routes) && /timingSafeEqual\(supplied, expected\)/.test(routes)],
   ["webhook captures raw request body", /rawBody/.test(routes) && /\/api\/paystack\/webhook/.test(server)],
-  ["frontend only redirects to Paystack checkout host", /https:\\\/\\\/checkout\\.paystack\\.com\\\//.test(page)],
+  ["frontend validates Paystack checkout host before redirect", /checkout\\.paystack\\.com/.test(page) && /window\\.location\\.assign\\(data\\.authorizationUrl\\)/.test(page)],
   ["frontend asks server to verify returned reference", /\/api\/paystack\/verify\//.test(page)],
 ];
 
