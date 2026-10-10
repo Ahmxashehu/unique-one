@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ArrowUpRight, Search, ShieldCheck, User, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,6 +24,7 @@ export default function SendMoneyPage() {
   const [transactionPin, setTransactionPin] = useState('');
   const [biometricBusy, setBiometricBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const transferAttemptRef = useRef<{ key: string; fingerprint: string } | null>(null);
 
   const handleResolveRecipient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,14 +79,39 @@ export default function SendMoneyPage() {
       return;
     }
 
+    const amountMinor = Math.round(amountValue * 100);
+    if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0 || Math.abs(amountValue * 100 - amountMinor) > 1e-7) {
+      setError('Enter a valid amount with no more than two decimal places.');
+      return;
+    }
+    const attemptFingerprint = JSON.stringify({ recipientId: recipient.uid, amountMinor, currency: 'NGN', description: description.trim() });
+    const attemptStorageKey = `uniqueplatform.walletTransferAttempt:${currentUser.uid}`;
+    if (!transferAttemptRef.current) {
+      try {
+        const storedAttempt = sessionStorage.getItem(attemptStorageKey);
+        if (storedAttempt) {
+          const parsed = JSON.parse(storedAttempt);
+          if (typeof parsed?.key === 'string' && typeof parsed?.fingerprint === 'string') transferAttemptRef.current = parsed;
+          else sessionStorage.removeItem(attemptStorageKey);
+        }
+      } catch { /* Session storage may be unavailable; in-memory idempotency still applies. */ }
+    }
+    if (transferAttemptRef.current && transferAttemptRef.current.fingerprint !== attemptFingerprint) {
+      setError('A previous transfer attempt may still be processing. Restore its original recipient, amount and description, then retry it; check your transaction history before starting a different transfer.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
+    let finalResponseStatus: number | null = null;
+    let finalResponseCode: string | null = null;
     try {
       const token = await currentUser.getIdToken();
-      const amountMinor = Math.round(amountValue * 100);
-      const idempotencyKey = typeof crypto.randomUUID === 'function'
+      const idempotencyKey = transferAttemptRef.current?.key ?? (typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
-        : `transfer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        : `transfer-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      transferAttemptRef.current = { key: idempotencyKey, fingerprint: attemptFingerprint };
+      try { sessionStorage.setItem(attemptStorageKey, JSON.stringify(transferAttemptRef.current)); } catch { /* Keep the attempt in memory if storage is unavailable. */ }
 
       let biometricAssertion: BiometricAssertion | undefined;
       if (amountMinor >= 5_000_000) {
@@ -115,6 +141,8 @@ export default function SendMoneyPage() {
 
       let response = await submitTransfer();
       let payload = await response.json().catch(() => null);
+      finalResponseStatus = response.status;
+      finalResponseCode = payload?.error?.code ?? null;
 
       if (!response.ok && payload?.error?.code === 'BIOMETRIC_REQUIRED' && !biometricAssertion) {
         setBiometricBusy(true);
@@ -125,14 +153,25 @@ export default function SendMoneyPage() {
         }
         response = await submitTransfer();
         payload = await response.json().catch(() => null);
+        finalResponseStatus = response.status;
+        finalResponseCode = payload?.error?.code ?? null;
       }
 
       if (!response.ok || !payload?.id) {
         throw new Error(payload?.error?.message || 'The transfer could not be completed.');
       }
 
+      transferAttemptRef.current = null;
+      try { sessionStorage.removeItem(attemptStorageKey); } catch { /* Best-effort cleanup. */ }
       navigate(`/os/pay/receipts/${payload.id}`);
     } catch (sendError) {
+      // Keep the key after network/5xx ambiguity so a retry cannot create a second debit.
+      // A definitive client error is safe to retry with a fresh key, except while the server
+      // reports that the original idempotent operation is still in progress.
+      if (finalResponseStatus !== null && finalResponseStatus >= 400 && finalResponseStatus < 500 && finalResponseCode !== 'TRANSFER_IN_PROGRESS') {
+        transferAttemptRef.current = null;
+        try { sessionStorage.removeItem(attemptStorageKey); } catch { /* Best-effort cleanup. */ }
+      }
       console.error('Wallet transfer failed:', sendError);
       const message = sendError instanceof Error ? sendError.message : 'The transfer could not be completed.';
       if (/biometric|passkey|credential/i.test(message)) {
