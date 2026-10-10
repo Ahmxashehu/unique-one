@@ -22,6 +22,7 @@ export default function PayPage() {
   const [walletError, setWalletError] = useState('');
   const [walletRetry, setWalletRetry] = useState(0);
   const [fundAmount, setFundAmount] = useState('1000');
+  const [fundingStep, setFundingStep] = useState<1 | 2>(1);
   const [billingEmail, setBillingEmail] = useState('');
   const [funding, setFunding] = useState(false);
   const [fundingMessage, setFundingMessage] = useState('');
@@ -247,31 +248,33 @@ export default function PayPage() {
             )}
           </div>
 
-          <div className="mt-4 rounded-2xl border border-emerald-300/20 bg-slate-900/80 p-4">
-            <div className="flex items-center gap-2">
-              <Landmark className="h-5 w-5 text-emerald-300" />
-              <div>
-                <p className="text-sm font-black text-white">Add money to UniquePay</p>
-                <p className="text-[11px] text-slate-300">Secure checkout powered by Paystack Test Mode</p>
+          <div className="mt-4 rounded-2xl border border-emerald-300/20 bg-slate-900/80 p-3.5 sm:p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300"><Landmark className="h-4.5 w-4.5" /></div>
+                <div className="min-w-0"><p className="text-sm font-black text-white">Add money</p><p className="text-[10px] text-slate-400">Secure checkout · Paystack Test Mode</p></div>
               </div>
+              <span className="shrink-0 rounded-full border border-white/10 px-2 py-1 text-[10px] font-semibold text-slate-300">Step {fundingStep} of 2</span>
             </div>
-            <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); void startWalletFunding(); }}>
-              <label className="sr-only" htmlFor="unique-pay-fund-amount">Amount in naira</label>
-              <label className="flex flex-1 items-center rounded-xl border border-white/10 bg-white/5 px-3">
-                <span className="sr-only">Email for payment receipt</span>
-                <input type="email" autoComplete="email" required value={billingEmail} onChange={(event) => setBillingEmail(event.target.value)} className="w-full bg-transparent py-3 text-sm text-white outline-none placeholder:text-slate-400" placeholder="Email for receipt" />
-              </label>
-              <div className="flex flex-1 items-center rounded-xl border border-white/10 bg-white/5 px-3">
-                <span className="mr-2 text-sm text-slate-300">₦</span>
-                <input id="unique-pay-fund-amount" inputMode="numeric" type="number" min="1" max="1000000" step="1" value={fundAmount} onChange={(event) => setFundAmount(event.target.value)} className="w-full bg-transparent py-3 text-sm font-bold text-white outline-none" placeholder="Amount in naira" />
-              </div>
-              <button type="submit" disabled={funding || !currentUser} className="rounded-xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60">
-                {funding ? 'Please wait…' : 'Continue to payment'}
-              </button>
-            </form>
+            <div className="mt-3 flex gap-1.5"><span className="h-1 flex-1 rounded-full bg-emerald-400" /><span className={"h-1 flex-1 rounded-full " + (fundingStep === 2 ? "bg-emerald-400" : "bg-white/10")} /></div>
+            {fundingStep === 1 ? (
+              <form className="mt-3" onSubmit={(event) => { event.preventDefault(); const amount = Number(fundAmount); if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1000000) { setFundingError("Enter an amount from ₦1 to ₦1,000,000."); return; } setFundingError(""); setFundingStep(2); }}>
+                <label htmlFor="unique-pay-fund-amount" className="mb-1.5 block text-xs font-semibold text-slate-300">How much would you like to add?</label>
+                <div className="flex items-center rounded-xl border border-white/10 bg-white/5 px-3"><span className="mr-2 text-lg font-bold text-emerald-300">₦</span><input id="unique-pay-fund-amount" inputMode="numeric" type="number" min="1" max="1000000" step="1" required value={fundAmount} onChange={(event) => setFundAmount(event.target.value)} className="w-full bg-transparent py-3 text-lg font-black text-white outline-none placeholder:text-slate-500" placeholder="1,000" /></div>
+                <p className="mt-1.5 text-[10px] text-slate-400">Enter an amount from ₦1 to ₦1,000,000.</p>
+                <button type="submit" className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-300">Next <ChevronRight className="h-4 w-4" /></button>
+              </form>
+            ) : (
+              <form className="mt-3" onSubmit={(event) => { event.preventDefault(); void startWalletFunding(); }}>
+                <p className="text-xs text-slate-300">Amount to add</p><p className="mt-0.5 text-xl font-black text-white">₦{Number(fundAmount || 0).toLocaleString("en-NG")}</p>
+                <label htmlFor="unique-pay-receipt-email" className="mb-1.5 mt-3 block text-xs font-semibold text-slate-300">Email for payment receipt</label>
+                <input id="unique-pay-receipt-email" type="email" autoComplete="email" required value={billingEmail} onChange={(event) => setBillingEmail(event.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-emerald-300/60" placeholder="you@example.com" />
+                <div className="mt-3 grid grid-cols-[auto_1fr] gap-2"><button type="button" disabled={funding} onClick={() => { setFundingError(""); setFundingStep(1); }} className="rounded-xl border border-white/10 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/10 disabled:opacity-50">Back</button><button type="submit" disabled={funding || !currentUser} className="rounded-xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60">{funding ? "Please wait…" : "Continue to Pay"}</button></div>
+              </form>
+            )}
             {fundingMessage && <p role="status" className="mt-2 text-xs text-emerald-200">{fundingMessage}</p>}
             {fundingError && <p role="alert" className="mt-2 text-xs text-rose-200">{fundingError}</p>}
-            <p className="mt-2 text-[10px] leading-4 text-slate-400">Use test payment details only. Your balance changes only after server-side verification.</p>
+            <p className="mt-2 text-[10px] leading-4 text-slate-400">Test mode only. Your wallet updates only after server-side payment verification.</p>
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
