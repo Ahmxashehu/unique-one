@@ -35,7 +35,7 @@ export default function PaymentRequestsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const changeStatus = async (item: PaymentRequest, status: 'sent' | 'viewed' | 'approved' | 'rejected' | 'cancelled') => {
+  const changeStatus = async (item: PaymentRequest, status: 'viewed' | 'approved' | 'rejected' | 'cancelled') => {
     if (!currentUser || busy) return;
     setBusy(item.id); setError(null);
     try {
@@ -48,6 +48,21 @@ export default function PaymentRequestsPage() {
       if (!response.ok) throw new Error(payload?.error?.message || 'Unable to update request.');
       setRequests((old) => old.map((r) => r.id === item.id ? { ...r, status } : r));
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to update request.'); }
+    finally { setBusy(null); }
+  };
+
+  const sendDraft = async (item: PaymentRequest) => {
+    if (!currentUser || busy) return;
+    setBusy(item.id); setError(null);
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/payment-requests/' + encodeURIComponent(item.id) + '/send', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + token },
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error?.message || 'Unable to send payment request.');
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to send payment request.'); }
     finally { setBusy(null); }
   };
 
@@ -67,7 +82,7 @@ export default function PaymentRequestsPage() {
         const respond = received && ['sent', 'viewed'].includes(String(r.status));
         const cancel = !received && ['draft', 'sent'].includes(String(r.status));
         const canSend = !received && r.status === 'draft';
-        return <div key={r.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="font-medium text-slate-900">{r.description || 'Payment request'}</p><p className="mt-1 truncate text-xs text-slate-500">#{r.id} · {r.status || 'unknown'} · {createdLabel(r.createdAt)}</p>{r.dueDate && <p className="mt-1 text-xs text-slate-500">Due {r.dueDate}</p>}</div><div className="flex flex-col gap-3 sm:items-end"><div className="text-left sm:text-right"><p className="font-semibold text-slate-900">{r.currency === 'NGN' ? '₦' : r.currency || ''}{Number(r.amount || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p><p className="text-xs text-slate-500">{received ? 'Received request' : `To ${r.recipientIdentifier || 'recipient'}`}</p></div><div className="flex flex-wrap gap-2">{respond && r.status === 'sent' && <button type="button" disabled={busy === r.id} onClick={() => void changeStatus(r, 'viewed')} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs disabled:opacity-50"><Check className="h-3.5 w-3.5" /> Viewed</button>}{respond && <button type="button" disabled={busy === r.id} onClick={() => void changeStatus(r, 'approved')} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-2 text-xs text-emerald-700 disabled:opacity-50"><Check className="h-3.5 w-3.5" /> Approve request</button>}{respond && <button type="button" disabled={busy === r.id} onClick={() => void changeStatus(r, 'rejected')} className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-2 text-xs text-rose-700 disabled:opacity-50"><X className="h-3.5 w-3.5" /> Reject</button>}{canSend && <button type="button" disabled={busy === r.id} onClick={() => void changeStatus(r, 'sent')} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-2 text-xs text-emerald-700 disabled:opacity-50">Send request</button>}{cancel && <button type="button" disabled={busy === r.id} onClick={() => void changeStatus(r, 'cancelled')} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs disabled:opacity-50"><Ban className="h-3.5 w-3.5" /> Cancel</button>}{busy === r.id && <Loader2 className="h-4 w-4 animate-spin" />}</div></div></div>;
+        return <div key={r.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="font-medium text-slate-900">{r.description || 'Payment request'}</p><p className="mt-1 truncate text-xs text-slate-500">#{r.id} · {r.status || 'unknown'} · {createdLabel(r.createdAt)}</p>{r.dueDate && <p className="mt-1 text-xs text-slate-500">Due {r.dueDate}</p>}</div><div className="flex flex-col gap-3 sm:items-end"><div className="text-left sm:text-right"><p className="font-semibold text-slate-900">{r.currency === 'NGN' ? '₦' : r.currency || ''}{Number(r.amount || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p><p className="text-xs text-slate-500">{received ? 'Received request' : `To ${r.recipientIdentifier || 'recipient'}`}</p></div><div className="flex flex-wrap gap-2">{respond && r.status === 'sent' && <button type="button" disabled={busy === r.id} onClick={() => void changeStatus(r, 'viewed')} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs disabled:opacity-50"><Check className="h-3.5 w-3.5" /> Viewed</button>}{respond && <button type="button" disabled={busy === r.id} onClick={() => void changeStatus(r, 'approved')} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-2 text-xs text-emerald-700 disabled:opacity-50"><Check className="h-3.5 w-3.5" /> Approve request</button>}{respond && <button type="button" disabled={busy === r.id} onClick={() => void changeStatus(r, 'rejected')} className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-2 text-xs text-rose-700 disabled:opacity-50"><X className="h-3.5 w-3.5" /> Reject</button>}{canSend && <button type="button" disabled={busy === r.id} onClick={() => void sendDraft(r)} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-2 text-xs text-emerald-700 disabled:opacity-50">Send request</button>}{cancel && <button type="button" disabled={busy === r.id} onClick={() => void changeStatus(r, 'cancelled')} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs disabled:opacity-50"><Ban className="h-3.5 w-3.5" /> Cancel</button>}{busy === r.id && <Loader2 className="h-4 w-4 animate-spin" />}</div></div></div>;
       })}</div>}
     </div>
   </div>;
