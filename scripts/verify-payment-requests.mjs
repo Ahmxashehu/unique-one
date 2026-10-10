@@ -20,7 +20,7 @@ assert.ok(page.includes("changeStatus(r, 'rejected')") && page.includes('Reject'
 assert.ok(page.includes("fetch('/api/payment-requests'"), 'page must load requests through the server API');
 assert.ok(!page.includes('firebase/firestore'), 'page must not read requests directly from Firestore');
 const start = rules.indexOf('match /payment_requests/{reqId}');
-const end = rules.indexOf('\\n    match /', start + 1);
+const end = rules.indexOf('\n    match /', start + 1);
 assert.ok(start >= 0 && end > start, 'payment request rules must exist');
 assert.ok(rules.slice(start, end).includes('allow update: if false;'), 'client status writes must be blocked completely');
 assert.ok(server.includes('const amountMinor = Math.round(amount * 100)'), 'request amounts must be normalized to integer minor units');
