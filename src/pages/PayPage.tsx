@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ArrowDownLeft, ArrowUpRight, Banknote, ChevronRight, Clock3, Copy,
   History, Landmark, Receipt, ShieldCheck, Smartphone, Users, Wallet,
-  WalletCards, Zap, Wifi, PhoneCall
+  WalletCards, Zap, Wifi, PhoneCall, LockKeyhole, X
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,8 +21,9 @@ export default function PayPage() {
   const [walletLoading, setWalletLoading] = useState(true);
   const [walletError, setWalletError] = useState('');
   const [walletRetry, setWalletRetry] = useState(0);
-  const [fundAmount, setFundAmount] = useState('1000');
+  const [fundAmount, setFundAmount] = useState('');
   const [fundingStep, setFundingStep] = useState<1 | 2>(1);
+  const [showSendPopup, setShowSendPopup] = useState(false);
   const [billingEmail, setBillingEmail] = useState('');
   const [funding, setFunding] = useState(false);
   const [fundingMessage, setFundingMessage] = useState('');
@@ -252,15 +253,15 @@ export default function PayPage() {
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2.5">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300"><Landmark className="h-4.5 w-4.5" /></div>
-                <div className="min-w-0"><p className="text-sm font-black text-white">Add money</p><p className="text-[10px] text-slate-400">Secure checkout · Paystack Test Mode</p></div>
+                <div className="min-w-0"><p className="text-sm font-black text-white">Add money to your wallet</p><p className="text-[10px] text-slate-400">Choose an amount, then continue to secure checkout</p></div>
               </div>
               <span className="shrink-0 rounded-full border border-white/10 px-2 py-1 text-[10px] font-semibold text-slate-300">Step {fundingStep} of 2</span>
             </div>
             <div className="mt-3 flex gap-1.5"><span className="h-1 flex-1 rounded-full bg-emerald-400" /><span className={"h-1 flex-1 rounded-full " + (fundingStep === 2 ? "bg-emerald-400" : "bg-white/10")} /></div>
             {fundingStep === 1 ? (
               <form className="mt-3" onSubmit={(event) => { event.preventDefault(); const amount = Number(fundAmount); if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1000000) { setFundingError("Enter an amount from ₦1 to ₦1,000,000."); return; } setFundingError(""); setFundingStep(2); }}>
-                <label htmlFor="unique-pay-fund-amount" className="mb-1.5 block text-xs font-semibold text-slate-300">How much would you like to add?</label>
-                <div className="flex items-center rounded-xl border border-white/10 bg-white/5 px-3"><span className="mr-2 text-lg font-bold text-emerald-300">₦</span><input id="unique-pay-fund-amount" inputMode="numeric" type="number" min="1" max="1000000" step="1" required value={fundAmount} onChange={(event) => setFundAmount(event.target.value)} className="w-full bg-transparent py-3 text-lg font-black text-white outline-none placeholder:text-slate-500" placeholder="1,000" /></div>
+                <label htmlFor="unique-pay-fund-amount" className="mb-1.5 block text-xs font-semibold text-slate-300">Amount to add (₦)</label>
+                <div className="flex items-center rounded-xl border border-white/10 bg-white/5 px-3"><span className="mr-2 text-lg font-bold text-emerald-300">₦</span><input id="unique-pay-fund-amount" inputMode="numeric" type="number" min="1" max="1000000" step="1" required value={fundAmount} onChange={(event) => setFundAmount(event.target.value)} className="w-full bg-transparent py-3 text-lg font-black text-white outline-none placeholder:text-slate-500" placeholder="Enter amount in naira" /></div>
                 <p className="mt-1.5 text-[10px] text-slate-400">Enter an amount from ₦1 to ₦1,000,000.</p>
                 <button type="submit" className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-300">Next <ChevronRight className="h-4 w-4" /></button>
               </form>
@@ -278,15 +279,35 @@ export default function PayPage() {
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            {actions.map(({ to, icon: Icon, title }) => (
+            {actions.map(({ to, icon: Icon, title }) => to === '/os/pay/send' ? (
+              <button key={to} type="button" onClick={() => setShowSendPopup(true)} className="group min-h-[102px] rounded-2xl border border-white/10 bg-white/10 p-3.5 text-left transition hover:-translate-y-0.5 hover:border-emerald-300/40 hover:bg-white/15 active:scale-[0.98]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-400 text-slate-950"><Icon className="h-4.5 w-4.5" /></div>
+                <p className="mt-2 text-xs font-bold text-white">{title}</p>
+                <p className="mt-1 text-[10px] text-slate-300">Secure quick menu</p>
+              </button>
+            ) : (
               <Link key={to} to={to} className="group min-h-[102px] rounded-2xl border border-white/10 bg-white/10 p-3.5 transition hover:-translate-y-0.5 hover:bg-white/15 active:scale-[0.98]">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-400 text-slate-950">
-                  <Icon className="h-4.5 w-4.5" />
-                </div>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-400 text-slate-950"><Icon className="h-4.5 w-4.5" /></div>
                 <p className="mt-2 text-xs font-bold text-white">{title}</p>
               </Link>
             ))}
           </div>
+
+          {showSendPopup && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowSendPopup(false); }}>
+              <section role="dialog" aria-modal="true" aria-labelledby="send-money-popup-title" className="w-full max-w-sm overflow-hidden rounded-[28px] border border-white/15 bg-slate-950 p-5 text-white shadow-2xl shadow-black/40">
+                <div className="flex items-start justify-between gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300"><LockKeyhole className="h-5 w-5" /></div><button type="button" onClick={() => setShowSendPopup(false)} aria-label="Close send money menu" className="rounded-xl p-2 text-slate-400 transition hover:bg-white/10 hover:text-white"><X className="h-5 w-5" /></button></div>
+                <p className="mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">Private · Secure</p>
+                <h2 id="send-money-popup-title" className="mt-1 text-xl font-black">Send money</h2>
+                <p className="mt-1 text-xs leading-5 text-slate-400">Choose a destination. Your transfer details and PIN are entered only in the secure transfer screen.</p>
+                <div className="mt-4 grid gap-2.5">
+                  <Link to="/os/pay/send" onClick={() => setShowSendPopup(false)} className="flex items-center gap-3 rounded-2xl border border-emerald-300/25 bg-emerald-300/10 p-3.5 transition hover:bg-emerald-300/15"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-300 text-slate-950"><ArrowUpRight className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-bold">UniquePay user</span><span className="mt-0.5 block text-[11px] text-slate-400">Phone number or UniquePay ID</span></span><ChevronRight className="h-4 w-4 text-emerald-300" /></Link>
+                  <Link to="/os/pay/send?destination=bank" onClick={() => setShowSendPopup(false)} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3.5 transition hover:bg-white/10"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-emerald-300"><Landmark className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-bold">Bank or other recipient</span><span className="mt-0.5 block text-[11px] text-slate-400">Check transfer availability first</span></span><ChevronRight className="h-4 w-4 text-slate-400" /></Link>
+                </div>
+                <p className="mt-3 text-center text-[10px] text-slate-500">No PIN or account details are shown in this quick menu.</p>
+              </section>
+            </div>
+          )}
 
           <Link
             to="/os/payment-requests/new"
