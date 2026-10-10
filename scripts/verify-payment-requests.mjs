@@ -36,4 +36,6 @@ assert.ok(server.includes('Math.abs(amount * 100 - Math.round(amount * 100)) > 1
 assert.ok(server.includes('const amountNaira = Math.round(amount * 100) / 100'), 'request amounts must be rounded to two decimal places before persistence');
 assert.ok(server.includes('adminDb.collection("payment_request_idempotency").where("requestId", "==", requestId)'), 'sending a draft must find its idempotency record');
 assert.ok(server.includes('transaction.update(idempotencyDoc.ref, { recipientId: recipientDoc.id, status: "sent", updatedAt: now })'), 'sending a draft must synchronize its retry record to sent');
+assert.ok(server.includes('if (latest.status === "sent" && latest.recipientId === recipientDoc.id) return { replayed: true };'), 'repeated sends to the same recipient must replay safely');
+assert.ok(server.includes('...(sendResult.replayed ? { idempotentReplay: true } : {})'), 'repeated draft send response must identify idempotent replay');
 console.log('Payment request lifecycle contract checks passed (static checks; live Firestore integration still required).');
