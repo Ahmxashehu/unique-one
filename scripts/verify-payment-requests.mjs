@@ -25,5 +25,6 @@ const start = rules.indexOf('match /payment_requests/{reqId}');
 const end = rules.indexOf('\n    match /', start + 1);
 assert.ok(start >= 0 && end > start, 'payment request rules must exist');
 assert.ok(rules.slice(start, end).includes('allow update: if false;'), 'client status writes must be blocked completely');
-assert.ok(server.includes('const amountMinor = Math.round(amount * 100)'), 'request amounts must be normalized to integer minor units');
+assert.ok(server.includes('Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7'), 'request amounts must reject values with more than two decimal places');
+assert.ok(server.includes('const amountNaira = Math.round(amount * 100) / 100'), 'request amounts must be rounded to two decimal places before persistence');
 console.log('Payment request lifecycle contract checks passed (static checks; live Firestore integration still required).');
