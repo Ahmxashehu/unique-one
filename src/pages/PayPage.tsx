@@ -18,6 +18,10 @@ export default function PayPage() {
   const [walletLoading, setWalletLoading] = useState(true);
   const [walletError, setWalletError] = useState('');
   const [walletRetry, setWalletRetry] = useState(0);
+  const [fundAmount, setFundAmount] = useState('1000');
+  const [funding, setFunding] = useState(false);
+  const [fundingMessage, setFundingMessage] = useState('');
+  const [fundingError, setFundingError] = useState('');
 
   useEffect(() => {
     if (authLoading) return;
@@ -57,6 +61,71 @@ export default function PayPage() {
     void loadWallet();
     return () => { cancelled = true; };
   }, [authLoading, currentUser, walletRetry]);
+
+  useEffect(() => {
+    if (authLoading || !currentUser) return;
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get('reference') || params.get('trxref');
+    if (!reference || !/^UP-PS-[A-Za-z0-9_-]{20,80}$/.test(reference)) return;
+    let cancelled = false;
+    const verifyReturn = async () => {
+      setFunding(true);
+      setFundingMessage('Checking payment status with Paystack…');
+      setFundingError('');
+      try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch('/api/paystack/verify/' + encodeURIComponent(reference), {
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        const data = await response.json().catch(() => ({})) as { ok?: boolean; error?: { message?: string }; payment?: { amountMinor?: number } };
+        if (!response.ok || !data.ok) throw new Error(data.error?.message || 'Payment is not yet confirmed.');
+        if (!cancelled) {
+          setFundingMessage('Payment verified. Your wallet has been updated by the server.');
+          setWalletRetry(value => value + 1);
+        }
+      } catch (error) {
+        if (!cancelled) setFundingError(error instanceof Error ? error.message : 'Could not verify payment. Please retry shortly.');
+      } finally {
+        if (!cancelled) {
+          setFunding(false);
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete('reference');
+          cleanUrl.searchParams.delete('trxref');
+          window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+        }
+      }
+    };
+    void verifyReturn();
+    return () => { cancelled = true; };
+  }, [authLoading, currentUser]);
+
+  const startWalletFunding = async () => {
+    if (!currentUser || funding) return;
+    const amount = Number(fundAmount);
+    if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1_000_000) {
+      setFundingError('Enter an amount from ₦1 to ₦1,000,000.');
+      return;
+    }
+    setFunding(true);
+    setFundingError('');
+    setFundingMessage('');
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/paystack/initialize', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amountMinor: amount * 100 }),
+      });
+      const data = await response.json().catch(() => ({})) as { authorizationUrl?: string; error?: { message?: string } };
+      if (!response.ok || !data.authorizationUrl || !/^https:\/\/checkout\.paystack\.com\//.test(data.authorizationUrl)) {
+        throw new Error(data.error?.message || 'Payment could not be started.');
+      }
+      window.location.assign(data.authorizationUrl);
+    } catch (error) {
+      setFundingError(error instanceof Error ? error.message : 'Payment could not be started.');
+      setFunding(false);
+    }
+  };
 
   if (authLoading) return null;
 
@@ -116,6 +185,29 @@ export default function PayPage() {
                 <button type="button" onClick={() => setWalletRetry((value) => value + 1)} className="shrink-0 rounded-lg bg-white/10 px-2.5 py-1.5 font-bold text-white hover:bg-white/15">Retry</button>
               </div>
             )}
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-emerald-300/20 bg-slate-900/80 p-4">
+            <div className="flex items-center gap-2">
+              <Landmark className="h-5 w-5 text-emerald-300" />
+              <div>
+                <p className="text-sm font-black text-white">Add money to UniquePay</p>
+                <p className="text-[11px] text-slate-300">Secure checkout powered by Paystack Test Mode</p>
+              </div>
+            </div>
+            <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); void startWalletFunding(); }}>
+              <label className="sr-only" htmlFor="unique-pay-fund-amount">Amount in naira</label>
+              <div className="flex flex-1 items-center rounded-xl border border-white/10 bg-white/5 px-3">
+                <span className="mr-2 text-sm text-slate-300">₦</span>
+                <input id="unique-pay-fund-amount" inputMode="numeric" type="number" min="1" max="1000000" step="1" value={fundAmount} onChange={(event) => setFundAmount(event.target.value)} className="w-full bg-transparent py-3 text-sm font-bold text-white outline-none" placeholder="Amount in naira" />
+              </div>
+              <button type="submit" disabled={funding || !currentUser} className="rounded-xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60">
+                {funding ? 'Please wait…' : 'Continue to payment'}
+              </button>
+            </form>
+            {fundingMessage && <p role="status" className="mt-2 text-xs text-emerald-200">{fundingMessage}</p>}
+            {fundingError && <p role="alert" className="mt-2 text-xs text-rose-200">{fundingError}</p>}
+            <p className="mt-2 text-[10px] leading-4 text-slate-400">Use test payment details only. Your balance changes only after server-side verification.</p>
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
