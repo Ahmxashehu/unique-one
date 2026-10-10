@@ -7,6 +7,8 @@ const rules = readFileSync('firestore.rules', 'utf8');
 const server = readFileSync('server.ts', 'utf8');
 
 assert.ok(routes.includes("app.get('/api/payment-requests'"), 'requests must be listed through the server API');
+assert.ok((routes.match(/where\('senderId', '==', uid\)\.orderBy\('createdAt', 'desc'\)\.limit\(100\)\.get\(\)/g) ?? []).length === 1, 'sender history must sort newest-first before limiting');
+assert.ok((routes.match(/where\('recipientId', '==', uid\)\.orderBy\('createdAt', 'desc'\)\.limit\(100\)\.get\(\)/g) ?? []).length === 1, 'recipient history must sort newest-first before limiting');
 assert.ok(routes.includes("app.patch('/api/payment-requests/:requestId/status'"), 'status changes must use the server API');
 assert.ok(routes.includes('await db.runTransaction('), 'status changes must be transaction-protected');
 assert.ok(routes.includes("nextStatus === 'approved' && recipient && ['sent', 'viewed'].includes(current)"), 'only recipients may approve sent/viewed requests');
