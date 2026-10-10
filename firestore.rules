@@ -329,18 +329,9 @@ service cloud.firestore {
       // Payment requests are created only through the authenticated server API, which resolves the recipient and writes the audit record.
       allow create: if false;
       // Keep sender and recipient state transitions separated so one party cannot impersonate the other's approval/rejection.
-      allow update: if isPlatformAdmin()
-        || (isAuthenticated()
-          && request.resource.data.senderId == resource.data.senderId
-          && request.resource.data.recipientId == resource.data.recipientId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-          && (
-            (resource.data.senderId == request.auth.uid
-              && request.resource.data.status == 'cancelled'
-              && resource.data.status in ['draft', 'sent'])
-            || (resource.data.recipientId == request.auth.uid
-              && request.resource.data.status in ['viewed', 'pending_approval', 'approved', 'rejected'])
-          ));
+      // All participant status changes go through the authenticated server API, which enforces valid transitions and writes audit records.
+      // Admin SDK server operations bypass client rules; clients cannot forge sent/approved/rejected/cancelled states.
+      allow update: if isPlatformAdmin();
       allow delete: if isPlatformAdmin();
     }
     match /invoices/{invId} {
