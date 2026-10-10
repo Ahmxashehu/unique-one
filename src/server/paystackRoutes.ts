@@ -1,4 +1,5 @@
 import type { Express, Request, RequestHandler } from "express";
+import rateLimit from "express-rate-limit";
 import type { Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "crypto";
@@ -40,9 +41,6 @@ function verifyWebhookSignature(req: Request): boolean {
 }
 
 export function registerPaystackRoutes(app: Express, authenticate: RequestHandler, db: Firestore) {
-  const rateLimit = (awaitlessRateLimit => awaitlessRateLimit);
-  // Rate limits are also enforced by the server-wide API limiter; per-route limits are set in server.ts.
-
   async function settleVerifiedDeposit(reference: string, expectedUid?: string) {
     const depositRef = db.collection("paystackDeposits").doc(reference);
     const depositSnap = await depositRef.get();
@@ -118,7 +116,7 @@ export function registerPaystackRoutes(app: Express, authenticate: RequestHandle
     });
   }
 
-  app.post("/api/paystack/initialize", authenticate, async (req, res) => {
+  app.post("/api/paystack/initialize", rateLimit({ windowMs: 60_000, limit: 5, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = uidFrom(req);
     if (!uid) return res.status(401).json({ error: { code: "UNAUTHENTICATED", message: "Sign in to start a payment." } });
     const body = req.body;
@@ -166,7 +164,7 @@ export function registerPaystackRoutes(app: Express, authenticate: RequestHandle
     }
   });
 
-  app.get("/api/paystack/verify/:reference", authenticate, async (req, res) => {
+  app.get("/api/paystack/verify/:reference", rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), authenticate, async (req, res) => {
     const uid = uidFrom(req);
     const reference = req.params.reference;
     if (!uid) return res.status(401).json({ error: { code: "UNAUTHENTICATED", message: "Sign in to verify this payment." } });
