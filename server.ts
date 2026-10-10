@@ -22,6 +22,7 @@ import { registerUniqueShareRoutes } from "./src/server/uniqueShareRoutes";
 import { getTransactionAuthPolicy } from "./src/server/transactionAuthPolicy";
 import { registerAdminRbacRoutes } from "./src/server/adminRbacRoutes";
 import { registerAdminAuditRoutes } from "./src/server/adminAuditRoutes";
+import { registerPlacesRoutes } from "./src/server/placesRoutes";
 import { hasRolePermission } from "./src/lib/auth/rbac";
 import { executeFinancialRefund } from "./src/server/financialRefundService";
 import { recordStoreInventoryMovement } from "./src/server/storeInventoryLedger";
@@ -919,6 +920,7 @@ const app = express();
   registerUniqueShareRoutes(app, authenticate);
   registerAdminRbacRoutes(app, authenticate, requirePermission);
   registerAdminAuditRoutes(app, authenticate, requirePermission);
+  registerPlacesRoutes(app);
 
   app.post("/api/ai/discovery", rateLimit({
     windowMs: 60_000,
