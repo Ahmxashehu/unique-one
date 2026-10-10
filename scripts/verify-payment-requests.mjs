@@ -34,4 +34,6 @@ assert.ok(start >= 0 && end > start, 'payment request rules must exist');
 assert.ok(rules.slice(start, end).includes('allow update: if false;'), 'client status writes must be blocked completely');
 assert.ok(server.includes('Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7'), 'request amounts must reject values with more than two decimal places');
 assert.ok(server.includes('const amountNaira = Math.round(amount * 100) / 100'), 'request amounts must be rounded to two decimal places before persistence');
+assert.ok(server.includes('adminDb.collection("payment_request_idempotency").where("requestId", "==", requestId)'), 'sending a draft must find its idempotency record');
+assert.ok(server.includes('transaction.update(idempotencyDoc.ref, { recipientId: recipientDoc.id, status: "sent", updatedAt: now })'), 'sending a draft must synchronize its retry record to sent');
 console.log('Payment request lifecycle contract checks passed (static checks; live Firestore integration still required).');
