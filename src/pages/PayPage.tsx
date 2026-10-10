@@ -115,7 +115,7 @@ export default function PayPage() {
     };
     void loadRecentActivity();
     return () => { cancelled = true; };
-  }, [authLoading, currentUser]);
+  }, [authLoading, currentUser, walletRetry]);
 
   useEffect(() => {
     if (authLoading || !currentUser) return;
