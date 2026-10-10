@@ -129,6 +129,30 @@ for (const forbidden of ["demo rice order", "featured providers"]) {
   assert(matches.length === 0, `obsolete placeholder phrase removed: ${forbidden}`);
 }
 
+const walletTransferSource = read("server.ts");
+const velocityStart = walletTransferSource.indexOf("const velocityWindowStartMs = velocityWindowEndMs - 10 * 60 * 1000;");
+assert(velocityStart >= 0, "wallet transfer velocity window has explicit start and end bounds");
+const velocityBlock = walletTransferSource.slice(velocityStart, velocityStart + 1800);
+for (const required of [
+  "Timestamp.fromMillis(velocityWindowStartMs)",
+  "Timestamp.fromMillis(velocityWindowEndMs)",
+  ".where('createdAt', '>=', velocityWindowStart)",
+  ".where('createdAt', '<=', velocityWindowEnd)",
+  "recentTimestampTransactionsSnapshot.size + recentIsoTransactionsSnapshot.size",
+]) {
+  assert(velocityBlock.includes(required), `wallet transfer velocity check includes: ${required}`);
+}
+assert((velocityBlock.match(/\.where\('senderId', '==', senderUid\)/g) ?? []).length >= 2, "wallet velocity checks both supported createdAt representations");
+assert(!velocityBlock.includes(".limit(20)"), "wallet transfer velocity check does not count an unordered capped sample");
+const firestoreIndexes = JSON.parse(read("firestore.indexes.json"));
+assert(firestoreIndexes.indexes.some((index) =>
+  index.collectionGroup === "transactions" &&
+  index.fields.some((field) => field.fieldPath === "senderId" && field.order === "ASCENDING") &&
+  index.fields.some((field) => field.fieldPath === "createdAt" && field.order === "DESCENDING")
+), "Firestore has a composite index for wallet transfer velocity query");
+assert(JSON.parse(read("firebase.json")).firestore?.indexes === "firestore.indexes.json", "Firebase config registers the composite index file");
+
+
 assert(fs.existsSync(path.join(root, "dist/sw.js")), "production PWA service worker exists");
 assert(fs.existsSync(path.join(root, "dist/server.cjs")), "production server bundle exists");
 console.log("\nUniquePlatform smoke verification: ALL CHECKS PASSED");
