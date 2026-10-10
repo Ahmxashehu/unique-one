@@ -331,7 +331,7 @@ service cloud.firestore {
       // Keep sender and recipient state transitions separated so one party cannot impersonate the other's approval/rejection.
       // All participant status changes go through the authenticated server API, which enforces valid transitions and writes audit records.
       // Admin SDK server operations bypass client rules; clients cannot forge sent/approved/rejected/cancelled states.
-      allow update: if isPlatformAdmin();
+      allow update: if false;
       allow delete: if isPlatformAdmin();
     }
     match /invoices/{invId} {
