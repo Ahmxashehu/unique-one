@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "node scripts/verify-platform.mjs && node scripts/verify-payment-requests.mjs && node scripts/financial-integrity-harness.mjs && node scripts/verify-cheapdatahub.mjs",
+    "test": "node scripts/verify-platform.mjs && node scripts/verify-payment-requests.mjs && node scripts/verify-wallet-transfer-retry.mjs && node scripts/financial-integrity-harness.mjs && node scripts/verify-cheapdatahub.mjs",
     "localization:audit": "node scripts/audit-localization.mjs",
     "localization:strict": "node scripts/audit-localization.mjs --strict",
     "store:expire-reservations": "node scripts/expire-store-reservations.mjs",
