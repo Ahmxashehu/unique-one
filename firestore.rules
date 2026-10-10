@@ -98,10 +98,24 @@ service cloud.firestore {
         || isPlatformAdmin();
       allow delete: if isPlatformAdmin();
     }
+    function isJobPublisher() {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles is list
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['business_owner', 'administrator', 'platform_admin', 'super_admin']);
+    }
     match /jobs/{jobId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.employerUid == request.auth.uid) || isPlatformAdmin();
-      allow create: if isAuthenticated() && request.resource.data.employerUid == request.auth.uid && request.resource.data.status in ['draft','published'];
-      allow update: if isAuthenticated() && resource.data.employerUid == request.auth.uid && request.resource.data.employerUid == resource.data.employerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','companyName','category','location','employmentType','description','status','updatedAt']) && request.resource.data.status in ['draft','published','closed'];
+      allow create: if isAuthenticated()
+        && request.resource.data.employerUid == request.auth.uid
+        && request.resource.data.status in ['draft','published']
+        && (request.resource.data.status == 'draft' || isJobPublisher());
+      allow update: if isAuthenticated()
+        && resource.data.employerUid == request.auth.uid
+        && request.resource.data.employerUid == resource.data.employerUid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','companyName','category','location','employmentType','description','status','updatedAt'])
+        && request.resource.data.status in ['draft','published','closed']
+        && (request.resource.data.status != 'published' || isJobPublisher());
       allow delete: if isPlatformAdmin();
     }
     match /jobApplications/{applicationId} {
