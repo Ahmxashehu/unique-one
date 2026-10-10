@@ -179,20 +179,22 @@ export default function NearMePage() {
           {places.length ? (
             <div className="space-y-3">
               {places.map((place) => (
-                <button key={place.id} type="button" onClick={() => setSelectedId(place.id)} className={`block w-full rounded-2xl border p-4 text-left transition ${selectedId === place.id ? "border-emerald-600 bg-emerald-50/60 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-slate-900">{place.name}</h3>
-                      {place.address && <p className="mt-1 text-sm text-slate-600">{place.address}</p>}
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                        {typeof place.rating === "number" && <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" /> {place.rating.toFixed(1)}{typeof place.ratingCount === "number" ? ` (${place.ratingCount.toLocaleString()})` : ""}</span>}
-                        {place.businessStatus && <span>{place.businessStatus.replaceAll("_", " ").toLowerCase()}</span>}
+                <div key={place.id} className={`rounded-2xl border p-4 transition ${selectedId === place.id ? "border-emerald-600 bg-emerald-50/60 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+                  <button type="button" onClick={() => setSelectedId(place.id)} aria-pressed={selectedId === place.id} className="block w-full text-left">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-slate-900">{place.name}</h3>
+                        {place.address && <p className="mt-1 text-sm text-slate-600">{place.address}</p>}
+                        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                          {typeof place.rating === "number" && <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" /> {place.rating.toFixed(1)}{typeof place.ratingCount === "number" ? ` (${place.ratingCount.toLocaleString()})` : ""}</span>}
+                          {place.businessStatus && <span>{place.businessStatus.replaceAll("_", " ").toLowerCase()}</span>}
+                        </div>
                       </div>
+                      <MapPin className={`mt-1 h-5 w-5 shrink-0 ${selectedId === place.id ? "text-emerald-700" : "text-slate-400"}`} />
                     </div>
-                    <MapPin className={`mt-1 h-5 w-5 shrink-0 ${selectedId === place.id ? "text-emerald-700" : "text-slate-400"}`} />
-                  </div>
-                  {place.mapsUrl && <span onClick={(event) => event.stopPropagation()} className="mt-3 inline-flex"><a href={place.mapsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline">Open in Google Maps <ExternalLink className="h-3.5 w-3.5" /></a></span>}
-                </button>
+                  </button>
+                  {place.mapsUrl && <a href={place.mapsUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline">Open in Google Maps <ExternalLink className="h-3.5 w-3.5" /></a>}
+                </div>
               ))}
             </div>
           ) : (
