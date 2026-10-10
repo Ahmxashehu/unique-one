@@ -122,7 +122,7 @@ export function registerPaystackRoutes(app: Express, authenticate: RequestHandle
     const body = req.body;
     if (!body || typeof body !== "object" || Array.isArray(body) ||
         Object.keys(body).some(key => key !== "amountMinor" && key !== "email") ||
-        (body.email !== undefined && (typeof body.email !== "string" || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(body.email.trim()) || body.email.trim().length > 254)) ||
+        (body.email !== undefined && (typeof body.email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email.trim()) || body.email.trim().length > 254)) ||
         !Number.isSafeInteger(body.amountMinor) || body.amountMinor < 100 ||
         body.amountMinor > MAX_DEPOSIT_MINOR) {
       return res.status(400).json({ error: { code: "INVALID_AMOUNT", message: "Enter an amount between ₦1 and ₦1,000,000." } });
