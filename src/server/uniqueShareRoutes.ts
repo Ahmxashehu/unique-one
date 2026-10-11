@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "crypto";
 import type { Express, Request, Response } from "express";
 import rateLimit from "express-rate-limit";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 type AuthenticatedRequest = Request & { user?: { uid?: string } };
 
@@ -177,6 +178,28 @@ export function registerUniqueShareRoutes(app: Express, authenticate: any) {
     const file = snap.data() as Record<string, any>;
     if (file.senderUid !== uid) return error(res, 403, "FORBIDDEN", "Only the authenticated sender can complete this transfer.");
     if (file.status !== "pending") return error(res, 409, "FILE_UNAVAILABLE", "This UniqueShare file is no longer pending.");
+    const sessionSnap = await db.collection("uniqueShareSessions").doc(sessionId).get();
+    if (!sessionSnap.exists) return error(res, 404, "SESSION_NOT_FOUND", "The UniqueShare connection was not found.");
+    const session = sessionSnap.data() as Record<string, any>;
+    if (session.status !== "accepted" || (session.senderUid !== uid && session.receiverUid !== uid)) {
+      return error(res, 409, "SESSION_UNAVAILABLE", "The UniqueShare connection is no longer accepted.");
+    }
+    try {
+      const [metadata] = await getStorage().bucket().file(String(file.storagePath)).getMetadata();
+      const custom = metadata.metadata || {};
+      const actualSize = Number(metadata.size);
+      if (
+        custom.source !== "UniqueShare" ||
+        custom.sessionId !== sessionId ||
+        custom.senderUid !== uid ||
+        actualSize !== Number(file.sizeBytes) ||
+        metadata.contentType !== file.contentType
+      ) {
+        return error(res, 409, "UPLOAD_NOT_VERIFIED", "The uploaded file does not match the expected UniqueShare transfer.");
+      }
+    } catch {
+      return error(res, 409, "UPLOAD_NOT_VERIFIED", "The uploaded file could not be verified in secure storage.");
+    }
     await fileRef.update({ status: "available", uploadedAt: Timestamp.now() });
     return res.json({ fileId, status: "available" });
   });
