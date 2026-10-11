@@ -4,13 +4,16 @@ import { Link } from 'react-router-dom';
 import { collection, deleteDoc, doc, getDocs, where, query, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Product, WishlistItem } from '../../lib/os/types';
+import { Product, WishlistItem, type ProductLanguage, type ProductTranslation } from '../../lib/os/types';
+import { getLanguage, type SupportedLanguage } from '../../lib/i18n';
 
 type WishlistRow = WishlistItem & { product: Product };
 
 export default function StoreWishlistPage() {
   const { currentUser } = useAuth();
   const [items, setItems] = useState<WishlistRow[]>([]);
+  const [language, setLanguage] = useState<SupportedLanguage>(() => getLanguage());
+  const [listTranslations, setListTranslations] = useState<Record<string, ProductTranslation>>({});
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -53,6 +56,41 @@ export default function StoreWishlistPage() {
     loadWishlist();
   }, [currentUser]);
 
+  useEffect(() => {
+    const syncLanguage = (event: Event) => {
+      const detail = (event as CustomEvent<SupportedLanguage>).detail;
+      setLanguage(detail || getLanguage());
+    };
+    window.addEventListener('unique-language-change', syncLanguage);
+    return () => window.removeEventListener('unique-language-change', syncLanguage);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setListTranslations({});
+    if (language === 'en' || items.length === 0) return () => { active = false; };
+    const targetLanguage = language as ProductLanguage;
+    const uncached = items.filter(item => !item.product.translations?.[targetLanguage]?.name || !item.product.translations?.[targetLanguage]?.description).slice(0, 4);
+    const loadTranslations = async () => {
+      const resolved: Record<string, ProductTranslation> = {};
+      await Promise.all(uncached.map(async item => {
+        try {
+          const response = await fetch(`/api/store/products/${encodeURIComponent(item.productId)}/translation?language=${encodeURIComponent(language)}`);
+          if (!response.ok) return;
+          const translation = await response.json() as { language?: string; name?: string; description?: string; variants?: ProductTranslation['variants']; sourceHash?: string; translatedAt?: unknown };
+          if (translation.language === language && typeof translation.name === 'string' && typeof translation.description === 'string') {
+            resolved[item.productId] = { name: translation.name, description: translation.description, variants: translation.variants, sourceHash: translation.sourceHash || '', translatedAt: translation.translatedAt };
+          }
+        } catch { /* Keep original seller text when translation is unavailable. */ }
+      }));
+      if (active) setListTranslations(resolved);
+    };
+    void loadTranslations();
+    return () => { active = false; };
+  }, [items, language]);
+
+  const displayName = (item: WishlistRow) => language === 'en' ? item.product.name : listTranslations[item.productId]?.name || item.product.translations?.[language as ProductLanguage]?.name || item.product.name;
+
   const removeItem = async (item: WishlistRow) => {
     try {
       await deleteDoc(doc(db, 'wishlists', item.id));
@@ -66,7 +104,7 @@ export default function StoreWishlistPage() {
     const term = search.trim().toLowerCase();
     if (!term) return items;
     return items.filter(item =>
-      item.product.name.toLowerCase().includes(term) ||
+      displayName(item).toLowerCase().includes(term) ||
       item.product.description.toLowerCase().includes(term)
     );
   }, [items, search]);
@@ -125,7 +163,7 @@ export default function StoreWishlistPage() {
             <div key={item.id} className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
               <Link to={`/store/product/${item.product.id}`} className="block aspect-square bg-slate-100 overflow-hidden">
                 {item.product.images?.[0] ? (
-                  <img src={item.product.images[0]} alt={item.product.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                  <img src={item.product.images[0]} alt={displayName(item)} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center"><ShoppingBag className="w-10 h-10 text-slate-300" /></div>
                 )}
