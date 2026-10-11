@@ -266,8 +266,4 @@ console.warn(
   "BLOCKER (not a CI failure): Flights, Hotels & Events, and Health & Wellness remain unavailable until verified provider integrations and end-to-end tests are completed.",
 );
 
-console.log(`REVIEW: ${feature} has no known unavailable-provider phrase; verify live integration manually.`);
-  }
-}
-
 console.log("\nPay-excluded source-contract checks completed. These checks do not prove runtime behavior, provider connectivity, or end-to-end success.");
