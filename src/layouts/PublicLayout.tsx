@@ -124,12 +124,12 @@ export default function PublicLayout() {
 
       <Link
         to="/admin/login"
-        aria-label="Authorized access"
-        title="Authorized access"
-        className="fixed bottom-[5.25rem] left-3 z-[90] hidden md:flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/70 bg-white/55 text-slate-300 shadow-sm backdrop-blur-sm transition-all duration-200 hover:h-8 hover:w-8 hover:border-emerald-300 hover:bg-white hover:text-emerald-600 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+        aria-label="Admin access"
+        title="Admin access"
+        className="group fixed bottom-9 left-2 z-[90] hidden md:flex h-6 w-6 items-center justify-center rounded-full border border-slate-800/20 bg-slate-950 text-white shadow-md transition hover:scale-110 hover:bg-black focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-700/50"
       >
-        <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.25} />
-        <span className="sr-only">Authorized access</span>
+        <ArrowRight className="h-3 w-3" strokeWidth={2.5} />
+        <span className="sr-only">Admin access</span>
       </Link>
 
       <MobileBottomNav variant="public" onMenu={() => setIsMobileMenuOpen(true)} />
