@@ -76,5 +76,5 @@ assert(storeCartPage.includes("unique-language-change"), "Store cart responds to
 assert(storeCartPage.includes("/translation?language="), "Store cart requests translations for uncached product names");
 assert(storeCartPage.includes("slice(0, 4)"), "Store cart caps automatic translation requests");
 assert(storeCartPage.includes("displayName(item)"), "Store cart displays translated names with original-text fallback");
-assert(storeCartPage.includes("Number(product.price).toLocaleString()"), "Store cart keeps checkout prices based on canonical product values");
+assert(storeCartPage.includes("item.product.price.toLocaleString()"), "Store cart keeps checkout prices based on canonical product values");
 
