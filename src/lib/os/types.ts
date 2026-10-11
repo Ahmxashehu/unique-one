@@ -121,6 +121,7 @@ export type ProductLanguage = 'ha' | 'fr' | 'ig' | 'yo' | 'pcm';
 export interface ProductTranslation {
   name: string;
   description: string;
+  variants?: { name: string; options: string[] }[];
   sourceHash: string;
   translatedAt?: unknown;
 }
