@@ -171,7 +171,7 @@ export default function DiscoverPage() {
       const snap = await getDoc(doc(db, 'edgePreferences', currentUser.uid));
       if (!snap.exists()) return;
       const data = snap.data();
-      setAudience(data.defaultAudience === 'followers' ? 'followers' : 'public');
+      setAudience('public');
       setAllowComments(data.allowComments !== false);
       setAllowReshare(data.allowReshare !== false);
     };
@@ -477,7 +477,7 @@ export default function DiscoverPage() {
           <div className="w-full max-w-lg rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6">
             <div className="flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-600">Creator controls</p><h2 className="text-xl font-black">Active Edge preferences</h2></div><button type="button" onClick={() => setPreferencesOpen(false)} className="rounded-full p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
             <div className="mt-5 space-y-3">
-              <div className="rounded-2xl border border-slate-200 p-4"><p className="text-sm font-bold">Default audience</p><p className="mt-1 text-xs text-slate-500">Choose the default visibility for new updates. Followers-only is disabled until follower relationships can be verified.</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => setAudience('public')} className={'rounded-full px-4 py-2 text-xs font-bold ' + (audience === 'public' ? 'bg-emerald-600 text-white' : 'bg-slate-100')}>Public</button><button type="button" onClick={() => setAudience('followers')} className={'rounded-full px-4 py-2 text-xs font-bold ' + (audience === 'followers' ? 'bg-emerald-600 text-white' : 'bg-slate-100')}>Followers</button></div></div>
+              <div className="rounded-2xl border border-slate-200 p-4"><p className="text-sm font-bold">Default audience</p><p className="mt-1 text-xs text-slate-500">Choose the default visibility for new updates. Followers-only is disabled until follower relationships can be verified.</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => setAudience('public')} className={'rounded-full px-4 py-2 text-xs font-bold ' + (audience === 'public' ? 'bg-emerald-600 text-white' : 'bg-slate-100')}>Public</button><button type="button" disabled className="rounded-full bg-slate-100 px-4 py-2 text-xs font-bold text-slate-400">Followers (unavailable)</button></div></div>
               <label className="flex items-center justify-between rounded-2xl border border-slate-200 p-4"><span><span className="block text-sm font-bold">Allow comments</span><span className="text-xs text-slate-500">Let people respond to your updates.</span></span><input type="checkbox" checked={allowComments} onChange={event => setAllowComments(event.target.checked)} /></label>
               <label className="flex items-center justify-between rounded-2xl border border-slate-200 p-4"><span><span className="block text-sm font-bold">Allow resharing</span><span className="text-xs text-slate-500">Let personal posts be reshared.</span></span><input type="checkbox" checked={allowReshare} onChange={event => setAllowReshare(event.target.checked)} /></label>
             </div>
