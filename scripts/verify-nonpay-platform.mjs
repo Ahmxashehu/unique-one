@@ -68,8 +68,15 @@ for (const safeguard of [
   "session.senderUid !== uid && session.receiverUid !== uid",
   "session.receiverUid !== uid",
   "actionLimiter",
+  'import { getStorage } from "firebase-admin/storage"',
+  "getStorage().bucket().file(String(file.storagePath)).getMetadata()",
+  'custom.source !== "UniqueShare"',
+  "custom.sessionId !== sessionId",
+  "custom.senderUid !== uid",
+  "actualSize !== Number(file.sizeBytes)",
+  'UPLOAD_NOT_VERIFIED',
 ]) {
-  assert(share.includes(safeguard), `UniqueShare authorization/rate-limit safeguard exists: ${safeguard}`);
+  assert(share.includes(safeguard), `UniqueShare authorization/transfer-verification safeguard exists: ${safeguard}`);
 }
 
 const storeLifecycle = read("src/server/storeOrderLifecycleRoutes.ts");
