@@ -57,3 +57,24 @@ assert(wishlistPage.includes("/translation?language="), "Wishlist requests cache
 assert(wishlistPage.includes("slice(0, 4)"), "Wishlist caps uncached translation requests");
 assert(wishlistPage.includes("Number(product.price).toLocaleString()"), "Wishlist preserves canonical prices");
 assert(wishlistPage.includes("deleteDoc(doc(db, 'wishlists'"), "Wishlist supports removing saved products");
+
+const storeDiscoverPage = read("src/pages/store/StoreDiscoverPage.tsx");
+assert(storeDiscoverPage.includes("unique-language-change"), "Store discovery responds to selected-language changes");
+assert(storeDiscoverPage.includes("/translation?language="), "Store discovery requests translations for uncached product cards");
+assert(storeDiscoverPage.includes("slice(0, 4)"), "Store discovery caps automatic translation requests");
+assert(storeDiscoverPage.includes("displayName(product)"), "Store discovery uses translated product names with original-text fallback");
+assert(storeDiscoverPage.includes("Number(product.price).toLocaleString()"), "Store discovery preserves canonical prices");
+
+const storeWishlistPage = read("src/pages/store/StoreWishlistPage.tsx");
+assert(storeWishlistPage.includes("unique-language-change"), "Store-specific wishlist responds to selected-language changes");
+assert(storeWishlistPage.includes("/translation?language="), "Store-specific wishlist requests translated product names");
+assert(storeWishlistPage.includes("slice(0, 4)"), "Store-specific wishlist caps automatic translation requests");
+assert(storeWishlistPage.includes("displayName(item)"), "Store-specific wishlist displays translated names with original-text fallback");
+
+const storeCartPage = read("src/pages/store/StoreCartPage.tsx");
+assert(storeCartPage.includes("unique-language-change"), "Store cart responds to selected-language changes");
+assert(storeCartPage.includes("/translation?language="), "Store cart requests translations for uncached product names");
+assert(storeCartPage.includes("slice(0, 4)"), "Store cart caps automatic translation requests");
+assert(storeCartPage.includes("displayName(item)"), "Store cart displays translated names with original-text fallback");
+assert(storeCartPage.includes("Number(product.price).toLocaleString()"), "Store cart keeps checkout prices based on canonical product values");
+
