@@ -116,12 +116,23 @@ export type ProductCategory =
 export type ProductCondition = 'new' | 'used' | 'refurbished';
 export type ProductStatus = 'draft' | 'published' | 'out_of_stock';
 
+export type ProductLanguage = 'ha' | 'fr' | 'ig' | 'yo' | 'pcm';
+
+export interface ProductTranslation {
+  name: string;
+  description: string;
+  sourceHash: string;
+  translatedAt?: unknown;
+}
+
 export interface Product {
   id: string;
   sellerId: string;
   businessId?: string;
   name: string;
   description: string;
+  /** Cached translations are derived from the original listing; never replace original seller text. */
+  translations?: Partial<Record<ProductLanguage, ProductTranslation>>;
   category: ProductCategory;
   images: string[];
   hasVideo: boolean;
