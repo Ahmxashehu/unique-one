@@ -106,6 +106,26 @@ for (const safeguard of [
   assert(inventoryLedger.includes(safeguard), `Store inventory ledger invariant exists: ${safeguard}`);
 }
 
+const permissionRules = read("firestore.rules");
+const userRules = permissionRules.slice(
+  permissionRules.indexOf("match /users/{userId}"),
+  permissionRules.indexOf("match /profiles/{userId}"),
+);
+assert(
+  userRules.includes("request.resource.data.keys().hasOnly([") &&
+    !userRules.includes("!('administrator' in request.resource.data.roles)"),
+  "client-created user profiles cannot self-assign privileged roles, permissions, or status",
+);
+const jobRules = permissionRules.slice(
+  permissionRules.indexOf("match /jobs/{jobId}"),
+  permissionRules.indexOf("match /jobApplications/{applicationId}"),
+);
+assert(
+  jobRules.includes("'business_owner' in get(") &&
+    jobRules.includes("isAdmin()"),
+  "job publishing requires a business-owner role or administrator authorization in Firestore rules",
+);
+
 const educationRules = read("firestore.rules");
 const educationTypes = read("src/lib/education/educationTypes.ts");
 const educationPage = read("src/pages/EducationPage.tsx");
