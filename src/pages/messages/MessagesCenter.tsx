@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, MessageSquare, Loader2, VolumeX, UsersRound, Sparkles, ChevronRight } from 'lucide-react';
+import { Search, Plus, MessageSquare, Loader2, VolumeX, UsersRound, Sparkles, ChevronRight, X, Check, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Conversation } from '../../lib/os/communication-types';
@@ -14,6 +14,15 @@ export default function MessagesCenter() {
   const [error, setError] = useState('');
   const [userResults, setUserResults] = useState<Array<{ uid: string; fullName: string; username?: string; uniqueOneId?: string; profilePhotoUrl?: string }>>([]);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [groupTitle, setGroupTitle] = useState('');
+  const [groupSearch, setGroupSearch] = useState('');
+  const [groupResults, setGroupResults] = useState<Array<{ uid: string; fullName: string; username?: string; uniqueOneId?: string; profilePhotoUrl?: string }>>([]);
+  const [selectedMembers, setSelectedMembers] = useState<Array<{ uid: string; fullName: string; username?: string; uniqueOneId?: string; profilePhotoUrl?: string }>>([]);
+  const [groupSearchLoading, setGroupSearchLoading] = useState(false);
+  const [groupCreating, setGroupCreating] = useState(false);
+  const [groupError, setGroupError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +70,54 @@ export default function MessagesCenter() {
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [currentUser, search]);
 
+  const searchGroupMembers = async () => {
+    if (!currentUser) return;
+    const term = groupSearch.trim();
+    if (term.length < 2) { setGroupError('Enter at least 2 characters to find a member.'); return; }
+    setGroupSearchLoading(true);
+    setGroupError('');
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/communication/users/search?q=' + encodeURIComponent(term), { headers: { Authorization: 'Bearer ' + token } });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error?.message ?? 'Member search failed.');
+      const found = Array.isArray(payload?.users) ? payload.users : [];
+      setGroupResults(found.filter((u: { uid: string }) => !selectedMembers.some((selected) => selected.uid === u.uid)));
+      if (!found.length) setGroupError('No matching users found.');
+    } catch (err) {
+      setGroupError(err instanceof Error ? err.message : 'Member search failed.');
+    } finally { setGroupSearchLoading(false); }
+  };
+
+  const createGroup = async () => {
+    if (!currentUser || groupCreating) return;
+    const title = groupTitle.trim();
+    if (title.length < 2) { setGroupError('Enter a group name with at least 2 characters.'); return; }
+    if (selectedMembers.length < 1) { setGroupError('Select at least one friend to create a group.'); return; }
+    setGroupCreating(true);
+    setGroupError('');
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/communication/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ type: 'group', title, memberUids: selectedMembers.map((member) => member.uid) }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error?.message ?? 'Could not create the group.');
+      const conversationId = payload?.conversation?.id;
+      if (!conversationId) throw new Error('Group was created but its conversation ID was missing.');
+      setShowCreateGroup(false);
+      setGroupTitle('');
+      setGroupSearch('');
+      setGroupResults([]);
+      setSelectedMembers([]);
+      navigate('/os/messages/' + conversationId);
+    } catch (err) {
+      setGroupError(err instanceof Error ? err.message : 'Could not create the group.');
+    } finally { setGroupCreating(false); }
+  };
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return conversations
@@ -87,7 +144,7 @@ export default function MessagesCenter() {
                   <h1 className="text-xl font-black">Connect</h1>
                 </div>
               </div>
-              <button onClick={() => navigate('/os/messages/add')} aria-label="Add user" title="Add user" className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 hover:bg-white/15">
+              <button onClick={() => setShowAddMenu((open) => !open)} aria-label="Add user or create group" title="Add user or create group" className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 hover:bg-white/15">
                 <Plus className="h-5 w-5" />
               </button>
             </div>
@@ -97,6 +154,17 @@ export default function MessagesCenter() {
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search people, Unique ID or conversations" className="w-full rounded-xl border border-white/10 bg-white/10 py-2.5 pl-9 pr-4 text-sm text-white outline-none placeholder:text-slate-400 focus:border-emerald-400/60" />
             </div>
           </div>
+
+          {showAddMenu && (
+            <div className="border-b border-slate-200 bg-slate-50 p-3">
+              <button onClick={() => { setShowAddMenu(false); navigate('/os/messages/add'); }} className="flex w-full items-center gap-3 rounded-xl bg-white p-3 text-left text-sm font-semibold text-slate-800 shadow-sm">
+                <UserPlus className="h-4 w-4 text-emerald-600" /> Find a friend and start a private chat
+              </button>
+              <button onClick={() => { setShowCreateGroup(true); setShowAddMenu(false); setGroupError(''); }} className="mt-2 flex w-full items-center gap-3 rounded-xl bg-white p-3 text-left text-sm font-semibold text-slate-800 shadow-sm">
+                <UsersRound className="h-4 w-4 text-emerald-600" /> Create a group chat
+              </button>
+            </div>
+          )}
 
           <div className="flex border-b border-slate-100 bg-white px-3 pt-2">
             {(['users', 'groups'] as const).map((tab) => (
@@ -163,6 +231,39 @@ export default function MessagesCenter() {
           <p className="mt-1 max-w-sm text-center text-sm text-slate-500">Select a conversation to continue, or use the + button to find a person.</p>
         </div>
       </div>
+      {showCreateGroup && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="create-group-title">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 p-4 sm:p-5">
+              <div><h2 id="create-group-title" className="text-lg font-black text-slate-900">Create group chat</h2><p className="mt-1 text-xs text-slate-500">Name the group and choose people to include.</p></div>
+              <button onClick={() => setShowCreateGroup(false)} aria-label="Close group creation" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="space-y-4 p-4 sm:p-5">
+              <label className="block text-sm font-semibold text-slate-700">Group name
+                <input value={groupTitle} onChange={(event) => setGroupTitle(event.target.value)} maxLength={80} placeholder="e.g. Family, Project Team" className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-emerald-500" />
+              </label>
+              <div><label className="block text-sm font-semibold text-slate-700" htmlFor="group-member-search">Add members</label>
+                <div className="mt-1.5 flex gap-2">
+                  <input id="group-member-search" value={groupSearch} onChange={(event) => setGroupSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void searchGroupMembers(); } }} placeholder="Name, username or Unique ID" className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-emerald-500" />
+                  <button onClick={() => void searchGroupMembers()} disabled={groupSearchLoading} className="rounded-xl bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-50">{groupSearchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</button>
+                </div>
+              </div>
+              {selectedMembers.length > 0 && <div className="flex flex-wrap gap-2">{selectedMembers.map((member) => <button key={member.uid} onClick={() => setSelectedMembers((items) => items.filter((item) => item.uid !== member.uid))} className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">{member.fullName}<X className="h-3 w-3" /></button>)}</div>}
+              {groupResults.length > 0 && <div className="max-h-48 space-y-2 overflow-y-auto">{groupResults.map((member) => <div key={member.uid} className="flex items-center gap-3 rounded-xl border border-slate-100 p-2.5">
+                {member.profilePhotoUrl ? <img src={member.profilePhotoUrl} alt="" className="h-9 w-9 rounded-full object-cover" /> : <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 font-bold text-emerald-700">{member.fullName.charAt(0).toUpperCase()}</div>}
+                <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-800">{member.fullName}</p><p className="truncate text-xs text-slate-500">{member.username ? '@' + member.username : member.uniqueOneId ?? 'UniquePlatform user'}</p></div>
+                <button onClick={() => { setSelectedMembers((items) => items.some((item) => item.uid === member.uid) ? items : [...items, member]); setGroupResults((items) => items.filter((item) => item.uid !== member.uid)); setGroupError(''); }} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> Add</button>
+              </div>)}</div>}
+              {groupError && <p role="alert" className="text-sm text-red-600">{groupError}</p>}
+              <p className="text-xs text-slate-500">Select 1–49 other members. Everyone must have a UniquePlatform account.</p>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setShowCreateGroup(false)} className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700">Cancel</button>
+                <button onClick={() => void createGroup()} disabled={groupCreating || selectedMembers.length < 1 || groupTitle.trim().length < 2} className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{groupCreating ? 'Creating…' : 'Create group'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
