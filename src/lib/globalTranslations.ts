@@ -169,3 +169,79 @@ const EXTRA: Record<SupportedLanguage, Record<string,string>> = {
 };
 Object.entries(EXTRA).forEach(([language, values]) => Object.assign(UI[language as SupportedLanguage], values));
 
+// Core workflow vocabulary for common account, payment, booking and business screens.
+// Keep these English source phrases stable so the global layer can translate them
+// consistently across routes, including text rendered after navigation.
+const WORKFLOW: Record<SupportedLanguage, Record<string,string>> = {
+  en: {},
+  ha: {
+    "Account":"Asusu","Sign in":"Shiga","Sign out":"Fita","Verify":"Tabbatar","Verification":"Tabbatarwa","Confirm":"Tabbatar","Continue with Google":"Ci gaba da Google",
+    "Enter amount":"Shigar da adadi","Amount":"Adadi","Balance":"Ma'auni","Available balance":"Ma'aunin da ake da shi","Add money":"Ƙara kuɗi","Withdraw":"Cire kuɗi",
+    "Transfer":"Canja wurin kuɗi","Bank transfer":"Canja wurin banki","Bank":"Banki","Account number":"Lambar asusu","Account name":"Sunan asusu","Reference":"Lambar shaida",
+    "Recipient":"Mai karɓa","Beneficiary":"Wanda zai karɓa","Transaction PIN":"PIN na ciniki","Enter PIN":"Shigar da PIN","Confirm PIN":"Tabbatar da PIN",
+    "Transaction history":"Tarihin ciniki","Pending":"Ana jira","Completed":"An kammala","Failed":"Ya gaza","Processing":"Ana sarrafawa","Paid":"An biya","Unpaid":"Ba a biya ba",
+    "Book now":"Yi ajiyar wuri yanzu","Book flight":"Yi ajiyar jirgi","Departure":"Tashi","Destination":"Inda za a je","Return date":"Ranar dawowa","Passengers":"Fasinjoji",
+    "Check-in":"Shiga otal","Check-out":"Fita otal","Guest":"Baƙo","Guests":"Baƙi","Availability":"Samuwar wuri","Price":"Farashi","Total":"Jimilla","Quantity":"Adadi",
+    "Business name":"Sunan kasuwanci","Business details":"Bayanan kasuwanci","Business dashboard":"Dashboard na kasuwanci","Create business":"Ƙirƙiri kasuwanci",
+    "Upload file":"Loda fayil","Choose file":"Zaɓi fayil","No file selected":"Ba a zaɓi fayil ba","Required field":"Ana buƙatar wannan filin","Invalid input":"Shigarwar ba daidai ba ce",
+    "Please enter a valid phone number":"Shigar da lambar waya mai inganci","Network error":"Kuskuren hanyar sadarwa","Permission denied":"An hana izini","Try again later":"Sake gwadawa daga baya",
+    "Privacy":"Sirri","Terms and conditions":"Sharuɗɗa da ƙa'idoji","Help center":"Cibiyar taimako","Contact us":"Tuntuɓe mu","Language saved":"An ajiye harshe"
+  },
+  fr: {
+    "Account":"Compte","Sign in":"Se connecter","Sign out":"Se déconnecter","Verify":"Vérifier","Verification":"Vérification","Confirm":"Confirmer","Continue with Google":"Continuer avec Google",
+    "Enter amount":"Saisir le montant","Amount":"Montant","Balance":"Solde","Available balance":"Solde disponible","Add money":"Ajouter de l’argent","Withdraw":"Retirer",
+    "Transfer":"Transférer","Bank transfer":"Virement bancaire","Bank":"Banque","Account number":"Numéro de compte","Account name":"Nom du compte","Reference":"Référence",
+    "Recipient":"Destinataire","Beneficiary":"Bénéficiaire","Transaction PIN":"Code PIN de transaction","Enter PIN":"Saisir le PIN","Confirm PIN":"Confirmer le PIN",
+    "Transaction history":"Historique des transactions","Pending":"En attente","Completed":"Terminé","Failed":"Échec","Processing":"En cours de traitement","Paid":"Payé","Unpaid":"Non payé",
+    "Book now":"Réserver maintenant","Book flight":"Réserver un vol","Departure":"Départ","Destination":"Destination","Return date":"Date de retour","Passengers":"Passagers",
+    "Check-in":"Arrivée","Check-out":"Départ","Guest":"Voyageur","Guests":"Voyageurs","Availability":"Disponibilité","Price":"Prix","Total":"Total","Quantity":"Quantité",
+    "Business name":"Nom de l’entreprise","Business details":"Détails de l’entreprise","Business dashboard":"Tableau de bord professionnel","Create business":"Créer une entreprise",
+    "Upload file":"Téléverser un fichier","Choose file":"Choisir un fichier","No file selected":"Aucun fichier sélectionné","Required field":"Champ obligatoire","Invalid input":"Saisie invalide",
+    "Please enter a valid phone number":"Veuillez saisir un numéro de téléphone valide","Network error":"Erreur réseau","Permission denied":"Autorisation refusée","Try again later":"Réessayez plus tard",
+    "Privacy":"Confidentialité","Terms and conditions":"Conditions générales","Help center":"Centre d’aide","Contact us":"Nous contacter","Language saved":"Langue enregistrée"
+  },
+  ig: {
+    "Account":"Akaụntụ","Sign in":"Banye","Sign out":"Pụọ","Verify":"Nyochaa","Verification":"Nyocha","Confirm":"Kwenye","Continue with Google":"Gaa n'ihu na Google",
+    "Enter amount":"Tinye ego ole","Amount":"Ego ole","Balance":"Ego fọdụrụ","Available balance":"Ego dị","Add money":"Tinye ego","Withdraw":"Wepụ ego",
+    "Transfer":"Nyefee ego","Bank transfer":"Nyefee ego n'ụlọ akụ","Bank":"Ụlọ akụ","Account number":"Nọmba akaụntụ","Account name":"Aha akaụntụ","Reference":"Nọmba ntụaka",
+    "Recipient":"Onye nnata","Beneficiary":"Onye ga-anata","Transaction PIN":"PIN azụmahịa","Enter PIN":"Tinye PIN","Confirm PIN":"Kwenye PIN",
+    "Transaction history":"Akụkọ azụmahịa","Pending":"Na-echere","Completed":"Emechara","Failed":"Ọ dara","Processing":"A na-ahazi","Paid":"Akwụla ụgwọ","Unpaid":"Akwụghị ụgwọ",
+    "Book now":"Debe ugbu a","Book flight":"Debe ụgbọ elu","Departure":"Ọpụpụ","Destination":"Ebe aga","Return date":"Ụbọchị nlọghachi","Passengers":"Ndị njem",
+    "Check-in":"Banye","Check-out":"Pụọ","Guest":"Ọbịa","Guests":"Ndị ọbịa","Availability":"Ịdị adị","Price":"Ọnụahịa","Total":"Ngụkọta","Quantity":"Ọnụọgụ",
+    "Business name":"Aha azụmahịa","Business details":"Nkọwa azụmahịa","Business dashboard":"Dashboard azụmahịa","Create business":"Mepụta azụmahịa",
+    "Upload file":"Bulite faịlụ","Choose file":"Họrọ faịlụ","No file selected":"Ahọpụtaghị faịlụ","Required field":"A chọrọ mpaghara a","Invalid input":"Ihe etinyere ezighi ezi",
+    "Please enter a valid phone number":"Tinye nọmba ekwentị ziri ezi","Network error":"Nsogbu netwọk","Permission denied":"Ajụrụ ikike","Try again later":"Nwaa ọzọ ma emechaa",
+    "Privacy":"Nzuzo","Terms and conditions":"Usoro na ọnọdụ","Help center":"Ebe enyemaka","Contact us":"Kpọtụrụ anyị","Language saved":"Echekwara asụsụ"
+  },
+  yo: {
+    "Account":"Àkọọ́lẹ̀","Sign in":"Wọlé","Sign out":"Jáde","Verify":"Jẹ́rìí","Verification":"Ìjẹ́rìí","Confirm":"Jẹ́rìí","Continue with Google":"Tẹ̀síwájú pẹ̀lú Google",
+    "Enter amount":"Tẹ iye owó sílẹ̀","Amount":"Iye owó","Balance":"Ìwọ̀ntúnwọ̀nsì","Available balance":"Owó tó wà","Add money":"Fi owó kún","Withdraw":"Yọ owó",
+    "Transfer":"Gbe owó lọ","Bank transfer":"Gbigbe owó banki","Bank":"Banki","Account number":"Nọ́mbà àkọọ́lẹ̀","Account name":"Orúkọ àkọọ́lẹ̀","Reference":"Nọ́mbà ìtọ́kasí",
+    "Recipient":"Olùgbà","Beneficiary":"Ẹni tó máa gba","Transaction PIN":"PIN ìṣòwò","Enter PIN":"Tẹ PIN sílẹ̀","Confirm PIN":"Jẹ́rìí PIN",
+    "Transaction history":"Ìtàn àwọn ìṣòwò","Pending":"Ń dúró","Completed":"Ti parí","Failed":"Kùnà","Processing":"Ń ṣiṣẹ́","Paid":"Ti sanwó","Unpaid":"A kò sanwó",
+    "Book now":"Ṣe ìfipamọ́ nísinsìnyí","Book flight":"Ṣe ìfipamọ́ ọkọ̀ òfurufú","Departure":"Ìlọkúrò","Destination":"Ibi tí a ń lọ","Return date":"Ọjọ́ ìpadà","Passengers":"Àwọn arìnrìn-àjò",
+    "Check-in":"Ìwọlé","Check-out":"Ìjáde","Guest":"Àlejò","Guests":"Àwọn àlejò","Availability":"Wíwà nílẹ̀","Price":"Iye","Total":"Àpapọ̀","Quantity":"Iye",
+    "Business name":"Orúkọ ilé iṣẹ́","Business details":"Àlàyé ilé iṣẹ́","Business dashboard":"Pẹpẹ iṣakoso ilé iṣẹ́","Create business":"Ṣẹ̀dá ilé iṣẹ́",
+    "Upload file":"Gbé fáìlì sókè","Choose file":"Yan fáìlì","No file selected":"A kò yan fáìlì","Required field":"A nílò ààyè yìí","Invalid input":"Ìwọlé kò tọ́",
+    "Please enter a valid phone number":"Tẹ nọ́mbà fóònù tó tọ́ sílẹ̀","Network error":"Àṣìṣe nẹ́tíwọ́ọ̀kì","Permission denied":"A kọ̀ àṣẹ","Try again later":"Gbìyànjú lẹ́ẹ̀kan síi lẹ́yìn náà",
+    "Privacy":"Àṣírí","Terms and conditions":"Àwọn òfin àti ìlànà","Help center":"Ibùdó ìrànlọ́wọ́","Contact us":"Kàn sí wa","Language saved":"A ti fi èdè pamọ́"
+  },
+  pcm: {
+    "Account":"Account","Sign in":"Sign in","Sign out":"Sign out","Verify":"Check am","Verification":"Verification","Confirm":"Confirm","Continue with Google":"Continue with Google",
+    "Enter amount":"Put amount","Amount":"Amount","Balance":"Money wey remain","Available balance":"Money wey dey","Add money":"Add money","Withdraw":"Comot money",
+    "Transfer":"Send money","Bank transfer":"Bank transfer","Bank":"Bank","Account number":"Account number","Account name":"Account name","Reference":"Reference",
+    "Recipient":"Person wey go collect","Beneficiary":"Person wey go collect","Transaction PIN":"Transaction PIN","Enter PIN":"Put PIN","Confirm PIN":"Confirm PIN",
+    "Transaction history":"Money history","Pending":"E never finish","Completed":"E don finish","Failed":"E no work","Processing":"E dey process","Paid":"Dem don pay","Unpaid":"Dem never pay",
+    "Book now":"Book am now","Book flight":"Book flight","Departure":"Where e dey leave","Destination":"Where you dey go","Return date":"Date wey you dey come back","Passengers":"People wey dey travel",
+    "Check-in":"Check in","Check-out":"Check out","Guest":"Visitor","Guests":"Visitors","Availability":"E dey available","Price":"Price","Total":"Everything join","Quantity":"How many",
+    "Business name":"Business name","Business details":"Business details","Business dashboard":"Business dashboard","Create business":"Create business",
+    "Upload file":"Upload file","Choose file":"Choose file","No file selected":"You never choose file","Required field":"You must fill this place","Invalid input":"Wetin you put no correct",
+    "Please enter a valid phone number":"Abeg put correct phone number","Network error":"Network problem","Permission denied":"Dem no allow am","Try again later":"Try am again later",
+    "Privacy":"Privacy","Terms and conditions":"Terms and conditions","Help center":"Help center","Contact us":"Contact us","Language saved":"Dem don save language"
+  }
+};
+Object.entries(WORKFLOW).forEach(([language, values]) => Object.assign(UI[language as SupportedLanguage], values));
+
+// Keep the Pidgin success state semantically correct; it must not announce an error.
+UI.pcm.Success = "E don work";
+
