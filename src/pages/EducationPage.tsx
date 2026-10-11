@@ -84,14 +84,14 @@ export default function EducationPage() {
     } catch (e) { console.error(e); setError('Could not create the education enrollment.'); }
   };
 
-  const publishInstitution = async (institution: EducationInstitution) => {
+  const requestInstitutionReview = async (institution: EducationInstitution) => {
     if (!currentUser || institution.ownerUid !== currentUser.uid) return;
-    try { await updateDoc(doc(db, 'educationInstitutions', institution.id), { status: 'published', updatedAt: new Date().toISOString() }); setInstitutions(items => items.map(i => i.id === institution.id ? { ...i, status: 'published' } : i)); } catch (e) { console.error(e); setError('Could not publish the institution.'); }
+    try { await updateDoc(doc(db, 'educationInstitutions', institution.id), { status: 'pending_review', updatedAt: new Date().toISOString() }); setInstitutions(items => items.map(i => i.id === institution.id ? { ...i, status: 'pending_review' } : i)); } catch (e) { console.error(e); setError('Could not submit the institution for review.'); }
   };
 
-  const publishCourse = async (course: EducationCourse) => {
+  const requestCourseReview = async (course: EducationCourse) => {
     if (!currentUser || course.ownerUid !== currentUser.uid) return;
-    try { await updateDoc(doc(db, 'educationCourses', course.id), { status: 'published', updatedAt: new Date().toISOString() }); setCourses(items => items.map(c => c.id === course.id ? { ...c, status: 'published' } : c)); } catch (e) { console.error(e); setError('Could not publish the course.'); }
+    try { await updateDoc(doc(db, 'educationCourses', course.id), { status: 'pending_review', updatedAt: new Date().toISOString() }); setCourses(items => items.map(c => c.id === course.id ? { ...c, status: 'pending_review' } : c)); } catch (e) { console.error(e); setError('Could not submit the course for review.'); }
   };
 
   const createCourse = async () => {
@@ -151,9 +151,9 @@ export default function EducationPage() {
 
       {loading ? <div className="bg-white rounded-2xl p-8 text-center text-slate-500">Loading education data…</div> : (
         <div className="grid lg:grid-cols-3 gap-5">
-          <section className="bg-white border rounded-2xl p-5"><School className="w-6 h-6 text-emerald-600" /><h2 className="font-semibold mt-3">Institutions</h2><p className="text-sm text-slate-500 mt-1">Published education providers available on Unique One.</p><div className="mt-4 space-y-3">{institutions.length ? institutions.map(i => <div key={i.id} className="border rounded-xl p-3"><p className="font-medium">{i.name}</p><p className="text-xs text-slate-500">{i.type.replace('_',' ')} · {i.location} · {i.status}</p>{i.ownerUid === currentUser?.uid && i.status === 'draft' && <button onClick={() => publishInstitution(i)} className="mt-2 text-xs font-medium text-emerald-700">Publish institution</button>}</div>) : <p className="text-sm text-slate-500">No published institutions yet.</p>}</div></section>
+          <section className="bg-white border rounded-2xl p-5"><School className="w-6 h-6 text-emerald-600" /><h2 className="font-semibold mt-3">Institutions</h2><p className="text-sm text-slate-500 mt-1">Published education providers available on Unique One.</p><div className="mt-4 space-y-3">{institutions.length ? institutions.map(i => <div key={i.id} className="border rounded-xl p-3"><p className="font-medium">{i.name}</p><p className="text-xs text-slate-500">{i.type.replace('_',' ')} · {i.location} · {i.status}</p>{i.ownerUid === currentUser?.uid && i.status === 'draft' && <button onClick={() => requestInstitutionReview(i)} className="mt-2 text-xs font-medium text-emerald-700">Submit for review</button>}</div>) : <p className="text-sm text-slate-500">No published institutions yet.</p>}</div></section>
           <section className="bg-white border rounded-2xl p-5"><Users className="w-6 h-6 text-indigo-600" /><h2 className="font-semibold mt-3">My enrollments</h2><p className="text-sm text-slate-500 mt-1">Your current education relationships.</p><div className="mt-4 space-y-3">{enrollments.length ? enrollments.map(e => <div key={e.id} className="border rounded-xl p-3"><p className="font-medium">{e.programme || 'Education enrollment'}</p><p className="text-xs text-slate-500">{e.level || 'Level not specified'} · {e.status}</p></div>) : <p className="text-sm text-slate-500">No enrollments linked to your account.</p>}</div></section>
-          <section className="bg-white border rounded-2xl p-5"><BookOpen className="w-6 h-6 text-amber-600" /><h2 className="font-semibold mt-3">My courses</h2><p className="text-sm text-slate-500 mt-1">Courses you manage as an educator.</p><div className="mt-4 space-y-3">{courses.length ? courses.map(c => <div key={c.id} className="border rounded-xl p-3"><p className="font-medium">{c.title}</p><p className="text-xs text-slate-500">{c.status}{c.description ? ' · '+c.description : ''}</p>{c.status === 'draft' && <button onClick={() => publishCourse(c)} className="mt-2 text-xs font-medium text-emerald-700">Publish course</button>}</div>) : <p className="text-sm text-slate-500">No courses created yet.</p>}</div></section>
+          <section className="bg-white border rounded-2xl p-5"><BookOpen className="w-6 h-6 text-amber-600" /><h2 className="font-semibold mt-3">My courses</h2><p className="text-sm text-slate-500 mt-1">Courses you manage as an educator.</p><div className="mt-4 space-y-3">{courses.length ? courses.map(c => <div key={c.id} className="border rounded-xl p-3"><p className="font-medium">{c.title}</p><p className="text-xs text-slate-500">{c.status}{c.description ? ' · '+c.description : ''}</p>{c.status === 'draft' && <button onClick={() => requestCourseReview(c)} className="mt-2 text-xs font-medium text-emerald-700">Submit for review</button>}</div>) : <p className="text-sm text-slate-500">No courses created yet.</p>}</div></section>
         </div>
       )}
     </div>
