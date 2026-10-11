@@ -135,11 +135,11 @@ export default function PublicLayout() {
       <MobileBottomNav variant="public" onMenu={() => setIsMobileMenuOpen(true)} />
       <Link
         to="/admin/login"
-        aria-label="Open Super Admin"
-        title="Super Admin"
-        className="hidden md:flex fixed bottom-3 left-3 z-[70] h-9 w-9 items-center justify-center rounded-full border border-slate-300/70 bg-white/80 text-slate-500 shadow-sm backdrop-blur transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+        aria-label="Super Admin access"
+        title="Super Admin access"
+        className="group fixed bottom-2 left-2 z-[70] hidden md:flex h-5 w-5 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
       >
-        <span aria-hidden="true" className="text-lg leading-none">←</span>
+        <span aria-hidden="true" className="h-2 w-2 rounded-full bg-red-600 shadow-[0_0_5px_rgba(220,38,38,0.35)] transition group-hover:scale-125 group-hover:bg-red-700" />
       </Link>
     </div>
   );
