@@ -35,6 +35,9 @@ for (const phrase of ["Home", "Search", "Log in", "Sign Up", "Checkout", "Wallet
 }
 assert(globalLanguage.includes("MutationObserver"), "dynamic UI text is observed for translation");
 assert(globalLanguage.includes("placeholder"), "form placeholders are included in translation handling");
+assert(globalLanguage.includes('if (next === "en")'), "switching back to English triggers a restoration pass");
+assert(globalLanguage.includes("if (translationUI) apply(document.body, next)"), "English restoration runs after translations have loaded");
+assert(globalLanguage.includes("revision !== languageRevision"), "rapid language changes ignore stale asynchronous translation imports");
 
 const backendSources = [
   ["server.ts", read("server.ts")],
