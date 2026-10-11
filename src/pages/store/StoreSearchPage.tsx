@@ -4,7 +4,8 @@ import { Search, Filter, Store as StoreIcon, Heart, Loader2, Building2, Briefcas
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { Product } from '../../lib/os/types';
+import { Product, type ProductLanguage, type ProductTranslation } from '../../lib/os/types';
+import { getLanguage, type SupportedLanguage } from '../../lib/i18n';
 
 type StoreProductsCacheEntry = { products: Product[]; expiresAt: number };
 
@@ -76,6 +77,8 @@ export default function StoreSearchPage() {
   const [minPriceInput, setMinPriceInput] = useState(minPrice ? String(minPrice) : '');
   const [maxPriceInput, setMaxPriceInput] = useState(maxPrice !== null ? String(maxPrice) : '');
   const [products, setProducts] = useState<Product[]>([]);
+  const [language, setLanguage] = useState<SupportedLanguage>(() => getLanguage());
+  const [listTranslations, setListTranslations] = useState<Record<string, ProductTranslation>>({});
   const [businesses, setBusinesses] = useState<StoreBusiness[]>([]);
   const [services, setServices] = useState<StoreService[]>([]);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
@@ -105,6 +108,41 @@ export default function StoreSearchPage() {
     ['digital_products', 'Digital Products'],
     ['other', 'Other'],
   ];
+
+  useEffect(() => {
+    const syncLanguage = (event: Event) => {
+      const detail = (event as CustomEvent<SupportedLanguage>).detail;
+      setLanguage(detail || getLanguage());
+    };
+    window.addEventListener('unique-language-change', syncLanguage);
+    return () => window.removeEventListener('unique-language-change', syncLanguage);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setListTranslations({});
+    if (language === 'en' || products.length === 0) return () => { active = false; };
+    const targetLanguage = language as ProductLanguage;
+    const uncached = products.filter(product => !product.translations?.[targetLanguage]?.name || !product.translations?.[targetLanguage]?.description).slice(0, 4);
+    const loadCardTranslations = async () => {
+      const resolved: Record<string, ProductTranslation> = {};
+      await Promise.all(uncached.map(async product => {
+        try {
+          const response = await fetch(`/api/store/products/${encodeURIComponent(product.id)}/translation?language=${encodeURIComponent(language)}`);
+          if (!response.ok) return;
+          const translation = await response.json() as { language?: string; name?: string; description?: string; variants?: { name: string; options: string[] }[]; sourceHash?: string; translatedAt?: unknown };
+          if (translation.language === language && typeof translation.name === 'string' && typeof translation.description === 'string') {
+            resolved[product.id] = { name: translation.name, description: translation.description, variants: translation.variants, sourceHash: translation.sourceHash || '', translatedAt: translation.translatedAt };
+          }
+        } catch {
+          // Keep original listing text if a translation cannot be loaded.
+        }
+      }));
+      if (active) setListTranslations(resolved);
+    };
+    void loadCardTranslations();
+    return () => { active = false; };
+  }, [products, language]);
 
   useEffect(() => {
     let active = true;
@@ -297,22 +335,25 @@ export default function StoreSearchPage() {
                 </div>
               </div>
             ))}
-            {products.map(product => (
+            {products.map(product => {
+            const cachedTranslation = language === 'en' ? undefined : product.translations?.[language as ProductLanguage];
+            const translatedName = cachedTranslation?.name || listTranslations[product.id]?.name || product.name;
+            return (
             <Link key={product.id} to={`/store/product/${product.id}`} className="group flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all">
               <div className="aspect-square bg-slate-100 relative overflow-hidden flex items-center justify-center">
-                {product.images?.length > 0 ? <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <StoreIcon className="w-8 h-8 text-slate-300" />}
+                {product.images?.length > 0 ? <img src={product.images[0]} alt={translatedName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <StoreIcon className="w-8 h-8 text-slate-300" />}
                 <button className={`absolute top-2 right-2 p-2 bg-white/80 backdrop-blur rounded-full transition-colors z-10 ${wishlistIds.has(product.id) ? 'text-red-500' : 'text-slate-400 hover:text-red-500'}`} onClick={e => toggleWishlist(product, e)} aria-label={wishlistIds.has(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}>
                   {wishlistLoading === product.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className={`w-4 h-4 ${wishlistIds.has(product.id) ? 'fill-current' : ''}`} />}
                 </button>
                 <div className="absolute bottom-2 left-2 px-2 py-1 bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider rounded text-slate-700">{product.condition}</div>
               </div>
               <div className="p-3 sm:p-4 flex flex-col flex-1">
-                <h3 className="text-sm font-medium text-slate-900 line-clamp-2 mb-1 group-hover:text-blue-600 transition-colors">{product.name}</h3>
+                <h3 className="text-sm font-medium text-slate-900 line-clamp-2 mb-1 group-hover:text-blue-600 transition-colors">{translatedName}</h3>
                 <p className="text-base sm:text-lg font-bold text-slate-900 mt-auto">{product.currency === 'NGN' ? '₦' : '$'}{Number(product.price).toLocaleString()}</p>
                 <div className="flex items-center gap-1 text-xs text-slate-500 mt-2"><StoreIcon className="w-3 h-3" /><span className="truncate">Seller ID: {product.sellerId || 'Unavailable'}</span></div>
               </div>
             </Link>
-          ))}</div>}
+          );})}</div>}
         </div>
       </div>
     </div>
