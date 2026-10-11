@@ -16,6 +16,8 @@ const requiredFiles = [
   "src/App.tsx",
   "server.ts",
   "src/pages/messages/MessagesPage.tsx",
+  "src/pages/messages/ChatView.tsx",
+  "src/lib/os/communication-db.ts",
   "src/pages/UniqueSharePage.tsx",
   "src/pages/StorePage.tsx",
   "src/pages/store/StoreOrdersPage.tsx",
@@ -76,9 +78,23 @@ for (const safeguard of ["hasRolePermission", "authenticate", "rateLimit"]) {
 }
 
 const communicationDocs = read("src/lib/os/communication-docs.md");
+const chatView = read("src/pages/messages/ChatView.tsx");
+const communicationDb = read("src/lib/os/communication-db.ts");
 assert(
-  /real-time subscriptions, message UI, and external messaging integration/i.test(communicationDocs),
-  "communication documentation explicitly records remaining real-time/UI/integration scope",
+  /real-time message subscription code/i.test(communicationDocs),
+  "communication documentation reflects implemented native messaging source",
+);
+assert(
+  chatView.includes("subscribeToMessagesForConversation"),
+  "chat UI subscribes to live conversation messages",
+);
+assert(
+  communicationDb.includes("onSnapshot"),
+  "communication data layer contains Firestore real-time subscriptions",
+);
+assert(
+  /Not yet certified/i.test(communicationDocs),
+  "communication documentation distinguishes source presence from production E2E certification",
 );
 
 const providerPages = [
