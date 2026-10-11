@@ -11,6 +11,7 @@ const assert = (condition, message) => {
 const route = read("src/server/storeProductTranslationRoutes.ts");
 const productPage = read("src/pages/store/StoreProductPage.tsx");
 const storeSearchPage = read("src/pages/store/StoreSearchPage.tsx");
+const wishlistPage = read("src/pages/WishlistPage.tsx");
 const types = read("src/lib/os/types.ts");
 const registrations = read("src/server/adminRbacRoutes.ts");
 const packageJson = JSON.parse(read("package.json"));
@@ -47,3 +48,12 @@ assert(storeHomePage.includes("product.translations?.[language as ProductLanguag
 assert(storeHomePage.includes("/translation?language="), "Store home requests translations for uncached products");
 assert(storeHomePage.includes("getDisplayProductName(product)"), "Store home product, low-stock, and service cards use localized names");
 assert(storeHomePage.includes("Number(product.price).toLocaleString()"), "Store home keeps canonical product prices unchanged");
+
+assert(wishlistPage.includes("collection(db, 'wishlists')"), "Wishlist loads saved items for the signed-in user");
+assert(wishlistPage.includes("doc(db, 'products', productId)"), "Wishlist resolves saved IDs to real product records");
+assert(wishlistPage.includes("product.status !== 'published'"), "Wishlist hides unpublished or unavailable products");
+assert(wishlistPage.includes("unique-language-change"), "Wishlist responds to selected-language changes");
+assert(wishlistPage.includes("/translation?language="), "Wishlist requests cached server-side translations for saved product names");
+assert(wishlistPage.includes("slice(0, 4)"), "Wishlist caps uncached translation requests");
+assert(wishlistPage.includes("Number(product.price).toLocaleString()"), "Wishlist preserves canonical prices");
+assert(wishlistPage.includes("deleteDoc(doc(db, 'wishlists'"), "Wishlist supports removing saved products");
