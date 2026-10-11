@@ -1,7 +1,7 @@
 export type EducationInstitutionType = 'school' | 'university' | 'college' | 'training_center' | 'tutor' | 'online';
-export type EducationInstitutionStatus = 'draft' | 'published' | 'suspended';
+export type EducationInstitutionStatus = 'draft' | 'pending_review' | 'published' | 'suspended';
 export type EducationEnrollmentStatus = 'active' | 'completed' | 'withdrawn';
-export type EducationCourseStatus = 'draft' | 'published' | 'archived';
+export type EducationCourseStatus = 'draft' | 'pending_review' | 'published' | 'archived';
 
 export interface EducationInstitution {
   id: string;
