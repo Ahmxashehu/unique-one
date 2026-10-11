@@ -39,6 +39,9 @@ jobs:
       - name: Run Pay-excluded platform inventory
         run: npm run audit:nonpay
 
+      - name: Verify Pay-excluded platform source contracts
+        run: npm run audit:nonpay:verify
+
       - name: Audit user-facing localization coverage
         run: npm run localization:audit
 
