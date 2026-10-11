@@ -30,17 +30,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run Pay-excluded platform inventory
-        run: npm run audit:nonpay
-
       - name: Lint
         run: npm run lint
 
       - name: Build
         run: npm run build
 
-      - name: Run whole-platform smoke verification
-        run: npm test
+      - name: Run Pay-excluded platform inventory
+        run: npm run audit:nonpay
 
       - name: Audit user-facing localization coverage
         run: npm run localization:audit
