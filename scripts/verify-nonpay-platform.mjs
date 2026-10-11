@@ -126,6 +126,46 @@ assert(
   "job publishing requires a business-owner role or administrator authorization in Firestore rules",
 );
 
+const serviceRules = read("firestore.rules");
+const serviceRequestRules = serviceRules.slice(
+  serviceRules.indexOf("match /serviceRequests/{requestId}"),
+  serviceRules.indexOf("match /professionalRequests/{requestId}"),
+);
+const professionalRequestRules = serviceRules.slice(
+  serviceRules.indexOf("match /professionalRequests/{requestId}"),
+  serviceRules.indexOf("match /workAgreements/{agreementId}"),
+);
+const agreementRules = serviceRules.slice(
+  serviceRules.indexOf("match /workAgreements/{agreementId}"),
+  serviceRules.indexOf("match /services/{serviceId}"),
+);
+assert(
+  serviceRequestRules.includes("resource.data.status == 'requested'") &&
+    serviceRequestRules.includes("request.resource.data.providerUid == request.auth.uid"),
+  "service requests are limited to their named provider and one valid response transition",
+);
+assert(
+  professionalRequestRules.includes("resource.data.requesterUid == request.auth.uid") &&
+    professionalRequestRules.includes("request.resource.data.visibility == 'public'"),
+  "professional requests enforce owner identity and explicit public publication",
+);
+assert(
+  agreementRules.includes("request.resource.data.createdByUid == request.auth.uid") &&
+    agreementRules.includes("request.resource.data.clientAccepted == false") &&
+    agreementRules.includes("request.resource.data.providerAccepted == false") &&
+    agreementRules.includes("request.resource.data.status == ("),
+  "work agreements enforce linked accepted requests and two-party acceptance state",
+);
+const serviceListingRules = serviceRules.slice(
+  serviceRules.indexOf("match /services/{serviceId}"),
+  serviceRules.lastIndexOf("\\n  }"),
+);
+assert(
+  serviceListingRules.includes("'business_owner' in get(") &&
+    serviceListingRules.includes("isAdmin()"),
+  "service listing create/update requires business-owner or administrator authorization",
+);
+
 const educationRules = read("firestore.rules");
 const educationTypes = read("src/lib/education/educationTypes.ts");
 const educationPage = read("src/pages/EducationPage.tsx");
