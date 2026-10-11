@@ -34,17 +34,18 @@ for (const file of requiredFiles) {
 }
 
 const app = read("src/App.tsx");
+const appRoutes = [...app.matchAll(/path=["']\\/?([^"']+)["']/g)].map((match) => match[1]);
 for (const route of [
-  'path="/messages/*"',
-  'path="/unique-share"',
-  'path="/store"',
-  'path="/ai"',
-  'path="/flights"',
-  'path="/hotels-events"',
-  'path="/health-wellness"',
-  'path="/education-hub"',
+  "messages/*",
+  "unique-share",
+  "store",
+  "ai",
+  "flights",
+  "hotels-events",
+  "health-wellness",
+  "education-hub",
 ]) {
-  assert(app.includes(route), `frontend route is registered: ${route}`);
+  assert(appRoutes.includes(route), `frontend route is registered: ${route}`);
 }
 
 const server = read("server.ts");
