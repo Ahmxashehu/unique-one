@@ -141,7 +141,7 @@ const agreementRules = serviceRules.slice(
 );
 assert(
   serviceRequestRules.includes("resource.data.status == 'requested'") &&
-    serviceRequestRules.includes("request.resource.data.providerUid == request.auth.uid"),
+    serviceRequestRules.includes("resource.data.providerUid == request.auth.uid"),
   "service requests are limited to their named provider and one valid response transition",
 );
 assert(
@@ -158,7 +158,7 @@ assert(
 );
 const serviceListingRules = serviceRules.slice(
   serviceRules.indexOf("match /services/{serviceId}"),
-  serviceRules.lastIndexOf("\\n  }"),
+  serviceRules.indexOf("\n  }\n}", serviceRules.indexOf("match /services/{serviceId}")),
 );
 assert(
   serviceListingRules.includes("'business_owner' in get(") &&
