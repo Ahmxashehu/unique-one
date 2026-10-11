@@ -238,6 +238,15 @@ assert(
   "communication documentation distinguishes source presence from production E2E certification",
 );
 
+const conversationRules = read("firestore.rules");
+assert(
+  conversationRules.includes("function isConversationMember(conversationId)") &&
+    conversationRules.includes("exists(/databases/$(database)/documents/conversationMembers/$(conversationMemberId(conversationId, request.auth.uid)))") &&
+    conversationRules.includes("match /conversations/{conversationId} { allow read: if isConversationMember(conversationId); allow create, update, delete: if false; }") &&
+    conversationRules.includes("match /messages/{messageId} { allow read: if isConversationMember(resource.data.conversationId); allow create, update, delete: if false; }"),
+  "conversation and message reads are membership-gated and client-side direct writes are denied by Firestore rules",
+);
+
 const flightPage = read("src/pages/public/FlightsPage.tsx");
 assert(
   flightPage.includes("Live flight booking is not available yet") &&
