@@ -28,6 +28,7 @@ const requiredFiles = [
   "src/pages/EducationHubPage.tsx",
   "src/server/uniqueShareRoutes.ts",
   "src/server/storeOrderLifecycleRoutes.ts",
+  "src/server/storeInventoryLedger.ts",
   "firestore.rules",
   "storage.rules",
 ];
@@ -80,8 +81,29 @@ for (const safeguard of [
 }
 
 const storeLifecycle = read("src/server/storeOrderLifecycleRoutes.ts");
-for (const safeguard of ["hasRolePermission", "authenticate", "rateLimit"]) {
+for (const safeguard of [
+  "hasRolePermission",
+  "authenticate",
+  "rateLimit",
+  "TRANSITIONS[currentStatus] !== targetStatus",
+  "order.sellerId",
+  "orderBusinessId === activeBusinessId",
+  "orderBranchId === assignedBranchId",
+  "DELIVERY_CONFIRMATION_REQUIRES_PROOF",
+  "transaction.create(db.collection('audit_logs').doc()",
+]) {
   assert(storeLifecycle.includes(safeguard), `Store order lifecycle safeguard exists: ${safeguard}`);
+}
+
+const inventoryLedger = read("src/server/storeInventoryLedger.ts");
+for (const safeguard of [
+  "INVALID_INVENTORY_MOVEMENT",
+  "quantityDelta + input.previousQuantity !== input.resultingQuantity",
+  "expectedDirection[input.movementType]?.includes(input.direction)",
+  "Number.isSafeInteger(input.quantity)",
+  "transaction.create(movementRef",
+]) {
+  assert(inventoryLedger.includes(safeguard), `Store inventory ledger invariant exists: ${safeguard}`);
 }
 
 const educationRules = read("firestore.rules");
