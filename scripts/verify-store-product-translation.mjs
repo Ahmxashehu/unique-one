@@ -10,6 +10,7 @@ const assert = (condition, message) => {
 
 const route = read("src/server/storeProductTranslationRoutes.ts");
 const productPage = read("src/pages/store/StoreProductPage.tsx");
+const storeSearchPage = read("src/pages/store/StoreSearchPage.tsx");
 const types = read("src/lib/os/types.ts");
 const registrations = read("src/server/adminRbacRoutes.ts");
 const packageJson = JSON.parse(read("package.json"));
@@ -32,3 +33,17 @@ assert(productPage.includes("value={option}"), "translated variant labels preser
 assert(types.includes("translations?: Partial<Record<ProductLanguage, ProductTranslation>>"), "product type stores derived translations separately from original fields");
 assert(registrations.includes("registerStoreProductTranslationRoutes(app)"), "public product translation route is registered");
 assert(packageJson.scripts?.test?.includes("verify-store-product-translation.mjs"), "product translation checks are included in the test command");
+
+assert(storeSearchPage.includes("unique-language-change"), "Store search reacts to selected-language changes");
+assert(storeSearchPage.includes("product.translations?.[language as ProductLanguage]"), "Store search cards use persisted product translations");
+assert(storeSearchPage.includes("/translation?language="), "Store search loads missing card translations from the server");
+assert(storeSearchPage.includes("slice(0, 4)"), "Store search limits automatic translation requests to protect the API quota");
+assert(storeSearchPage.includes("const translatedName"), "Store search displays translated product names with original-text fallback");
+assert(storeSearchPage.includes("Number(product.price).toLocaleString()"), "Store search keeps canonical product prices unchanged");
+
+const storeHomePage = read("src/pages/StorePage.tsx");
+assert(storeHomePage.includes("unique-language-change"), "Store home reacts to selected-language changes");
+assert(storeHomePage.includes("product.translations?.[language as ProductLanguage]"), "Store home uses persisted product translations");
+assert(storeHomePage.includes("/translation?language="), "Store home requests translations for uncached products");
+assert(storeHomePage.includes("getDisplayProductName(product)"), "Store home product, low-stock, and service cards use localized names");
+assert(storeHomePage.includes("Number(product.price).toLocaleString()"), "Store home keeps canonical product prices unchanged");

@@ -7,7 +7,8 @@ import {
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Product, ProductCategory } from '../lib/os/types';
+import { Product, ProductCategory, type ProductLanguage, type ProductTranslation } from '../lib/os/types';
+import { getLanguage, type SupportedLanguage } from '../lib/i18n';
 
 const storeProductsCache = new Map<string, { products: Product[]; expiresAt: number }>();
 const storeProductsRequests = new Map<string, Promise<Product[]>>();
@@ -67,12 +68,49 @@ export default function StorePage() {
   const { currentUser } = useAuth();
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
+  const [language, setLanguage] = useState<SupportedLanguage>(() => getLanguage());
+  const [listTranslations, setListTranslations] = useState<Record<string, ProductTranslation>>({});
   const [wishlistCount, setWishlistCount] = useState(0);
   const [cartCount, setCartCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [savingWishlist, setSavingWishlist] = useState<string | null>(null);
 
+
+  useEffect(() => {
+    const syncLanguage = (event: Event) => {
+      const detail = (event as CustomEvent<SupportedLanguage>).detail;
+      setLanguage(detail || getLanguage());
+    };
+    window.addEventListener('unique-language-change', syncLanguage);
+    return () => window.removeEventListener('unique-language-change', syncLanguage);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setListTranslations({});
+    if (language === 'en' || products.length === 0) return () => { active = false; };
+    const targetLanguage = language as ProductLanguage;
+    const uncached = products.filter(product => !product.translations?.[targetLanguage]?.name || !product.translations?.[targetLanguage]?.description).slice(0, 4);
+    const loadCardTranslations = async () => {
+      const resolved: Record<string, ProductTranslation> = {};
+      await Promise.all(uncached.map(async product => {
+        try {
+          const response = await fetch(`/api/store/products/${encodeURIComponent(product.id)}/translation?language=${encodeURIComponent(language)}`);
+          if (!response.ok) return;
+          const translation = await response.json() as { language?: string; name?: string; description?: string; variants?: { name: string; options: string[] }[]; sourceHash?: string; translatedAt?: unknown };
+          if (translation.language === language && typeof translation.name === 'string' && typeof translation.description === 'string') {
+            resolved[product.id] = { name: translation.name, description: translation.description, variants: translation.variants, sourceHash: translation.sourceHash || '', translatedAt: translation.translatedAt };
+          }
+        } catch {
+          // Preserve original seller text if translation is unavailable.
+        }
+      }));
+      if (active) setListTranslations(resolved);
+    };
+    void loadCardTranslations();
+    return () => { active = false; };
+  }, [products, language]);
 
   useEffect(() => {
     let active = true;
@@ -147,6 +185,11 @@ export default function StorePage() {
   const visibleProducts = useMemo(() => products.filter(product => product.status === 'published'), [products]);
   const lowStockProducts = useMemo(() => visibleProducts.filter(product => Number(product.quantity) > 0 && Number(product.quantity) <= 5), [visibleProducts]);
   const serviceListings = useMemo(() => visibleProducts.filter(product => product.category === 'services'), [visibleProducts]);
+  const getDisplayProductName = (product: Product) => {
+    if (language === 'en') return product.name;
+    const cached = product.translations?.[language as ProductLanguage]?.name;
+    return cached || listTranslations[product.id]?.name || product.name;
+  };
 
 
   return (
@@ -301,7 +344,7 @@ export default function StorePage() {
         {!loading && lowStockProducts.length > 0 && (
           <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
             <div className="flex items-center justify-between gap-3 mb-3"><div><h3 className="font-bold text-slate-900">Low stock</h3><p className="text-xs text-slate-600">Real listings with five or fewer units currently available.</p></div><Zap className="w-5 h-5 text-amber-500" /></div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{lowStockProducts.slice(0, 4).map(product => (<Link key={product.id} to={`/store/product/${product.id}`} className="bg-white rounded-xl border border-amber-100 p-3 hover:shadow-sm"><p className="text-sm font-semibold text-slate-900 line-clamp-2">{product.name}</p><p className="text-xs font-semibold text-amber-700 mt-2">{product.quantity} left</p></Link>))}</div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{lowStockProducts.slice(0, 4).map(product => (<Link key={product.id} to={`/store/product/${product.id}`} className="bg-white rounded-xl border border-amber-100 p-3 hover:shadow-sm"><p className="text-sm font-semibold text-slate-900 line-clamp-2">{getDisplayProductName(product)}</p><p className="text-xs font-semibold text-amber-700 mt-2">{product.quantity} left</p></Link>))}</div>
           </div>
         )}
 
@@ -330,14 +373,14 @@ export default function StorePage() {
               <Link key={product.id} to={`/store/product/${product.id}`} className="group bg-white border border-slate-200 rounded-xl sm:rounded-2xl overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <div className="aspect-square bg-slate-100 overflow-hidden flex items-center justify-center">
                   {product.images?.[0] ? (
-                    <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <img src={product.images[0]} alt={getDisplayProductName(product)} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   ) : (
                     <ShoppingBag className="w-9 h-9 text-slate-300" />
                   )}
                 </div>
                 <div className="p-3.5">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium text-slate-900 line-clamp-2 min-h-10">{product.name}</p>
+                    <p className="text-sm font-medium text-slate-900 line-clamp-2 min-h-10">{getDisplayProductName(product)}</p>
                     <button type="button" onClick={(event) => toggleWishlist(product, event)} disabled={savingWishlist === product.id} aria-label={wishlistIds.has(product.id) ? 'Remove from saved' : 'Save item'} className="shrink-0 rounded-full bg-slate-50 p-2 transition-colors hover:bg-rose-50">
                       <Heart className={`h-4 w-4 ${wishlistIds.has(product.id) ? 'fill-rose-500 text-rose-500' : 'text-slate-500'}`} />
                     </button>
@@ -354,7 +397,7 @@ export default function StorePage() {
       {!loading && serviceListings.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-3"><div><h2 className="text-xl font-bold text-slate-900">Services to hire or book</h2><p className="text-sm text-slate-500">Real service listings currently published in Store.</p></div><Link to="/store/search?cat=services" className="text-sm font-semibold text-emerald-700 flex items-center gap-1">See services <ChevronRight className="w-4 h-4" /></Link></div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{serviceListings.slice(0, 4).map(product => (<Link key={product.id} to={`/store/product/${product.id}`} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-emerald-300 hover:shadow-sm transition-all"><div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mb-3"><Clock3 className="w-5 h-5 text-emerald-700" /></div><p className="font-semibold text-slate-900 line-clamp-2">{product.name}</p><p className="text-sm font-bold text-slate-900 mt-2">{product.currency === 'NGN' ? '₦' : product.currency + ' '}{Number(product.price).toLocaleString()}</p></Link>))}</div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{serviceListings.slice(0, 4).map(product => (<Link key={product.id} to={`/store/product/${product.id}`} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-emerald-300 hover:shadow-sm transition-all"><div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mb-3"><Clock3 className="w-5 h-5 text-emerald-700" /></div><p className="font-semibold text-slate-900 line-clamp-2">{getDisplayProductName(product)}</p><p className="text-sm font-bold text-slate-900 mt-2">{product.currency === 'NGN' ? '₦' : product.currency + ' '}{Number(product.price).toLocaleString()}</p></Link>))}</div>
         </section>
       )}
     </div>
