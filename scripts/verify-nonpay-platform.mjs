@@ -238,6 +238,43 @@ assert(
   "communication documentation distinguishes source presence from production E2E certification",
 );
 
+const communicationServer = read("server.ts");
+assert(
+  communicationServer.includes('app.post("/api/communication/messages", authenticate, rateLimit(') &&
+    communicationServer.includes("const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(draft.conversationId, senderUid));") &&
+    communicationServer.includes("if (!conversationSnapshot.exists || !membershipSnapshot.exists)") &&
+    communicationServer.includes("A valid message idempotency key is required."),
+  "server-side message sending requires authentication, conversation membership, and an idempotency key",
+);
+assert(
+  communicationServer.includes("if (forwardBlock.exists || reverseBlock.exists) return errorResponse(res, 'BLOCKED'") &&
+    communicationServer.includes("if (!otherUids.includes(draft.encryptedPayload.recipientId))"),
+  "message sending checks bilateral block records and prevents encrypted recipients outside the conversation",
+);
+assert(
+  communicationServer.includes("actualSize !== attachment.sizeBytes || actualContentType !== attachment.contentType") &&
+    communicationServer.includes("One or more message attachments could not be verified."),
+  "server verifies stored attachment size and content type before accepting a message",
+);
+assert(
+  communicationServer.includes('app.get("/api/communication/conversations/:conversationId/messages", authenticate, rateLimit(') &&
+    communicationServer.includes("You are not a member of this conversation.") &&
+    communicationServer.includes(".where('conversationId', '==', conversationId)"),
+  "message-history endpoint requires authentication and membership before returning conversation messages",
+);
+assert(
+  communicationServer.includes('app.post("/api/communication/messages/:messageId/delivery", authenticate, rateLimit(') &&
+    communicationServer.includes("if (!membershipSnapshot.exists) throw new Error('FORBIDDEN')") &&
+    communicationServer.includes("if (message.senderId === uid) throw new Error('SENDER_CANNOT_UPDATE_DELIVERY')"),
+  "delivery/read status changes require conversation membership and are restricted to recipients",
+);
+assert(
+  communicationServer.includes('app.post("/api/communication/media/upload", authenticate, rateLimit(') &&
+    communicationServer.includes("if (!membershipSnapshot.exists) return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403)") &&
+    communicationServer.includes("if (body.length > maxBytes)"),
+  "message attachment upload requires authentication, membership, MIME allowlisting, and bounded file size",
+);
+
 const conversationRules = read("firestore.rules");
 assert(
   conversationRules.includes("function isConversationMember(conversationId)") &&
