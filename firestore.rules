@@ -30,13 +30,13 @@ service cloud.firestore {
     match /educationInstitutions/{institutionId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.status == 'draft';
-      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','type','location','description','status','updatedAt']) && (request.resource.data.status == resource.data.status || request.resource.data.status == 'draft') || isPlatformAdmin();
+      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','type','location','description','status','updatedAt']) && (request.resource.data.status == resource.data.status || request.resource.data.status in ['draft','pending_review']) || isPlatformAdmin();
       allow delete: if isPlatformAdmin();
     }
     match /educationCourses/{courseId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.status == 'draft' && request.resource.data.keys().hasOnly(['ownerUid','institutionId','title','description','level','status','createdAt','updatedAt']) && request.resource.data.institutionId is string && exists(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId)) && get(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId)).data.ownerUid == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.institutionId == resource.data.institutionId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','level','status','updatedAt']) && (request.resource.data.status == resource.data.status || request.resource.data.status == 'draft' || request.resource.data.status == 'archived') || isPlatformAdmin();
+      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.institutionId == resource.data.institutionId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','level','status','updatedAt']) && (request.resource.data.status == resource.data.status || request.resource.data.status in ['draft','pending_review','archived']) || isPlatformAdmin();
       allow delete: if isPlatformAdmin();
     }
     match /educationEnrollments/{enrollmentId} {
