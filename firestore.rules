@@ -706,6 +706,7 @@ service cloud.firestore {
         ));
       allow create: if isAuthenticated()
         && request.resource.data.createdByUid == request.auth.uid
+        && (request.resource.data.createdByUid == request.resource.data.clientUid || request.resource.data.createdByUid == request.resource.data.providerUid)
         && request.resource.data.clientUid is string
         && request.resource.data.providerUid is string
         && request.resource.data.clientUid != request.resource.data.providerUid
