@@ -278,3 +278,78 @@ Object.entries(WORKFLOW).forEach(([language, values]) => Object.assign(UI[langua
 // Keep the Pidgin success state semantically correct; it must not announce an error.
 UI.pcm.Success = "E don work";
 
+/** Shared labels and safety notices used by Unique Communication screens. */
+const COMMUNICATION: Record<SupportedLanguage, Record<string,string>> = {
+  en: {},
+  ha: {
+    "Connect":"Haɗa","Private messaging, people, groups and business communication — all in one place.":"Saƙonni na sirri, mutane, ƙungiyoyi da sadarwar kasuwanci — duk a wuri guda.",
+    "Search people, Unique ID or conversations":"Bincika mutane, Unique ID ko tattaunawa","Users":"Masu amfani","Groups":"Ƙungiyoyi","People":"Mutane",
+    "No conversations yet":"Babu tattaunawa tukuna","Search for a person or start a new conversation.":"Bincika mutum ko fara sabuwar tattaunawa.",
+    "Your communication space":"Wurin sadarwarka","Select a conversation to continue, or use the + button to find a person.":"Zaɓi tattaunawa don ci gaba, ko amfani da maɓallin + don nemo mutum.",
+    "Group conversation":"Tattaunawar ƙungiya","Business conversation":"Tattaunawar kasuwanci","User conversation":"Tattaunawar mai amfani",
+    "Online":"Yana kan layi","Last seen":"An gan shi na ƙarshe","New contact":"Sabon lamba",
+    "You may not know this person. Read the message first. If it looks familiar, you can reply; if you don't recognize the person, you can block them.":"Wataƙila ba ka san wannan mutumin ba. Karanta saƙon tukuna. Idan ka gane shi, za ka iya amsawa; idan ba ka gane shi ba, za ka iya toshe shi.",
+    "Block":"Toshe","No matches":"Babu sakamako","Previous match":"Sakamako na baya","Next match":"Sakamako na gaba","Close search":"Rufe bincike",
+    "Start the conversation":"Fara tattaunawa","Send a message, photo, or document. Your conversation will appear here.":"Aika saƙo, hoto ko takarda. Tattaunawarka za ta bayyana a nan.",
+    "Loading conversation…":"Ana loda tattaunawa…","Loading older messages…":"Ana loda tsofaffin saƙonni…",
+    "Preparing attachment…":"Ana shirya abin da za a haɗa…","Choose from gallery":"Zaɓa daga hotuna","Take a photo":"Ɗauki hoto","Attach document":"Haɗa takarda",
+    "Message…":"Saƙo…","End-to-end encrypted":"An ɓoye saƙo daga farko zuwa ƙarshe","This message was deleted":"An goge wannan saƙon"
+  },
+  fr: {
+    "Connect":"Connecter","Private messaging, people, groups and business communication — all in one place.":"Messagerie privée, personnes, groupes et communication professionnelle — tout au même endroit.",
+    "Search people, Unique ID or conversations":"Rechercher des personnes, un identifiant Unique ou des conversations","Users":"Utilisateurs","Groups":"Groupes","People":"Personnes",
+    "No conversations yet":"Aucune conversation pour le moment","Search for a person or start a new conversation.":"Recherchez une personne ou démarrez une nouvelle conversation.",
+    "Your communication space":"Votre espace de communication","Select a conversation to continue, or use the + button to find a person.":"Sélectionnez une conversation ou utilisez le bouton + pour trouver une personne.",
+    "Group conversation":"Conversation de groupe","Business conversation":"Conversation professionnelle","User conversation":"Conversation utilisateur",
+    "Online":"En ligne","Last seen":"Vu pour la dernière fois","New contact":"Nouveau contact",
+    "You may not know this person. Read the message first. If it looks familiar, you can reply; if you don't recognize the person, you can block them.":"Vous ne connaissez peut-être pas cette personne. Lisez d’abord le message. Si elle vous semble familière, répondez ; sinon, vous pouvez la bloquer.",
+    "Block":"Bloquer","No matches":"Aucun résultat","Previous match":"Résultat précédent","Next match":"Résultat suivant","Close search":"Fermer la recherche",
+    "Start the conversation":"Démarrer la conversation","Send a message, photo, or document. Your conversation will appear here.":"Envoyez un message, une photo ou un document. Votre conversation apparaîtra ici.",
+    "Loading conversation…":"Chargement de la conversation…","Loading older messages…":"Chargement des anciens messages…",
+    "Preparing attachment…":"Préparation de la pièce jointe…","Choose from gallery":"Choisir dans la galerie","Take a photo":"Prendre une photo","Attach document":"Joindre un document",
+    "Message…":"Message…","End-to-end encrypted":"Chiffré de bout en bout","This message was deleted":"Ce message a été supprimé"
+  },
+  ig: {
+    "Connect":"Jikọọ","Private messaging, people, groups and business communication — all in one place.":"Ozi nzuzo, ndị mmadụ, otu na nkwukọrịta azụmahịa — ha niile n'otu ebe.",
+    "Search people, Unique ID or conversations":"Chọọ ndị mmadụ, Unique ID ma ọ bụ mkparịta ụka","Users":"Ndị ọrụ","Groups":"Otu","People":"Ndị mmadụ",
+    "No conversations yet":"Enwebeghị mkparịta ụka","Search for a person or start a new conversation.":"Chọọ mmadụ ma ọ bụ malite mkparịta ụka ọhụrụ.",
+    "Your communication space":"Ebe nkwukọrịta gị","Select a conversation to continue, or use the + button to find a person.":"Họrọ mkparịta ụka ka ị gaa n'ihu, ma ọ bụ jiri bọtịnụ + chọta mmadụ.",
+    "Group conversation":"Mkparịta ụka otu","Business conversation":"Mkparịta ụka azụmahịa","User conversation":"Mkparịta ụka onye ọrụ",
+    "Online":"Ọ nọ n'ịntanetị","Last seen":"Oge ikpeazụ a hụrụ ya","New contact":"Onye ọhụrụ",
+    "You may not know this person. Read the message first. If it looks familiar, you can reply; if you don't recognize the person, you can block them.":"O nwere ike ị maghị onye a. Buru ụzọ gụọ ozi ahụ. Ọ bụrụ na ị mata ya, zaghachi; ọ bụrụ na ị maghị ya, ị nwere ike igbochi ya.",
+    "Block":"Gbochie","No matches":"Enweghị nsonaazụ","Previous match":"Nsonaazụ gara aga","Next match":"Nsonaazụ ọzọ","Close search":"Mechie ọchụchọ",
+    "Start the conversation":"Malite mkparịta ụka","Send a message, photo, or document. Your conversation will appear here.":"Zipu ozi, foto ma ọ bụ akwụkwọ. Mkparịta ụka gị ga-apụta ebe a.",
+    "Loading conversation…":"A na-ebufe mkparịta ụka…","Loading older messages…":"A na-ebufe ozi ochie…",
+    "Preparing attachment…":"A na-akwadebe ihe mgbakwunye…","Choose from gallery":"Họrọ na gallery","Take a photo":"See foto","Attach document":"Tinye akwụkwọ",
+    "Message…":"Ozi…","End-to-end encrypted":"Ezochiri ozi site na mmalite ruo na njedebe","This message was deleted":"Ehichapụla ozi a"
+  },
+  yo: {
+    "Connect":"Sopọ","Private messaging, people, groups and business communication — all in one place.":"Ìfiranṣẹ́ aládàáni, àwọn ènìyàn, ẹgbẹ́ àti ìbánisọ̀rọ̀ iṣẹ́ — gbogbo rẹ̀ ní ibi kan.",
+    "Search people, Unique ID or conversations":"Wá àwọn ènìyàn, Unique ID tàbí ìjíròrò","Users":"Àwọn olùlò","Groups":"Àwọn ẹgbẹ́","People":"Àwọn ènìyàn",
+    "No conversations yet":"Kò tíì sí ìjíròrò","Search for a person or start a new conversation.":"Wá ènìyàn kan tàbí bẹ̀rẹ̀ ìjíròrò tuntun.",
+    "Your communication space":"Ààyè ìbánisọ̀rọ̀ rẹ","Select a conversation to continue, or use the + button to find a person.":"Yan ìjíròrò láti tẹ̀síwájú, tàbí lo bọ́tìnì + láti wá ènìyàn.",
+    "Group conversation":"Ìjíròrò ẹgbẹ́","Business conversation":"Ìjíròrò iṣẹ́","User conversation":"Ìjíròrò olùlò",
+    "Online":"Ó wà lórí ayélujára","Last seen":"Ìgbà tí a rí i gbẹ̀yìn","New contact":"Olùbásọrọ tuntun",
+    "You may not know this person. Read the message first. If it looks familiar, you can reply; if you don't recognize the person, you can block them.":"Ó ṣeé ṣe kí o má mọ ẹni yìí. Kọ́kọ́ ka ìfiranṣẹ́ náà. Tí o bá mọ̀ ọ́, o lè dáhùn; bí o kò bá mọ̀ ọ́, o lè dí i lọ́wọ́.",
+    "Block":"Dí lọ́wọ́","No matches":"Kò sí àbájáde","Previous match":"Àbájáde tó ṣáájú","Next match":"Àbájáde tó kàn","Close search":"Pa ìwádìí",
+    "Start the conversation":"Bẹ̀rẹ̀ ìjíròrò","Send a message, photo, or document. Your conversation will appear here.":"Fi ìfiranṣẹ́, fọ́tò tàbí ìwé ránṣẹ́. Ìjíròrò rẹ yóò hàn níbí.",
+    "Loading conversation…":"Ń gbé ìjíròrò wọlé…","Loading older messages…":"Ń gbé àwọn ìfiranṣẹ́ àtijọ́ wọlé…",
+    "Preparing attachment…":"Ń pèsè ohun àfikún…","Choose from gallery":"Yan láti inú gallery","Take a photo":"Ya fọ́tò","Attach document":"So ìwé mọ́",
+    "Message…":"Ìfiranṣẹ́…","End-to-end encrypted":"A ti fi ìkọ̀kọ̀ dáàbò bo láti ìbẹ̀rẹ̀ dé òpin","This message was deleted":"A ti pa ìfiranṣẹ́ yìí rẹ́"
+  },
+  pcm: {
+    "Connect":"Connect","Private messaging, people, groups and business communication — all in one place.":"Private message, people, groups and business chat — everything dey one place.",
+    "Search people, Unique ID or conversations":"Find people, Unique ID or chats","Users":"Users","Groups":"Groups","People":"People",
+    "No conversations yet":"No chat dey yet","Search for a person or start a new conversation.":"Find person or start new chat.",
+    "Your communication space":"Your communication space","Select a conversation to continue, or use the + button to find a person.":"Choose chat to continue, or press + to find person.",
+    "Group conversation":"Group chat","Business conversation":"Business chat","User conversation":"User chat",
+    "Online":"E dey online","Last seen":"Last seen","New contact":"New contact",
+    "You may not know this person. Read the message first. If it looks familiar, you can reply; if you don't recognize the person, you can block them.":"You fit no sabi this person. Read the message first. If you know am, reply; if you no know am, you fit block am.",
+    "Block":"Block","No matches":"No match","Previous match":"Previous match","Next match":"Next match","Close search":"Close search",
+    "Start the conversation":"Start chat","Send a message, photo, or document. Your conversation will appear here.":"Send message, photo or document. Your chat go show here.",
+    "Loading conversation…":"Chat dey load…","Loading older messages…":"Old messages dey load…",
+    "Preparing attachment…":"E dey prepare attachment…","Choose from gallery":"Choose from gallery","Take a photo":"Take photo","Attach document":"Attach document",
+    "Message…":"Message…","End-to-end encrypted":"Na end-to-end encryption protect am","This message was deleted":"Dem don delete this message"
+  }
+};
+Object.entries(COMMUNICATION).forEach(([language, values]) => Object.assign(UI[language as SupportedLanguage], values));
