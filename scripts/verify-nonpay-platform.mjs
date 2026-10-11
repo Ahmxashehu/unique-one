@@ -167,6 +167,19 @@ assert(
   "service listing create/update requires business-owner or administrator authorization",
 );
 
+const contributionRules = read("firestore.rules");
+const contributionOfferRules = contributionRules.slice(
+  contributionRules.indexOf("match /contributionOffers/{offerId}"),
+  contributionRules.indexOf("match /businesses/{businessId}"),
+);
+assert(
+  contributionOfferRules.includes("resource.data.status == 'pending'") &&
+    contributionOfferRules.includes("request.resource.data.status == 'withdrawn'") &&
+    contributionOfferRules.includes("request.resource.data.status in ['accepted','rejected']") &&
+    contributionOfferRules.includes(".data.status == 'published'"),
+  "contribution offers allow only one pending-to-final transition and require an open request for acceptance",
+);
+
 const educationRules = read("firestore.rules");
 const educationTypes = read("src/lib/education/educationTypes.ts");
 const educationPage = read("src/pages/EducationPage.tsx");
