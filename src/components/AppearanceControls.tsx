@@ -53,57 +53,57 @@ export default function AppearanceControls() {
 
   return (
     <>
-      <div className="fixed right-3 top-9 z-[80] flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 p-1 shadow-lg shadow-slate-900/5 backdrop-blur-xl transition-all unique-appearance-controls sm:right-4 sm:top-9">
-      <button
-        type="button"
-        onClick={toggleTheme}
-        aria-label={dark ? t('lightMode', language) : t('darkMode', language)}
-        title={dark ? t('lightMode', language) : t('darkMode', language)}
-        className="group flex h-9 w-9 items-center justify-center rounded-full text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700 active:scale-95"
-      >
-        {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-      </button>
-
-      <div ref={languageMenuRef} className="relative">
+      <div className="fixed right-2.5 top-9 z-[80] flex items-center gap-1 rounded-full border border-white/70 bg-white/90 p-0.5 shadow-lg shadow-slate-900/5 backdrop-blur-xl transition-all unique-appearance-controls sm:right-3 sm:top-9">
         <button
           type="button"
-          onClick={() => setLanguageOpen((open) => !open)}
-          aria-expanded={languageOpen}
-          aria-haspopup="listbox"
-          aria-label={t('language', language)}
-          title={t('language', language)}
-          className="flex h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700 active:scale-95"
+          onClick={toggleTheme}
+          aria-label={dark ? t('lightMode', language) : t('darkMode', language)}
+          title={dark ? t('lightMode', language) : t('darkMode', language)}
+          className="group flex h-7 w-7 items-center justify-center rounded-full text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 sm:h-8 sm:w-8"
         >
-          <Languages className="h-4 w-4" />
-          <span className="hidden sm:inline">{currentLanguage.code.toUpperCase()}</span>
-          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${languageOpen ? 'rotate-180' : ''}`} />
+          {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
         </button>
 
-        {languageOpen && (
-          <div
-            role="listbox"
+        <div ref={languageMenuRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setLanguageOpen((open) => !open)}
+            aria-expanded={languageOpen}
+            aria-haspopup="listbox"
             aria-label={t('language', language)}
-            className="absolute right-0 top-11 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl shadow-slate-900/15"
+            title={t('language', language)}
+            className="flex h-7 items-center gap-1 rounded-full px-2 text-[11px] font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 sm:h-8 sm:px-2.5"
           >
-            <div className="px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-              Language
+            <Languages className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{currentLanguage.code.toUpperCase()}</span>
+            <ChevronDown className={`h-3 w-3 transition-transform ${languageOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {languageOpen && (
+            <div
+              role="listbox"
+              aria-label={t('language', language)}
+              className="absolute right-0 top-9 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl shadow-slate-900/15"
+            >
+              <div className="px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                Language
+              </div>
+              {SUPPORTED_LANGUAGES.map((item) => (
+                <button
+                  key={item.code}
+                  type="button"
+                  role="option"
+                  aria-selected={language === item.code}
+                  onClick={() => changeLanguage(item.code)}
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800"
+                >
+                  <span>{item.label}</span>
+                  {language === item.code && <Check className="h-4 w-4 text-emerald-600" />}
+                </button>
+              ))}
             </div>
-            {SUPPORTED_LANGUAGES.map((item) => (
-              <button
-                key={item.code}
-                type="button"
-                role="option"
-                aria-selected={language === item.code}
-                onClick={() => changeLanguage(item.code)}
-                className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800"
-              >
-                <span>{item.label}</span>
-                {language === item.code && <Check className="h-4 w-4 text-emerald-600" />}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+          )}
+        </div>
       </div>
     </>
   );
