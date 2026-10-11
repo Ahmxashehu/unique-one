@@ -62,13 +62,27 @@ export default function GlobalLanguageLayer() {
   useEffect(() => {
     let language = getLanguage();
     let scheduled = false;
+    let languageRevision = 0;
     const run = (next:SupportedLanguage) => {
       language = next;
+      const revision = ++languageRevision;
       document.documentElement.lang = next;
       document.documentElement.dataset.language = next;
-      if (next !== "en") {
-        void import("../lib/globalTranslations").then((module) => { translationUI = module.UI; apply(document.body, next); });
+
+      // The global layer mutates rendered text in place. When users switch back
+      // to English, run the same canonicalization pass so translated phrases
+      // are restored instead of leaving the previous language on screen.
+      if (next === "en") {
+        if (translationUI) apply(document.body, next);
+        return;
       }
+
+      void import("../lib/globalTranslations").then((module) => {
+        // Ignore stale async imports when a user changes language quickly.
+        if (revision !== languageRevision) return;
+        translationUI = module.UI;
+        apply(document.body, next);
+      });
     };
     run(language);
     let timer: number | null = null;
