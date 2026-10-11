@@ -35,7 +35,7 @@ export default function StoreProductPage() {
   useEffect(() => {
     let cancelled = false;
     setTranslatedText(null);
-    if (!id || language === 'en') return () => { cancelled = true; };
+    if (!id || !product || language === 'en') return () => { cancelled = true; };
     const loadTranslation = async () => {
       try {
         const response = await fetch(`/api/store/products/${encodeURIComponent(id)}/translation?language=${encodeURIComponent(language)}`);
