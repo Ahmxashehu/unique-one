@@ -83,20 +83,48 @@ export default function DiscoverPage() {
 
   useEffect(() => {
     setLoading(true);
-    const postsQuery = query(collection(db, 'edgePosts'), where('status', '==', 'published'), limit(50));
-    const unsubscribe = onSnapshot(postsQuery, snapshot => {
-      const next = snapshot.docs
-        .map(item => ({ id: item.id, ...(item.data() as Omit<EdgePost, 'id'>) }))
-        .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
-      setPosts(next);
+    let publicPosts: EdgePost[] = [];
+    let ownPosts: EdgePost[] = [];
+    const publishMergedPosts = () => {
+      const byId = new Map<string, EdgePost>();
+      [...publicPosts, ...ownPosts].forEach(post => byId.set(post.id, post));
+      setPosts([...byId.values()].sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt)).slice(0, 50));
       setLoading(false);
+    };
+    const publicPostsQuery = query(
+      collection(db, 'edgePosts'),
+      where('status', '==', 'published'),
+      where('audience', '==', 'public'),
+      limit(50),
+    );
+    const unsubscribePublic = onSnapshot(publicPostsQuery, snapshot => {
+      publicPosts = snapshot.docs.map(item => ({ id: item.id, ...(item.data() as Omit<EdgePost, 'id'>) }));
+      publishMergedPosts();
     }, err => {
-      console.error('Active Edge feed failed:', err);
+      console.error('Active Edge public feed failed:', err);
       setError('Active Edge could not load right now.');
       setLoading(false);
     });
-    return () => unsubscribe();
-  }, []);
+    let unsubscribeOwn = () => {};
+    if (currentUser) {
+      const ownPostsQuery = query(
+        collection(db, 'edgePosts'),
+        where('authorUid', '==', currentUser.uid),
+        where('status', '==', 'published'),
+        limit(50),
+      );
+      unsubscribeOwn = onSnapshot(ownPostsQuery, snapshot => {
+        ownPosts = snapshot.docs.map(item => ({ id: item.id, ...(item.data() as Omit<EdgePost, 'id'>) }));
+        publishMergedPosts();
+      }, err => {
+        console.error('Active Edge own posts failed:', err);
+        setError('Your own Active Edge posts could not load right now.');
+      });
+    } else {
+      ownPosts = [];
+    }
+    return () => { unsubscribePublic(); unsubscribeOwn(); };
+  }, [currentUser?.uid]);
 
   useEffect(() => {
     const statusesQuery = query(collection(db, 'edgeStatuses'), where('status', '==', 'published'), limit(30));
@@ -143,7 +171,7 @@ export default function DiscoverPage() {
       const snap = await getDoc(doc(db, 'edgePreferences', currentUser.uid));
       if (!snap.exists()) return;
       const data = snap.data();
-      setAudience(data.defaultAudience === 'followers' ? 'followers' : 'public');
+      setAudience('public');
       setAllowComments(data.allowComments !== false);
       setAllowReshare(data.allowReshare !== false);
     };
@@ -162,6 +190,10 @@ export default function DiscoverPage() {
       return;
     }
     const text = postText.trim();
+    if (audience !== 'public') {
+      setError('Followers-only posting is temporarily disabled until a verified follow system is available. Your private posts remain visible only to you.');
+      return;
+    }
     if (!text || text.length > 5000 || !selectedActor) return;
     setPosting(true);
     setError('');
@@ -265,7 +297,8 @@ export default function DiscoverPage() {
 
   const savePreferences = async () => {
     if (!currentUser) return;
-    await setDoc(doc(db, 'edgePreferences', currentUser.uid), { defaultAudience: audience, allowComments, allowReshare, updatedAt: serverTimestamp() }, { merge: true });
+    await setDoc(doc(db, 'edgePreferences', currentUser.uid), { defaultAudience: 'public', allowComments, allowReshare, updatedAt: serverTimestamp() }, { merge: true });
+    setAudience('public');
     setPreferencesOpen(false);
   };
 
@@ -406,7 +439,7 @@ export default function DiscoverPage() {
             <textarea value={postText} onChange={event => setPostText(event.target.value)} maxLength={5000} rows={7} placeholder="Share an update, announcement, experience, idea or useful information..." className="mt-4 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 outline-none focus:border-emerald-400 focus:bg-white" />
             <div className="mt-2 flex items-center justify-between text-xs text-slate-400"><span>{postText.length}/5000</span><span className="inline-flex items-center gap-1"><ImagePlus className="h-4 w-4" /> Media upload coming through the existing storage pipeline</span></div>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <label className="text-xs font-bold text-slate-600">Audience<select value={audience} onChange={event => setAudience(event.target.value as Audience)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-normal"><option value="public">Public</option><option value="followers">Followers</option></select></label>
+              <label className="text-xs font-bold text-slate-600">Audience<select value={audience} onChange={event => setAudience(event.target.value as Audience)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-normal"><option value="public">Public</option><option value="followers" disabled>Followers (temporarily unavailable)</option></select></label>
               <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-3 text-xs font-bold"><input type="checkbox" checked={allowComments} onChange={event => setAllowComments(event.target.checked)} /> Comments</label>
               <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-3 text-xs font-bold"><input type="checkbox" checked={allowReshare} onChange={event => setAllowReshare(event.target.checked)} /> Resharing</label>
             </div>
@@ -444,7 +477,7 @@ export default function DiscoverPage() {
           <div className="w-full max-w-lg rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6">
             <div className="flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-600">Creator controls</p><h2 className="text-xl font-black">Active Edge preferences</h2></div><button type="button" onClick={() => setPreferencesOpen(false)} className="rounded-full p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
             <div className="mt-5 space-y-3">
-              <div className="rounded-2xl border border-slate-200 p-4"><p className="text-sm font-bold">Default audience</p><p className="mt-1 text-xs text-slate-500">Choose the default visibility for new updates.</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => setAudience('public')} className={'rounded-full px-4 py-2 text-xs font-bold ' + (audience === 'public' ? 'bg-emerald-600 text-white' : 'bg-slate-100')}>Public</button><button type="button" onClick={() => setAudience('followers')} className={'rounded-full px-4 py-2 text-xs font-bold ' + (audience === 'followers' ? 'bg-emerald-600 text-white' : 'bg-slate-100')}>Followers</button></div></div>
+              <div className="rounded-2xl border border-slate-200 p-4"><p className="text-sm font-bold">Default audience</p><p className="mt-1 text-xs text-slate-500">Choose the default visibility for new updates. Followers-only is disabled until follower relationships can be verified.</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => setAudience('public')} className={'rounded-full px-4 py-2 text-xs font-bold ' + (audience === 'public' ? 'bg-emerald-600 text-white' : 'bg-slate-100')}>Public</button><button type="button" disabled className="rounded-full bg-slate-100 px-4 py-2 text-xs font-bold text-slate-400">Followers (unavailable)</button></div></div>
               <label className="flex items-center justify-between rounded-2xl border border-slate-200 p-4"><span><span className="block text-sm font-bold">Allow comments</span><span className="text-xs text-slate-500">Let people respond to your updates.</span></span><input type="checkbox" checked={allowComments} onChange={event => setAllowComments(event.target.checked)} /></label>
               <label className="flex items-center justify-between rounded-2xl border border-slate-200 p-4"><span><span className="block text-sm font-bold">Allow resharing</span><span className="text-xs text-slate-500">Let personal posts be reshared.</span></span><input type="checkbox" checked={allowReshare} onChange={event => setAllowReshare(event.target.checked)} /></label>
             </div>

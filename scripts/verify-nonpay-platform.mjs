@@ -1,0 +1,337 @@
+import fs from "node:fs";
+import path from "node:path";
+
+const root = process.cwd();
+const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const assert = (condition, message) => {
+  if (!condition) {
+    console.error("FAIL:", message);
+    process.exitCode = 1;
+    return;
+  }
+  console.log("PASS:", message);
+};
+
+const requiredFiles = [
+  "src/App.tsx",
+  "server.ts",
+  "src/pages/messages/MessagesPage.tsx",
+  "src/pages/messages/ChatView.tsx",
+  "src/lib/os/communication-db.ts",
+  "src/pages/UniqueSharePage.tsx",
+  "src/pages/StorePage.tsx",
+  "src/pages/store/StoreOrdersPage.tsx",
+  "src/pages/UniqueAiPage.tsx",
+  "src/pages/public/FlightsPage.tsx",
+  "src/pages/public/HotelsEventsPage.tsx",
+  "src/pages/HealthWellnessPage.tsx",
+  "src/pages/EducationHubPage.tsx",
+  "src/server/uniqueShareRoutes.ts",
+  "src/server/storeOrderLifecycleRoutes.ts",
+  "src/server/storeInventoryLedger.ts",
+  "firestore.rules",
+  "storage.rules",
+];
+for (const file of requiredFiles) {
+  assert(fs.existsSync(path.join(root, file)), `required non-Pay platform file exists: ${file}`);
+}
+
+const app = read("src/App.tsx");
+const appRoutes = [...app.matchAll(/path=["']\/?([^"']+)["']/g)].map((match) => match[1]);
+for (const route of [
+  "messages/*",
+  "unique-share",
+  "store",
+  "ai",
+  "flights",
+  "hotels-events",
+  "health-wellness",
+  "education-hub",
+]) {
+  assert(appRoutes.includes(route), `frontend route is registered: ${route}`);
+}
+
+const server = read("server.ts");
+for (const route of [
+  '"/api/communication/conversations"',
+  '"/api/communication/messages"',
+  '"/api/store/checkout"',
+  '"/api/ai/public-chat"',
+  '"/api/ai/discovery"',
+]) {
+  assert(server.includes(route), `backend route surface is registered: ${route}`);
+}
+
+const share = read("src/server/uniqueShareRoutes.ts");
+assert(share.includes('"/api/unique-share/sessions"'), "UniqueShare API routes are registered in their dedicated route module");
+for (const safeguard of [
+  "authenticate",
+  "session.senderUid !== uid && session.receiverUid !== uid",
+  "session.receiverUid !== uid",
+  "actionLimiter",
+  'import { getStorage } from "firebase-admin/storage"',
+  "getStorage().bucket().file(String(file.storagePath)).getMetadata()",
+  'custom.source !== "UniqueShare"',
+  "custom.sessionId !== sessionId",
+  "custom.senderUid !== uid",
+  "actualSize !== Number(file.sizeBytes)",
+  'UPLOAD_NOT_VERIFIED',
+]) {
+  assert(share.includes(safeguard), `UniqueShare authorization/transfer-verification safeguard exists: ${safeguard}`);
+}
+
+const storeLifecycle = read("src/server/storeOrderLifecycleRoutes.ts");
+for (const safeguard of [
+  "hasRolePermission",
+  "authenticate",
+  "rateLimit",
+  "TRANSITIONS[currentStatus] !== targetStatus",
+  "order.sellerId",
+  "orderBusinessId === activeBusinessId",
+  "orderBranchId === assignedBranchId",
+  "DELIVERY_CONFIRMATION_REQUIRES_PROOF",
+  "transaction.create(db.collection('audit_logs').doc()",
+]) {
+  assert(storeLifecycle.includes(safeguard), `Store order lifecycle safeguard exists: ${safeguard}`);
+}
+
+const inventoryLedger = read("src/server/storeInventoryLedger.ts");
+for (const safeguard of [
+  "INVALID_INVENTORY_MOVEMENT",
+  "quantityDelta + input.previousQuantity !== input.resultingQuantity",
+  "expectedDirection[input.movementType]?.includes(input.direction)",
+  "Number.isSafeInteger(input.quantity)",
+  "transaction.create(movementRef",
+]) {
+  assert(inventoryLedger.includes(safeguard), `Store inventory ledger invariant exists: ${safeguard}`);
+}
+
+const permissionRules = read("firestore.rules");
+const userRules = permissionRules.slice(
+  permissionRules.indexOf("match /users/{userId}"),
+  permissionRules.indexOf("match /profiles/{userId}"),
+);
+assert(
+  userRules.includes("request.resource.data.keys().hasOnly([") &&
+    !userRules.includes("!('administrator' in request.resource.data.roles)"),
+  "client-created user profiles cannot self-assign privileged roles, permissions, or status",
+);
+const jobRules = permissionRules.slice(
+  permissionRules.indexOf("match /jobs/{jobId}"),
+  permissionRules.indexOf("match /jobApplications/{applicationId}"),
+);
+assert(
+  jobRules.includes("'business_owner' in get(") &&
+    jobRules.includes("isAdmin()"),
+  "job publishing requires a business-owner role or administrator authorization in Firestore rules",
+);
+
+const serviceRules = read("firestore.rules");
+const serviceRequestRules = serviceRules.slice(
+  serviceRules.indexOf("match /serviceRequests/{requestId}"),
+  serviceRules.indexOf("match /professionalRequests/{requestId}"),
+);
+const professionalRequestRules = serviceRules.slice(
+  serviceRules.indexOf("match /professionalRequests/{requestId}"),
+  serviceRules.indexOf("match /workAgreements/{agreementId}"),
+);
+const agreementRules = serviceRules.slice(
+  serviceRules.indexOf("match /workAgreements/{agreementId}"),
+  serviceRules.indexOf("match /services/{serviceId}"),
+);
+assert(
+  serviceRequestRules.includes("resource.data.status == 'requested'") &&
+    serviceRequestRules.includes("resource.data.providerUid == request.auth.uid"),
+  "service requests are limited to their named provider and one valid response transition",
+);
+assert(
+  professionalRequestRules.includes("resource.data.requesterUid == request.auth.uid") &&
+    professionalRequestRules.includes("request.resource.data.visibility == 'public'"),
+  "professional requests enforce owner identity and explicit public publication",
+);
+assert(
+  agreementRules.includes("request.resource.data.createdByUid == request.auth.uid") &&
+    agreementRules.includes("request.resource.data.createdByUid == request.resource.data.clientUid || request.resource.data.createdByUid == request.resource.data.providerUid") &&
+    agreementRules.includes("request.resource.data.clientAccepted == false") &&
+    agreementRules.includes("request.resource.data.providerAccepted == false") &&
+    agreementRules.includes("request.resource.data.status == ("),
+  "work agreements enforce linked accepted requests and two-party acceptance state",
+);
+const serviceListingRules = serviceRules.slice(
+  serviceRules.indexOf("match /services/{serviceId}"),
+  serviceRules.indexOf("\n  }\n}", serviceRules.indexOf("match /services/{serviceId}")),
+);
+assert(
+  serviceListingRules.includes("'business_owner' in get(") &&
+    serviceListingRules.includes("isAdmin()"),
+  "service listing create/update requires business-owner or administrator authorization",
+);
+
+const activeEdgeRules = read("firestore.rules");
+const activeEdgePostRules = activeEdgeRules.slice(
+  activeEdgeRules.indexOf("match /edgePosts/{postId}"),
+  activeEdgeRules.indexOf("match /edgeStatuses/{statusId}"),
+);
+assert(
+  activeEdgePostRules.includes("resource.data.audience == 'public'") &&
+    activeEdgePostRules.includes("data.authorUid == request.auth.uid") &&
+    activeEdgePostRules.includes("data.audience == 'public'") &&
+    activeEdgePostRules.includes("allow read: if (exists("),
+  "Active Edge follower-only posts and nested likes/comments are not publicly readable",
+);
+const discoverPage = read("src/pages/public/DiscoverPage.tsx");
+assert(
+  discoverPage.includes("where('audience', '==', 'public')") &&
+    discoverPage.includes("where('authorUid', '==', currentUser.uid)") &&
+    discoverPage.includes("Followers-only posting is temporarily disabled") &&
+    discoverPage.includes("defaultAudience: 'public'"),
+  "Active Edge feed explicitly queries public posts, retains the owner's private posts, and disables unsupported followers-only publishing",
+);
+
+const contributionRules = read("firestore.rules");
+const contributionOfferRules = contributionRules.slice(
+  contributionRules.indexOf("match /contributionOffers/{offerId}"),
+  contributionRules.indexOf("match /businesses/{businessId}"),
+);
+assert(
+  contributionOfferRules.includes("resource.data.status == 'pending'") &&
+    contributionOfferRules.includes("request.resource.data.status == 'withdrawn'") &&
+    contributionOfferRules.includes("request.resource.data.status in ['accepted','rejected']") &&
+    contributionOfferRules.includes(".data.status == 'published'"),
+  "contribution offers allow only one pending-to-final transition and require an open request for acceptance",
+);
+
+const educationRules = read("firestore.rules");
+const educationTypes = read("src/lib/education/educationTypes.ts");
+const educationPage = read("src/pages/EducationPage.tsx");
+assert(
+  educationRules.includes("request.resource.data.status == 'draft'") &&
+    educationRules.includes("'pending_review'") &&
+    educationRules.includes("isPlatformAdmin()"),
+  "Education institutions and courses require draft creation and admin-controlled publication",
+);
+assert(
+  educationTypes.includes("'pending_review'") &&
+    educationPage.includes("requestInstitutionReview") &&
+    educationPage.includes("requestCourseReview") &&
+    educationPage.includes("Submit for review"),
+  "EducationHub submits owner-created institutions/courses for review instead of self-publishing",
+);
+
+const communicationDocs = read("src/lib/os/communication-docs.md");
+const chatView = read("src/pages/messages/ChatView.tsx");
+const communicationDb = read("src/lib/os/communication-db.ts");
+assert(
+  /real-time message subscription code/i.test(communicationDocs),
+  "communication documentation reflects implemented native messaging source",
+);
+assert(
+  chatView.includes("subscribeToMessagesForConversation"),
+  "chat UI subscribes to live conversation messages",
+);
+assert(
+  communicationDb.includes("onSnapshot"),
+  "communication data layer contains Firestore real-time subscriptions",
+);
+assert(
+  /Not yet certified/i.test(communicationDocs),
+  "communication documentation distinguishes source presence from production E2E certification",
+);
+
+const communicationServer = read("server.ts");
+assert(
+  communicationServer.includes('app.post("/api/communication/messages", authenticate, rateLimit(') &&
+    communicationServer.includes("const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(draft.conversationId, senderUid));") &&
+    communicationServer.includes("if (!conversationSnapshot.exists || !membershipSnapshot.exists)") &&
+    communicationServer.includes("A valid idempotency key is required."),
+  "server-side message sending requires authentication, conversation membership, and an idempotency key",
+);
+assert(
+  communicationServer.includes("if (forwardBlock.exists || reverseBlock.exists) return errorResponse(res, 'BLOCKED'") &&
+    communicationServer.includes("if (draft.encryptedPayload && !otherUids.includes(draft.encryptedPayload.recipientId))"),
+  "message sending checks bilateral block records and prevents encrypted recipients outside the conversation",
+);
+assert(
+  communicationServer.includes("actualSize !== attachment.sizeBytes || actualContentType !== attachment.contentType") &&
+    communicationServer.includes("One or more message attachments could not be verified."),
+  "server verifies stored attachment size and content type before accepting a message",
+);
+assert(
+  communicationServer.includes('app.get("/api/communication/conversations/:conversationId/messages", authenticate, rateLimit(') &&
+    communicationServer.includes("You are not a member of this conversation.") &&
+    communicationServer.includes(".where('conversationId', '==', conversationId)"),
+  "message-history endpoint requires authentication and membership before returning conversation messages",
+);
+assert(
+  communicationServer.includes('app.post("/api/communication/messages/:messageId/delivery", authenticate, rateLimit(') &&
+    communicationServer.includes("if (!membershipSnapshot.exists) throw new Error('FORBIDDEN')") &&
+    communicationServer.includes("if (message.senderId === uid) throw new Error('SENDER_CANNOT_UPDATE_DELIVERY')"),
+  "delivery/read status changes require conversation membership and are restricted to recipients",
+);
+assert(
+  communicationServer.includes('app.post("/api/communication/media/upload", authenticate, rateLimit(') &&
+    communicationServer.includes("if (!membershipSnapshot.exists) return errorResponse(res, 'INVALID_REQUEST', 'You are not a member of this conversation.', 403)") &&
+    communicationServer.includes("if (body.length > maxBytes)"),
+  "message attachment upload requires authentication, membership, MIME allowlisting, and bounded file size",
+);
+
+const conversationRules = read("firestore.rules");
+assert(
+  conversationRules.includes("function isConversationMember(conversationId)") &&
+    conversationRules.includes("exists(/databases/$(database)/documents/conversationMembers/$(conversationMemberId(conversationId, request.auth.uid)))") &&
+    conversationRules.includes("match /conversations/{conversationId} { allow read: if isConversationMember(conversationId); allow create, update, delete: if false; }") &&
+    conversationRules.includes("match /messages/{messageId} { allow read: if isConversationMember(resource.data.conversationId); allow create, update, delete: if false; }"),
+  "conversation and message reads are membership-gated and client-side direct writes are denied by Firestore rules",
+);
+
+const messageStorageRules = read("storage.rules");
+assert(
+  messageStorageRules.includes("match /messages/{conversationId}/{uid}/{fileName}") &&
+    messageStorageRules.includes("allow read: if isConversationMember(conversationId)") &&
+    messageStorageRules.includes("allow create, update: if isConversationMember(conversationId)") &&
+    messageStorageRules.includes("request.auth.uid == uid"),
+  "message attachment storage access is conversation-member-gated and uploads are scoped to the authenticated user's path",
+);
+assert(
+  communicationDb.includes("export async function getOlderMessagesForConversation") &&
+    communicationDb.includes("startAfter(Timestamp.fromDate(beforeDate))") &&
+    chatView.includes("getOlderMessagesForConversation(id, oldestMessage.createdAt, 100)"),
+  "messaging source includes cursor-based older-message pagination",
+);
+assert(
+  chatView.includes("conversation?.type !== 'direct'") &&
+    chatView.includes("setOtherUid(null)") &&
+    chatView.includes("setOtherPresence(null)") &&
+    chatView.includes("setBlocked(false)"),
+  "group chats cannot accidentally expose a first member as the direct-chat presence/block target",
+);
+
+const flightPage = read("src/pages/public/FlightsPage.tsx");
+assert(
+  flightPage.includes("Live flight booking is not available yet") &&
+    flightPage.includes("No reservation or booking request has been submitted") &&
+    flightPage.includes("ticket-issuance flow can be verified end to end"),
+  "Flights page clearly blocks unverified booking and never implies a ticket or reservation was issued",
+);
+
+const hotelsPage = read("src/pages/public/HotelsEventsPage.tsx").replace(/\s+/g, " ");
+assert(
+  hotelsPage.includes("Live hotel and event booking is unavailable") &&
+    hotelsPage.includes("No search, reservation or booking request can be submitted") &&
+    hotelsPage.includes("verified partners provide live inventory"),
+  "Hotels & Events page discloses missing inventory and prevents false reservation expectations",
+);
+
+const healthPage = read("src/pages/HealthWellnessPage.tsx");
+assert(
+  healthPage.includes("Live healthcare-provider search is not connected yet") &&
+    healthPage.includes("No provider was contacted, prescription was sent, appointment was booked") &&
+    healthPage.includes("Prescription submission unavailable"),
+  "Health & Wellness page prevents false claims about provider contact, prescriptions, and appointments",
+);
+
+console.warn(
+  "BLOCKER (not a CI failure): Flights, Hotels & Events, and Health & Wellness remain unavailable until verified provider integrations and end-to-end tests are completed.",
+);
+
+console.log("\nPay-excluded source-contract checks completed. These checks do not prove runtime behavior, provider connectivity, or end-to-end success.");

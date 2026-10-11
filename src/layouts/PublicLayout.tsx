@@ -124,22 +124,22 @@ export default function PublicLayout() {
 
       <Link
         to="/admin/login"
-        aria-label="Authorized access"
-        title="Authorized access"
-        className="fixed bottom-[5.25rem] left-3 z-[90] hidden md:flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/70 bg-white/55 text-slate-300 shadow-sm backdrop-blur-sm transition-all duration-200 hover:h-8 hover:w-8 hover:border-emerald-300 hover:bg-white hover:text-emerald-600 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+        aria-label="Admin access"
+        title="Admin access"
+        className="group fixed bottom-9 left-2 z-[90] hidden md:flex h-6 w-6 items-center justify-center rounded-full border border-slate-800/20 bg-slate-950 text-white shadow-md transition hover:scale-110 hover:bg-black focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-700/50"
       >
-        <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.25} />
-        <span className="sr-only">Authorized access</span>
+        <ArrowRight className="h-3 w-3" strokeWidth={2.5} />
+        <span className="sr-only">Admin access</span>
       </Link>
 
       <MobileBottomNav variant="public" onMenu={() => setIsMobileMenuOpen(true)} />
       <Link
         to="/admin/login"
-        aria-label="Open Super Admin"
-        title="Super Admin"
-        className="hidden md:flex fixed bottom-3 left-3 z-[70] h-9 w-9 items-center justify-center rounded-full border border-slate-300/70 bg-white/80 text-slate-500 shadow-sm backdrop-blur transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+        aria-label="Super Admin access"
+        title="Super Admin access"
+        className="group fixed bottom-2 left-2 z-[70] hidden md:flex h-5 w-5 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
       >
-        <span aria-hidden="true" className="text-lg leading-none">←</span>
+        <span aria-hidden="true" className="h-2 w-2 rounded-full bg-red-600 shadow-[0_0_5px_rgba(220,38,38,0.35)] transition group-hover:scale-125 group-hover:bg-red-700" />
       </Link>
     </div>
   );

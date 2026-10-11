@@ -29,14 +29,14 @@ service cloud.firestore {
 
     match /educationInstitutions/{institutionId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isPlatformAdmin();
-      allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.status in ['draft','published'];
-      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','type','location','description','status','updatedAt']) && request.resource.data.status in ['draft','published','suspended'] || isPlatformAdmin();
+      allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.status == 'draft';
+      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','type','location','description','status','updatedAt']) && (request.resource.data.status == resource.data.status || request.resource.data.status in ['draft','pending_review']) || isPlatformAdmin();
       allow delete: if isPlatformAdmin();
     }
     match /educationCourses/{courseId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isPlatformAdmin();
-      allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.institutionId is string && exists(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId)) && get(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId)).data.ownerUid == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.institutionId == resource.data.institutionId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','level','status','updatedAt']) && request.resource.data.status in ['draft','published','archived'] || isPlatformAdmin();
+      allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.status == 'draft' && request.resource.data.keys().hasOnly(['ownerUid','institutionId','title','description','level','status','createdAt','updatedAt']) && request.resource.data.institutionId is string && exists(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId)) && get(/databases/$(database)/documents/educationInstitutions/$(request.resource.data.institutionId)).data.ownerUid == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.institutionId == resource.data.institutionId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','level','status','updatedAt']) && (request.resource.data.status == resource.data.status || request.resource.data.status in ['draft','pending_review','archived']) || isPlatformAdmin();
       allow delete: if isPlatformAdmin();
     }
     match /educationEnrollments/{enrollmentId} {
@@ -70,7 +70,15 @@ service cloud.firestore {
     match /authCredentials/{userId} { allow read, write: if false; }
     match /users/{userId} {
       allow read: if isOwner(userId) || isPlatformAdmin();
-      allow create: if isOwner(userId) && (!('roles' in request.resource.data) || !('administrator' in request.resource.data.roles));
+      // Privileged identity claims must only be provisioned by trusted server-side flows.
+      // A client-created profile may contain safe profile fields, never roles/permissions/status.
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'uid','firstName','otherName','lastName','fullName','username',
+          'preferredLanguage','profilePhotoUrl','address','shippingAddresses',
+          'communicationProfile'
+        ])
+        && (!('uid' in request.resource.data) || request.resource.data.uid == userId);
       // User role/permission/status changes are server-controlled. Do not let
       // an authenticated admin client mutate the control-plane user document
       // directly; privileged changes go through authenticated server RBAC routes.
@@ -100,8 +108,16 @@ service cloud.firestore {
     }
     match /jobs/{jobId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.employerUid == request.auth.uid) || isPlatformAdmin();
-      allow create: if isAuthenticated() && request.resource.data.employerUid == request.auth.uid && request.resource.data.status in ['draft','published'];
-      allow update: if isAuthenticated() && resource.data.employerUid == request.auth.uid && request.resource.data.employerUid == resource.data.employerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','companyName','category','location','employmentType','description','status','updatedAt']) && request.resource.data.status in ['draft','published','closed'];
+      allow create: if isAuthenticated()
+        && request.resource.data.employerUid == request.auth.uid
+        && ('business_owner' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles || isAdmin())
+        && request.resource.data.status in ['draft','published'];
+      allow update: if isAuthenticated()
+        && resource.data.employerUid == request.auth.uid
+        && request.resource.data.employerUid == resource.data.employerUid
+        && ('business_owner' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles || isAdmin())
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','companyName','category','location','employmentType','description','status','updatedAt'])
+        && request.resource.data.status in ['draft','published','closed'];
       allow delete: if isPlatformAdmin();
     }
     match /jobApplications/{applicationId} {
@@ -159,9 +175,15 @@ service cloud.firestore {
           && request.resource.data.requesterUid == resource.data.requesterUid
           && request.resource.data.requestId == resource.data.requestId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt'])
+          && resource.data.status == 'pending'
           && (
-            (resource.data.contributorUid == request.auth.uid && request.resource.data.status in ['pending','withdrawn'])
-            || (resource.data.requesterUid == request.auth.uid && request.resource.data.status in ['accepted','rejected'])
+            (resource.data.contributorUid == request.auth.uid && request.resource.data.status == 'withdrawn')
+            || (resource.data.requesterUid == request.auth.uid
+              && request.resource.data.status in ['accepted','rejected']
+              && (request.resource.data.status == 'rejected'
+                || (exists(/databases/$(database)/documents/contributionRequests/$(resource.data.requestId))
+                  && get(/databases/$(database)/documents/contributionRequests/$(resource.data.requestId)).data.requesterUid == request.auth.uid
+                  && get(/databases/$(database)/documents/contributionRequests/$(resource.data.requestId)).data.status == 'published')))
           ));
       allow delete: if isPlatformAdmin();
     }
@@ -431,7 +453,7 @@ service cloud.firestore {
     }
 
     match /edgePosts/{postId} {
-      allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.authorUid == request.auth.uid) || isPlatformAdmin();
+      allow read: if (resource.data.status == 'published' && resource.data.audience == 'public') || (isAuthenticated() && resource.data.authorUid == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated()
         && request.resource.data.authorUid == request.auth.uid
         && request.resource.data.status == 'published'
@@ -471,11 +493,12 @@ service cloud.firestore {
       allow delete: if isPlatformAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
 
       match /likes/{uid} {
-        allow read: if true;
+        allow read: if (exists(/databases/$(database)/documents/edgePosts/$(postId)) && get(/databases/$(database)/documents/edgePosts/$(postId)).data.status == 'published' && get(/databases/$(database)/documents/edgePosts/$(postId)).data.audience == 'public') || (isAuthenticated() && exists(/databases/$(database)/documents/edgePosts/$(postId)) && get(/databases/$(database)/documents/edgePosts/$(postId)).data.authorUid == request.auth.uid) || isPlatformAdmin();
         allow create: if isAuthenticated()
           && uid == request.auth.uid
           && exists(/databases/$(database)/documents/edgePosts/$(postId))
           && get(/databases/$(database)/documents/edgePosts/$(postId)).data.status == 'published'
+          && get(/databases/$(database)/documents/edgePosts/$(postId)).data.audience == 'public'
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.keys().hasOnly(['uid','name','createdAt']);
         allow delete: if isAuthenticated() && uid == request.auth.uid;
@@ -483,10 +506,11 @@ service cloud.firestore {
       }
 
       match /comments/{commentId} {
-        allow read: if true;
+        allow read: if (exists(/databases/$(database)/documents/edgePosts/$(postId)) && get(/databases/$(database)/documents/edgePosts/$(postId)).data.status == 'published' && get(/databases/$(database)/documents/edgePosts/$(postId)).data.audience == 'public') || (isAuthenticated() && exists(/databases/$(database)/documents/edgePosts/$(postId)) && get(/databases/$(database)/documents/edgePosts/$(postId)).data.authorUid == request.auth.uid) || isPlatformAdmin();
         allow create: if isAuthenticated()
           && exists(/databases/$(database)/documents/edgePosts/$(postId))
           && get(/databases/$(database)/documents/edgePosts/$(postId)).data.status == 'published'
+          && get(/databases/$(database)/documents/edgePosts/$(postId)).data.audience == 'public'
           && get(/databases/$(database)/documents/edgePosts/$(postId)).data.allowComments == true
           && request.resource.data.authorUid == request.auth.uid
           && request.resource.data.authorName is string
@@ -626,12 +650,121 @@ service cloud.firestore {
         allow delete: if isAuthenticated() && resource.data.to == request.auth.uid;
       }
     }
+    match /serviceRequests/{requestId} {
+      allow read: if isPlatformAdmin()
+        || (isAuthenticated() && (
+          resource.data.requesterUid == request.auth.uid
+          || resource.data.providerUid == request.auth.uid
+        ));
+      allow create: if isAuthenticated()
+        && request.resource.data.requesterUid == request.auth.uid
+        && request.resource.data.providerUid is string
+        && request.resource.data.providerUid.size() > 0
+        && request.resource.data.providerUid != request.auth.uid
+        && request.resource.data.serviceId is string
+        && exists(/databases/$(database)/documents/services/$(request.resource.data.serviceId))
+        && get(/databases/$(database)/documents/services/$(request.resource.data.serviceId)).data.status == 'published'
+        && get(/databases/$(database)/documents/services/$(request.resource.data.serviceId)).data.ownerUid == request.resource.data.providerUid
+        && request.resource.data.status == 'requested'
+        && request.resource.data.paymentStatus == 'unpaid'
+        && request.resource.data.keys().hasOnly([
+          'requesterUid','requesterName','providerUid','serviceId','serviceTitle',
+          'providerName','status','paymentStatus','createdAt','updatedAt'
+        ]);
+      allow update: if isAuthenticated()
+        && resource.data.providerUid == request.auth.uid
+        && request.resource.data.requesterUid == resource.data.requesterUid
+        && resource.data.status == 'requested'
+        && request.resource.data.providerUid == resource.data.providerUid
+        && request.resource.data.serviceId == resource.data.serviceId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','respondedAt','updatedAt'])
+        && request.resource.data.status in ['accepted','declined'];
+      allow delete: if isPlatformAdmin();
+    }
+
+    match /professionalRequests/{requestId} {
+      allow read: if resource.data.visibility == 'public' && resource.data.status == 'published'
+        || (isAuthenticated() && resource.data.requesterUid == request.auth.uid)
+        || isPlatformAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.requesterUid == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 160
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 3000
+        && request.resource.data.status == 'published'
+        && request.resource.data.visibility == 'public'
+        && request.resource.data.keys().hasOnly([
+          'requesterUid','requesterName','title','category','location','requiredDate',
+          'budget','description','status','visibility','createdAt','updatedAt'
+        ]);
+      allow update: if isAuthenticated() && resource.data.requesterUid == request.auth.uid
+        && request.resource.data.requesterUid == resource.data.requesterUid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','category','location','requiredDate','budget','description','updatedAt']);
+      allow delete: if isPlatformAdmin();
+    }
+
+    match /workAgreements/{agreementId} {
+      allow read: if isPlatformAdmin()
+        || (isAuthenticated() && (
+          resource.data.clientUid == request.auth.uid
+          || resource.data.providerUid == request.auth.uid
+        ));
+      allow create: if isAuthenticated()
+        && request.resource.data.createdByUid == request.auth.uid
+        && (request.resource.data.createdByUid == request.resource.data.clientUid || request.resource.data.createdByUid == request.resource.data.providerUid)
+        && request.resource.data.clientUid is string
+        && request.resource.data.providerUid is string
+        && request.resource.data.clientUid != request.resource.data.providerUid
+        && request.resource.data.serviceRequestId is string
+        && exists(/databases/$(database)/documents/serviceRequests/$(request.resource.data.serviceRequestId))
+        && get(/databases/$(database)/documents/serviceRequests/$(request.resource.data.serviceRequestId)).data.status == 'accepted'
+        && get(/databases/$(database)/documents/serviceRequests/$(request.resource.data.serviceRequestId)).data.requesterUid == request.resource.data.clientUid
+        && get(/databases/$(database)/documents/serviceRequests/$(request.resource.data.serviceRequestId)).data.providerUid == request.resource.data.providerUid
+        && request.resource.data.status == 'pending_acceptance'
+        && request.resource.data.clientAccepted == false
+        && request.resource.data.providerAccepted == false
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.scope is string
+        && request.resource.data.scope.size() > 0
+        && request.resource.data.keys().hasOnly([
+          'serviceRequestId','clientUid','providerUid','serviceId','title','scope','price',
+          'currency','startDate','completionDate','responsibilities','cancellationTerms',
+          'status','clientAccepted','providerAccepted','createdByUid','createdAt','updatedAt'
+        ]);
+      allow update: if isAuthenticated()
+        && (resource.data.clientUid == request.auth.uid || resource.data.providerUid == request.auth.uid)
+        && request.resource.data.clientUid == resource.data.clientUid
+        && request.resource.data.providerUid == resource.data.providerUid
+        && request.resource.data.createdByUid == resource.data.createdByUid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'clientAccepted','providerAccepted','status','updatedAt'
+        ])
+        && (
+          (resource.data.clientUid == request.auth.uid
+            && request.resource.data.clientAccepted == true
+            && request.resource.data.providerAccepted == resource.data.providerAccepted)
+          || (resource.data.providerUid == request.auth.uid
+            && request.resource.data.providerAccepted == true
+            && request.resource.data.clientAccepted == resource.data.clientAccepted)
+        )
+        && request.resource.data.status == (
+          request.resource.data.clientAccepted && request.resource.data.providerAccepted
+            ? 'active' : 'pending_acceptance'
+        );
+      allow delete: if isPlatformAdmin();
+    }
+
     match /services/{serviceId} {
       allow read: if resource.data.status == 'published'
         || (isAuthenticated() && resource.data.ownerUid == request.auth.uid)
         || isPlatformAdmin();
       allow create: if isAuthenticated()
         && request.resource.data.ownerUid == request.auth.uid
+        && ('business_owner' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles || isAdmin())
         && request.resource.data.status in ['draft','published']
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
@@ -654,6 +787,7 @@ service cloud.firestore {
       allow update: if isPlatformAdmin()
         || (isAuthenticated()
           && resource.data.ownerUid == request.auth.uid
+          && ('business_owner' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles || isAdmin())
           && request.resource.data.ownerUid == resource.data.ownerUid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'providerName','title','category','description','price','currency','durationHours','status','updatedAt'
