@@ -246,7 +246,7 @@ assert(
   "Flights page clearly blocks unverified booking and never implies a ticket or reservation was issued",
 );
 
-const hotelsPage = read("src/pages/public/HotelsEventsPage.tsx");
+const hotelsPage = read("src/pages/public/HotelsEventsPage.tsx").replace(/\\s+/g, " ");
 assert(
   hotelsPage.includes("Live hotel and event booking is unavailable") &&
     hotelsPage.includes("No search, reservation or booking request can be submitted") &&
