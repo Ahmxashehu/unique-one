@@ -51,7 +51,6 @@ const server = read("server.ts");
 for (const route of [
   '"/api/communication/conversations"',
   '"/api/communication/messages"',
-  '"/api/unique-share/sessions"',
   '"/api/store/checkout"',
   '"/api/ai/public-chat"',
   '"/api/ai/discovery"',
