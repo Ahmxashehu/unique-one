@@ -238,18 +238,35 @@ assert(
   "communication documentation distinguishes source presence from production E2E certification",
 );
 
-const providerPages = [
-  ["Flights", "src/pages/public/FlightsPage.tsx"],
-  ["Hotels & Events", "src/pages/public/HotelsEventsPage.tsx"],
-  ["Health & Wellness", "src/pages/HealthWellnessPage.tsx"],
-];
-for (const [feature, file] of providerPages) {
-  const source = read(file);
-  const hasExplicitStatus = /not connected|not been confirmed|cannot be submitted|unavailable|not yet/i.test(source);
-  if (hasExplicitStatus) {
-    console.warn(`BLOCKER (not a CI failure): ${feature} source still documents an unavailable/unverified live provider flow.`);
-  } else {
-    console.log(`REVIEW: ${feature} has no known unavailable-provider phrase; verify live integration manually.`);
+const flightPage = read("src/pages/public/FlightsPage.tsx");
+assert(
+  flightPage.includes("Live flight booking is not available yet") &&
+    flightPage.includes("No reservation or booking request has been submitted") &&
+    flightPage.includes("ticket-issuance flow can be verified end to end"),
+  "Flights page clearly blocks unverified booking and never implies a ticket or reservation was issued",
+);
+
+const hotelsPage = read("src/pages/public/HotelsEventsPage.tsx");
+assert(
+  hotelsPage.includes("Live hotel and event booking is unavailable") &&
+    hotelsPage.includes("No search, reservation or booking request can be submitted") &&
+    hotelsPage.includes("verified partners provide live inventory"),
+  "Hotels & Events page discloses missing inventory and prevents false reservation expectations",
+);
+
+const healthPage = read("src/pages/HealthWellnessPage.tsx");
+assert(
+  healthPage.includes("Live healthcare-provider search is not connected yet") &&
+    healthPage.includes("No provider was contacted, prescription was sent, appointment was booked") &&
+    healthPage.includes("Prescription submission unavailable"),
+  "Health & Wellness page prevents false claims about provider contact, prescriptions, and appointments",
+);
+
+console.warn(
+  "BLOCKER (not a CI failure): Flights, Hotels & Events, and Health & Wellness remain unavailable until verified provider integrations and end-to-end tests are completed.",
+);
+
+console.log(`REVIEW: ${feature} has no known unavailable-provider phrase; verify live integration manually.`);
   }
 }
 
