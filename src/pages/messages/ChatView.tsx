@@ -83,6 +83,14 @@ export default function ChatView() {
 
   const loadOtherPresence = useCallback(async () => {
     if (!id || !currentUser) return;
+    // Group conversations do not have a single peer. Never treat the first
+    // other member as the recipient for direct-chat presence or block actions.
+    if (conversation?.type !== 'direct') {
+      setOtherUid(null);
+      setOtherPresence(null);
+      setBlocked(false);
+      return;
+    }
     try {
       const token = await currentUser.getIdToken();
       const response = await fetch(`/api/communication/conversations/${id}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -115,7 +123,7 @@ export default function ChatView() {
     } catch (err) {
       console.error('Presence read failed:', err);
     }
-  }, [id, currentUser]);
+  }, [id, currentUser, conversation?.type]);
 
   useEffect(() => {
     let active = true;
