@@ -34,7 +34,7 @@ for (const file of requiredFiles) {
 }
 
 const app = read("src/App.tsx");
-const appRoutes = [...app.matchAll(/path=["']\\/?([^"']+)["']/g)].map((match) => match[1]);
+const appRoutes = [...app.matchAll(/path=["']\/?([^"']+)["']/g)].map((match) => match[1]);
 for (const route of [
   "messages/*",
   "unique-share",
