@@ -248,7 +248,7 @@ assert(
 );
 assert(
   communicationServer.includes("if (forwardBlock.exists || reverseBlock.exists) return errorResponse(res, 'BLOCKED'") &&
-    communicationServer.includes("if (!otherUids.includes(draft.encryptedPayload.recipientId))"),
+    communicationServer.includes("if (draft.encryptedPayload && !otherUids.includes(draft.encryptedPayload.recipientId))"),
   "message sending checks bilateral block records and prevents encrypted recipients outside the conversation",
 );
 assert(
