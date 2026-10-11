@@ -175,9 +175,15 @@ service cloud.firestore {
           && request.resource.data.requesterUid == resource.data.requesterUid
           && request.resource.data.requestId == resource.data.requestId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt'])
+          && resource.data.status == 'pending'
           && (
-            (resource.data.contributorUid == request.auth.uid && request.resource.data.status in ['pending','withdrawn'])
-            || (resource.data.requesterUid == request.auth.uid && request.resource.data.status in ['accepted','rejected'])
+            (resource.data.contributorUid == request.auth.uid && request.resource.data.status == 'withdrawn')
+            || (resource.data.requesterUid == request.auth.uid
+              && request.resource.data.status in ['accepted','rejected']
+              && (request.resource.data.status == 'rejected'
+                || (exists(/databases/$(database)/documents/contributionRequests/$(resource.data.requestId))
+                  && get(/databases/$(database)/documents/contributionRequests/$(resource.data.requestId)).data.requesterUid == request.auth.uid
+                  && get(/databases/$(database)/documents/contributionRequests/$(resource.data.requestId)).data.status == 'published')))
           ));
       allow delete: if isPlatformAdmin();
     }
