@@ -40,3 +40,10 @@ assert(storeSearchPage.includes("/translation?language="), "Store search loads m
 assert(storeSearchPage.includes("slice(0, 4)"), "Store search limits automatic translation requests to protect the API quota");
 assert(storeSearchPage.includes("const translatedName"), "Store search displays translated product names with original-text fallback");
 assert(storeSearchPage.includes("Number(product.price).toLocaleString()"), "Store search keeps canonical product prices unchanged");
+
+const storeHomePage = read("src/pages/StorePage.tsx");
+assert(storeHomePage.includes("unique-language-change"), "Store home reacts to selected-language changes");
+assert(storeHomePage.includes("product.translations?.[language as ProductLanguage]"), "Store home uses persisted product translations");
+assert(storeHomePage.includes("/translation?language="), "Store home requests translations for uncached products");
+assert(storeHomePage.includes("getDisplayProductName(product)"), "Store home product, low-stock, and service cards use localized names");
+assert(storeHomePage.includes("Number(product.price).toLocaleString()"), "Store home keeps canonical product prices unchanged");
