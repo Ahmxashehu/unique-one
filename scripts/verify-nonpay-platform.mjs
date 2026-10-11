@@ -167,6 +167,27 @@ assert(
   "service listing create/update requires business-owner or administrator authorization",
 );
 
+const activeEdgeRules = read("firestore.rules");
+const activeEdgePostRules = activeEdgeRules.slice(
+  activeEdgeRules.indexOf("match /edgePosts/{postId}"),
+  activeEdgeRules.indexOf("match /edgeStatuses/{statusId}"),
+);
+assert(
+  activeEdgePostRules.includes("resource.data.audience == 'public'") &&
+    activeEdgePostRules.includes("data.authorUid == request.auth.uid") &&
+    activeEdgePostRules.includes("data.audience == 'public'") &&
+    activeEdgePostRules.includes("allow read: if (exists("),
+  "Active Edge follower-only posts and nested likes/comments are not publicly readable",
+);
+const discoverPage = read("src/pages/public/DiscoverPage.tsx");
+assert(
+  discoverPage.includes("where('audience', '==', 'public')") &&
+    discoverPage.includes("where('authorUid', '==', currentUser.uid)") &&
+    discoverPage.includes("Followers-only posting is temporarily disabled") &&
+    discoverPage.includes("defaultAudience: 'public'"),
+  "Active Edge feed explicitly queries public posts, retains the owner's private posts, and disables unsupported followers-only publishing",
+);
+
 const contributionRules = read("firestore.rules");
 const contributionOfferRules = contributionRules.slice(
   contributionRules.indexOf("match /contributionOffers/{offerId}"),
