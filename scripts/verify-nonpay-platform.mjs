@@ -243,7 +243,7 @@ assert(
   communicationServer.includes('app.post("/api/communication/messages", authenticate, rateLimit(') &&
     communicationServer.includes("const membershipRef = adminDb.collection('conversationMembers').doc(conversationMemberDocumentId(draft.conversationId, senderUid));") &&
     communicationServer.includes("if (!conversationSnapshot.exists || !membershipSnapshot.exists)") &&
-    communicationServer.includes("A valid message idempotency key is required."),
+    communicationServer.includes("A valid idempotency key is required."),
   "server-side message sending requires authentication, conversation membership, and an idempotency key",
 );
 assert(
