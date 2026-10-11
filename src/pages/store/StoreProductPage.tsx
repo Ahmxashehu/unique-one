@@ -5,6 +5,7 @@ import { db } from '../../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Product } from '../../lib/os/types';
 import { useAuth } from '../../contexts/AuthContext';
+import { getLanguage, type SupportedLanguage } from '../../lib/i18n';
 
 export default function StoreProductPage() {
   const { id } = useParams();
@@ -19,6 +20,37 @@ export default function StoreProductPage() {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+  const [language, setLanguage] = useState<SupportedLanguage>(() => getLanguage());
+  const [translatedText, setTranslatedText] = useState<{ language: SupportedLanguage; name: string; description: string; variants: { name: string; options: string[] }[] } | null>(null);
+
+  useEffect(() => {
+    const syncLanguage = (event: Event) => {
+      const detail = (event as CustomEvent<SupportedLanguage>).detail;
+      setLanguage(detail || getLanguage());
+    };
+    window.addEventListener('unique-language-change', syncLanguage);
+    return () => window.removeEventListener('unique-language-change', syncLanguage);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTranslatedText(null);
+    if (!id || !product || language === 'en') return () => { cancelled = true; };
+    const loadTranslation = async () => {
+      try {
+        const response = await fetch(`/api/store/products/${encodeURIComponent(id)}/translation?language=${encodeURIComponent(language)}`);
+        if (!response.ok) return;
+        const result = await response.json() as { language?: SupportedLanguage; name?: string; description?: string; variants?: { name: string; options: string[] }[] };
+        if (!cancelled && result.language === language && typeof result.name === 'string' && typeof result.description === 'string') {
+          setTranslatedText({ language, name: result.name, description: result.description, variants: Array.isArray(result.variants) ? result.variants : [] });
+        }
+      } catch {
+        // Preserve the seller's original listing when translation is unavailable.
+      }
+    };
+    void loadTranslation();
+    return () => { cancelled = true; };
+  }, [id, language, product?.name, product?.description]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -156,22 +188,25 @@ export default function StoreProductPage() {
         <div className="space-y-6">
           <div>
             <p className="text-sm font-medium text-slate-500 mb-2 uppercase tracking-wide">{product.category.replace('_', ' ')}</p>
-            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight leading-tight">{product.name}</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight leading-tight">{translatedText?.language === language ? translatedText.name : product.name}</h1>
             <div className="mt-4 flex items-end gap-4">
               <span className="text-3xl font-bold text-slate-900">{product.currency === 'NGN' ? '₦' : product.currency + ' '}{salePrice.toLocaleString()}</span>{hasDiscount && <span className="text-sm text-slate-400 line-through">{product.currency === 'NGN' ? '₦' : product.currency + ' '}{product.price.toLocaleString()}</span>}
               {product.quantity > 0 ? <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full mb-1">In Stock ({product.quantity})</span> : <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full mb-1">Out of Stock</span>}
             </div>
             {product.wholesalePrice && <p className="text-sm font-medium text-blue-600 mt-2">Wholesale: {product.currency === 'NGN' ? '₦' : '$'}{product.wholesalePrice.toLocaleString()} (Min qty: {product.minOrderQuantity})</p>}
           </div>
-          <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{product.description}</p>
+          <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{translatedText?.language === language ? translatedText.description : product.description}</p>
           {(product.variants || []).length > 0 && <div className="space-y-3 rounded-2xl border border-slate-200 p-4 bg-slate-50">
             <h3 className="font-bold text-slate-900">Choose options</h3>
-            {(product.variants || []).map(variant => <div key={variant.name}>
-              <label className="text-xs font-bold uppercase tracking-wide text-slate-500">{variant.name}</label>
+            {(product.variants || []).map((variant, variantIndex) => {
+              const displayVariant = translatedText?.language === language ? translatedText.variants[variantIndex] : undefined;
+              return <div key={variant.name}>
+              <label className="text-xs font-bold uppercase tracking-wide text-slate-500">{displayVariant?.name || variant.name}</label>
               <select value={selectedVariants[variant.name] || ''} onChange={e => setSelectedVariants(current => ({ ...current, [variant.name]: e.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold">
-                {variant.options.map(option => <option key={option} value={option}>{option}</option>)}
+                {variant.options.map((option, optionIndex) => <option key={option} value={option}>{displayVariant?.options?.[optionIndex] || option}</option>)}
               </select>
-            </div>)}
+            </div>;
+            })}
           </div>}
           {product.location?.address && <div className="flex items-center gap-1 text-sm text-slate-500"><MapPin className="w-4 h-4" /> {product.location.address}</div>}
           <div className="pt-6 border-t border-slate-100 space-y-4">

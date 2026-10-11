@@ -11,6 +11,7 @@ import { registerStoreOrderLifecycleRoutes } from './storeOrderLifecycleRoutes';
 import { registerStoreReturnInspectionRoutes } from './storeReturnInspectionRoutes';
 import { registerPaySmallSmallRoutes } from './paySmallSmallRoutes';
 import { registerRestaurantRoutes } from './restaurantRoutes';
+import { registerStoreProductTranslationRoutes } from './storeProductTranslationRoutes';
 
 const ALL_ROLES: Role[] = [
   'customer','buyer','seller','business_owner','staff_member','farmer','service_provider',
@@ -153,6 +154,7 @@ export function registerAdminRbacRoutes(
   registerBusinessDataRoutes(app, authenticate, db);
   registerBusinessInventoryRoutes(app, authenticate, db);
   registerBusinessProductRoutes(app, authenticate, db);
+  registerStoreProductTranslationRoutes(app);
   registerRestaurantRoutes(app, authenticate, db, requirePermission);
   registerBusinessOperationsRoutes(app, authenticate, db);
   registerStoreOrderLifecycleRoutes(app, authenticate, db);
