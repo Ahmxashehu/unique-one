@@ -70,7 +70,15 @@ service cloud.firestore {
     match /authCredentials/{userId} { allow read, write: if false; }
     match /users/{userId} {
       allow read: if isOwner(userId) || isPlatformAdmin();
-      allow create: if isOwner(userId) && (!('roles' in request.resource.data) || !('administrator' in request.resource.data.roles));
+      // Privileged identity claims must only be provisioned by trusted server-side flows.
+      // A client-created profile may contain safe profile fields, never roles/permissions/status.
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'uid','firstName','otherName','lastName','fullName','username',
+          'preferredLanguage','profilePhotoUrl','address','shippingAddresses',
+          'communicationProfile'
+        ])
+        && (!('uid' in request.resource.data) || request.resource.data.uid == userId);
       // User role/permission/status changes are server-controlled. Do not let
       // an authenticated admin client mutate the control-plane user document
       // directly; privileged changes go through authenticated server RBAC routes.
@@ -100,8 +108,16 @@ service cloud.firestore {
     }
     match /jobs/{jobId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.employerUid == request.auth.uid) || isPlatformAdmin();
-      allow create: if isAuthenticated() && request.resource.data.employerUid == request.auth.uid && request.resource.data.status in ['draft','published'];
-      allow update: if isAuthenticated() && resource.data.employerUid == request.auth.uid && request.resource.data.employerUid == resource.data.employerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','companyName','category','location','employmentType','description','status','updatedAt']) && request.resource.data.status in ['draft','published','closed'];
+      allow create: if isAuthenticated()
+        && request.resource.data.employerUid == request.auth.uid
+        && ('business_owner' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles || isAdmin())
+        && request.resource.data.status in ['draft','published'];
+      allow update: if isAuthenticated()
+        && resource.data.employerUid == request.auth.uid
+        && request.resource.data.employerUid == resource.data.employerUid
+        && ('business_owner' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles || isAdmin())
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','companyName','category','location','employmentType','description','status','updatedAt'])
+        && request.resource.data.status in ['draft','published','closed'];
       allow delete: if isPlatformAdmin();
     }
     match /jobApplications/{applicationId} {
