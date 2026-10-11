@@ -151,6 +151,7 @@ assert(
 );
 assert(
   agreementRules.includes("request.resource.data.createdByUid == request.auth.uid") &&
+    agreementRules.includes("request.resource.data.createdByUid == request.resource.data.clientUid || request.resource.data.createdByUid == request.resource.data.providerUid") &&
     agreementRules.includes("request.resource.data.clientAccepted == false") &&
     agreementRules.includes("request.resource.data.providerAccepted == false") &&
     agreementRules.includes("request.resource.data.status == ("),
