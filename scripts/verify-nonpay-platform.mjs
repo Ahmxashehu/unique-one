@@ -77,6 +77,23 @@ for (const safeguard of ["hasRolePermission", "authenticate", "rateLimit"]) {
   assert(storeLifecycle.includes(safeguard), `Store order lifecycle safeguard exists: ${safeguard}`);
 }
 
+const educationRules = read("firestore.rules");
+const educationTypes = read("src/lib/education/educationTypes.ts");
+const educationPage = read("src/pages/EducationPage.tsx");
+assert(
+  educationRules.includes("request.resource.data.status == 'draft'") &&
+    educationRules.includes("'pending_review'") &&
+    educationRules.includes("isPlatformAdmin()"),
+  "Education institutions and courses require draft creation and admin-controlled publication",
+);
+assert(
+  educationTypes.includes("'pending_review'") &&
+    educationPage.includes("requestInstitutionReview") &&
+    educationPage.includes("requestCourseReview") &&
+    educationPage.includes("Submit for review"),
+  "EducationHub submits owner-created institutions/courses for review instead of self-publishing",
+);
+
 const communicationDocs = read("src/lib/os/communication-docs.md");
 const chatView = read("src/pages/messages/ChatView.tsx");
 const communicationDb = read("src/lib/os/communication-db.ts");
