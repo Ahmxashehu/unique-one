@@ -60,6 +60,7 @@ for (const route of [
 }
 
 const share = read("src/server/uniqueShareRoutes.ts");
+assert(share.includes('"/api/unique-share/sessions"'), "UniqueShare API routes are registered in their dedicated route module");
 for (const safeguard of [
   "authenticate",
   "session.senderUid !== uid && session.receiverUid !== uid",
