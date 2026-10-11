@@ -247,6 +247,28 @@ assert(
   "conversation and message reads are membership-gated and client-side direct writes are denied by Firestore rules",
 );
 
+const messageStorageRules = read("storage.rules");
+assert(
+  messageStorageRules.includes("match /messages/{conversationId}/{uid}/{fileName}") &&
+    messageStorageRules.includes("allow read: if isConversationMember(conversationId)") &&
+    messageStorageRules.includes("allow create, update: if isConversationMember(conversationId)") &&
+    messageStorageRules.includes("request.auth.uid == uid"),
+  "message attachment storage access is conversation-member-gated and uploads are scoped to the authenticated user's path",
+);
+assert(
+  communicationDb.includes("export async function getOlderMessagesForConversation") &&
+    communicationDb.includes("startAfter(Timestamp.fromDate(beforeDate))") &&
+    chatView.includes("getOlderMessagesForConversation(id, oldestMessage.createdAt, 100)"),
+  "messaging source includes cursor-based older-message pagination",
+);
+assert(
+  chatView.includes("conversation?.type !== 'direct'") &&
+    chatView.includes("setOtherUid(null)") &&
+    chatView.includes("setOtherPresence(null)") &&
+    chatView.includes("setBlocked(false)"),
+  "group chats cannot accidentally expose a first member as the direct-chat presence/block target",
+);
+
 const flightPage = read("src/pages/public/FlightsPage.tsx");
 assert(
   flightPage.includes("Live flight booking is not available yet") &&
