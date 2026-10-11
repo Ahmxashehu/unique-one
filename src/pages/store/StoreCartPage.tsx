@@ -4,7 +4,8 @@ import { ShoppingBag, Trash2, ArrowRight, Loader2, Minus, Plus, ChevronLeft, Shi
 import { createBiometricAssertion, type BiometricAssertion } from '../../components/security/PasskeySecurityCard';
 import { collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Product, CartItem } from '../../lib/os/types';
+import { Product, CartItem, type ProductLanguage, type ProductTranslation } from '../../lib/os/types';
+import { getLanguage, type SupportedLanguage } from '../../lib/i18n';
 import { useAuth } from '../../contexts/AuthContext';
 
 type CartRow = CartItem & { product: Product };
@@ -13,6 +14,8 @@ export default function StoreCartPage() {
   const { currentUser, userData } = useAuth();
   const navigate = useNavigate();
   const [items, setItems] = useState<CartRow[]>([]);
+  const [language, setLanguage] = useState<SupportedLanguage>(() => getLanguage());
+  const [listTranslations, setListTranslations] = useState<Record<string, ProductTranslation>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [checkingOut, setCheckingOut] = useState(false);
@@ -53,6 +56,41 @@ export default function StoreCartPage() {
   };
 
   useEffect(() => { loadCart(); }, [currentUser]);
+
+  useEffect(() => {
+    const syncLanguage = (event: Event) => {
+      const detail = (event as CustomEvent<SupportedLanguage>).detail;
+      setLanguage(detail || getLanguage());
+    };
+    window.addEventListener('unique-language-change', syncLanguage);
+    return () => window.removeEventListener('unique-language-change', syncLanguage);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setListTranslations({});
+    if (language === 'en' || items.length === 0) return () => { active = false; };
+    const targetLanguage = language as ProductLanguage;
+    const uncached = items.filter(item => !item.product.translations?.[targetLanguage]?.name || !item.product.translations?.[targetLanguage]?.description).slice(0, 4);
+    const loadTranslations = async () => {
+      const resolved: Record<string, ProductTranslation> = {};
+      await Promise.all(uncached.map(async item => {
+        try {
+          const response = await fetch(`/api/store/products/${encodeURIComponent(item.productId)}/translation?language=${encodeURIComponent(language)}`);
+          if (!response.ok) return;
+          const translation = await response.json() as { language?: string; name?: string; description?: string; variants?: ProductTranslation['variants']; sourceHash?: string; translatedAt?: unknown };
+          if (translation.language === language && typeof translation.name === 'string' && typeof translation.description === 'string') {
+            resolved[item.productId] = { name: translation.name, description: translation.description, variants: translation.variants, sourceHash: translation.sourceHash || '', translatedAt: translation.translatedAt };
+          }
+        } catch { /* Keep original seller text when translation is unavailable. */ }
+      }));
+      if (active) setListTranslations(resolved);
+    };
+    void loadTranslations();
+    return () => { active = false; };
+  }, [items, language]);
+
+  const displayName = (item: CartRow) => language === 'en' ? item.product.name : listTranslations[item.productId]?.name || item.product.translations?.[language as ProductLanguage]?.name || item.product.name;
 
   useEffect(() => {
     const addresses = userData?.shippingAddresses || [];
@@ -168,10 +206,10 @@ export default function StoreCartPage() {
             {items.map(item => (
               <div key={item.id} className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex gap-3 sm:gap-4">
                 <Link to={`/store/product/${item.product.id}`} className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-slate-100 overflow-hidden shrink-0">
-                  {item.product.images?.[0] ? <img src={item.product.images[0]} alt={item.product.name} className="w-full h-full object-cover" /> : <ShoppingBag className="w-8 h-8 m-8 text-slate-300" />}
+                  {item.product.images?.[0] ? <img src={item.product.images[0]} alt={displayName(item)} className="w-full h-full object-cover" /> : <ShoppingBag className="w-8 h-8 m-8 text-slate-300" />}
                 </Link>
                 <div className="flex-1 min-w-0">
-                  <Link to={`/store/product/${item.product.id}`} className="font-semibold text-slate-900 hover:text-blue-600">{item.product.name}</Link>
+                  <Link to={`/store/product/${item.product.id}`} className="font-semibold text-slate-900 hover:text-blue-600">{displayName(item)}</Link>
                   <p className="text-sm text-slate-500 mt-1">{item.product.currency === 'NGN' ? '₦' : '$'}{item.product.price.toLocaleString()} each</p>
                   <div className="flex items-center justify-between gap-3 mt-3">
                     <div className="flex items-center border rounded-lg overflow-hidden">

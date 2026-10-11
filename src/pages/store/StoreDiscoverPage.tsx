@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, Tag, Building2, Store as StoreIcon, Heart, Loader2, ShoppingBag } from 'lucide-react';
 import { collection, getDocs, query, where, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Product } from '../../lib/os/types';
+import { Product, type ProductLanguage, type ProductTranslation } from '../../lib/os/types';
+import { getLanguage, type SupportedLanguage } from '../../lib/i18n';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function StoreDiscoverPage() {
@@ -11,6 +12,8 @@ export default function StoreDiscoverPage() {
   const { currentUser } = useAuth();
   const [searchText, setSearchText] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
+  const [language, setLanguage] = useState<SupportedLanguage>(() => getLanguage());
+  const [listTranslations, setListTranslations] = useState<Record<string, ProductTranslation>>({});
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [wishlistLoading, setWishlistLoading] = useState<string | null>(null);
@@ -24,6 +27,42 @@ export default function StoreDiscoverPage() {
     { name: 'Vehicles', icon: '🚗', path: '/store/search?cat=vehicles' },
     { name: 'Services', icon: '🔧', path: '/store/search?cat=services' },
   ];
+
+  useEffect(() => {
+    const syncLanguage = (event: Event) => {
+      const detail = (event as CustomEvent<SupportedLanguage>).detail;
+      setLanguage(detail || getLanguage());
+    };
+    window.addEventListener('unique-language-change', syncLanguage);
+    return () => window.removeEventListener('unique-language-change', syncLanguage);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setListTranslations({});
+    if (language === 'en' || products.length === 0) return () => { active = false; };
+    const targetLanguage = language as ProductLanguage;
+    const uncached = products.filter(product => !product.translations?.[targetLanguage]?.name || !product.translations?.[targetLanguage]?.description).slice(0, 4);
+    const loadCardTranslations = async () => {
+      const resolved: Record<string, ProductTranslation> = {};
+      await Promise.all(uncached.map(async product => {
+        if (!product.id) return;
+        try {
+          const response = await fetch(`/api/store/products/${encodeURIComponent(product.id)}/translation?language=${encodeURIComponent(language)}`);
+          if (!response.ok) return;
+          const translation = await response.json() as { language?: string; name?: string; description?: string; variants?: ProductTranslation['variants']; sourceHash?: string; translatedAt?: unknown };
+          if (translation.language === language && typeof translation.name === 'string' && typeof translation.description === 'string') {
+            resolved[product.id] = { name: translation.name, description: translation.description, variants: translation.variants, sourceHash: translation.sourceHash || '', translatedAt: translation.translatedAt };
+          }
+        } catch { /* Keep original seller text if translation is unavailable. */ }
+      }));
+      if (active) setListTranslations(resolved);
+    };
+    void loadCardTranslations();
+    return () => { active = false; };
+  }, [products, language]);
+
+  const displayName = (product: Product) => language === 'en' ? product.name : listTranslations[product.id || '']?.name || product.translations?.[language as ProductLanguage]?.name || product.name;
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -157,14 +196,14 @@ export default function StoreDiscoverPage() {
           {products.map(product => (
             <Link key={product.id} to={`/store/product/${product.id}`} className="group flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all">
               <div className="aspect-square bg-slate-100 relative overflow-hidden flex items-center justify-center">
-                {product.images?.length ? <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <StoreIcon className="w-8 h-8 text-slate-300" />}
+                {product.images?.length ? <img src={product.images[0]} alt={displayName(product)} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <StoreIcon className="w-8 h-8 text-slate-300" />}
                 <button type="button" onClick={e => toggleWishlist(product, e)} className={`absolute top-2 right-2 p-2 bg-white/80 backdrop-blur rounded-full transition-colors z-10 ${wishlistIds.has(product.id) ? 'text-red-500' : 'text-slate-400 hover:text-red-500'}`} aria-label={wishlistIds.has(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}>
                   {wishlistLoading === product.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className={`w-4 h-4 ${wishlistIds.has(product.id) ? 'fill-current' : ''}`} />}
                 </button>
                 <div className="absolute bottom-2 left-2 px-2 py-1 bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider rounded text-slate-700">{product.condition}</div>
               </div>
               <div className="p-3 sm:p-4 flex flex-col flex-1">
-                <h3 className="text-sm font-medium text-slate-900 line-clamp-2 mb-1">{product.name}</h3>
+                <h3 className="text-sm font-medium text-slate-900 line-clamp-2 mb-1">{displayName(product)}</h3>
                 <p className="text-lg font-bold text-slate-900 mt-auto">{product.currency === 'NGN' ? '₦' : '$'}{Number(product.price).toLocaleString()}</p>
                 <div className="flex items-center gap-1 text-xs text-slate-500 mt-2"><StoreIcon className="w-3 h-3" /><span className="truncate">Seller: {product.sellerId || 'Unavailable'}</span></div>
               </div>
