@@ -9,7 +9,7 @@ export default function AboutPage() {
           About Unique One
         </h1>
         <p className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-          The public ecosystem driving innovation, commerce, and connection across Nigeria, powered by the secure UniqueOS infrastructure.
+          UniquePlatform connects people, businesses and services across Nigeria through a secure, connected digital ecosystem.
         </p>
       </div>
 
@@ -27,7 +27,7 @@ export default function AboutPage() {
             <ShieldCheck className="w-8 h-8" />
           </div>
           <h3 className="font-semibold text-lg text-slate-900">Secure Core</h3>
-          <p className="text-slate-600 text-sm leading-relaxed">UniqueOS provides robust authentication, unified payments, and secure data handling for all ecosystem participants.</p>
+          <p className="text-slate-600 text-sm leading-relaxed">UniquePlatform brings together secure account access, payments and data protection for ecosystem participants.</p>
         </div>
 
         <div className="text-center space-y-4">
