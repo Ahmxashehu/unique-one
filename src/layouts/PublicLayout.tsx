@@ -113,11 +113,6 @@ export default function PublicLayout() {
               </Link>
             </div>
 
-            {currentUser && (
-              <div className="mt-3">
-                <Link to="/os/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">{t('openUniqueOS', language)}</Link>
-              </div>
-            )}
           </div>
         </div>
       )}
