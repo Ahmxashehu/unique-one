@@ -2394,7 +2394,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       for (const item of supplied) {
         if (typeof item !== 'string') continue;
         const raw = item.trim();
-        const digits = raw.replace(/\\D/g, '');
+        const digits = raw.replace(/\D/g, '');
         if (digits.length < 7 || digits.length > 15) continue;
         variants.add(raw);
         variants.add(digits);
