@@ -12,6 +12,7 @@ import AuthGuard from "./components/auth/AuthGuard";
 import RoleGuard from "./components/auth/RoleGuard";
 import InstallPrompt from "./components/InstallPrompt";
 import GlobalLanguageLayer from "./components/GlobalLanguageLayer";
+import AppearanceControls from "./components/AppearanceControls";
 import OfflineIndicator from "./components/OfflineIndicator";
 import { OfflineQueueProvider } from "./contexts/OfflineQueueContext";
 import SyncOverlay from "./components/SyncOverlay";
@@ -170,6 +171,7 @@ export default function App() {
         <BrowserRouter>
           <div className="flex flex-col h-screen overflow-hidden w-full max-w-[100vw]">
             <GlobalLanguageLayer />
+            <AppearanceControls />
             <OfflineIndicator />
             <InstallPrompt />
             <SyncOverlay />
