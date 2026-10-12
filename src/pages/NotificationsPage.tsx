@@ -71,7 +71,7 @@ export default function NotificationsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Notifications</h1>
-          <p className="text-sm text-slate-500 mt-1">Updates and alerts from UniqueOS.</p>
+          <p className="text-sm text-slate-500 mt-1">Updates and alerts from UniquePlatform.</p>
         </div>
         <button
           type="button"
@@ -102,7 +102,7 @@ export default function NotificationsPage() {
                   <Bell className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h4 className="text-sm font-semibold text-slate-900">{notification.title || 'UniqueOS notification'}</h4>
+                  <h4 className="text-sm font-semibold text-slate-900">{notification.title || 'UniquePlatform notification'}</h4>
                   <p className="text-sm text-slate-600 mt-1">{notification.message || 'You have a new update.'}</p>
                   {date && <p className="text-xs text-slate-400 mt-2">{date.toLocaleString()}</p>}
                 </div>
