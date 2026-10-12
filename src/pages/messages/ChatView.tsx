@@ -19,6 +19,19 @@ const withMessageSetupTimeout = <T,>(operation: Promise<T>, message: string, tim
   });
 };
 
+const fetchWithMessageSetupTimeout = async (input: RequestInfo | URL, init: RequestInit, message: string, timeoutMs = 12000): Promise<Response> => {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error(message);
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
+};
+
 const formatMessageDate = (value: string) => {
   const date = new Date(value);
   const today = new Date();
@@ -37,6 +50,7 @@ export default function ChatView() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [chatLoadAttempt, setChatLoadAttempt] = useState(0);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [otherPresence, setOtherPresence] = useState<{ uid: string; status: 'online' | 'offline'; lastSeenAt: string | null } | null>(null);
@@ -174,10 +188,22 @@ export default function ChatView() {
   useEffect(() => {
     let active = true;
     let unsubscribe: (() => void) | null = null;
+    let initialLoadFinished = false;
+    let loadingWatchdog: number | undefined;
+    const finishInitialLoad = () => {
+      initialLoadFinished = true;
+      if (loadingWatchdog !== undefined) window.clearTimeout(loadingWatchdog);
+      setLoading(false);
+    };
     setLoading(true);
     setError('');
     setLoadingOlderMessages(false);
     setHasMoreOlderMessages(true);
+    loadingWatchdog = window.setTimeout(() => {
+      if (!active || initialLoadFinished) return;
+      setError('This conversation is taking longer than expected. Check your connection and retry.');
+      finishInitialLoad();
+    }, 15000);
 
     if (id) {
       try {
@@ -186,7 +212,7 @@ export default function ChatView() {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed?.messages)) {
             setMessages(parsed.messages as Message[]);
-            setLoading(false);
+            finishInitialLoad();
           }
           if (parsed?.conversation) setConversation(parsed.conversation as Conversation);
         }
@@ -196,12 +222,21 @@ export default function ChatView() {
     }
 
     const loadChat = async () => {
-      if (!id || !currentUser) return;
+      if (!id || !currentUser) {
+        setError(!id ? 'No conversation was selected. Return to Messages and open a chat.' : 'Please sign in again to load this conversation.');
+        finishInitialLoad();
+        return;
+      }
       try {
-        const token = await currentUser.getIdToken();
-        const conversationResponse = await fetch('/api/communication/conversations/' + id, {
-          headers: { Authorization: 'Bearer ' + token },
-        });
+        const token = await withMessageSetupTimeout(
+          currentUser.getIdToken(),
+          'Sign-in verification timed out. Reopen Messages and try again.',
+        );
+        const conversationResponse = await fetchWithMessageSetupTimeout(
+          '/api/communication/conversations/' + encodeURIComponent(id),
+          { headers: { Authorization: 'Bearer ' + token } },
+          'The conversation server did not respond in time. Check your connection and retry.',
+        );
         const conversationPayload = await conversationResponse.json().catch(() => null);
         if (!conversationResponse.ok || !conversationPayload?.conversation) {
           throw new Error(conversationPayload?.error?.message ?? 'Failed to load conversation.');
@@ -213,7 +248,7 @@ export default function ChatView() {
           setShowNewContactWarning(false);
         }
         try {
-          unsubscribe = await subscribeToMessagesForConversation(
+          const nextUnsubscribe = await subscribeToMessagesForConversation(
             id,
             (nextMessages) => {
               if (!active) return;
@@ -237,6 +272,8 @@ export default function ChatView() {
                 } catch (cacheError) {
                   console.warn('Could not cache conversation messages:', cacheError);
                 }
+                setError('');
+                finishInitialLoad();
                 setMessages((current) => {
                   const merged = new Map<string, Message>(current.map((item) => [item.id, item]));
                   hydrated.forEach((item) => merged.set(item.id, item));
@@ -256,29 +293,34 @@ export default function ChatView() {
                   return nextMessages;
                 });
                 setHasMoreOlderMessages((current) => current || hydrated.length === 100);
-                setLoading(false);
+                finishInitialLoad();
               })();
             },
             (messageError) => {
               if (!active) return;
               console.error('Communication live message subscription failed:', messageError);
-              setError(messageError.message);
-              setLoading(false);
+              setError(messageError.message || 'Live messages are temporarily unavailable.');
+              finishInitialLoad();
             },
             100,
           );
+          if (!active) {
+            nextUnsubscribe();
+            return;
+          }
+          unsubscribe = nextUnsubscribe;
         } catch (messageError) {
           if (active) {
             console.error('Communication live message subscription failed:', messageError);
             setError(messageError instanceof Error ? messageError.message : 'Failed to receive live Communication messages.');
-            setLoading(false);
+            finishInitialLoad();
           }
         }
       } catch (err) {
         console.error(err);
         if (active) {
           setError(err instanceof Error ? err.message : 'Unable to load this conversation.');
-          setLoading(false);
+          finishInitialLoad();
         }
       }
     };
@@ -286,9 +328,10 @@ export default function ChatView() {
     void loadChat();
     return () => {
       active = false;
+      if (loadingWatchdog !== undefined) window.clearTimeout(loadingWatchdog);
       unsubscribe?.();
     };
-  }, [id, currentUser]);
+  }, [id, currentUser, chatLoadAttempt]);
   const markVisibleMessagesRead = useCallback(async (items: Message[]) => {
     if (!currentUser) return;
     const unread = items.filter((item) => item.senderId !== currentUser.uid && item.status !== 'read');
@@ -783,7 +826,7 @@ export default function ChatView() {
             <p className="text-xs">Loading conversation…</p>
           </div>
         )}
-        {error && <div className="mx-auto max-w-xl text-center text-xs text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</div>}
+        {error && <div role="alert" className="mx-auto flex max-w-xl flex-wrap items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-center text-xs text-red-700"><span>{error}</span><button type="button" onClick={() => { setError(''); setLoading(true); setChatLoadAttempt((attempt) => attempt + 1); }} className="rounded-lg border border-red-200 bg-white px-3 py-1.5 font-semibold text-red-700 hover:bg-red-100">Retry</button></div>}
         {!loading && !error && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center min-h-[260px] text-center">
             <div className="w-14 h-14 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-2xl mb-3">💬</div>

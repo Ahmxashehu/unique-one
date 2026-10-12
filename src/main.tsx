@@ -53,7 +53,11 @@ function installRuntimeDiagnostics() {
   window.addEventListener('error', (event) => {
     const target = event.target as HTMLElement | null;
     if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
-      const source = (target as HTMLScriptElement | HTMLLinkElement).src || (target as HTMLLinkElement).href || '';
+      const source = target instanceof HTMLScriptElement
+        ? target.src
+        : target instanceof HTMLLinkElement
+          ? target.href
+          : '';
       if (!source || new URL(source, window.location.href).origin !== window.location.origin) return;
       showRuntimeFailure('Failed to load app ' + target.tagName.toLowerCase() + ' resource.');
       return;
