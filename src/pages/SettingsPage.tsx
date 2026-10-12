@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Shield, Key, Bell, LogOut, Lightbulb, ChevronRight, CheckCircle2, Sparkles } from 'lucide-react';
+import { User, Shield, Key, Bell, LogOut, Lightbulb, ChevronRight, CheckCircle2 } from 'lucide-react';
 
 export default function SettingsPage() {
   const { currentUser, userData, logout } = useAuth();
@@ -51,10 +51,6 @@ export default function SettingsPage() {
           ) : (
             <div className="border-t border-slate-100 bg-emerald-50/60 px-3.5 py-3 sm:px-4">
               <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0" /><span>Signed in to your UniquePlatform account</span></div>
-              <Link to="/os/dashboard" className="mt-3 flex w-full items-center gap-3 rounded-xl bg-slate-950 px-3 py-2.5 text-left text-xs font-black text-white transition hover:bg-slate-800">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-300/30 bg-emerald-400/10 text-[11px] font-black tracking-tight text-emerald-300">UP</span>
-                <span className="min-w-0 flex-1">Open UniquePlatform</span><Sparkles className="h-4 w-4 shrink-0 text-emerald-300" /><ChevronRight className="h-4 w-4 shrink-0" />
-              </Link>
             </div>
           )}
         </section>
