@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import AppearanceControls from '../components/AppearanceControls';
 import { getLanguage, t, type SupportedLanguage } from '../lib/i18n';
 import {
-  Settings, GraduationCap, Sparkles, Store, Calendar, Plane, ShoppingCart, Briefcase,
+  GraduationCap, Sparkles, Store, Calendar, Plane, ShoppingCart, Briefcase,
   Globe, Activity, Search, HeartHandshake, Wallet, MessageSquare, Video, Image
 } from 'lucide-react';
 
@@ -44,7 +44,6 @@ export default function PublicLayout() {
             </Link>
             <div className="flex-1" aria-hidden="true" />
             <AppearanceControls inline />
-            <Link to="/settings" aria-label="Open settings" title="Settings" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"><Settings className="h-4 w-4" /></Link>
           </div>
         </header>
       )}
