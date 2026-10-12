@@ -4,6 +4,31 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Conversation } from '../../lib/os/communication-types';
 
+const withCommunicationTimeout = <T,>(operation: Promise<T>, message: string, timeoutMs = 12000): Promise<T> => {
+  let timer: number | undefined;
+  return Promise.race([
+    operation,
+    new Promise<T>((_, reject) => {
+      timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    }),
+  ]).finally(() => {
+    if (timer !== undefined) window.clearTimeout(timer);
+  });
+};
+
+const fetchCommunicationWithTimeout = async (input: RequestInfo | URL, init: RequestInit, message: string, timeoutMs = 12000): Promise<Response> => {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error(message);
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
+};
+
 export default function MessagesCenter() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
@@ -35,9 +60,9 @@ export default function MessagesCenter() {
       if (conversations.length === 0) setLoading(true);
       setError('');
       try {
-        const token = await currentUser.getIdToken();
-        const response = await fetch('/api/communication/conversations', { headers: { Authorization: 'Bearer ' + token } });
-        const payload = await response.json().catch(() => null);
+        const token = await withCommunicationTimeout(currentUser.getIdToken(), 'Sign-in verification timed out. Reopen Messages and retry.');
+        const response = await fetchCommunicationWithTimeout('/api/communication/conversations', { headers: { Authorization: 'Bearer ' + token } }, 'Loading conversations timed out. Check your connection and retry.');
+        const payload = await withCommunicationTimeout(response.json().catch(() => null), 'The conversations response timed out. Retry Messages.');
         if (!response.ok || !Array.isArray(payload?.conversations)) throw new Error(payload?.error?.message ?? 'Failed to load messages.');
         if (!cancelled) setConversations(payload.conversations);
       } catch (err) {
@@ -124,13 +149,13 @@ export default function MessagesCenter() {
     setOpeningContactUid(uid);
     setContactMessage('');
     try {
-      const token = await currentUser.getIdToken();
-      const response = await fetch('/api/communication/conversations', {
+      const token = await withCommunicationTimeout(currentUser.getIdToken(), 'Sign-in verification timed out. Please retry.');
+      const response = await fetchCommunicationWithTimeout('/api/communication/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
         body: JSON.stringify({ type: 'direct', memberUids: [currentUser.uid, uid] }),
-      });
-      const payload = await response.json().catch(() => null);
+      }, 'Opening the conversation timed out. Check your connection and retry.');
+      const payload = await withCommunicationTimeout(response.json().catch(() => null), 'The conversation response timed out. Please retry.');
       if (!response.ok) throw new Error(payload?.error?.message ?? 'Could not open this conversation.');
       if (!payload?.conversation?.id) throw new Error('Conversation could not be created.');
       navigate('/os/messages/' + payload.conversation.id);
