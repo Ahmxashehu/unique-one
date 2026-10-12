@@ -5,7 +5,6 @@ import {
   ShieldCheck, Activity, Settings, LogOut, Network, Crown, Wallet
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import AppearanceControls from '../components/AppearanceControls';
 
 export default function AdminLayout() {
   const location = useLocation();
@@ -32,7 +31,6 @@ export default function AdminLayout() {
 
   return (
     <div className="flex h-full bg-slate-100 overflow-hidden font-sans">
-      <AppearanceControls />
       <aside className="hidden lg:flex flex-col w-64 bg-slate-900 text-slate-300 border-r border-slate-800 shrink-0">
         <div className="h-16 flex items-center px-6 border-b border-slate-800 shrink-0">
           <div className="font-bold text-xl tracking-tight text-white flex items-center gap-2">
