@@ -190,6 +190,7 @@ export default function ChatView() {
     let unsubscribe: (() => void) | null = null;
     let initialLoadFinished = false;
     let liveSubscriptionConnected = false;
+    let liveSubscriptionError = false;
     let historyRefreshInFlight = false;
     let historyRefreshTimer: number | undefined;
     let loadingWatchdog: number | undefined;
@@ -288,6 +289,10 @@ export default function ChatView() {
                 (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
               );
             });
+            if (liveSubscriptionError) {
+              liveSubscriptionError = false;
+              setError('');
+            }
             finishInitialLoad();
           } catch (historyError) {
             if (active) console.warn('Server-backed message history refresh failed:', historyError);
@@ -353,6 +358,7 @@ export default function ChatView() {
             (messageError) => {
               if (!active) return;
               liveSubscriptionConnected = false;
+              liveSubscriptionError = true;
               console.error('Communication live message subscription failed:', messageError);
               setError(messageError.message || 'Live messages are temporarily unavailable.');
               finishInitialLoad();
@@ -366,6 +372,7 @@ export default function ChatView() {
           unsubscribe = nextUnsubscribe;
         } catch (messageError) {
           if (active) {
+            liveSubscriptionError = true;
             console.error('Communication live message subscription failed:', messageError);
             setError(messageError instanceof Error ? messageError.message : 'Failed to receive live Communication messages.');
             finishInitialLoad();
