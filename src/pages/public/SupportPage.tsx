@@ -17,7 +17,7 @@ export default function SupportPage() {
             <HelpCircle className="w-6 h-6" />
           </div>
           <h3 className="font-semibold text-lg text-slate-900">Knowledge Base</h3>
-          <p className="text-slate-500 mt-2 text-sm">Read guides and FAQs about using UniqueOS.</p>
+          <p className="text-slate-500 mt-2 text-sm">Read guides and FAQs about using UniquePlatform.</p>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center hover:shadow-md transition-shadow cursor-pointer">
