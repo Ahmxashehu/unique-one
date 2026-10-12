@@ -745,6 +745,10 @@ export default function ChatView() {
   const handleSend = async () => {
     const text = message.trim();
     if ((!text && attachments.length === 0) || !id || !currentUser || sending || uploadingAttachment) return;
+    if (!conversation) {
+      setError('Conversation details are still loading. Please wait a moment and try again.');
+      return;
+    }
     setSending(true);
     setError('');
     try {
