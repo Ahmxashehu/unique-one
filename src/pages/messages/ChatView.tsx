@@ -189,6 +189,9 @@ export default function ChatView() {
     let active = true;
     let unsubscribe: (() => void) | null = null;
     let initialLoadFinished = false;
+    let liveSubscriptionConnected = false;
+    let historyRefreshInFlight = false;
+    let historyRefreshTimer: number | undefined;
     let loadingWatchdog: number | undefined;
     const finishInitialLoad = () => {
       initialLoadFinished = true;
@@ -244,6 +247,56 @@ export default function ChatView() {
         if (!active) return;
         setConversation(conversationPayload.conversation);
         setMuted(conversationPayload.conversation?.muted === true);
+
+        // Load history through the authenticated server API first. This keeps a
+        // slow or misconfigured Firestore client listener from blocking the chat.
+        const refreshHistory = async () => {
+          if (historyRefreshInFlight || !active || liveSubscriptionConnected) return;
+          historyRefreshInFlight = true;
+          try {
+            const historyToken = await withMessageSetupTimeout(
+              currentUser.getIdToken(),
+              'Sign-in verification timed out while refreshing messages.',
+              8000,
+            );
+            const historyResponse = await fetchWithMessageSetupTimeout(
+              '/api/communication/conversations/' + encodeURIComponent(id) + '/messages?limit=100',
+              { headers: { Authorization: 'Bearer ' + historyToken } },
+              'Message history is temporarily unavailable. Retrying automatically.',
+              10000,
+            );
+            const historyPayload = await historyResponse.json().catch(() => null);
+            if (!historyResponse.ok || !Array.isArray(historyPayload?.messages)) {
+              throw new Error(historyPayload?.error?.message ?? 'Failed to load message history.');
+            }
+            const hydratedHistory = await withMessageSetupTimeout(Promise.all(
+              (historyPayload.messages as Message[]).map(async (item) => {
+                if (item.deleted || !item.encryptedPayload) return item;
+                try {
+                  const text = await decryptFromUser(currentUser.uid, item.encryptedPayload.senderPublicKey, item.encryptedPayload);
+                  return { ...item, text };
+                } catch {
+                  return { ...item, text: '[Unable to decrypt this message on this device]' };
+                }
+              }),
+            ), 'Decrypting message history took too long.', 10000);
+            if (!active) return;
+            setMessages((current) => {
+              const merged = new Map<string, Message>(current.map((item) => [item.id, item]));
+              hydratedHistory.forEach((item) => merged.set(item.id, item));
+              return Array.from(merged.values()).sort(
+                (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+              );
+            });
+            finishInitialLoad();
+          } catch (historyError) {
+            if (active) console.warn('Server-backed message history refresh failed:', historyError);
+          } finally {
+            historyRefreshInFlight = false;
+          }
+        };
+        void refreshHistory();
+        historyRefreshTimer = window.setInterval(() => { void refreshHistory(); }, 5000);
         if (showNewContactWarning && typeof window !== 'undefined' && window.localStorage.getItem('unique-one:contact-reply:' + id) === '1') {
           setShowNewContactWarning(false);
         }
@@ -252,6 +305,7 @@ export default function ChatView() {
             id,
             (nextMessages) => {
               if (!active) return;
+              liveSubscriptionConnected = true;
               void (async () => {
                 const hydrated = await Promise.all(nextMessages.map(async (item) => {
                   if (item.deleted || !item.encryptedPayload) return item;
@@ -298,6 +352,7 @@ export default function ChatView() {
             },
             (messageError) => {
               if (!active) return;
+              liveSubscriptionConnected = false;
               console.error('Communication live message subscription failed:', messageError);
               setError(messageError.message || 'Live messages are temporarily unavailable.');
               finishInitialLoad();
@@ -329,6 +384,7 @@ export default function ChatView() {
     return () => {
       active = false;
       if (loadingWatchdog !== undefined) window.clearTimeout(loadingWatchdog);
+      if (historyRefreshTimer !== undefined) window.clearInterval(historyRefreshTimer);
       unsubscribe?.();
     };
   }, [id, currentUser, chatLoadAttempt]);
@@ -720,8 +776,28 @@ export default function ChatView() {
       } finally {
         window.clearTimeout(sendTimeout);
       }
-      const payload = await response.json().catch(() => null);
+      const payload = await withMessageSetupTimeout(
+        response.json().catch(() => null),
+        'The send response did not finish loading. Your message draft is preserved; retry safely.',
+        10000,
+      );
       if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to send message.');
+      // A confirmed server write should appear immediately, even if the live
+      // Firestore listener is delayed. The idempotency key prevents duplicate
+      // server writes when the user retries after a network timeout.
+      if (payload?.message && typeof payload.message.id === 'string') {
+        const confirmedMessage = {
+          ...(payload.message as Message),
+          ...(text ? { text } : {}),
+        };
+        setMessages((current) => {
+          const merged = new Map<string, Message>(current.map((item) => [item.id, item]));
+          merged.set(confirmedMessage.id, { ...merged.get(confirmedMessage.id), ...confirmedMessage } as Message);
+          return Array.from(merged.values()).sort(
+            (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+          );
+        });
+      }
       setMessage('');
       try {
         window.localStorage.removeItem(`unique-one:message-draft:${currentUser.uid}:${id}`);
