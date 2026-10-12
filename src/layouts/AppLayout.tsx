@@ -9,7 +9,6 @@ import {
 import { cn } from '../lib/utils';
 import MobileBottomNav from '../components/MobileBottomNav';
 import { useAuth } from '../contexts/AuthContext';
-import AppearanceControls from '../components/AppearanceControls';
 import AppErrorBoundary from '../components/AppErrorBoundary';
 
 export default function AppLayout() {
@@ -116,7 +115,6 @@ export default function AppLayout() {
 
   return (
     <div className="flex h-full bg-slate-50 overflow-hidden w-full max-w-[100vw]">
-      <AppearanceControls />
       {isMobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-[100] isolate" role="dialog" aria-modal="true" aria-label="More UniquePlatform">
           <button
