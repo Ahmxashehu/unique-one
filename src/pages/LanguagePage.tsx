@@ -14,7 +14,7 @@ export default function LanguagePage() {
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Language Preferences</h1>
-        <p className="text-sm text-slate-500 mt-1">Choose your preferred language for the UniqueOS interface.</p>
+        <p className="text-sm text-slate-500 mt-1">Choose your preferred language for the UniquePlatform interface.</p>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
