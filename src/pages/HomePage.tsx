@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import {
   ArrowRight,
   Building2,
@@ -21,6 +22,7 @@ import {
   Video,
   WalletCards,
   Briefcase as BriefcaseIcon,
+  UserRound,
 } from 'lucide-react';
 import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -36,6 +38,9 @@ function formatPrice(product: Product) {
 }
 
 export default function HomePage() {
+  const { currentUser, userData } = useAuth();
+  const homeDisplayName = userData?.fullName || [userData?.firstName, userData?.lastName].filter(Boolean).join(' ') || currentUser?.displayName || '';
+  const homeProfilePhoto = userData?.profilePhotoUrl || currentUser?.photoURL || '';
   const [products, setProducts] = useState<Product[]>([]);
   const [jobs, setJobs] = useState<Array<{ id: string; title?: string; companyName?: string; location?: string; description?: string; category?: string }>>([]);
   const [contributions, setContributions] = useState<Array<{ id: string; title?: string; description?: string; category?: string; location?: string }>>([]);
@@ -507,6 +512,21 @@ export default function HomePage() {
             </div>
           </div>
 
+          <Link
+            to={currentUser ? "/os/profile" : "/login"}
+            aria-label={currentUser ? "Open your profile" : "Sign in"}
+            title={homeDisplayName || (currentUser ? "Your profile" : "Sign in")}
+            className="flex h-10 max-w-[42%] shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-1.5 pr-2 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 sm:px-2.5"
+          >
+            {homeProfilePhoto ? (
+              <img src={homeProfilePhoto} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
+            ) : (
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                {currentUser && homeDisplayName ? <span className="text-xs font-black">{homeDisplayName.trim().charAt(0).toUpperCase()}</span> : <UserRound className="h-4 w-4" />}
+              </span>
+            )}
+            {currentUser && homeDisplayName && <span className="hidden max-w-24 truncate text-xs font-bold text-slate-700 sm:block">{homeDisplayName}</span>}
+          </Link>
         </div>
       </header>
 
