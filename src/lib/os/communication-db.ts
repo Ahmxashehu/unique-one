@@ -277,7 +277,10 @@ export async function subscribeToMessagesForConversation(
 ): Promise<() => void> {
   const uid = requireAuthenticatedUid();
   const id = requireId(conversationId, 'conversationId');
-  const membershipSnapshot = await safeRead(() => getDoc(doc(db, CONVERSATION_MEMBERS_COLLECTION, `${id}_${uid}`)));
+  const membershipSnapshot = await Promise.race([
+    safeRead(() => getDoc(doc(db, CONVERSATION_MEMBERS_COLLECTION, `${id}_${uid}`))),
+    new Promise<never>((_, reject) => window.setTimeout(() => reject(new CommunicationDbError('READ_FAILED', 'Conversation setup timed out.')), 8000)),
+  ]);
   if (!membershipSnapshot.exists()) {
     onMessages([]);
     onError(new CommunicationDbError('NOT_FOUND', `Conversation ${id} was not found.`));
