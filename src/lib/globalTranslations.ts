@@ -24,7 +24,7 @@ export const UI: Record<SupportedLanguage, Record<Phrase, string>> = {
     "Buy now":"Saya yanzu", Remove:"Cire", Delete:"Share", Update:"Sabunta", Create:"Ƙirƙira", Done:"An gama", Yes:"Eh", No:"A'a",
     Restaurant:"Gidan abinci", Hotel:"Otal", Flights:"Jirage", School:"Makaranta", Transportation:"Sufuri", "Real Estate":"Gidaje",
     "Global Search":"Bincike na duniya", Jobs:"Ayyuka", Contributions:"Gudummawa", Education:"Ilimi", Travel:"Unique Travel",
-    "Open UniqueOS":"Buɗe UniqueOS", "More experiences":"Ƙarin ayyuka",
+    "Open UniquePlatform":"Buɗe UniquePlatform", "More experiences":"Ƙarin ayyuka",
     "Refresh":"Sabunta", "View":"Duba", "Edit":"Gyara", "Open":"Buɗe", "Apply":"Aika", "Post a job":"Sanya aiki", "All categories":"Duk rukuni", "No published jobs found":"Ba a sami ayyukan da aka wallafa ba", "Copy link":"Kwafi mahaɗi", "Reshare to chat":"Sake rabawa zuwa hira", "Message Seller":"Tura saƙo ga mai sayarwa", "Open Store":"Buɗe shago", "Connect phone media":"Haɗa kafofin wayar", "Open UniqueShare":"Buɗe UniqueShare", "Backup":"Ajiye madadin", "Restore latest":"Mayar da na baya-bayan nan", "Institution":"Cibiyar", "Course":"Darasi", "Enroll":"Yi rajista", "Add Customer":"Ƙara abokin ciniki", "Invite Member":"Gayyaci memba", "Upload Documents":"Loda takardu", "Go to Dashboard":"Je zuwa Dashboard", "Change Login PIN":"Canja PIN na shiga", "Save Draft":"Ajiye daftari", "Send Request":"Aika buƙata", "Create Another Request":"Ƙirƙiri wata buƙata", "Search messages":"Bincika saƙonni", "Voice calls coming soon":"Kiran murya zai zo nan ba da jimawa ba", "Enable biometric security":"Kunna tsaron biometric", "Setting up…":"Ana saitawa…", "Publishing...":"Ana wallafawa...", "Publish Service":"Wallafa sabis", "All Invoices":"Duk rasit", "Drafts":"Daftari", "Connect":"Haɗa", "Employer not specified":"Ba a bayyana ma'aikaci ba"
   },
   fr: {
@@ -47,7 +47,7 @@ export const UI: Record<SupportedLanguage, Record<Phrase, string>> = {
     "Add to cart":"Ajouter au panier", "Buy now":"Acheter maintenant", Remove:"Supprimer", Delete:"Supprimer", Update:"Mettre à jour",
     Create:"Créer", Done:"Terminé", Yes:"Oui", No:"Non", Restaurant:"Restaurant", Hotel:"Hôtel", Flights:"Vols", School:"École",
     Transportation:"Transport", "Real Estate":"Immobilier", "Global Search":"Recherche globale", Jobs:"Emplois", Contributions:"Contributions",
-    Education:"Éducation", Travel:"Unique Travel", "Open UniqueOS":"Ouvrir UniqueOS", "More experiences":"Plus d’expériences"
+    Education:"Éducation", Travel:"Unique Travel", "Open UniquePlatform":"Ouvrir UniquePlatform", "More experiences":"Plus d’expériences"
   },
   ig: {
     Home:"Ụlọ", Search:"Chọọ", AI:"AI", Language:"Asụsụ", "Light mode":"Ọnọdụ ọkụ", "Dark mode":"Ọnọdụ ọchịchịrị",
@@ -66,7 +66,7 @@ export const UI: Record<SupportedLanguage, Record<Phrase, string>> = {
     "Buy now":"Zụta ugbu a", Remove:"Wepụ", Delete:"Hichapụ", Update:"Melite", Create:"Mepụta", Done:"Emechara", Yes:"Ee", No:"Mba",
     Restaurant:"Ụlọ oriri", Hotel:"Ụlọ nkwari akụ", Flights:"Ụgbọ elu", School:"Ụlọ akwụkwọ", Transportation:"Ụgbọ njem",
     "Real Estate":"Ala na ụlọ", "Global Search":"Ọchụchọ zuru ụwa", Jobs:"Ọrụ", Contributions:"Onyinye", Education:"Agụmakwụkwọ",
-    Travel:"Njem", "Open UniqueOS":"Mepee UniqueOS", "More experiences":"Ahụmịhe ndị ọzọ"
+    Travel:"Njem", "Open UniquePlatform":"Mepee UniquePlatform", "More experiences":"Ahụmịhe ndị ọzọ"
   },
   yo: {
     Home:"Ilé", Search:"Wa", AI:"AI", Language:"Èdè", "Light mode":"Ipo ìmọ́lẹ̀", "Dark mode":"Ipo òkùnkùn",
@@ -84,7 +84,7 @@ export const UI: Record<SupportedLanguage, Record<Phrase, string>> = {
     "Coming soon":"Ó ń bọ̀ láìpẹ́", "View details":"Wo àwọn àlàyé", Details:"Àwọn àlàyé", "Search...":"Wá...", "Search products":"Wá àwọn ọjà",
     "Add to cart":"Fi sínú àpò", "Buy now":"Ra nísinsìnyí", Remove:"Yọ", Delete:"Paarẹ́", Update:"Ṣàfikún", Create:"Ṣẹ̀dá", Done:"Ti parí", Yes:"Bẹ́ẹ̀ni", No:"Rárá",
     Restaurant:"Ilé ìjẹun", Hotel:"Hotẹẹli", Flights:"Àwọn ọkọ̀ òfuurufú", School:"Ilé ẹ̀kọ́", Transportation:"Ìrìnàjò", "Real Estate":"Ohun-ìní ilẹ̀",
-    "Global Search":"Ìwádìí àgbáyé", Jobs:"Àwọn iṣẹ́", Contributions:"Àwọn àfikún", Education:"Ẹ̀kọ́", Travel:"Ìrìnàjò", "Open UniqueOS":"Ṣí UniqueOS", "More experiences":"Àwọn ìrírí míì"
+    "Global Search":"Ìwádìí àgbáyé", Jobs:"Àwọn iṣẹ́", Contributions:"Àwọn àfikún", Education:"Ẹ̀kọ́", Travel:"Ìrìnàjò", "Open UniquePlatform":"Ṣí UniquePlatform", "More experiences":"Àwọn ìrírí míì"
   },
   pcm: {
     Home:"House", Search:"Find", AI:"AI", Language:"Language", "Light mode":"Light mode", "Dark mode":"Dark mode",
@@ -101,7 +101,7 @@ export const UI: Record<SupportedLanguage, Record<Phrase, string>> = {
     "Buy now":"Buy now", Remove:"Remove", Delete:"Delete", Update:"Update", Create:"Create", Done:"Done", Yes:"Yes", No:"No",
     Restaurant:"Chop place", Hotel:"Hotel", Flights:"Flights", School:"School", Transportation:"Transport", "Real Estate":"Land and house",
     "Global Search":"Search everywhere", Jobs:"Work", Contributions:"Contributions", Education:"Education", Travel:"Travel",
-    "Open UniqueOS":"Open UniqueOS", "More experiences":"More experiences",
+    "Open UniquePlatform":"Open UniquePlatform", "More experiences":"More experiences",
     "Refresh":"Refresh", "View":"See", "Edit":"Edit", "Open":"Open", "Apply":"Apply", "Post a job":"Post job", "All categories":"All categories", "No published jobs found":"No jobs wey dem publish", "Copy link":"Copy link", "Reshare to chat":"Share again for chat", "Message Seller":"Message seller", "Open Store":"Open Store", "Connect phone media":"Connect phone media", "Open UniqueShare":"Open UniqueShare", "Backup":"Backup", "Restore latest":"Restore latest", "Institution":"Institution", "Course":"Course", "Enroll":"Register", "Add Customer":"Add customer", "Invite Member":"Invite member", "Upload Documents":"Upload documents", "Go to Dashboard":"Go to Dashboard", "Change Login PIN":"Change login PIN", "Save Draft":"Save draft", "Send Request":"Send request", "Search messages":"Find messages", "Voice calls coming soon":"Voice call dey come soon", "Enable biometric security":"Turn on biometric security", "Setting up…":"E dey set up…", "Publishing...":"E dey publish...", "Publish Service":"Publish service", "All Invoices":"All invoices", "Drafts":"Drafts", "Connect":"Connect", "Employer not specified":"Employer no dey specified"
   }
 };
