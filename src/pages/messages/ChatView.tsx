@@ -50,6 +50,7 @@ export default function ChatView() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [chatLoadAttempt, setChatLoadAttempt] = useState(0);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [otherPresence, setOtherPresence] = useState<{ uid: string; status: 'online' | 'offline'; lastSeenAt: string | null } | null>(null);
@@ -325,7 +326,7 @@ export default function ChatView() {
       if (loadingWatchdog !== undefined) window.clearTimeout(loadingWatchdog);
       unsubscribe?.();
     };
-  }, [id, currentUser]);
+  }, [id, currentUser, chatLoadAttempt]);
   const markVisibleMessagesRead = useCallback(async (items: Message[]) => {
     if (!currentUser) return;
     const unread = items.filter((item) => item.senderId !== currentUser.uid && item.status !== 'read');
@@ -820,7 +821,7 @@ export default function ChatView() {
             <p className="text-xs">Loading conversation…</p>
           </div>
         )}
-        {error && <div className="mx-auto max-w-xl text-center text-xs text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</div>}
+        {error && <div role="alert" className="mx-auto flex max-w-xl flex-wrap items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-center text-xs text-red-700"><span>{error}</span><button type="button" onClick={() => { setError(''); setLoading(true); setChatLoadAttempt((attempt) => attempt + 1); }} className="rounded-lg border border-red-200 bg-white px-3 py-1.5 font-semibold text-red-700 hover:bg-red-100">Retry</button></div>}
         {!loading && !error && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center min-h-[260px] text-center">
             <div className="w-14 h-14 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-2xl mb-3">💬</div>
