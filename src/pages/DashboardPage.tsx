@@ -84,7 +84,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-500">Your live UniqueOS overview.</p>
+        <p className="mt-1 text-sm text-slate-500">Your live UniquePlatform overview.</p>
       </div>
 
       {error && (
@@ -144,7 +144,7 @@ export default function DashboardPage() {
         </div>
         <h3 className="text-lg font-semibold text-slate-900">No recent activity</h3>
         <p className="mx-auto mt-1 max-w-sm text-slate-500">
-          Your activities, transactions, and bookings across UniqueOS will appear here.
+          Your activities, transactions, and bookings across UniquePlatform will appear here.
         </p>
       </div>
     </div>
