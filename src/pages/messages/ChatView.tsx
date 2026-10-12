@@ -248,7 +248,7 @@ export default function ChatView() {
           setShowNewContactWarning(false);
         }
         try {
-          unsubscribe = await subscribeToMessagesForConversation(
+          const nextUnsubscribe = await subscribeToMessagesForConversation(
             id,
             (nextMessages) => {
               if (!active) return;
@@ -304,6 +304,11 @@ export default function ChatView() {
             },
             100,
           );
+          if (!active) {
+            nextUnsubscribe();
+            return;
+          }
+          unsubscribe = nextUnsubscribe;
         } catch (messageError) {
           if (active) {
             console.error('Communication live message subscription failed:', messageError);
