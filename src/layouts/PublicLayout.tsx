@@ -3,7 +3,6 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import MobileBottomNav from '../components/MobileBottomNav';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
-import AppearanceControls from '../components/AppearanceControls';
 import { getLanguage, t, type SupportedLanguage } from '../lib/i18n';
 import {
   GraduationCap, Sparkles, Store, Calendar, Plane, ShoppingCart, Briefcase,
@@ -35,7 +34,6 @@ export default function PublicLayout() {
 
   return (
     <div className="relative flex h-full min-h-0 w-full max-w-[100vw] flex-col overflow-hidden bg-slate-50">
-      {!hasHeader && <AppearanceControls />}
       {hasHeader && (
         <header className="fixed top-0 z-50 w-full shrink-0 border-b border-slate-100 bg-white/95 shadow-sm backdrop-blur-md">
           <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-3 sm:px-6 lg:px-8">
@@ -43,7 +41,6 @@ export default function PublicLayout() {
               <span className="unique-platform-wordmark truncate text-[1.05rem] font-extrabold tracking-[-0.035em] text-slate-950 sm:text-xl">UniquePlatform</span>
             </Link>
             <div className="flex-1" aria-hidden="true" />
-            <AppearanceControls inline />
           </div>
         </header>
       )}
