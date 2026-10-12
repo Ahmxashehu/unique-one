@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, MessageSquare, Loader2, VolumeX, UsersRound, Sparkles, ChevronRight, X, Check, UserPlus } from 'lucide-react';
+import { Search, Plus, MessageSquare, Loader2, VolumeX, UsersRound, Sparkles, ChevronRight, X, Check, UserPlus, Contact } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Conversation } from '../../lib/os/communication-types';
@@ -13,7 +13,7 @@ export default function MessagesCenter() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [userResults, setUserResults] = useState<Array<{ uid: string; fullName: string; username?: string; uniqueOneId?: string; profilePhotoUrl?: string }>>([]);
-  const [userSearchLoading, setUserSearchLoading] = useState(false);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);\n  const [contactMatches, setContactMatches] = useState<Array<{ uid: string; fullName: string; username?: string; uniqueOneId?: string; profilePhotoUrl?: string }>>([]);\n  const [contactLoading, setContactLoading] = useState(false);\n  const [contactMessage, setContactMessage] = useState('');\n  const [openingContactUid, setOpeningContactUid] = useState<string | null>(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [groupTitle, setGroupTitle] = useState('');
@@ -69,6 +69,73 @@ export default function MessagesCenter() {
     }, 300);
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [currentUser, search]);
+
+  const findPhoneContacts = async () => {
+    if (!currentUser || contactLoading) return;
+    const picker = (navigator as Navigator & {
+      contacts?: {
+        select: (properties: string[], options?: { multiple?: boolean }) => Promise<Array<{ name?: string[]; tel?: string[] }>>;
+      };
+    }).contacts;
+    if (!picker?.select) {
+      setContactMessage('Contact picking is not supported in this browser. Open UniquePlatform in Chrome on Android, or use search by name, phone or Unique ID.');
+      return;
+    }
+    setContactLoading(true);
+    setContactMessage('');
+    try {
+      const picked = await picker.select(['name', 'tel'], { multiple: true });
+      const numbers = Array.from(new Set(picked.flatMap((contact) => contact.tel ?? []).map((phone) => phone.trim()).filter(Boolean)));
+      if (!numbers.length) {
+        setContactMatches([]);
+        setContactMessage('No phone numbers were selected. Try selecting contacts that have a phone number.');
+        return;
+      }
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/communication/contacts/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ phoneNumbers: numbers.slice(0, 100) }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error?.message ?? 'Could not match your contacts.');
+      const matches = Array.isArray(payload?.users) ? payload.users : [];
+      setContactMatches(matches);
+      setContactMessage(matches.length
+        ? `Found ${matches.length} registered contact${matches.length === 1 ? '' : 's'} from the contacts you selected.`
+        : 'None of the selected phone numbers matched a registered UniquePlatform profile yet. You can still search by name or Unique ID.');
+    } catch (err) {
+      if (err instanceof Error && /cancel|abort/i.test(err.name + ' ' + err.message)) {
+        setContactMessage('Contact selection was cancelled.');
+      } else {
+        setContactMessage(err instanceof Error ? err.message : 'Could not match your contacts.');
+      }
+    } finally {
+      setContactLoading(false);
+    }
+  };
+
+  const openContactChat = async (uid: string) => {
+    if (!currentUser || openingContactUid) return;
+    setOpeningContactUid(uid);
+    setContactMessage('');
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/communication/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ type: 'direct', memberUids: [currentUser.uid, uid] }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error?.message ?? 'Could not open this conversation.');
+      if (!payload?.conversation?.id) throw new Error('Conversation could not be created.');
+      navigate('/os/messages/' + payload.conversation.id);
+    } catch (err) {
+      setContactMessage(err instanceof Error ? err.message : 'Could not open this conversation.');
+    } finally {
+      setOpeningContactUid(null);
+    }
+  };
 
   const searchGroupMembers = async () => {
     if (!currentUser) return;
@@ -153,6 +220,10 @@ export default function MessagesCenter() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search people, Unique ID or conversations" className="w-full rounded-xl border border-white/10 bg-white/10 py-2.5 pl-9 pr-4 text-sm text-white outline-none placeholder:text-slate-400 focus:border-emerald-400/60" />
             </div>
+            <button onClick={() => void findPhoneContacts()} disabled={contactLoading} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300/30 bg-emerald-400/10 px-3 py-2.5 text-sm font-bold text-emerald-200 disabled:opacity-60">
+              {contactLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Contact className="h-4 w-4" />}
+              {contactLoading ? 'Matching selected contacts…' : 'Find people in my phone contacts'}
+            </button>
           </div>
 
           {showAddMenu && (
@@ -193,6 +264,27 @@ export default function MessagesCenter() {
             </div>
           )}
 
+          {(contactMessage || contactMatches.length > 0) && (
+            <div className="border-b border-slate-100 bg-emerald-50/50 p-3">
+              {contactMessage && <p role="status" className="mb-2 text-xs text-slate-600">{contactMessage}</p>}
+              {contactMatches.length > 0 && (
+                <div className="space-y-2">
+                  {contactMatches.map((user) => (
+                    <div key={user.uid} className="flex items-center gap-3 rounded-xl bg-white p-2">
+                      {user.profilePhotoUrl ? <img src={user.profilePhotoUrl} alt="" className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-800">{user.fullName.charAt(0).toUpperCase()}</div>}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-slate-900">{user.fullName}</p>
+                        <p className="truncate text-xs text-slate-500">{user.username ? '@' + user.username : user.uniqueOneId ?? 'UniquePlatform user'}</p>
+                      </div>
+                      <button onClick={() => void openContactChat(user.uid)} disabled={openingContactUid !== null} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                        {openingContactUid === user.uid ? 'Opening…' : 'Message'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto bg-white">
             {loading && <div className="flex justify-center p-10"><Loader2 className="h-5 w-5 animate-spin text-emerald-500" /></div>}
             {!loading && error && <div className="p-8 text-center text-sm text-red-600">{error}</div>}
