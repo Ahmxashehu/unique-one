@@ -13,7 +13,8 @@ export default function MessagesCenter() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [userResults, setUserResults] = useState<Array<{ uid: string; fullName: string; username?: string; uniqueOneId?: string; profilePhotoUrl?: string }>>([]);
-  const [userSearchLoading, setUserSearchLoading] = useState(false);\n  const [contactMatches, setContactMatches] = useState<Array<{ uid: string; fullName: string; username?: string; uniqueOneId?: string; profilePhotoUrl?: string }>>([]);\n  const [contactLoading, setContactLoading] = useState(false);\n  const [contactMessage, setContactMessage] = useState('');\n  const [openingContactUid, setOpeningContactUid] = useState<string | null>(null);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
+  const [contactMatches, setContactMatches] = useState<Array<{ uid: string; fullName: string; username?: string; uniqueOneId?: string; profilePhotoUrl?: string }>>([]);\n  const [contactLoading, setContactLoading] = useState(false);\n  const [contactMessage, setContactMessage] = useState('');\n  const [openingContactUid, setOpeningContactUid] = useState<string | null>(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [groupTitle, setGroupTitle] = useState('');
