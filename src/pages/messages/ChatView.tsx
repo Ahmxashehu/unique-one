@@ -640,8 +640,13 @@ export default function ChatView() {
       }
       const idempotencyKey = pendingMessageIdempotencyKeyRef.current ?? crypto.randomUUID();
       pendingMessageIdempotencyKeyRef.current = idempotencyKey;
-      const response = await fetch('/api/communication/messages', {
+      const sendController = new AbortController();
+      const sendTimeout = window.setTimeout(() => sendController.abort(), 25000);
+      let response: Response;
+      try {
+        response = await fetch('/api/communication/messages', {
         method: 'POST',
+        signal: sendController.signal,
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify({
           conversationId: id,
@@ -651,7 +656,15 @@ export default function ChatView() {
           ...(attachments.length > 0 ? { attachments: attachments.map((item) => ({ ...item, storagePath: item.storagePath })) } : {}),
           replyToMessageId: replyingTo?.id,
         }),
-      });
+        });
+      } catch (sendError) {
+        if (sendController.signal.aborted) {
+          throw new Error('Sending took too long. Your message is still here—check your connection and tap Send to retry.');
+        }
+        throw sendError;
+      } finally {
+        window.clearTimeout(sendTimeout);
+      }
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error?.message ?? 'Failed to send message.');
       setMessage('');
@@ -665,9 +678,7 @@ export default function ChatView() {
       pendingMessageIdempotencyKeyRef.current = null;
     } catch (err) {
       console.error(err);
-      await Promise.all(attachments.map((attachment) => cleanupUploadedAttachment(attachment)));
-      setAttachments([]);
-      setError(err instanceof Error ? err.message : 'Failed to send message.');
+      setError(err instanceof Error ? err.message : 'Failed to send message. Your draft and attachments are kept so you can retry.');
     } finally {
       setSending(false);
     }
