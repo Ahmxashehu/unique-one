@@ -7,6 +7,18 @@ import { optimizeImage } from '../../lib/media/image';
 import { getOlderMessagesForConversation, subscribeToMessagesForConversation } from '../../lib/os/communication-db';
 import { decryptFromUser, encryptForUser, ensureDeviceKeyPair, getUserPublicKey, registerPublicKey } from '../../lib/os/communication-crypto';
 
+const withMessageSetupTimeout = <T,>(operation: Promise<T>, message: string, timeoutMs = 12000): Promise<T> => {
+  let timer: number | undefined;
+  return Promise.race([
+    operation,
+    new Promise<T>((_, reject) => {
+      timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    }),
+  ]).finally(() => {
+    if (timer !== undefined) window.clearTimeout(timer);
+  });
+};
+
 const formatMessageDate = (value: string) => {
   const date = new Date(value);
   const today = new Date();
@@ -630,12 +642,12 @@ export default function ChatView() {
     setSending(true);
     setError('');
     try {
-      const token = await currentUser.getIdToken();
+      const token = await withMessageSetupTimeout(currentUser.getIdToken(), 'Sign-in verification is taking too long. Check your connection, reopen Messages, and try again.');
       let encryptedPayload: { version: 1; recipientId: string; senderPublicKey: JsonWebKey; iv: string; ciphertext: string } | undefined;
       if (text && conversation?.type === 'direct') {
         if (!encryptionReady || !peerPublicKey || !otherUid) throw new Error('The recipient has not registered an encryption key on this device yet. Open the conversation on the other device, then try again.');
-        const senderPublicKey = await ensureDeviceKeyPair(currentUser.uid);
-        const encrypted = await encryptForUser(currentUser.uid, peerPublicKey, text);
+        const senderPublicKey = await withMessageSetupTimeout(ensureDeviceKeyPair(currentUser.uid), 'Secure messaging setup is stuck on this device. Reopen the chat and try again.');
+        const encrypted = await withMessageSetupTimeout(encryptForUser(currentUser.uid, peerPublicKey, text), 'Message encryption took too long. Reopen the chat and try again.');
         encryptedPayload = { version: 1, recipientId: otherUid, senderPublicKey, ...encrypted };
       }
       const idempotencyKey = pendingMessageIdempotencyKeyRef.current ?? crypto.randomUUID();
