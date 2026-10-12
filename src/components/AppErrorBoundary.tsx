@@ -17,7 +17,7 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('UniqueOS section error:', error, info);
+    console.error('UniquePlatform section error:', error, info);
   }
 
   handleHome = () => {
@@ -30,7 +30,7 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
     return (
       <div className="flex min-h-[50vh] items-center justify-center p-6">
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-          <h2 className="text-lg font-black text-slate-900">UniqueOS couldn’t load this section</h2>
+          <h2 className="text-lg font-black text-slate-900">UniquePlatform couldn’t load this section</h2>
           <p className="mt-2 text-sm text-slate-500">
             Something went wrong while opening this page. Your account is still safe.
           </p>
