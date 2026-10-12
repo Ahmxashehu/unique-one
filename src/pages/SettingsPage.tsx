@@ -54,7 +54,6 @@ export default function SettingsPage() {
             <div className="bg-gradient-to-br from-emerald-50 via-white to-slate-50 p-5 sm:p-6">
               <p className="text-sm font-bold text-emerald-700">Your UniquePlatform account is ready</p>
               <p className="mt-1 text-sm text-slate-600">Manage your identity, payments, activity and connected experiences from UniquePlatform.</p>
-              <Link to="/os/dashboard" className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white">Open UniquePlatform <ChevronRight className="h-4 w-4" /></Link>
             </div>
           )}
         </div>
