@@ -98,7 +98,7 @@ export default function BookingsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Bookings</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage your schedule and appointments across UniqueOS.</p>
+          <p className="text-sm text-slate-500 mt-1">Manage your schedule and appointments across UniquePlatform.</p>
         </div>
         {isAuthenticated && (
           <button 
@@ -119,7 +119,7 @@ export default function BookingsPage() {
           </div>
           <h3 className="text-xl font-semibold text-slate-900">Connect your Calendar</h3>
           <p className="text-slate-500 mt-2 max-w-sm mx-auto">
-            UniqueOS uses Google Calendar to seamlessly sync and manage your bookings. Connect your account to continue.
+            UniquePlatform uses Google Calendar to seamlessly sync and manage your bookings. Connect your account to continue.
           </p>
           <button 
             onClick={handleConnect}
