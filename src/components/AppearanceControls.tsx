@@ -59,12 +59,10 @@ export default function AppearanceControls({ inline = false }: AppearanceControl
 
   return (
     <div className={containerClass}>
-      {!inline && (
-        <Link to="/" aria-label="UniquePlatform home" title="UniquePlatform home" className="group relative flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-950 px-1.5 text-[10px] font-black tracking-tight text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.28)] transition hover:shadow-[0_0_18px_rgba(16,185,129,0.48)] active:scale-95 sm:h-8 sm:min-w-8 sm:text-[11px]">
-          <span className="absolute inset-0 rounded-full bg-emerald-400/10 opacity-70 blur-sm" aria-hidden="true" />
-          <span className="relative">UP</span>
-        </Link>
-      )}
+      <Link to="/" aria-label="UniquePlatform home" title="UniquePlatform home" className="group relative flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-950 px-1.5 text-[10px] font-black tracking-tight text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.28)] transition hover:shadow-[0_0_18px_rgba(16,185,129,0.48)] active:scale-95 sm:h-8 sm:min-w-8 sm:text-[11px]">
+        <span className="absolute inset-0 rounded-full bg-emerald-400/10 opacity-70 blur-sm" aria-hidden="true" />
+        <span className="relative">UP</span>
+      </Link>
       <button type="button" onClick={toggleTheme} aria-label={dark ? t('lightMode', language) : t('darkMode', language)} title={dark ? t('lightMode', language) : t('darkMode', language)} className="group flex h-7 w-7 items-center justify-center rounded-full text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 sm:h-8 sm:w-8">
         {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
       </button>
