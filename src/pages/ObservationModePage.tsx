@@ -15,7 +15,7 @@ const destinations = [
   { to: '/os/business/dashboard', label: 'Business / Seller', text: 'Observe seller operations and dashboard tools.', icon: BriefcaseBusiness },
   { to: '/store/command-centre', label: 'Store Command Centre', text: 'Observe the full commerce ecosystem roadmap UI.', icon: Store },
   { to: '/os/pay/security', label: 'Pay Security', text: 'Observe security controls without changing them.', icon: WalletCards },
-  { to: '/os/settings', label: 'Settings', text: 'Observe the broader UniqueOS settings experience.', icon: Settings },
+  { to: '/os/settings', label: 'Settings', text: 'Observe the broader UniquePlatform settings experience.', icon: Settings },
 ];
 
 export default function ObservationModePage() {
