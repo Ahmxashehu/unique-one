@@ -47,6 +47,18 @@ const DEFAULT_MESSAGE_LIMIT = 50;
 const MAX_MESSAGE_LIMIT = 200;
 const MAX_IN_QUERY_IDS = 30;
 
+function withFirestoreSetupTimeout<T>(operation: Promise<T>, message: string, timeoutMs = 8000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    operation,
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new CommunicationDbError('READ_FAILED', message)), timeoutMs);
+    }),
+  ]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
+
 export type CommunicationDbErrorCode =
   | 'UNAUTHENTICATED'
   | 'INVALID_ID'
@@ -277,10 +289,10 @@ export async function subscribeToMessagesForConversation(
 ): Promise<() => void> {
   const uid = requireAuthenticatedUid();
   const id = requireId(conversationId, 'conversationId');
-  const membershipSnapshot = await Promise.race([
+  const membershipSnapshot = await withFirestoreSetupTimeout(
     safeRead(() => getDoc(doc(db, CONVERSATION_MEMBERS_COLLECTION, `${id}_${uid}`))),
-    new Promise<never>((_, reject) => window.setTimeout(() => reject(new CommunicationDbError('READ_FAILED', 'Conversation setup timed out.')), 8000)),
-  ]);
+    'Conversation setup timed out. Please retry.',
+  );
   if (!membershipSnapshot.exists()) {
     onMessages([]);
     onError(new CommunicationDbError('NOT_FOUND', `Conversation ${id} was not found.`));
