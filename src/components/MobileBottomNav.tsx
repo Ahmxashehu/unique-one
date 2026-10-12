@@ -60,7 +60,7 @@ export default function MobileBottomNav({ variant, onMenu }: MobileBottomNavProp
             </Link>
           );
         })}
-        <button type="button" onClick={onMenu} className="mobile-nav-item" aria-label="Open UniqueOS menu">
+        <button type="button" onClick={onMenu} className="mobile-nav-item" aria-label="Open UniquePlatform menu">
           <Menu className="h-5 w-5" aria-hidden="true" />
           <span>Menu</span>
         </button>
