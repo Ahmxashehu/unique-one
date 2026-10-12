@@ -2369,6 +2369,72 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
   });
 
 
+  app.post("/api/communication/contacts/match", authenticate, rateLimit({
+    windowMs: 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createFirestoreRateLimitStore('communicationContactMatchRateLimits', 60_000),
+    keyGenerator: (req) => {
+      const uid = (req as any).user?.uid;
+      return isSafeFirebaseUid(uid) ? uid : ipKeyGenerator(req.ip);
+    },
+    handler: (_req, res) => errorResponse(res, 'RATE_LIMITED', 'Too many contact matches. Please try again shortly.'),
+  }), async (req, res) => {
+    try {
+      const requesterUid = sanitizeRequiredAuthUid((req as any).user?.uid);
+      if (!isPlainObject(req.body) || !Array.isArray(req.body.phoneNumbers)) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Provide a list of phone numbers from contacts you chose to share.');
+      }
+      const supplied = req.body.phoneNumbers;
+      if (supplied.length > 100) {
+        return errorResponse(res, 'INVALID_REQUEST', 'Match up to 100 contacts at a time.');
+      }
+      const variants = new Set<string>();
+      for (const item of supplied) {
+        if (typeof item !== 'string') continue;
+        const raw = item.trim();
+        const digits = raw.replace(/\\D/g, '');
+        if (digits.length < 7 || digits.length > 15) continue;
+        variants.add(raw);
+        variants.add(digits);
+        variants.add('+' + digits);
+        if (digits.startsWith('0') && digits.length >= 10) variants.add('+234' + digits.slice(1));
+        if (digits.startsWith('234')) variants.add('+' + digits);
+        if (digits.startsWith('234')) variants.add('0' + digits.slice(3));
+        if (digits.startsWith('00')) variants.add('+' + digits.slice(2));
+      }
+      if (!variants.size) return res.status(200).json({ users: [] });
+
+      const usersRef = adminDb.collection('users');
+      const matches = new Map<string, FirebaseFirestore.DocumentData>();
+      const values = Array.from(variants);
+      const chunks: string[][] = [];
+      for (let index = 0; index < values.length; index += 30) chunks.push(values.slice(index, index + 30));
+      const queries: FirebaseFirestore.QuerySnapshot[] = [];
+      for (const field of ['phone', 'phoneNumber']) {
+        const snapshots = await Promise.all(chunks.map((chunk) => usersRef.where(field, 'in', chunk).limit(100).get()));
+        queries.push(...snapshots);
+      }
+      for (const snapshot of queries) {
+        for (const doc of snapshot.docs) {
+          if (doc.id !== requesterUid) matches.set(doc.id, doc.data());
+        }
+      }
+      const users = Array.from(matches.entries()).slice(0, 100).map(([uid, data]) => ({
+        uid,
+        fullName: typeof data.fullName === 'string' && data.fullName.trim() ? data.fullName : 'UniquePlatform user',
+        username: typeof data.username === 'string' && data.username.trim() ? data.username : undefined,
+        uniqueOneId: typeof data.uniqueOneId === 'string' && data.uniqueOneId.trim() ? data.uniqueOneId : undefined,
+        profilePhotoUrl: typeof data.profilePhotoUrl === 'string' ? data.profilePhotoUrl : undefined,
+      }));
+      return res.status(200).json({ users });
+    } catch (error) {
+      console.error('Communication contact matching failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Could not match your selected contacts right now.');
+    }
+  });
+
   app.get("/api/communication/users/search", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 30,
