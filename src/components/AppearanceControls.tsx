@@ -65,7 +65,7 @@ export default function AppearanceControls({ inline = false }: AppearanceControl
           <span className="relative">UP</span>
         </Link>
       )}
-      <button type="button" onClick={toggleTheme aria-label={dark ? t('lightMode', language) : t('darkMode', language)} title={dark ? t('lightMode', language) : t('darkMode', language)} className="group flex h-7 w-7 items-center justify-center rounded-full text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 sm:h-8 sm:w-8">
+      <button type="button" onClick={toggleTheme} aria-label={dark ? t('lightMode', language) : t('darkMode', language)} title={dark ? t('lightMode', language) : t('darkMode', language)} className="group flex h-7 w-7 items-center justify-center rounded-full text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 sm:h-8 sm:w-8">
         {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
       </button>
       <div ref={languageMenuRef} className="relative">
