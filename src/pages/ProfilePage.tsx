@@ -230,12 +230,12 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-12">
+    <div className="space-y-4 max-w-3xl mx-auto pb-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Unified Profile</h1>
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">Unified Profile</h1>
           <div className="mt-2 mb-2">
-             <Link to="/os/messages" className="px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition-colors inline-flex items-center gap-2 text-sm">
+             <Link to="/os/messages" className="px-3 py-2 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-colors inline-flex items-center gap-2 text-xs">
                 <MessageSquare className="w-4 h-4" /> Message User
              </Link>
           </div>
@@ -244,7 +244,7 @@ export default function ProfilePage() {
         {!isEditing ? (
           <button 
             onClick={() => setIsEditing(true)}
-            className="px-6 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors"
+            className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors"
           >
             Edit Profile
           </button>
@@ -252,14 +252,14 @@ export default function ProfilePage() {
           <div className="flex gap-2">
             <button 
               onClick={() => setIsEditing(false)}
-              className="px-6 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+              className="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors"
             >
               Cancel
             </button>
             <button 
               onClick={handleSave}
               disabled={loading}
-              className="px-6 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors flex items-center gap-2"
+              className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors flex items-center gap-2"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Save Changes
@@ -268,13 +268,13 @@ export default function ProfilePage() {
         )}
       </div>
       
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mb-8 pb-8 border-b border-slate-100">
+      <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-5 pb-5 border-b border-slate-100">
           <div className="relative shrink-0">
-            <div className="w-24 h-24 bg-indigo-50 rounded-full overflow-hidden flex items-center justify-center text-indigo-700 text-3xl font-bold uppercase">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-50 rounded-full overflow-hidden flex items-center justify-center text-emerald-700 text-2xl font-bold uppercase">
               {userData.profilePhotoUrl ? <img src={userData.profilePhotoUrl} alt="Profile" className="w-full h-full object-cover" /> : userData.fullName.charAt(0)}
             </div>
-            <label className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center cursor-pointer shadow-lg">
+            <label className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center cursor-pointer shadow-lg">
               {photoLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
               <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handlePhotoChange} disabled={photoLoading} className="hidden" />
             </label>
@@ -282,12 +282,12 @@ export default function ProfilePage() {
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-2xl font-bold text-slate-900">{userData.fullName}</h2>
+              <h2 className="text-lg sm:text-xl font-black text-slate-900">{userData.fullName}</h2>
               {userData.verificationStatus !== 'unverified' && (
                 <ShieldCheck className="w-5 h-5 text-blue-500" />
               )}
             </div>
-            <p className="text-slate-500 font-medium mb-3">Unique One ID: <span className="text-slate-900 bg-slate-100 px-2 py-0.5 rounded font-mono text-sm">{userData.uniqueOneId}</span></p>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium mb-2">Unique One ID: <span className="text-slate-900 bg-slate-100 px-2 py-0.5 rounded font-mono text-sm">{userData.uniqueOneId}</span></p>
             <div className="flex flex-wrap gap-2">
               {userData.roles.map(role => (
                 <span key={role} className="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full uppercase tracking-wider">
@@ -298,16 +298,16 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="mb-8 pb-8 border-b border-slate-100">
-          <div className="flex items-center gap-2 mb-4"><User className="w-5 h-5 text-slate-500"/><h3 className="text-lg font-bold text-slate-900">Customer ownership & communication profile</h3></div>
-          <p className="text-sm text-slate-500 mb-4">You control the non-sensitive information people can use to recognize and communicate with you. Your phone, Unique ID, verification records, NIN/BVN, and PINs remain protected.</p>
-          <div className="grid sm:grid-cols-3 gap-4">
-            <input disabled={!isEditing} value={formData.firstName} onChange={e=>setFormData({...formData,firstName:e.target.value})} placeholder="First name" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
-            <input disabled={!isEditing} value={formData.otherName} onChange={e=>setFormData({...formData,otherName:e.target.value})} placeholder="Other / middle name" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
-            <input disabled={!isEditing} value={formData.lastName} onChange={e=>setFormData({...formData,lastName:e.target.value})} placeholder="Last name" className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"/>
+        <div className="mb-5 pb-5 border-b border-slate-100">
+          <div className="flex items-center gap-2 mb-4"><User className="w-4 h-4 text-slate-500"/><h3 className="text-sm sm:text-base font-black text-slate-900">Customer ownership & communication profile</h3></div>
+          <p className="text-xs sm:text-sm text-slate-500 mb-3">You control the non-sensitive information people can use to recognize and communicate with you. Your phone, Unique ID, verification records, NIN/BVN, and PINs remain protected.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input disabled={!isEditing} value={formData.firstName} onChange={e=>setFormData({...formData,firstName:e.target.value})} placeholder="First name" className="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-xl text-sm disabled:bg-slate-50"/>
+            <input disabled={!isEditing} value={formData.otherName} onChange={e=>setFormData({...formData,otherName:e.target.value})} placeholder="Other / middle name" className="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-xl text-sm disabled:bg-slate-50"/>
+            <input disabled={!isEditing} value={formData.lastName} onChange={e=>setFormData({...formData,lastName:e.target.value})} placeholder="Last name" className="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-xl text-sm disabled:bg-slate-50"/>
           </div>
-          <div className="mt-4 grid sm:grid-cols-2 gap-4">
-            <select disabled={!isEditing} value={formData.communicationLocationVisibility} onChange={e=>setFormData({...formData,communicationLocationVisibility:e.target.value as typeof formData.communicationLocationVisibility})} className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <select disabled={!isEditing} value={formData.communicationLocationVisibility} onChange={e=>setFormData({...formData,communicationLocationVisibility:e.target.value as typeof formData.communicationLocationVisibility})} className="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-xl text-sm disabled:bg-slate-50">
               <option value="hidden">Communication location: Hidden</option>
               <option value="city_only">Communication location: City only</option>
               <option value="contacts">Communication location: Contacts</option>
@@ -316,8 +316,8 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-6">
-          <div className="space-y-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-500 flex items-center gap-2">
               <User className="w-4 h-4" /> Full Name
             </label>
@@ -326,14 +326,14 @@ export default function ProfilePage() {
                 type="text" 
                 value={formData.fullName}
                 onChange={e => setFormData({...formData, fullName: e.target.value})}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 focus:outline-none" 
+                className="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 focus:outline-none" 
               />
             ) : (
               <p className="text-slate-900 font-medium">{userData.fullName}</p>
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-500 flex items-center gap-2">
               <Hash className="w-4 h-4" /> Username
             </label>
@@ -342,7 +342,7 @@ export default function ProfilePage() {
                 type="text" 
                 value={formData.username}
                 onChange={e => setFormData({...formData, username: e.target.value})}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 focus:outline-none" 
+                className="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 focus:outline-none" 
                 placeholder="@username"
               />
             ) : (
@@ -350,7 +350,7 @@ export default function ProfilePage() {
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-500 flex items-center gap-2">
               <Mail className="w-4 h-4" /> Email Address
             </label>
@@ -361,7 +361,7 @@ export default function ProfilePage() {
                 onChange={e => { setEmailDraft(e.target.value); setEmailError(''); setEmailMessage(''); }}
                 disabled={userData.emailVerified === true || emailLoading}
                 placeholder="you@example.com"
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg disabled:bg-slate-50"
+                className="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-xl text-sm disabled:bg-slate-50"
               />
               {userData.emailVerified === true ? (
                 <p className="text-xs text-green-600 font-medium">✓ Verified email — accepted as a login identifier.</p>
@@ -383,7 +383,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-500 flex items-center gap-2">
               <Phone className="w-4 h-4" /> Phone Number
             </label>
@@ -391,38 +391,38 @@ export default function ProfilePage() {
             {isEditing && <p className="text-xs text-slate-400 mt-1">Phone/Unique ID cannot be edited here. Use the protected phone-change verification flow.</p>}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-500 flex items-center gap-2">
               <MapPin className="w-4 h-4" /> Location
             </label>
             <p className="text-slate-900 font-medium">{userData.location?.address || <span className="text-slate-400 italic">No location set</span>}</p>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-500 flex items-center gap-2">
               <BadgeCheck className="w-4 h-4" /> Account Status
             </label>
             <p className="text-slate-900 font-medium capitalize">{userData.status}</p>
           </div>
           
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-500 flex items-center gap-2">
               <Clock className="w-4 h-4" /> Last Login
             </label>
             <p className="text-slate-900 font-medium">{new Date(userData.lastLogin).toLocaleString()}</p>
           </div>
         </div>
-        <div className="mt-8 pt-8 border-t border-slate-100">
+        <div className="mt-5 pt-5 border-t border-slate-100">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-            <div className="flex items-center gap-2"><MapPin className="w-5 h-5 text-slate-500"/><h3 className="text-lg font-bold text-slate-900">Shipping Addresses</h3></div>
+            <div className="flex items-center gap-2"><MapPin className="w-5 h-5 text-slate-500"/><h3 className="text-sm sm:text-base font-black text-slate-900">Shipping Addresses</h3></div>
             {isEditing && <button type="button" onClick={() => setShippingAddresses(current => [...current, { id: 'address-' + Date.now(), label: 'New address', recipientName: formData.firstName + (formData.lastName ? ' ' + formData.lastName : ''), phone: userData.phone || '', country: 'Nigeria', state: '', lga: '', town: '', area: '', fullAddress: '', landmark: '', isDefault: current.length === 0 }])} className="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm">Add address</button>}
           </div>
-          <p className="text-sm text-slate-500 mb-4">Keep multiple private delivery addresses such as Home, Office, or another destination. One address is always marked as the default for Store checkout.</p>
+          <p className="text-xs sm:text-sm text-slate-500 mb-3">Keep multiple private delivery addresses such as Home, Office, or another destination. One address is always marked as the default for Store checkout.</p>
           <div className="space-y-4">
             {(shippingAddresses.length ? shippingAddresses : [{
               id: 'default', label: formData.shippingLabel || 'Home', recipientName: formData.shippingRecipientName || userData.fullName, phone: formData.shippingPhone || userData.phone || '', country: 'Nigeria', state: formData.shippingState, lga: formData.shippingLga, town: formData.shippingTown, area: formData.shippingArea, fullAddress: formData.shippingFullAddress, landmark: formData.shippingLandmark, isDefault: true
             } as ShippingAddress]).map((address, index) => (
-              <div key={address.id} className="border border-slate-200 rounded-2xl p-4">
+              <div key={address.id} className="border border-slate-200 rounded-xl p-3">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
                     <input disabled={!isEditing} value={address.label} onChange={e=>setShippingAddresses(current=>current.map(item=>item.id===address.id?{...item,label:e.target.value}:item))} placeholder="Home / Office" className="px-3 py-2 border border-slate-200 rounded-lg font-semibold disabled:bg-slate-50"/>
@@ -430,7 +430,7 @@ export default function ProfilePage() {
                   </div>
                   {isEditing && shippingAddresses.length > 1 && <button type="button" onClick={()=>setShippingAddresses(current=>{const remaining=current.filter(item=>item.id!==address.id); if(address.isDefault && remaining[0]) remaining[0]={...remaining[0],isDefault:true}; return remaining;})} className="text-xs text-red-600">Remove</button>}
                 </div>
-                <div className="grid sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {([
                     ['recipientName','Recipient name'],['phone','Delivery phone'],['state','State'],['lga','LGA'],['town','Town / City'],['area','Area'],['landmark','Landmark (optional)'],['fullAddress','Full address']
                   ] as const).map(([key,placeholder]) => key === 'fullAddress' ? (
