@@ -18,7 +18,7 @@ const translations: Record<SupportedLanguage, Record<TranslationKey, string>> = 
   en: {
     language:'Language', lightMode:'Light mode', darkMode:'Dark mode', activeEdge:'Active Edge', categories:'Categories',
     nearMe:'Near Me', about:'About', support:'Support', dashboard:'Dashboard', login:'Log in', signUp:'Sign Up',
-    moreExperiences:'More experiences', close:'Close', openUniqueOS:'Open UniqueOS', register:'Register',
+    moreExperiences:'More experiences', close:'Close', openUniqueOS:'Open UniquePlatform', register:'Register',
     home:'Home', search:'Search', ai:'AI', settings:'Settings', profile:'Profile', messages:'Messages',
     orders:'Orders', bookings:'Bookings', wishlist:'Wishlist', notifications:'Notifications', logout:'Log out',
     send:'Send', receive:'Receive', cancel:'Cancel', save:'Save', back:'Back', next:'Next', continue:'Continue',
@@ -31,7 +31,7 @@ const translations: Record<SupportedLanguage, Record<TranslationKey, string>> = 
   ha: {
     language:'Harshe', lightMode:'Yanayin haske', darkMode:'Yanayin duhu', activeEdge:'Sabbin abubuwa', categories:'Rukuni',
     nearMe:'Kusa da ni', about:'Game da mu', support:'Tallafi', dashboard:'Dashboard', login:'Shiga', signUp:'Yi rajista',
-    moreExperiences:'Ƙarin ayyuka', close:'Rufe', openUniqueOS:'Buɗe UniqueOS', register:'Yi rajista',
+    moreExperiences:'Ƙarin ayyuka', close:'Rufe', openUniqueOS:'Buɗe UniquePlatform', register:'Yi rajista',
     home:'Gida', search:'Bincika', ai:'AI', settings:'Saituna', profile:'Bayani na', messages:'Saƙonni',
     orders:'Umarni', bookings:'Ajiyar wuri', wishlist:'Abubuwan so', notifications:'Sanarwa', logout:'Fita',
     send:'Aika', receive:'Karɓa', cancel:'Soke', save:'Ajiye', back:'Koma', next:'Na gaba', continue:'Ci gaba',
@@ -44,7 +44,7 @@ const translations: Record<SupportedLanguage, Record<TranslationKey, string>> = 
   fr: {
     language:'Langue', lightMode:'Mode clair', darkMode:'Mode sombre', activeEdge:'À la une', categories:'Catégories',
     nearMe:'Près de moi', about:'À propos', support:'Assistance', dashboard:'Tableau de bord', login:'Se connecter',
-    signUp:'S’inscrire', moreExperiences:'Plus d’expériences', close:'Fermer', openUniqueOS:'Ouvrir UniqueOS', register:'S’inscrire',
+    signUp:'S’inscrire', moreExperiences:'Plus d’expériences', close:'Fermer', openUniqueOS:'Ouvrir UniquePlatform', register:'S’inscrire',
     home:'Accueil', search:'Rechercher', ai:'IA', settings:'Paramètres', profile:'Profil', messages:'Messages',
     orders:'Commandes', bookings:'Réservations', wishlist:'Liste de souhaits', notifications:'Notifications', logout:'Se déconnecter',
     send:'Envoyer', receive:'Recevoir', cancel:'Annuler', save:'Enregistrer', back:'Retour', next:'Suivant', continue:'Continuer',
@@ -57,7 +57,7 @@ const translations: Record<SupportedLanguage, Record<TranslationKey, string>> = 
   ig: {
     language:'Asụsụ', lightMode:'Ọnọdụ ọkụ', darkMode:'Ọnọdụ ọchịchịrị', activeEdge:'Ihe ọhụrụ', categories:'Ụdị',
     nearMe:'N’akụkụ m', about:'Banyere', support:'Nkwado', dashboard:'Dashboard', login:'Banye', signUp:'Debanye aha',
-    moreExperiences:'Ahụmịhe ndị ọzọ', close:'Mechie', openUniqueOS:'Mepee UniqueOS', register:'Debanye aha',
+    moreExperiences:'Ahụmịhe ndị ọzọ', close:'Mechie', openUniqueOS:'Mepee UniquePlatform', register:'Debanye aha',
     home:'Ụlọ', search:'Chọọ', ai:'AI', settings:'Ntọala', profile:'Profaịlụ', messages:'Ozi',
     orders:'Iwu', bookings:'Ndokwa', wishlist:'Ihe ndị masịrị', notifications:'Ọkwa', logout:'Pụọ',
     send:'Zipu', receive:'Nata', cancel:'Kagbuo', save:'Chekwaa', back:'Laghachi', next:'Ọzọ', continue:'Gaa n’ihu',
@@ -70,7 +70,7 @@ const translations: Record<SupportedLanguage, Record<TranslationKey, string>> = 
   yo: {
     language:'Èdè', lightMode:'Ipo ìmọ́lẹ̀', darkMode:'Ipo òkùnkùn', activeEdge:'Àwọn tuntun', categories:'Àwọn ẹka',
     nearMe:'Nítòsí mi', about:'Nípa wa', support:'Ìrànlọ́wọ́', dashboard:'Pẹpẹ iṣakoso', login:'Wọlé',
-    signUp:'Forúkọsílẹ̀', moreExperiences:'Àwọn ìrírí míì', close:'Pa', openUniqueOS:'Ṣí UniqueOS', register:'Forúkọsílẹ̀',
+    signUp:'Forúkọsílẹ̀', moreExperiences:'Àwọn ìrírí míì', close:'Pa', openUniqueOS:'Ṣí UniquePlatform', register:'Forúkọsílẹ̀',
     home:'Ilé', search:'Wá', ai:'AI', settings:'Ètò', profile:'Àkọsílẹ̀', messages:'Àwọn ifiranṣẹ',
     orders:'Àwọn àṣẹ', bookings:'Àwọn ìfipamọ́', wishlist:'Àwọn ohun tí mo fẹ́', notifications:'Àwọn ìfitónilétí', logout:'Jáde',
     send:'Firanṣẹ́', receive:'Gba', cancel:'Fagilé', save:'Fipamọ́', back:'Padà', next:'Tókàn', continue:'Tẹ̀síwájú',
@@ -83,7 +83,7 @@ const translations: Record<SupportedLanguage, Record<TranslationKey, string>> = 
   pcm: {
     language:'Language', lightMode:'Light mode', darkMode:'Dark mode', activeEdge:'New things', categories:'Categories',
     nearMe:'Near Me', about:'About', support:'Support', dashboard:'Dashboard', login:'Log in', signUp:'Sign Up',
-    moreExperiences:'More experiences', close:'Close', openUniqueOS:'Open UniqueOS', register:'Register',
+    moreExperiences:'More experiences', close:'Close', openUniqueOS:'Open UniquePlatform', register:'Register',
     home:'Home', search:'Search', ai:'AI', settings:'Settings', profile:'Profile', messages:'Messages',
     orders:'Orders', bookings:'Bookings', wishlist:'Wishlist', notifications:'Notifications', logout:'Log out',
     send:'Send', receive:'Receive', cancel:'Cancel', save:'Save', back:'Back', next:'Next', continue:'Continue',
