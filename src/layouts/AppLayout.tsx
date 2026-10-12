@@ -116,6 +116,7 @@ export default function AppLayout() {
 
   return (
     <div className="flex h-full bg-slate-50 overflow-hidden w-full max-w-[100vw]">
+      <AppearanceControls />
       {isMobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-[100] isolate" role="dialog" aria-modal="true" aria-label="More UniquePlatform">
           <button
@@ -229,7 +230,7 @@ export default function AppLayout() {
       </Link>
 
       <div className="flex-1 flex flex-col h-full min-w-0 w-full overflow-hidden">
-        <main className="mobile-scroll-padding flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pt-4 lg:p-8 w-full pb-20 lg:pb-8">
+        <main className="mobile-scroll-padding flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pt-16 lg:p-8 lg:pt-16 w-full pb-20 lg:pb-8">
           <div className="mx-auto max-w-5xl h-full w-full">
             <AppErrorBoundary>
               <Outlet />
