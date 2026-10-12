@@ -74,7 +74,7 @@ export default function DashboardPage() {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <div className="text-sm font-medium text-slate-500">
-          {authLoading ? 'Loading UniqueOS…' : 'Returning to UniqueOS…'}
+          {authLoading ? 'Loading UniquePlatform…' : 'Returning to UniquePlatform…'}
         </div>
       </div>
     );
