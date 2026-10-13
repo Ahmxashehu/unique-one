@@ -21,11 +21,11 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
-      - name: Install locked dependencies
-        run: npm ci
+      - name: Install dependencies and reconcile lockfile
+        run: npm install --no-audit --no-fund
 
       - name: Build frontend
         run: npx vite build --outDir dist/netlify
