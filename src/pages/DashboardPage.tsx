@@ -31,22 +31,27 @@ export default function DashboardPage() {
 
       try {
         const ordersRef = collection(db, 'orders');
-        const [walletSnapshot, customerOrders, sellerOrders, conversationSnapshot] = await Promise.all([
+        const token = await currentUser.getIdToken();
+        const [walletSnapshot, customerOrders, sellerOrdersResponse, conversationSnapshot] = await Promise.all([
           getDoc(doc(db, 'wallets', currentUser.uid)),
           getDocs(query(ordersRef, where('customerId', '==', currentUser.uid))),
-          getDocs(query(ordersRef, where('sellerId', '==', currentUser.uid))),
+          fetch('/api/business/seller/orders', { headers: { Authorization: `Bearer ${token}` } }),
           getDocs(query(collection(db, 'conversations'), where('participants', 'array-contains', currentUser.uid))),
         ]);
+        if (!sellerOrdersResponse.ok) throw new Error('Seller orders are temporarily unavailable.');
+        const sellerOrdersData = await sellerOrdersResponse.json();
+        const sellerOrders = Array.isArray(sellerOrdersData.orders) ? sellerOrdersData.orders : [];
 
         if (cancelled) return;
 
         const orderIds = new Set<string>();
         const completedStatuses = new Set(['delivered', 'completed', 'cancelled', 'refunded']);
 
-        [...customerOrders.docs, ...sellerOrders.docs].forEach((order) => {
-          if (!completedStatuses.has(String(order.data().status))) {
-            orderIds.add(order.id);
-          }
+        customerOrders.docs.forEach((order) => {
+          if (!completedStatuses.has(String(order.data().status))) orderIds.add(order.id);
+        });
+        sellerOrders.forEach((order: any) => {
+          if (!completedStatuses.has(String(order.status))) orderIds.add(String(order.id));
         });
 
         const walletData = walletSnapshot.exists() ? walletSnapshot.data() : null;
