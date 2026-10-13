@@ -80,6 +80,7 @@ const AdminVerificationPage = lazy(() => import("./pages/admin/AdminVerification
 const AdminTransactionsPage = lazy(() => import("./pages/admin/AdminTransactionsPage"));
 const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage"));
 const AdminControlTowerPage = lazy(() => import("./pages/admin/AdminControlTowerPage"));
+const AdminSupportCentrePage = lazy(() => import("./pages/admin/AdminSupportCentrePage"));
 const SuperAdminDashboardPage = lazy(() => import("./pages/admin/SuperAdminDashboardPage"));
 const StoreDiscoverPage = lazy(() => import("./pages/store/StoreDiscoverPage"));
 const StorePage = lazy(() => import("./pages/StorePage"));
@@ -292,6 +293,7 @@ export default function App() {
                   <Route path="/admin" element={<AdminLayout />}>
                     <Route index element={<Navigate to="/admin/workspace/super" replace />} />
                     <Route path="control-tower" element={<RoleGuard dashboard="super_admin"><AdminControlTowerPage /></RoleGuard>} />
+                    <Route path="support-centre" element={<RoleGuard requiredPermission="manage:support"><AdminSupportCentrePage /></RoleGuard>} />
                     <Route path="workspace/finance" element={<RoleGuard dashboard="finance_settlement"><WorkspaceDashboardPage dashboard="finance_settlement" /></RoleGuard>} />
                     <Route path="workspace/risk" element={<RoleGuard dashboard="security_risk"><WorkspaceDashboardPage dashboard="security_risk" /></RoleGuard>} />
                     <Route path="workspace/platform" element={<RoleGuard dashboard="platform_admin"><WorkspaceDashboardPage dashboard="platform_admin" /></RoleGuard>} />
