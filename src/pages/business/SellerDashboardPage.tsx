@@ -79,15 +79,18 @@ export default function SellerDashboardPage() {
     setError('');
 
     try {
-      const [orderSnap, invoiceSnap, productSnap, sentTxSnap, receivedTxSnap] = await Promise.all([
-        getDocs(query(collection(db, 'orders'), where('sellerId', '==', currentUser.uid))),
+      const token = await currentUser.getIdToken();
+      const [orderResponse, invoiceSnap, productSnap, sentTxSnap, receivedTxSnap] = await Promise.all([
+        fetch('/api/business/seller/orders', { headers: { Authorization: `Bearer ${token}` } }),
         getDocs(query(collection(db, 'invoices'), where('sellerId', '==', currentUser.uid))),
         getDocs(query(collection(db, 'products'), where('sellerId', '==', currentUser.uid))),
         getDocs(query(collection(db, 'transactions'), where('senderId', '==', currentUser.uid))),
         getDocs(query(collection(db, 'transactions'), where('recipientId', '==', currentUser.uid))),
       ]);
+      if (!orderResponse.ok) throw new Error('Seller orders are temporarily unavailable.');
+      const orderData = await orderResponse.json();
 
-      setOrders(orderSnap.docs.map(d => ({ id: d.id, ...d.data() } as DashboardOrder)));
+      setOrders(Array.isArray(orderData.orders) ? orderData.orders as DashboardOrder[] : []);
       setInvoices(invoiceSnap.docs.map(d => ({ id: d.id, ...d.data() } as DashboardInvoice)));
       setProducts(productSnap.docs.map(d => ({ id: d.id, ...d.data() } as DashboardProduct)));
 
