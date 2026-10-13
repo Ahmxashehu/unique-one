@@ -82,15 +82,13 @@ export default function AdminSupportCentrePage() {
       const nextCases: SupportCase[] = Array.isArray(queueData.cases) ? queueData.cases : [];
       setCases(nextCases);
       setStaff(Array.isArray(staffData.staff) ? staffData.staff : []);
-      if (!keepSelection || !nextCases.some(item => item.id === selectedId)) {
-        setSelectedId(nextCases[0]?.id || '');
-      }
+      setSelectedId(current => keepSelection && nextCases.some(item => item.id === current) ? current : (nextCases[0]?.id || ''));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load support cases.');
     } finally {
       setLoading(false);
     }
-  }, [currentUser, selectedId, tokenHeaders]);
+  }, [currentUser, tokenHeaders]);
 
   const loadMessages = useCallback(async (caseId: string) => {
     if (!currentUser || !caseId) {
