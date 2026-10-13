@@ -1405,16 +1405,20 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const snapshot = await query.get();
       const applications = await Promise.all(snapshot.docs.map(async (applicationDoc) => {
         const data = applicationDoc.data();
+        const { contactPhone: _privateContactPhone, ...safeApplicationData } = data;
         const applicantSnapshot = await adminDb.collection('users').doc(String(data.applicantUid || '')).get();
         const applicant = applicantSnapshot.data() || {};
+        const applicantPhone = typeof applicant.phone === 'string' ? applicant.phone : (typeof data.contactPhone === 'string' ? data.contactPhone : '');
         return {
           id: applicationDoc.id,
-          ...data,
+          ...safeApplicationData,
+          contactPhoneMasked: typeof data.contactPhone === 'string' ? data.contactPhone.replace(/[0-9](?=[0-9]{2})/g, '•') : '',
           applicant: {
             uid: data.applicantUid,
             fullName: applicant.fullName || applicant.displayName || 'Unique One User',
             email: applicant.email || data.contactEmail || '',
-            phone: applicant.phone || data.contactPhone || '',
+            phone: applicantPhone.replace(/[0-9](?=[0-9]{2})/g, '•'),
+            phoneAccessRestricted: true,
             uniqueOneId: applicant.uniqueOneId || '',
           },
         };
@@ -1617,7 +1621,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       ]);
       const users = usersSnap.docs.map((doc) => {
         const d = doc.data();
-        return { id: doc.id, fullName: typeof d.fullName === 'string' ? d.fullName : null, email: typeof d.email === 'string' ? d.email : null, phone: typeof d.phone === 'string' ? d.phone : null, uniqueOneId: typeof d.uniqueOneId === 'string' ? d.uniqueOneId : null, roles: Array.isArray(d.roles) ? d.roles.filter((v: unknown) => typeof v === 'string') : [], verificationStatus: typeof d.verificationStatus === 'string' ? d.verificationStatus : 'unverified', createdAt: typeof d.createdAt?.toDate === 'function' ? d.createdAt.toDate().toISOString() : null };
+        return { id: doc.id, fullName: typeof d.fullName === 'string' ? d.fullName : null, email: typeof d.email === 'string' ? d.email : null, phone: typeof d.phone === 'string' ? d.phone.replace(/[0-9](?=[0-9]{2})/g, '•') : null, uniqueOneId: typeof d.uniqueOneId === 'string' ? d.uniqueOneId : null, roles: Array.isArray(d.roles) ? d.roles.filter((v: unknown) => typeof v === 'string') : [], verificationStatus: typeof d.verificationStatus === 'string' ? d.verificationStatus : 'unverified', createdAt: typeof d.createdAt?.toDate === 'function' ? d.createdAt.toDate().toISOString() : null };
       });
       const businesses = businessesSnap.docs.map((doc) => {
         const d = doc.data();
@@ -3990,7 +3994,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           currency: String(order.currency || 'NGN'),
           totalMinor: Number(order.totalMinor || 0),
           customerName: String(order.customerName || ''),
-          customerPhone: String(order.customerPhone || ''),
+          customerPhone: '', // Customer contact numbers are never exposed to restaurant staff; use platform messaging.
           mode: String(order.mode || ''),
           deliveryAddress: String(order.deliveryAddress || ''),
           date: String(order.date || ''),
