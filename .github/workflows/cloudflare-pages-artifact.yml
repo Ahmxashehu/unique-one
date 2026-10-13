@@ -44,6 +44,10 @@ jobs:
           cd dist/cloudflare
           zip -qr ../../uniqueplatform-pages-upload.zip .
 
+      - name: Route API requests to existing Render backend
+        run: |
+          printf '/api https://unique-one-162s.onrender.com/api 200\n/api/* https://unique-one-162s.onrender.com/api/:splat 200\n' > dist/cloudflare/_redirects
+
       - name: Upload static website artifact
         uses: actions/upload-artifact@v4
         with:
