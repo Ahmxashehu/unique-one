@@ -11,7 +11,7 @@ export type Permission =
   | 'view:customer_info' | 'manage:orders' | 'confirm:delivery' | 'manage:bookings' 
   | 'manage:business_staff' | 'manage:restaurant' | 'manage:restaurant_menu' | 'manage:restaurant_orders' | 'manage:restaurant_verification' | 'view:transactions' | 'manage:verification' 
   | 'manage:disputes' | 'access:admin_tools' | 'manage:roles' | 'manage:permissions' 
-  | 'view:audit_logs' | 'view:customer_phone';
+  | 'view:audit_logs' | 'view:customer_phone' | 'manage:support';
 
 export interface UniqueUser {
   uid: string;
