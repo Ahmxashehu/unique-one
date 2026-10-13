@@ -30,10 +30,24 @@ jobs:
       - name: Build frontend for Pages
         run: npx vite build --outDir dist/cloudflare
 
+      - name: Add Pages API proxy and SPA fallback
+        shell: bash
+        run: |
+          cat > dist/cloudflare/_redirects <<'EOF'
+          /api https://unique-one-162s.onrender.com/api 200
+          /api/* https://unique-one-162s.onrender.com/api/:splat 200
+          /* /index.html 200
+          EOF
+
+      - name: Package upload ZIP
+        run: |
+          cd dist/cloudflare
+          zip -qr ../../uniqueplatform-pages-upload.zip .
+
       - name: Upload static website artifact
         uses: actions/upload-artifact@v4
         with:
-          name: uniqueplatform-pages-site
-          path: dist/cloudflare/
+          name: uniqueplatform-pages-upload
+          path: uniqueplatform-pages-upload.zip
           if-no-files-found: error
           retention-days: 7
