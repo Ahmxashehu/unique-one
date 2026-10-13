@@ -209,7 +209,8 @@ service cloud.firestore {
       allow delete: if isPlatformAdmin();
     }
     match /orders/{orderId} {
-      allow read: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.sellerId == request.auth.uid) || isPlatformAdmin();
+      // Seller-facing order reads must use the server's sanitized response; direct reads expose private customer contact fields.
+      allow read: if (isAuthenticated() && resource.data.customerId == request.auth.uid) || isPlatformAdmin();
             allow create: if false;
       allow update: if isPlatformAdmin();
       allow delete: if isPlatformAdmin();
