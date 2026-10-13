@@ -1,0 +1,54 @@
+name: Build Netlify manual-deploy package
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cloudflare-free-hosting-pilot
+
+permissions:
+  contents: read
+
+jobs:
+  build-netlify-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pilot branch
+        uses: actions/checkout@v4
+        with:
+          ref: cloudflare-free-hosting-pilot
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies and reconcile lockfile
+        run: npm install --no-audit --no-fund
+
+      - name: Build frontend
+        run: npx vite build --outDir dist/netlify
+
+      - name: Add SPA fallback and proxy API to existing Render backend
+        shell: bash
+        run: |
+          cat > dist/netlify/_redirects <<'EOF'
+          /api https://unique-one-162s.onrender.com/api 200
+          /api/* https://unique-one-162s.onrender.com/api/:splat 200
+          /* /index.html 200
+          EOF
+
+      - name: Package Netlify upload ZIP
+        shell: bash
+        run: |
+          cd dist/netlify
+          zip -qr ../../uniqueplatform-netlify-upload.zip .
+
+      - name: Upload manual deployment package
+        uses: actions/upload-artifact@v4
+        with:
+          name: uniqueplatform-netlify-upload
+          path: uniqueplatform-netlify-upload.zip
+          if-no-files-found: error
+          retention-days: 7
