@@ -23,7 +23,7 @@ const ALL_PERMISSIONS: Permission[] = [
   'view:profile','edit:profile','create:products','edit:products','manage:inventory',
   'create:invoices','send:payment_requests','view:customer_info','manage:orders','manage:bookings',
   'manage:business_staff','view:transactions','manage:verification','manage:restaurant','manage:restaurant_menu','manage:restaurant_orders','manage:restaurant_verification','manage:disputes',
-  'access:admin_tools','manage:roles','manage:permissions','view:audit_logs','view:customer_phone',
+  'access:admin_tools','manage:roles','manage:permissions','view:audit_logs','view:customer_phone','manage:support',
 ];
 const RESTRICTED_ROLES = new Set<Role>(['risk_security_officer','platform_admin','super_admin']);
 const isRole = (value: unknown): value is Role => typeof value === 'string' && ALL_ROLES.includes(value as Role);
@@ -108,8 +108,8 @@ export function registerAdminRbacRoutes(
     if (!actorIsSuperAdmin && roles.some((role) => RESTRICTED_ROLES.has(role))) {
       return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can assign restricted platform roles.' } });
     }
-    if (!actorIsSuperAdmin && permissions.some((permission) => ['manage:roles','manage:permissions','view:customer_phone'].includes(permission))) {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can grant restricted administration or customer-phone access.' } });
+    if (!actorIsSuperAdmin && permissions.some((permission) => ['manage:roles','manage:permissions','view:customer_phone','manage:support'].includes(permission))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can grant restricted administration, support-management, or customer-phone access.' } });
     }
     const ref = db.collection('users').doc(targetUid);
     const target = await ref.get();
@@ -132,7 +132,7 @@ export function registerAdminRbacRoutes(
         if (!liveActorIsSuperAdmin && roles.some((role) => RESTRICTED_ROLES.has(role))) {
           throw new Error('RESTRICTED_ROLE_FORBIDDEN');
         }
-        if (!liveActorIsSuperAdmin && permissions.some((permission) => ['manage:roles','manage:permissions','view:customer_phone'].includes(permission))) {
+        if (!liveActorIsSuperAdmin && permissions.some((permission) => ['manage:roles','manage:permissions','view:customer_phone','manage:support'].includes(permission))) {
           throw new Error('RBAC_PERMISSION_FORBIDDEN');
         }
         if (targetUid === actorUid && liveActorIsSuperAdmin && !roles.includes('super_admin')) {
@@ -161,7 +161,7 @@ export function registerAdminRbacRoutes(
         return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can assign restricted platform roles.' } });
       }
       if (error instanceof Error && error.message === 'RBAC_PERMISSION_FORBIDDEN') {
-        return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can grant restricted administration or customer-phone access.' } });
+        return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can grant restricted administration, support-management, or customer-phone access.' } });
       }
       if (error instanceof Error && error.message === 'SELF_SUPER_ADMIN_REMOVAL') {
         return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'A Super Admin cannot remove their own Super Admin role.' } });
