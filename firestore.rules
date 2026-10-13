@@ -27,6 +27,15 @@ service cloud.firestore {
              );
     }
 
+    // Full user documents contain private contact data. Client reads of other
+    // users are limited to Super Admin; restricted staff use audited server APIs.
+    function isSuperAdmin() {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data != null &&
+             'roles' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+             'super_admin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles;
+    }
+
     match /educationInstitutions/{institutionId} {
       allow read: if resource.data.status == 'published' || (isAuthenticated() && resource.data.ownerUid == request.auth.uid) || isPlatformAdmin();
       allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.status in ['draft','published'];
@@ -69,7 +78,7 @@ service cloud.firestore {
     }
     match /authCredentials/{userId} { allow read, write: if false; }
     match /users/{userId} {
-      allow read: if isOwner(userId) || isPlatformAdmin();
+      allow read: if isOwner(userId) || isSuperAdmin();
       allow create: if isOwner(userId) && (!('roles' in request.resource.data) || !('administrator' in request.resource.data.roles));
       // User role/permission/status changes are server-controlled. Do not let
       // an authenticated admin client mutate the control-plane user document
@@ -200,7 +209,8 @@ service cloud.firestore {
       allow delete: if isPlatformAdmin();
     }
     match /orders/{orderId} {
-      allow read: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.sellerId == request.auth.uid) || isPlatformAdmin();
+      // Seller-facing order reads must use the server's sanitized response; direct reads expose private customer contact fields.
+      allow read: if (isAuthenticated() && resource.data.customerId == request.auth.uid) || isPlatformAdmin();
             allow create: if false;
       allow update: if isPlatformAdmin();
       allow delete: if isPlatformAdmin();

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import {
   Users, Building2, Package, Inbox, BarChart3,
-  ShieldCheck, Activity, Settings, LogOut, Network, Crown, Wallet
+  ShieldCheck, Activity, Settings, LogOut, Network, Crown, Wallet, Headphones
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -20,6 +20,7 @@ export default function AdminLayout() {
     { name: 'Businesses', path: '/admin/businesses', icon: Building2 },
     { name: 'Products', path: '/admin/products', icon: Package },
     { name: 'Business Applications', path: '/admin/requests', icon: Inbox },
+    { name: 'Support Centre', path: '/admin/support-centre', icon: Headphones },
     { name: 'Reports', path: '/admin/reports', icon: BarChart3 },
     { name: 'Verification', path: '/admin/verification', icon: ShieldCheck },
     { name: 'Transactions', path: '/admin/transactions', icon: Activity },

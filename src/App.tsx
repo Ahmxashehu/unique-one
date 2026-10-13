@@ -21,7 +21,6 @@ import DashboardPage from "./pages/DashboardPage";
 import WorkspaceDashboardPage from "./pages/WorkspaceDashboardPage";
 import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 
-const ConferencePage = lazy(() => import("./pages/ConferencePage"));
 const HomePage = lazy(() => import("./pages/HomePage"));
 const DiscoverPage = lazy(() => import("./pages/public/DiscoverPage"));
 const SearchPage = lazy(() => import("./pages/public/SearchPage"));
@@ -80,6 +79,7 @@ const AdminVerificationPage = lazy(() => import("./pages/admin/AdminVerification
 const AdminTransactionsPage = lazy(() => import("./pages/admin/AdminTransactionsPage"));
 const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage"));
 const AdminControlTowerPage = lazy(() => import("./pages/admin/AdminControlTowerPage"));
+const AdminSupportCentrePage = lazy(() => import("./pages/admin/AdminSupportCentrePage"));
 const SuperAdminDashboardPage = lazy(() => import("./pages/admin/SuperAdminDashboardPage"));
 const StoreDiscoverPage = lazy(() => import("./pages/store/StoreDiscoverPage"));
 const StorePage = lazy(() => import("./pages/StorePage"));
@@ -216,8 +216,6 @@ export default function App() {
                     <Route path="/store/command-centre" element={<StoreCommandCentrePage />} />
                   </Route>
 
-                  <Route path="/conference" element={<Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm font-bold text-emerald-300">Loading Unique Conference…</div>}><ConferencePage /></Suspense>} />
-                  <Route path="/conference/:roomId" element={<Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm font-bold text-emerald-300">Loading Unique Conference…</div>}><ConferencePage /></Suspense>} />
 
                   <Route path="/os" element={<AuthGuard><AppLayout /></AuthGuard>}>
                     <Route index element={<Navigate to="/os/dashboard" replace />} />
@@ -292,6 +290,7 @@ export default function App() {
                   <Route path="/admin" element={<AdminLayout />}>
                     <Route index element={<Navigate to="/admin/workspace/super" replace />} />
                     <Route path="control-tower" element={<RoleGuard dashboard="super_admin"><AdminControlTowerPage /></RoleGuard>} />
+                    <Route path="support-centre" element={<RoleGuard requiredPermission="manage:support"><AdminSupportCentrePage /></RoleGuard>} />
                     <Route path="workspace/finance" element={<RoleGuard dashboard="finance_settlement"><WorkspaceDashboardPage dashboard="finance_settlement" /></RoleGuard>} />
                     <Route path="workspace/risk" element={<RoleGuard dashboard="security_risk"><WorkspaceDashboardPage dashboard="security_risk" /></RoleGuard>} />
                     <Route path="workspace/platform" element={<RoleGuard dashboard="platform_admin"><WorkspaceDashboardPage dashboard="platform_admin" /></RoleGuard>} />

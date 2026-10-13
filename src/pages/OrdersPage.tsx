@@ -28,13 +28,19 @@ export default function OrdersPage() {
       setError('');
       try {
         const ordersRef = collection(db, 'orders');
-        const [customerSnapshot, sellerSnapshot] = await Promise.all([
+        const token = await currentUser.getIdToken();
+        const [customerSnapshot, sellerResponse] = await Promise.all([
           getDocs(query(ordersRef, where('customerId', '==', currentUser.uid))),
-          getDocs(query(ordersRef, where('sellerId', '==', currentUser.uid))),
+          fetch('/api/business/seller/orders', { headers: { Authorization: `Bearer ${token}` } }),
         ]);
+        if (!sellerResponse.ok) throw new Error('Seller orders are temporarily unavailable.');
+        const sellerData = await sellerResponse.json();
         const merged = new Map<string, Order>();
-        [...customerSnapshot.docs, ...sellerSnapshot.docs].forEach((doc) => {
+        customerSnapshot.docs.forEach((doc) => {
           merged.set(doc.id, { ...(doc.data() as Order), id: doc.id });
+        });
+        (Array.isArray(sellerData.orders) ? sellerData.orders : []).forEach((order: Order) => {
+          merged.set(order.id, order);
         });
         setOrders(Array.from(merged.values()).sort(
           (a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))

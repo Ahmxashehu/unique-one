@@ -22,6 +22,7 @@ import { registerUniqueShareRoutes } from "./src/server/uniqueShareRoutes";
 import { getTransactionAuthPolicy } from "./src/server/transactionAuthPolicy";
 import { registerAdminRbacRoutes } from "./src/server/adminRbacRoutes";
 import { registerAdminAuditRoutes } from "./src/server/adminAuditRoutes";
+import { registerSupportRoutes } from "./src/server/supportRoutes";
 import { registerPlacesRoutes } from "./src/server/placesRoutes";
 import { hasRolePermission } from "./src/lib/auth/rbac";
 import { executeFinancialRefund } from "./src/server/financialRefundService";
@@ -920,6 +921,7 @@ const app = express();
   registerUniqueShareRoutes(app, authenticate);
   registerAdminRbacRoutes(app, authenticate, requirePermission);
   registerAdminAuditRoutes(app, authenticate, requirePermission);
+  registerSupportRoutes(app, authenticate, requirePermission);
   registerPlacesRoutes(app);
 
   app.post("/api/ai/discovery", rateLimit({
@@ -1403,16 +1405,20 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       const snapshot = await query.get();
       const applications = await Promise.all(snapshot.docs.map(async (applicationDoc) => {
         const data = applicationDoc.data();
+        const { contactPhone: _privateContactPhone, ...safeApplicationData } = data;
         const applicantSnapshot = await adminDb.collection('users').doc(String(data.applicantUid || '')).get();
         const applicant = applicantSnapshot.data() || {};
+        const applicantPhone = typeof applicant.phone === 'string' ? applicant.phone : (typeof data.contactPhone === 'string' ? data.contactPhone : '');
         return {
           id: applicationDoc.id,
-          ...data,
+          ...safeApplicationData,
+          contactPhoneMasked: typeof data.contactPhone === 'string' ? data.contactPhone.replace(/[0-9](?=[0-9]{2})/g, '•') : '',
           applicant: {
             uid: data.applicantUid,
             fullName: applicant.fullName || applicant.displayName || 'Unique One User',
             email: applicant.email || data.contactEmail || '',
-            phone: applicant.phone || data.contactPhone || '',
+            phone: applicantPhone.replace(/[0-9](?=[0-9]{2})/g, '•'),
+            phoneAccessRestricted: true,
             uniqueOneId: applicant.uniqueOneId || '',
           },
         };
@@ -1615,7 +1621,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       ]);
       const users = usersSnap.docs.map((doc) => {
         const d = doc.data();
-        return { id: doc.id, fullName: typeof d.fullName === 'string' ? d.fullName : null, email: typeof d.email === 'string' ? d.email : null, phone: typeof d.phone === 'string' ? d.phone : null, uniqueOneId: typeof d.uniqueOneId === 'string' ? d.uniqueOneId : null, roles: Array.isArray(d.roles) ? d.roles.filter((v: unknown) => typeof v === 'string') : [], verificationStatus: typeof d.verificationStatus === 'string' ? d.verificationStatus : 'unverified', createdAt: typeof d.createdAt?.toDate === 'function' ? d.createdAt.toDate().toISOString() : null };
+        return { id: doc.id, fullName: typeof d.fullName === 'string' ? d.fullName : null, email: typeof d.email === 'string' ? d.email : null, phone: typeof d.phone === 'string' ? d.phone.replace(/[0-9](?=[0-9]{2})/g, '•') : null, uniqueOneId: typeof d.uniqueOneId === 'string' ? d.uniqueOneId : null, roles: Array.isArray(d.roles) ? d.roles.filter((v: unknown) => typeof v === 'string') : [], verificationStatus: typeof d.verificationStatus === 'string' ? d.verificationStatus : 'unverified', createdAt: typeof d.createdAt?.toDate === 'function' ? d.createdAt.toDate().toISOString() : null };
       });
       const businesses = businessesSnap.docs.map((doc) => {
         const d = doc.data();
@@ -3988,7 +3994,7 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
           currency: String(order.currency || 'NGN'),
           totalMinor: Number(order.totalMinor || 0),
           customerName: String(order.customerName || ''),
-          customerPhone: String(order.customerPhone || ''),
+          customerPhone: '', // Customer contact numbers are never exposed to restaurant staff; use platform messaging.
           mode: String(order.mode || ''),
           deliveryAddress: String(order.deliveryAddress || ''),
           date: String(order.date || ''),
@@ -4266,6 +4272,57 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
       if (error instanceof RequestValidationError) return errorResponse(res, error.code, error.message);
       console.error('Restaurant UniquePay payment failed:', error);
       return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Restaurant payment could not be completed. Your order remains protected.');
+    }
+  });
+
+  // Seller-facing order data is served through a strict allowlist. Never spread
+  // the full database document: it may contain private contact details or internal fields.
+  app.get("/api/business/seller/orders", authenticate, rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), async (req, res) => {
+    const uid = String((req as any).user?.uid || '');
+    if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+    try {
+      const snapshot = await adminDb.collection('orders').where('sellerId', '==', uid).limit(100).get();
+      const orders = snapshot.docs.map((orderDoc) => {
+        const data = orderDoc.data() as Record<string, any>;
+        const safeOrder: Record<string, any> = {
+          id: orderDoc.id,
+          sellerId: data.sellerId,
+          customerId: data.customerId,
+          items: Array.isArray(data.items) ? data.items.map((item: any) => ({
+            productId: typeof item?.productId === 'string' ? item.productId : undefined,
+            name: typeof item?.name === 'string' ? item.name : 'Item',
+            quantity: Number.isFinite(item?.quantity) ? item.quantity : 0,
+            price: Number.isFinite(item?.price) ? item.price : 0,
+            variant: item?.variant && typeof item.variant === 'object' && !Array.isArray(item.variant) ? item.variant : undefined,
+          })) : [],
+          totalAmount: Number.isFinite(data.totalAmount) ? data.totalAmount : 0,
+          currency: typeof data.currency === 'string' ? data.currency : 'NGN',
+          status: typeof data.status === 'string' ? data.status : 'pending',
+        };
+        for (const field of ['createdAt', 'updatedAt', 'shippedAt', 'deliveredAt']) {
+          const value = data[field];
+          if (value && typeof value.toDate === 'function') safeOrder[field] = value.toDate().toISOString();
+          else if (typeof value === 'string') safeOrder[field] = value;
+        }
+        // Keep only delivery location fields needed for fulfilment; never return
+        // recipient phone numbers, contact details, payment secrets, or arbitrary metadata.
+        const address = data.shippingAddress;
+        if (address && typeof address === 'object' && !Array.isArray(address)) {
+          const safeAddress: Record<string, unknown> = {};
+          for (const field of ['recipientName', 'country', 'state', 'lga', 'town', 'area', 'fullAddress', 'landmark', 'postalCode']) {
+            if (typeof address[field] === 'string') safeAddress[field] = address[field];
+          }
+          if (Object.keys(safeAddress).length) safeOrder.shippingAddress = safeAddress;
+        }
+        for (const field of ['trackingNumber', 'trackingUrl', 'deliveryStatus', 'deliveryMethod', 'pickupLocation']) {
+          if (typeof data[field] === 'string') safeOrder[field] = data[field];
+        }
+        return safeOrder;
+      });
+      return res.json({ orders });
+    } catch (error) {
+      console.error('Sanitized seller order list failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Seller orders are temporarily unavailable.');
     }
   });
 

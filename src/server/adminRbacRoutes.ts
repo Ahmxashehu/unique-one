@@ -23,7 +23,7 @@ const ALL_PERMISSIONS: Permission[] = [
   'view:profile','edit:profile','create:products','edit:products','manage:inventory',
   'create:invoices','send:payment_requests','view:customer_info','manage:orders','manage:bookings',
   'manage:business_staff','view:transactions','manage:verification','manage:restaurant','manage:restaurant_menu','manage:restaurant_orders','manage:restaurant_verification','manage:disputes',
-  'access:admin_tools','manage:roles','manage:permissions','view:audit_logs',
+  'access:admin_tools','manage:roles','manage:permissions','view:audit_logs','view:customer_phone','manage:support',
 ];
 const RESTRICTED_ROLES = new Set<Role>(['risk_security_officer','platform_admin','super_admin']);
 const isRole = (value: unknown): value is Role => typeof value === 'string' && ALL_ROLES.includes(value as Role);
@@ -49,20 +49,51 @@ export function registerAdminRbacRoutes(
       const snap = await db.collection('users').limit(limit).get();
       const users = snap.docs.map((doc) => {
         const data = doc.data() || {};
+        const phone = typeof data.phone === 'string' ? data.phone : '';
+        const maskedPhone = phone ? phone.replace(/[0-9](?=[0-9]{2})/g, '•') : '';
         return {
           uid: doc.id,
           displayName: typeof data.fullName === 'string' ? data.fullName : [data.firstName, data.lastName].filter(Boolean).join(' '),
           email: typeof data.email === 'string' ? data.email : '',
-          phone: typeof data.phone === 'string' ? data.phone : '',
+          phone: maskedPhone,
+          phoneAccessRestricted: true,
           roles: Array.isArray(data.roles) ? data.roles.filter(isRole) : [],
           permissions: Array.isArray(data.permissions) ? data.permissions.filter(isPermission) : [],
           status: data.status || 'active',
         };
       });
-      return res.json({ users });
+      return res.json({ users, phoneAccessRestricted: true });
     } catch (error) {
       console.error('RBAC user listing failed:', error);
       return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Role and permission data is temporarily unavailable.' } });
+    }
+  });
+
+  app.post('/api/admin/privacy/users/:uid/reveal-phone', authenticate, requirePermission('view:customer_phone'), async (req, res) => {
+    const actorUid = String((req as any).user?.uid || '');
+    const targetUid = String(req.params.uid || '').trim();
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+    if (!actorUid) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication is required.' } });
+    if (!targetUid || !/^[A-Za-z0-9_-]{1,128}$/.test(targetUid) || reason.length < 10 || reason.length > 500) {
+      return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'A valid user and a specific access reason are required.' } });
+    }
+    try {
+      const targetRef = db.collection('users').doc(targetUid);
+      const target = await targetRef.get();
+      if (!target.exists) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User was not found.' } });
+      const phone = typeof target.data()?.phone === 'string' ? target.data()!.phone : '';
+      await db.collection('audit_logs').add({
+        uid: actorUid,
+        action: 'privacy.customer_phone_revealed',
+        resource: 'user',
+        resourceId: targetUid,
+        details: JSON.stringify({ reason, phonePresent: Boolean(phone) }),
+        timestamp: Timestamp.now(),
+      });
+      return res.json({ uid: targetUid, phone });
+    } catch (error) {
+      console.error('Restricted phone reveal failed:', error);
+      return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'The contact detail could not be retrieved.' } });
     }
   });
 
@@ -87,8 +118,8 @@ export function registerAdminRbacRoutes(
     if (!actorIsSuperAdmin && roles.some((role) => RESTRICTED_ROLES.has(role))) {
       return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can assign restricted platform roles.' } });
     }
-    if (!actorIsSuperAdmin && permissions.some((permission) => ['manage:roles','manage:permissions'].includes(permission))) {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can grant RBAC-management permissions.' } });
+    if (!actorIsSuperAdmin && permissions.some((permission) => ['manage:roles','manage:permissions','view:customer_phone','manage:support'].includes(permission))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can grant restricted administration, support-management, or customer-phone access.' } });
     }
     const ref = db.collection('users').doc(targetUid);
     const target = await ref.get();
@@ -111,7 +142,7 @@ export function registerAdminRbacRoutes(
         if (!liveActorIsSuperAdmin && roles.some((role) => RESTRICTED_ROLES.has(role))) {
           throw new Error('RESTRICTED_ROLE_FORBIDDEN');
         }
-        if (!liveActorIsSuperAdmin && permissions.some((permission) => ['manage:roles','manage:permissions'].includes(permission))) {
+        if (!liveActorIsSuperAdmin && permissions.some((permission) => ['manage:roles','manage:permissions','view:customer_phone','manage:support'].includes(permission))) {
           throw new Error('RBAC_PERMISSION_FORBIDDEN');
         }
         if (targetUid === actorUid && liveActorIsSuperAdmin && !roles.includes('super_admin')) {
@@ -140,7 +171,7 @@ export function registerAdminRbacRoutes(
         return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can assign restricted platform roles.' } });
       }
       if (error instanceof Error && error.message === 'RBAC_PERMISSION_FORBIDDEN') {
-        return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can grant RBAC-management permissions.' } });
+        return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only a Super Admin can grant restricted administration, support-management, or customer-phone access.' } });
       }
       if (error instanceof Error && error.message === 'SELF_SUPER_ADMIN_REMOVAL') {
         return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'A Super Admin cannot remove their own Super Admin role.' } });
