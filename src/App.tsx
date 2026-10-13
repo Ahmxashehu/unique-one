@@ -21,7 +21,6 @@ import DashboardPage from "./pages/DashboardPage";
 import WorkspaceDashboardPage from "./pages/WorkspaceDashboardPage";
 import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 
-const ConferencePage = lazy(() => import("./pages/ConferencePage"));
 const HomePage = lazy(() => import("./pages/HomePage"));
 const DiscoverPage = lazy(() => import("./pages/public/DiscoverPage"));
 const SearchPage = lazy(() => import("./pages/public/SearchPage"));
@@ -217,8 +216,6 @@ export default function App() {
                     <Route path="/store/command-centre" element={<StoreCommandCentrePage />} />
                   </Route>
 
-                  <Route path="/conference" element={<Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm font-bold text-emerald-300">Loading Unique Conference…</div>}><ConferencePage /></Suspense>} />
-                  <Route path="/conference/:roomId" element={<Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm font-bold text-emerald-300">Loading Unique Conference…</div>}><ConferencePage /></Suspense>} />
 
                   <Route path="/os" element={<AuthGuard><AppLayout /></AuthGuard>}>
                     <Route index element={<Navigate to="/os/dashboard" replace />} />
