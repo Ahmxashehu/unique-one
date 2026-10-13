@@ -45,45 +45,55 @@ export function registerAdminRbacRoutes(
 
   app.get('/api/admin/rbac/users', authenticate, requirePermission('manage:roles'), async (req, res) => {
     try {
-      const actorUid = String((req as any).user?.uid || '');
-      if (!actorUid) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication is required.' } });
-      const actorSnap = await db.collection('users').doc(actorUid).get();
-      if (!actorSnap.exists) return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Administrator access could not be verified.' } });
-      const actorData = actorSnap.data() || {};
-      const actorRoles: Role[] = Array.isArray(actorData.roles) ? actorData.roles.filter(isRole) : [];
-      const actorPermissions: Permission[] = Array.isArray(actorData.permissions) ? actorData.permissions.filter(isPermission) : [];
-      const canViewPhone = hasRolePermission(actorRoles, actorPermissions, 'view:customer_phone');
       const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
       const snap = await db.collection('users').limit(limit).get();
       const users = snap.docs.map((doc) => {
         const data = doc.data() || {};
         const phone = typeof data.phone === 'string' ? data.phone : '';
-        const maskedPhone = phone ? phone.replace(/\d(?=\d{2})/g, '•') : '';
+        const maskedPhone = phone ? phone.replace(/\\d(?=\\d{2})/g, '•') : '';
         return {
           uid: doc.id,
           displayName: typeof data.fullName === 'string' ? data.fullName : [data.firstName, data.lastName].filter(Boolean).join(' '),
           email: typeof data.email === 'string' ? data.email : '',
-          phone: canViewPhone ? phone : maskedPhone,
-          phoneAccessRestricted: !canViewPhone,
+          phone: maskedPhone,
+          phoneAccessRestricted: true,
           roles: Array.isArray(data.roles) ? data.roles.filter(isRole) : [],
           permissions: Array.isArray(data.permissions) ? data.permissions.filter(isPermission) : [],
           status: data.status || 'active',
         };
       });
-      if (canViewPhone) {
-        await db.collection('audit_logs').add({
-          uid: actorUid,
-          action: 'privacy.customer_phone_list_accessed',
-          resource: 'user_directory',
-          resourceId: 'rbac_users',
-          details: JSON.stringify({ count: users.length, purpose: 'RBAC user administration' }),
-          timestamp: Timestamp.now(),
-        });
-      }
-      return res.json({ users, phoneAccessRestricted: !canViewPhone });
+      return res.json({ users, phoneAccessRestricted: true });
     } catch (error) {
       console.error('RBAC user listing failed:', error);
       return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Role and permission data is temporarily unavailable.' } });
+    }
+  });
+
+  app.post('/api/admin/privacy/users/:uid/reveal-phone', authenticate, requirePermission('view:customer_phone'), async (req, res) => {
+    const actorUid = String((req as any).user?.uid || '');
+    const targetUid = String(req.params.uid || '').trim();
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+    if (!actorUid) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication is required.' } });
+    if (!targetUid || !/^[A-Za-z0-9_-]{1,128}$/.test(targetUid) || reason.length < 10 || reason.length > 500) {
+      return res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'A valid user and a specific access reason are required.' } });
+    }
+    try {
+      const targetRef = db.collection('users').doc(targetUid);
+      const target = await targetRef.get();
+      if (!target.exists) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User was not found.' } });
+      const phone = typeof target.data()?.phone === 'string' ? target.data()!.phone : '';
+      await db.collection('audit_logs').add({
+        uid: actorUid,
+        action: 'privacy.customer_phone_revealed',
+        resource: 'user',
+        resourceId: targetUid,
+        details: JSON.stringify({ reason, phonePresent: Boolean(phone) }),
+        timestamp: Timestamp.now(),
+      });
+      return res.json({ uid: targetUid, phone });
+    } catch (error) {
+      console.error('Restricted phone reveal failed:', error);
+      return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'The contact detail could not be retrieved.' } });
     }
   });
 
