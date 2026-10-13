@@ -97,7 +97,22 @@ export function registerSupportRoutes(
     if (!uid) return res.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication is required.' } });
     try {
       const snap = await db.collection('support_cases').where('userUid', '==', uid).limit(50).get();
-      const cases = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const cases = snap.docs.map((doc) => {
+        const data = doc.data() || {};
+        return {
+          id: doc.id,
+          category: data.category,
+          department: data.department,
+          subject: data.subject,
+          orderReference: data.orderReference ?? null,
+          status: data.status,
+          priority: data.priority,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+          lastMessageAt: data.lastMessageAt,
+          messageCount: data.messageCount,
+        };
+      });
       cases.sort((a: any, b: any) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
       return res.json({ cases });
     } catch (error) {
@@ -131,7 +146,24 @@ export function registerSupportRoutes(
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
     try {
       const snap = await db.collection('support_cases').orderBy('updatedAt', 'desc').limit(limit).get();
-      return res.json({ cases: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) });
+      return res.json({ cases: snap.docs.map((doc) => {
+        const data = doc.data() || {};
+        return {
+          id: doc.id,
+          userUid: data.userUid,
+          category: data.category,
+          department: data.department,
+          subject: data.subject,
+          orderReference: data.orderReference ?? null,
+          status: data.status,
+          priority: data.priority,
+          assignedToUid: data.assignedToUid ?? null,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+          lastMessageAt: data.lastMessageAt,
+          messageCount: data.messageCount,
+        };
+      }) });
     } catch (error) {
       console.error('Admin support case listing failed:', error);
       return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'The support queue is temporarily unavailable.' } });
@@ -168,8 +200,10 @@ export function registerSupportRoutes(
       const snap = await ref.get();
       if (!snap.exists) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Support case not found.' } });
       const now = new Date().toISOString();
-      await ref.update({ ...patch, updatedAt: now });
-      await db.collection('audit_logs').add({
+      const auditRef = db.collection('audit_logs').doc();
+      const batch = db.batch();
+      batch.update(ref, { ...patch, updatedAt: now });
+      batch.set(auditRef, {
         uid: actorUid,
         action: 'support.case_updated',
         resource: 'support_case',
@@ -177,6 +211,7 @@ export function registerSupportRoutes(
         details: JSON.stringify(patch),
         timestamp: Timestamp.now(),
       });
+      await batch.commit();
       return res.json({ id: caseId, ...patch, updatedAt: now });
     } catch (error) {
       console.error('Support case update failed:', error);
@@ -196,7 +231,16 @@ export function registerSupportRoutes(
       const isStaff = await canManageSupport(db, uid);
       if (caseSnap.data()?.userUid !== uid && !isStaff) return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You cannot access this support conversation.' } });
       const snap = await ref.collection('messages').orderBy('createdAt', 'asc').limit(100).get();
-      return res.json({ messages: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) });
+      return res.json({ messages: snap.docs.map((doc) => {
+        const data = doc.data() || {};
+        return {
+          id: doc.id,
+          senderType: data.senderType,
+          senderLabel: data.senderLabel,
+          body: data.body,
+          createdAt: data.createdAt,
+        };
+      }) });
     } catch (error) {
       console.error('Support messages could not be loaded:', error);
       return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Support messages are temporarily unavailable.' } });
