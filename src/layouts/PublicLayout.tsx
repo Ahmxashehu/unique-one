@@ -6,13 +6,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { getLanguage, t, type SupportedLanguage } from '../lib/i18n';
 import {
   GraduationCap, Sparkles, Store, Calendar, Plane, ShoppingCart, Briefcase,
-  Globe, Activity, Search, HeartHandshake, Wallet, MessageSquare, Video, Image
+  Globe, Activity, Search, HeartHandshake, Wallet, MessageSquare, Image
 } from 'lucide-react';
 
 const platformExperiences = [
   ['UniquePay', '/os/pay', Wallet], ['Unique Store', '/store', ShoppingCart],
   ['Communication', '/os/messages', MessageSquare], ['Unique AI', '/os/ai', Sparkles],
-  ['UniqueMedia', '/media', Image], ['Online Conference', '/conference', Video],
+  ['UniqueMedia', '/media', Image],
   ['Restaurant', '/restaurant', Store], ['Hotels & Events', '/hotels-events', Calendar],
   ['Flights', '/flights', Plane], ['Health & Wellness', '/health-wellness', Activity],
   ['Global Search', '/search', Search], ['Near Me', '/near-me', Globe],
