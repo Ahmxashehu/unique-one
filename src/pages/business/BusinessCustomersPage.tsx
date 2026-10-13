@@ -50,10 +50,11 @@ export default function BusinessCustomersPage() {
     setError('');
 
     try {
-      const snapshot = await getDocs(
-        query(collection(db, 'orders'), where('sellerId', '==', currentUser.uid))
-      );
-      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerOrder)));
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/business/seller/orders', { headers: { Authorization: `Bearer ${token}` } });
+      if (!response.ok) throw new Error('Seller orders are temporarily unavailable.');
+      const data = await response.json();
+      setOrders(Array.isArray(data.orders) ? data.orders as CustomerOrder[] : []);
     } catch (err) {
       console.error('Business customers load failed:', err);
       setError('We could not load customer data. Please try again.');
