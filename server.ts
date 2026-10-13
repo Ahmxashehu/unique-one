@@ -4275,25 +4275,49 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
-  // Seller-facing order data is served through this sanitized API. Direct Firestore
-  // reads of full order documents would expose the customer's private contact number.
+  // Seller-facing order data is served through a strict allowlist. Never spread
+  // the full database document: it may contain private contact details or internal fields.
   app.get("/api/business/seller/orders", authenticate, rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), async (req, res) => {
     const uid = String((req as any).user?.uid || '');
     if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
     try {
       const snapshot = await adminDb.collection('orders').where('sellerId', '==', uid).limit(100).get();
-      const orders = snapshot.docs.map((doc) => {
-        const data = doc.data() as Record<string, any>;
-        const safeOrder: Record<string, any> = { ...data };
-        delete safeOrder.customerPhone;
-        if (safeOrder.shippingAddress && typeof safeOrder.shippingAddress === 'object' && !Array.isArray(safeOrder.shippingAddress)) {
-          const safeAddress = { ...safeOrder.shippingAddress };
-          delete safeAddress.phone;
-          safeOrder.shippingAddress = safeAddress;
+      const orders = snapshot.docs.map((orderDoc) => {
+        const data = orderDoc.data() as Record<string, any>;
+        const safeOrder: Record<string, any> = {
+          id: orderDoc.id,
+          sellerId: data.sellerId,
+          customerId: data.customerId,
+          items: Array.isArray(data.items) ? data.items.map((item: any) => ({
+            productId: typeof item?.productId === 'string' ? item.productId : undefined,
+            name: typeof item?.name === 'string' ? item.name : 'Item',
+            quantity: Number.isFinite(item?.quantity) ? item.quantity : 0,
+            price: Number.isFinite(item?.price) ? item.price : 0,
+            variant: item?.variant && typeof item.variant === 'object' && !Array.isArray(item.variant) ? item.variant : undefined,
+          })) : [],
+          totalAmount: Number.isFinite(data.totalAmount) ? data.totalAmount : 0,
+          currency: typeof data.currency === 'string' ? data.currency : 'NGN',
+          status: typeof data.status === 'string' ? data.status : 'pending',
+        };
+        for (const field of ['createdAt', 'updatedAt', 'shippedAt', 'deliveredAt']) {
+          const value = data[field];
+          if (value && typeof value.toDate === 'function') safeOrder[field] = value.toDate().toISOString();
+          else if (typeof value === 'string') safeOrder[field] = value;
         }
-        if (safeOrder.createdAt && typeof safeOrder.createdAt.toDate === 'function') safeOrder.createdAt = safeOrder.createdAt.toDate().toISOString();
-        if (safeOrder.updatedAt && typeof safeOrder.updatedAt.toDate === 'function') safeOrder.updatedAt = safeOrder.updatedAt.toDate().toISOString();
-        return { id: doc.id, ...safeOrder };
+        // Keep only delivery location fields needed for fulfilment; never return
+        // recipient phone numbers, contact details, payment secrets, or arbitrary metadata.
+        const address = data.shippingAddress;
+        if (address && typeof address === 'object' && !Array.isArray(address)) {
+          const safeAddress: Record<string, unknown> = {};
+          for (const field of ['recipientName', 'country', 'state', 'lga', 'town', 'area', 'fullAddress', 'landmark', 'postalCode']) {
+            if (typeof address[field] === 'string') safeAddress[field] = address[field];
+          }
+          if (Object.keys(safeAddress).length) safeOrder.shippingAddress = safeAddress;
+        }
+        for (const field of ['trackingNumber', 'trackingUrl', 'deliveryStatus', 'deliveryMethod', 'pickupLocation']) {
+          if (typeof data[field] === 'string') safeOrder[field] = data[field];
+        }
+        return safeOrder;
       });
       return res.json({ orders });
     } catch (error) {
