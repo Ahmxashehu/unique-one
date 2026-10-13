@@ -50,7 +50,7 @@ export function registerAdminRbacRoutes(
       const users = snap.docs.map((doc) => {
         const data = doc.data() || {};
         const phone = typeof data.phone === 'string' ? data.phone : '';
-        const maskedPhone = phone ? phone.replace(/\d(?=\d{2})/g, '•') : '';
+        const maskedPhone = phone ? phone.replace(/[0-9](?=[0-9]{2})/g, '•') : '';
         return {
           uid: doc.id,
           displayName: typeof data.fullName === 'string' ? data.fullName : [data.firstName, data.lastName].filter(Boolean).join(' '),
