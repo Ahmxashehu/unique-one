@@ -5,10 +5,6 @@ on:
   push:
     branches:
       - cloudflare-free-hosting-pilot
-    paths-ignore:
-      - 'cloudflare/**'
-      - 'wrangler.jsonc'
-      - '.github/workflows/cloudflare-pages-artifact.yml'
 
 permissions:
   contents: read
