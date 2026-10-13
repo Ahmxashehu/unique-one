@@ -4275,6 +4275,33 @@ function parseAiLocation(value: unknown): { latitude: number; longitude: number;
     }
   });
 
+  // Seller-facing order data is served through this sanitized API. Direct Firestore
+  // reads of full order documents would expose the customer's private contact number.
+  app.get("/api/business/seller/orders", authenticate, rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), async (req, res) => {
+    const uid = String((req as any).user?.uid || '');
+    if (!uid) return errorResponse(res, 'UNAUTHENTICATED', 'Authentication is required.');
+    try {
+      const snapshot = await adminDb.collection('orders').where('sellerId', '==', uid).limit(100).get();
+      const orders = snapshot.docs.map((doc) => {
+        const data = doc.data() as Record<string, any>;
+        const safeOrder: Record<string, any> = { ...data };
+        delete safeOrder.customerPhone;
+        if (safeOrder.shippingAddress && typeof safeOrder.shippingAddress === 'object' && !Array.isArray(safeOrder.shippingAddress)) {
+          const safeAddress = { ...safeOrder.shippingAddress };
+          delete safeAddress.phone;
+          safeOrder.shippingAddress = safeAddress;
+        }
+        if (safeOrder.createdAt && typeof safeOrder.createdAt.toDate === 'function') safeOrder.createdAt = safeOrder.createdAt.toDate().toISOString();
+        if (safeOrder.updatedAt && typeof safeOrder.updatedAt.toDate === 'function') safeOrder.updatedAt = safeOrder.updatedAt.toDate().toISOString();
+        return { id: doc.id, ...safeOrder };
+      });
+      return res.json({ orders });
+    } catch (error) {
+      console.error('Sanitized seller order list failed:', error);
+      return errorResponse(res, 'SERVICE_UNAVAILABLE', 'Seller orders are temporarily unavailable.');
+    }
+  });
+
   app.post("/api/store/checkout", authenticate, rateLimit({
     windowMs: 60_000,
     limit: 20,
