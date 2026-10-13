@@ -106,6 +106,27 @@ export function registerSupportRoutes(
     }
   });
 
+  app.get('/api/admin/support/staff', authenticate, requirePermission('manage:support'), async (_req, res) => {
+    try {
+      const snap = await db.collection('users').limit(200).get();
+      const staff = snap.docs.flatMap((doc) => {
+        const data = doc.data() || {};
+        const roles: Role[] = Array.isArray(data.roles) ? data.roles.filter(isRole) : [];
+        const permissions: Permission[] = Array.isArray(data.permissions) ? data.permissions.filter(isPermission) : [];
+        if (!hasRolePermission(roles, permissions, 'manage:support')) return [];
+        return [{
+          uid: doc.id,
+          displayName: typeof data.fullName === 'string' ? data.fullName : [data.firstName, data.lastName].filter(Boolean).join(' ') || 'Support Agent',
+          roles,
+        }];
+      });
+      return res.json({ staff });
+    } catch (error) {
+      console.error('Support staff directory failed:', error);
+      return res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'The support staff directory is temporarily unavailable.' } });
+    }
+  });
+
   app.get('/api/admin/support/cases', authenticate, requirePermission('manage:support'), async (req, res) => {
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
     try {
