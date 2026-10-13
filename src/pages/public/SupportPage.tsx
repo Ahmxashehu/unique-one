@@ -180,6 +180,14 @@ export default function SupportPage() {
         <div className="mt-5 flex flex-wrap gap-2 text-xs font-medium"><span className="rounded-full bg-white/10 px-3 py-1.5">Private case history</span><span className="rounded-full bg-white/10 px-3 py-1.5">Order reference support</span><span className="rounded-full bg-white/10 px-3 py-1.5">One official support identity</span></div>
       </header>
 
+      <section className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700"><MessageSquare className="h-5 w-5" /></div>
+          <div><h2 className="font-bold text-slate-900">Chat with us on WhatsApp</h2><p className="mt-1 text-sm text-slate-600">UniquePlatform Support · +234 703 930 5835</p><p className="mt-1 text-xs text-slate-500">Never share your password, payment PIN or OTP.</p></div>
+        </div>
+        <a href="https://wa.me/2347039305835?text=Hello%20UniquePlatform%20Support" target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800"><MessageSquare className="h-4 w-4" /> Open WhatsApp</a>
+      </section>
+
       {notice && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}
       {error && <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</div>}
 
@@ -215,7 +223,7 @@ export default function SupportPage() {
         </section>
       )}
 
-      <footer className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /><div><p className="text-sm font-semibold text-slate-800">Your contact details stay private by default</p><p className="mt-1 text-xs leading-5 text-slate-500">Support staff work from your case and order reference. Do not send passwords, payment PINs or one-time codes. Official WhatsApp integration is a later step and is not connected yet.</p></div></footer>
+      <footer className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /><div><p className="text-sm font-semibold text-slate-800">Your contact details stay private by default</p><p className="mt-1 text-xs leading-5 text-slate-500">Support staff work from your case and order reference. Do not send passwords, payment PINs or one-time codes. You can contact UniquePlatform Support on WhatsApp using the official chat link above. Your in-app support cases remain available for private, trackable follow-up.</p></div></footer>
       <div className="text-center"><Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-800"><ArrowLeft className="h-4 w-4" /> Back to UniquePlatform</Link></div>
     </main>
   );
